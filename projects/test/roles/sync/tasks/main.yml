@@ -1,0 +1,18 @@
+- name: Install ansible_runner
+  ansible.builtin.pip:
+    name: ansible-runner
+    state: present
+  delegate_to: localhost
+
+- name: Execute run.py script
+  ansible.builtin.shell:
+    # TODO: find out why /usr/bin/python3 and /usr/bin/python3.11 are different environments
+    # only /usr/bin/python3.11 is the interpreter used by ansible and contains proper packages
+    cmd: /usr/bin/python3.11 run.py
+    chdir: "{{ role_path }}/files"
+  delegate_to: localhost
+  register: script_output
+
+- name: Debug output
+  ansible.builtin.debug:
+    var: script_output.stdout

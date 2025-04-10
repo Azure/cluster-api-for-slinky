@@ -1,0 +1,12 @@
+AWX:
+  enabled: true
+  spec:
+    projects_persistence: true
+    service_type: nodeport
+    nodeport_port: 32000
+
+customVolumes:
+  projects:
+    enabled: true
+    hostPath: /data/projects
+    size: 1Gi
