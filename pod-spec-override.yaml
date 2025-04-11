@@ -1,0 +1,26 @@
+# this override is used to override the default instance group pod spec of AWX
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: awx
+spec:
+  serviceAccountName: default
+  automountServiceAccountToken: false
+  containers:
+    - image: quay.io/ansible/awx-ee:latest
+      name: worker
+      args:
+        - ansible-runner
+        - worker
+        - '--private-data-dir=/runner'
+      resources:
+        requests:
+          cpu: 250m
+          memory: 100Mi
+      volumeMounts:
+        - name: awx-kubeconfig-volume
+          mountPath: /runner/.kube
+  volumes:
+    - name: awx-kubeconfig-volume
+      persistentVolumeClaim:
+        claimName: awx-kubeconfig-claim

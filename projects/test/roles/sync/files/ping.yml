@@ -1,6 +1,7 @@
 # code: language=ansible
 - name: Find all Cluster API nodes
   hosts: localhost
+  connection: local
   gather_facts: false
   tasks:
     - name: Find all Cluster API nodes
