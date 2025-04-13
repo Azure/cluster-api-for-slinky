@@ -320,6 +320,18 @@ spec:
     spec:
       joinConfiguration:
         nodeRegistration: {}
+      # install and enable SSH with given public key, allowing root login
+      preKubeadmCommands:
+        - apt update -y
+        - apt install -y openssh-server
+        - mkdir -p /etc/ssh
+        # TODO: create a proper SSH key for the cluster, put public key here and put private key into AWX
+        - echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDAP2jl12fcVLLlgPguzNGT70RVKNbkTz2lcRdnE3XjZs2Fo/y8Qx4Tio1sC72agwV1HdvhsiRxFcy6L78KbQD+TVqkXAP7m/nUNCOR8jc9zAB4abL3QiO5pYAuIkTMkvxrOUas7rXAgUfvKpHJn3wnAYpC+i9p4AJiSbc0KOq/e7TvopqIBxQc7fays3qH7i2CmUqkDDgJYfma1rM1M8N3SJvRlo9posHgGte3BRib8Anh1YwKJtIvAJ+dChylJf2iilgQId5BCVGcquTveBHB44GZwh6ilegV4PcdBLNSTChhExSMcLopb/5asWKx//V8AH7+9YO+rwycH3OzX7iDCGWL8w+xU2LY3xsAb59XmTHvy5SbQKJW8rIrQE1RM6Ak/scDtQLDTAi7aLqKM1YHv8use+iw8Ila3NgItg4y4vRX1DCTp+M+syllE65tPPRbKaWGJFhleLCa2eyhIM7Sb+kg70fhGcO9CPAlGeE+lanzOZzS2vQR6ApkYVDpL01FpAabeBpC/x29M4n4anhN0OAm8If7gMdrQ7p1mj/YfwzdKee+inGpjYDACaKSEO9jPhQmPOIxwt4W6qSPfsPC7nC6/HRUKijhFnc26XweMErhMgUD5d37fIN1SFaZi2IKqDujsYuYftRwLJjn6Njqu1BRhgWmjgj6MNEH95BhNQ== arsdr@DESKTOP-NARBG5S" > /etc/ssh/authorized_keys
+        - echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
+        - echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
+        - echo "AuthorizedKeysFile /etc/ssh/authorized_keys .ssh/authorized_keys .ssh/authorized_keys2" >> /etc/ssh/sshd_config
+        - systemctl enable ssh
+        - systemctl start ssh
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
