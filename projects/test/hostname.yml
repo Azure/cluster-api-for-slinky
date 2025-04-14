@@ -1,0 +1,11 @@
+# code: language=ansible
+- name: Run hostname on all nodes and collect output
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Run hostname
+      ansible.builtin.command: hostname
+      register: hostname_output
+    - name: Show output
+      ansible.builtin.debug:
+        var: hostname_output.stdout_lines

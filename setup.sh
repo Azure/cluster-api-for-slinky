@@ -2,6 +2,10 @@
 envsubst < kind-config.yaml | kind create cluster --config -
 kubectl cluster-info --context kind-kind
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+# TODO: remove this workaround by allowing AWX to use manual projects directly
+helm repo add gitea-charts https://dl.gitea.com/charts/
+helm install gitea gitea-charts/gitea
+
 helm repo add awx-operator https://ansible-community.github.io/awx-operator-helm/
 helm install my-awx-operator awx-operator/awx-operator -n awx --create-namespace -f awx.yaml
 # kubectl get secret awx-admin-password -n awx -o jsonpath="{.data.password}" | base64 --decode ; echo
