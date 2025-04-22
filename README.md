@@ -1,14 +1,16 @@
-# Project
+# Cluster API Provider HPC
 
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
+Kubernetes-native declarative infrastructure for [Slinky](https://github.com/SlinkyProject)-based hybrid Slurm and Kubernetes clusters.
 
-As the maintainer of this project, please make a few updates:
+## What is the Cluster API Provider HPC (CAPH)
 
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
+The [Cluster API](https://github.com/kubernetes-sigs/cluster-api) (CAPI) brings declarative, Kubernetes-style APIs to cluster creation, configuration and management.
+
+CAPZ enables efficient management at scale of Slinky-based hybrid Slurm and Kubernetes clusters, with the nodes dual-managed by both Ansible AWX for Slurm workloads and CAPI providers (Cluster API Provider Docker/Azure/vCluster/etc.) for containerized workloads on Kubernetes, with slurm-bridge bridging Slurm and Kubernetes for fair-share scheduling across both orchestrators.
+
+![CAPH architecture](docs/images/architecture.svg)
+
+## Getting started
 
 ## Contributing
 
