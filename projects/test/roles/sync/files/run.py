@@ -1,4 +1,8 @@
 #!/usr/bin/python3.11
+
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 import os
 import subprocess
 import tempfile

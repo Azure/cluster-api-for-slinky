@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 extraDeploy:
   # TODO: this is a local kind-specific quick hack to pass through the kubernetes credentials.
   # proper credential management needs to be implemented for cloud providers.

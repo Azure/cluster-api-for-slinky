@@ -1,4 +1,8 @@
 # code: language=ansible
+
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 - name: Find all Cluster API nodes
   hosts: localhost
   connection: local

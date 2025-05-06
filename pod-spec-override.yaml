@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 # this override is used to override the default instance group pod spec of AWX
 apiVersion: v1
 kind: Pod

@@ -1,4 +1,8 @@
 #!/bin/bash
+
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 # Create a local Kubernetes cluster as the management cluster
 envsubst < kind-config.yaml | kind create cluster --config -
 kubectl cluster-info --context kind-kind

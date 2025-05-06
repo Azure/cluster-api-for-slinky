@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 - name: Install ansible_runner
   ansible.builtin.pip:
     name: ansible-runner
