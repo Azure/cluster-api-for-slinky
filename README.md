@@ -1,14 +1,14 @@
-# Cluster API Provider HPC
+# Cluster API Provider Slinky
 
 Kubernetes-native declarative infrastructure for [Slinky](https://github.com/SlinkyProject)-based converged Slurm and Kubernetes clusters.
 
-## What is the Cluster API Provider HPC (CAPH)
+## What is the Cluster API Provider Slinky (CAPS)
 
 The [Cluster API](https://github.com/kubernetes-sigs/cluster-api) (CAPI) brings declarative, Kubernetes-style APIs to cluster creation, configuration and management.
 
-CAPH enables efficient management at scale of Slinky-based converged Slurm and Kubernetes clusters, with the nodes dual-managed by both Ansible AWX for Slurm workloads and CAPI providers (Cluster API Provider Docker/Azure/vCluster/etc.) for containerized workloads on Kubernetes, with slurm-bridge bridging Slurm and Kubernetes for fair-share scheduling across both orchestrators.
+CAPS enables efficient management at scale of Slinky-based converged Slurm and Kubernetes clusters, with the nodes dual-managed by both Ansible AWX for Slurm workloads and CAPI providers (Cluster API Provider Docker/Azure/vCluster/etc.) for containerized workloads on Kubernetes, with slurm-bridge bridging Slurm and Kubernetes for fair-share scheduling across both orchestrators.
 
-![CAPH architecture](docs/images/architecture.svg)
+![CAPS architecture](docs/images/architecture.svg)
 
 ## Getting started
 
@@ -59,7 +59,7 @@ helm repo add gitea-charts https://dl.gitea.com/charts/
 helm install gitea gitea-charts/gitea -f values.yaml
 ```
 
-Upload your cluster-api-provider-hpc repo into this Gitea instance.
+Upload your cluster-api-provider-slinky repo into this Gitea instance.
 
 Install AWX Operator.
 
@@ -75,7 +75,7 @@ Using your AWX admin username and password, log in to AWX portal at `localhost:3
 
 Go to `Resources -> Credentials` and add your Gitea username and password as a credential of type `Source Control`.
 
-Go to `Resources -> Projects` and add a project of Source Control Type `Git`. The Source Control URL should be `http://host.docker.internal:3000/<your gitea admin username>/cluster-api-provider-hpc.git`, with appropriate branch/tag/commit name and Source Control Credential pointing to the credential you added in the last step.
+Go to `Resources -> Projects` and add a project of Source Control Type `Git`. The Source Control URL should be `http://host.docker.internal:3000/<your gitea admin username>/cluster-api-provider-slinky.git`, with appropriate branch/tag/commit name and Source Control Credential pointing to the credential you added in the last step.
 
 Go to `Resources -> Inventories` and add an inventory. Go to `Sources` of this inventory, add an inventory source `Sourced from a project`, and choose the Project you added in the last step, with Inventory file set as `projects/test/roles/sync/files/run.py`. For Update options, select `Overwrite` and `Update on launch`.
 
@@ -119,6 +119,8 @@ For more information see the [Code of Conduct FAQ](https://opensource.microsoft.
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
 ## Trademarks
+
+Slurm® and Slinky® are registered trademarks of SchedMD LLC.
 
 This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft 
 trademarks or logos is subject to and must follow 
