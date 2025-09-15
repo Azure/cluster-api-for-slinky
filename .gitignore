@@ -3,3 +3,5 @@
 
 # CAPD workload cluster kubeconfig shall not be committed to source control
 *.kubeconfig
+
+gitea-admin-secret.yaml

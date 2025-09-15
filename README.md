@@ -21,42 +21,26 @@ envsubst < kind-config.yaml | kind create cluster --config -
 kubectl cluster-info --context kind-kind
 ```
 
-To work around an AWX missing feature regarding using manual projects (see [this](https://github.com/ansible/awx/issues/1288) and [this](https://forum.ansible.com/t/how-to-import-inventory-files-from-ansible/28655/7)), we need to install a Git server, e.g. Gitea. set your own administrator username (cannot be `admin`), password and email in the following `values.yaml`:
+To work around an AWX missing feature regarding using manual projects (see [this](https://github.com/ansible/awx/issues/1288) and [this](https://forum.ansible.com/t/how-to-import-inventory-files-from-ansible/28655/7)), we need to install a Git server, e.g. Gitea.
+Set your own administrator username (cannot be `admin`), password and email by saving the following YAML into `gitea-admin-secret.yaml`:
 
 ```yaml
-redis-cluster:
-  enabled: false
-redis:
-  enabled: false
-postgresql:
-  enabled: false
-postgresql-ha:
-  enabled: false
-
-persistence:
-  enabled: false
-
-gitea:
-  config:
-    database:
-      DB_TYPE: sqlite3
-    session:
-      PROVIDER: memory
-    cache:
-      ADAPTER: memory
-    queue:
-      TYPE: level
-  admin:
-    username: "your username"
-    password: "your password"
-    email: "your email"
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gitea-admin-secret
+type: Opaque
+stringData:
+  username: <your admin username>
+  password: <your admin password>
+  email: <your admin email>
 ```
 
-Then deploy Gitea using this `values.yaml`:
+Do `kubectl apply -f gitea-admin-secret.yaml` to add the secret to Kubernetes, then deploy Gitea using `gitea-values.yaml` (you may customize the values to your liking):
 
 ```bash
 helm repo add gitea-charts https://dl.gitea.com/charts/
-helm install gitea gitea-charts/gitea -f values.yaml
+helm install gitea gitea-charts/gitea -f gitea-values.yaml
 ```
 
 Upload your cluster-api-provider-slinky repo into this Gitea instance.
