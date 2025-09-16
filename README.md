@@ -80,12 +80,15 @@ open `capi-quickstart.yaml` and modify the SSH public key (corresponding to the 
 Create the CAPD cluster. wait for the cluster to be ready.
 ```bash
 kubectl apply -f capi-quickstart.yaml
+# wait some time
 clusterctl get kubeconfig capi-quickstart > capi-quickstart.kubeconfig
 # https://cluster-api.sigs.k8s.io/clusterctl/developers#fix-kubeconfig-when-using-docker-desktop-and-clusterctl
 # Point the kubeconfig to the exposed port of the load balancer, rather than the inaccessible container IP.
 sed -i -e "s/server:.*/server: https:\/\/$(docker port capi-quickstart-lb 6443/tcp | sed "s/0.0.0.0/127.0.0.1/")/g" ./capi-quickstart.kubeconfig
 # CAPD nodes won't be ready until we install CNI
 kubectl --kubeconfig=./capi-quickstart.kubeconfig apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.3/manifests/calico.yaml
+# monitor CAPD cluster and wait for it to become ready
+watch -c clusterctl describe cluster capi-quickstart --color
 ```
 
 Run the job in AWX. The job should now output the hostnames of all pseudo-nodes of the CAPD cluster (which are Docker containers under the hood), and the inventory's host list should also contain those hosts. This means that AWX is now aware of these nodes and Ansible can bootstrap Slurm/SSSD/Storage/networking/etc.

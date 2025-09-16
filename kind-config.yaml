@@ -20,8 +20,9 @@ nodes:
 - role: worker
   image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
   extraMounts:
-  - hostPath: ./projects
-    containerPath: /data/projects
+  # uncomment the following only if you want to fix the "project from filesystem" feature of AWX (i.e. getting rid of Gitea)
+  # - hostPath: ./projects
+  #   containerPath: /data/projects
   - hostPath: ${HOME}/.kube
     containerPath: /root/.kube
   - hostPath: /var/run/docker.sock

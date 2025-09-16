@@ -33,7 +33,8 @@ extraDeploy:
 AWX:
   enabled: true
   spec:
-    projects_persistence: true
+    # change this to true only if you want to fix the "project from filesystem" feature of AWX (i.e. getting rid of Gitea)
+    projects_persistence: false 
     service_type: nodeport
     nodeport_port: 32000
     extra_volumes: |
@@ -47,8 +48,9 @@ AWX:
       - name: awx-kubeconfig-volume
         mountPath: /runner/.kube
 
-customVolumes:
-  projects:
-    enabled: true
-    hostPath: /data/projects
-    size: 1Gi
+# uncomment the following only if you want to fix the "project from filesystem" feature of AWX (i.e. getting rid of Gitea)
+# customVolumes:
+#   projects:
+#     enabled: true
+#     hostPath: /data/projects
+#     size: 1Gi
