@@ -10,6 +10,7 @@
     - name: Run hostname
       ansible.builtin.command: hostname
       register: hostname_output
+      changed_when: false
     - name: Show output
       ansible.builtin.debug:
         var: hostname_output.stdout_lines
