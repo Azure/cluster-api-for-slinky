@@ -57,15 +57,17 @@ kubectl get secret awx-admin-password -n awx -o jsonpath="{.data.password}" | ba
 
 Using your AWX `admin` username and password, log in to AWX portal at `localhost:32000`.
 
+Go to `Administration -> Instance Groups -> default`, press `Edit`, then check `Customize pod specification` and paste `pod-spec-override.yaml` into the `Custom pod spec` field, in order for the kubeconfig directory to properly mount into AWX runners, so that AWX can access data of management cluster. (TODO: instead of this kubeconfig mounting hack, properly introduce k8s credentials into AWX via awx-operator or some other methods)
+
 Go to `Resources -> Credentials` and add your Gitea username and password as a credential of type `Source Control`.
 
 Go to `Resources -> Projects` and add a project of Source Control Type `Git`. The Source Control URL should be `http://host.docker.internal:3000/<your gitea admin username>/cluster-api-provider-slinky.git`, with appropriate branch/tag/commit name and Source Control Credential pointing to the credential you added in the last step.
 
 Go to `Resources -> Inventories` and add an inventory. Go to `Sources` of this inventory, add an inventory source `Sourced from a project`, and choose the Project you added in the last step, with Inventory file set as `projects/test/roles/sync/files/run.py`. For Update options, select `Overwrite` and `Update on launch`.
 
-Go to `Resources -> Templates` and add a job template, with Job Type of `Run`, Inventory and project set to what you created in previous steps, and Playbook set to `projects/test/run.yml`.
+Go to `Resources -> Credentials` and add another credential of type `Machine`, with `root` as username and containing your SSH private key (and passphrase if you have any). This SSH Key would be used by Ansible to access pseudo-nodes bootstrapped by CAPD.
 
-Go to `Resources -> Credentials` and add another credential of type `Machine`, containing your SSH private key (and passphrase if you have any). This SSH Key would be used by Ansible to access pseudo-nodes bootstrapped by CAPD.
+Go to `Resources -> Templates` and add a job template, with Job Type of `Run`, Inventory and project set to what you created in previous steps, Playbook set to `projects/test/run.yml`, and Credentials set to the previous credential. This is a sample Ansible job that collects hostnames of nodes in the inventory, which will trigger the refresh of the inventory (which collects Cluster API node data) every time it runs.
 
 Install [CAPD](https://github.com/kubernetes-sigs/cluster-api/blob/main/test/infrastructure/docker/README.md) and turn your current Kind cluster into a CAPD management cluster, which we will use to create and manage CAPD workload clusters in the steps after.
 ```bash
@@ -83,7 +85,7 @@ clusterctl get kubeconfig capi-quickstart > capi-quickstart.kubeconfig
 # Point the kubeconfig to the exposed port of the load balancer, rather than the inaccessible container IP.
 sed -i -e "s/server:.*/server: https:\/\/$(docker port capi-quickstart-lb 6443/tcp | sed "s/0.0.0.0/127.0.0.1/")/g" ./capi-quickstart.kubeconfig
 # CAPD nodes won't be ready until we install CNI
-kubectl --kubeconfig=./capi-quickstart.kubeconfig apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.3/manifests/calico.yaml
+kubectl --kubeconfig=./capi-quickstart.kubeconfig apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.3/manifests/calico.yaml
 ```
 
 Run the job in AWX. The job should now output the hostnames of all pseudo-nodes of the CAPD cluster (which are Docker containers under the hood), and the inventory's host list should also contain those hosts. This means that AWX is now aware of these nodes and Ansible can bootstrap Slurm/SSSD/Storage/networking/etc.
