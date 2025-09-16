@@ -55,7 +55,7 @@ helm install my-awx-operator awx-operator/awx-operator -n awx --create-namespace
 kubectl get secret awx-admin-password -n awx -o jsonpath="{.data.password}" | base64 --decode ; echo
 ```
 
-Using your AWX admin username and password, log in to AWX portal at `localhost:32000`.
+Using your AWX `admin` username and password, log in to AWX portal at `localhost:32000`.
 
 Go to `Resources -> Credentials` and add your Gitea username and password as a credential of type `Source Control`.
 
@@ -67,7 +67,7 @@ Go to `Resources -> Templates` and add a job template, with Job Type of `Run`, I
 
 Go to `Resources -> Credentials` and add another credential of type `Machine`, containing your SSH private key (and passphrase if you have any). This SSH Key would be used by Ansible to access pseudo-nodes bootstrapped by CAPD.
 
-Install [CAPD](https://github.com/kubernetes-sigs/cluster-api/blob/main/test/infrastructure/docker/README.md).
+Install [CAPD](https://github.com/kubernetes-sigs/cluster-api/blob/main/test/infrastructure/docker/README.md) and turn your current Kind cluster into a CAPD management cluster, which we will use to create and manage CAPD workload clusters in the steps after.
 ```bash
 export CLUSTER_TOPOLOGY=true
 clusterctl init --infrastructure docker

@@ -1,0 +1,4 @@
+# Python dependencies for cluster-api-provider-slinky tooling scripts
+
+# YAML round-trip preservation for generate_capi_quickstart.py
+ruamel.yaml>=0.18,<0.19

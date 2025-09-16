@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+.venv
+
 # CAPD workload cluster kubeconfig shall not be committed to source control
 *.kubeconfig
 
