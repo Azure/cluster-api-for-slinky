@@ -79,6 +79,10 @@ SSH_COMMANDS_TEMPLATE = [
 MACHINEPOOL_DEFAULT_CLASS = "default-worker"
 MACHINEPOOL_DEFAULT_NAME = "mp-0"
 
+LABEL_KEY = "slinky.slurm.net/node-type"
+LABEL_VALUE_CONTROLLER = "controller"
+LABEL_VALUE_COMPUTE = "compute"
+
 # Track style/preamble for multi-doc YAML
 _MULTI_DOC_STYLE: dict[str, Any] = {
     "preamble": "",          # leading comments / whitespace before first doc
@@ -245,6 +249,37 @@ def ensure_machine_pool(docs: List[CommentedMap], replicas: int, pool_name: str 
     return mutated
 
 
+def ensure_topology_labels(docs):
+    changed = False
+    for doc in docs:
+        if doc.get("kind") != "Cluster":
+            continue
+        spec = doc.get("spec") or {}
+        topo = spec.get("topology") or {}
+        workers = topo.get("workers") or {}
+        # machineDeployments -> controller label
+        mds = workers.get("machineDeployments") or []
+        for md in mds:
+            if not isinstance(md, dict):
+                continue
+            meta = md.setdefault("metadata", {})
+            labels = meta.setdefault("labels", {})
+            if labels.get(LABEL_KEY) != LABEL_VALUE_CONTROLLER:
+                labels[LABEL_KEY] = LABEL_VALUE_CONTROLLER
+                changed = True
+        # machinePools -> compute label
+        mps = workers.get("machinePools") or []
+        for mp in mps:
+            if not isinstance(mp, dict):
+                continue
+            meta = mp.setdefault("metadata", {})
+            labels = meta.setdefault("labels", {})
+            if labels.get(LABEL_KEY) != LABEL_VALUE_COMPUTE:
+                labels[LABEL_KEY] = LABEL_VALUE_COMPUTE
+                changed = True
+    return changed
+
+
 # ---------------- CLI Parsing ---------------- #
 
 def parse_args() -> argparse.Namespace:
@@ -300,11 +335,12 @@ def main() -> int:
         pool_name=args.machinepool_name,
         pool_class=args.machinepool_class,
     )
+    labels_changed = ensure_topology_labels(docs)
 
     final_yaml = dump_documents(docs)
     args.output.write_text(final_yaml)
     print(
-        f"Wrote {args.output} (SSH modified docs: {ssh_modified}, machinePool changed: {mp_modified})"
+        f"Wrote {args.output} (SSH modified docs: {ssh_modified}, machinePool changed: {mp_modified}, labels changed: {labels_changed})"
     )
     return 0
 

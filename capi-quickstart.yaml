@@ -394,7 +394,13 @@ spec:
       - class: default-worker
         name: md-0
         replicas: 1
+        metadata:
+          labels:
+            slinky.slurm.net/node-type: controller
       machinePools:
       - class: default-worker
         name: mp-0
         replicas: 2
+        metadata:
+          labels:
+            slinky.slurm.net/node-type: compute
