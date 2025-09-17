@@ -111,6 +111,25 @@ helm install slurm-operator oci://ghcr.io/slinkyproject/charts/slurm-operator --
 helm install slurm oci://ghcr.io/slinkyproject/charts/slurm -f slurm-cluster.yaml --set-file "loginsets.slinky.rootSshAuthorizedKeys=${HOME}/.ssh/id_rsa.pub" --namespace=slurm --create-namespace
 ```
 
+In a separate terminal, port forward the Slurm login node:
+```bash
+kubectl -n slurm port-forward svc/slurm-login-slinky 2222:22
+```
+
+Log into the Slurm login node:
+```bash
+ssh -p 2222 root@127.0.0.1
+```
+
+Run Slurm commands to quickly verify that Slurm is functioning:
+```bash
+sinfo
+srun hostname
+sbatch --wrap="sleep 60"
+squeue
+sacct
+```
+
 
 ## Contributing
 
