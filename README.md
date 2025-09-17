@@ -73,6 +73,8 @@ Install [CAPD](https://github.com/kubernetes-sigs/cluster-api/blob/main/test/inf
 ```bash
 export CLUSTER_TOPOLOGY=true
 clusterctl init --infrastructure docker
+# enhance metadata propagation so that Slinky labels will land on the node (for MachineSet and Machine only; CAPD MachinePool label seems to propagate just fine without this trick)
+kubectl -n capi-system patch deployment/capi-controller-manager --type=json -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--additional-sync-machine-labels=.*slinky\\.slurm\\.net.*"}]'
 ```
 
 open `capi-quickstart.yaml` and modify the SSH public key (corresponding to the private key in AWX) inside `preKubeCommands` (around line 329).
@@ -91,7 +93,24 @@ kubectl --kubeconfig=./capi-quickstart.kubeconfig apply -f https://raw.githubuse
 watch -c clusterctl describe cluster capi-quickstart --color
 ```
 
-Run the job in AWX. The job should now output the hostnames of all pseudo-nodes of the CAPD cluster (which are Docker containers under the hood), and the inventory's host list should also contain those hosts. This means that AWX is now aware of these nodes and Ansible can bootstrap Slurm/SSSD/Storage/networking/etc.
+Run the job in AWX. The job should now output the hostnames of all pseudo-nodes of the CAPD cluster (which are Docker containers under the hood), and the inventory's host list should also contain those hosts. This means that AWX is now aware of these nodes and Ansible can bootstrap SSSD/Storage/networking/etc.
+
+Next, we introduce Slurm into the cluster by installing `slurm-operator`. We need to switch to the CAPD cluster's k8s context first.
+```bash
+export KUBECONFIG="$(pwd)/capi-quickstart.kubeconfig"
+# add a local-path-based StorageClass for Slurm persistence
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.32/deploy/local-path-storage.yaml
+kubectl patch storageclass local-path -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+kubectl patch storageclass local-path -p '{"metadata":{"annotations":{"defaultVolumeType":"local"}}}'
+# relax pod security for local storage to work
+kubectl label ns local-path-storage pod-security.kubernetes.io/enforce=privileged --overwrite
+kubectl label ns local-path-storage pod-security.kubernetes.io/enforce-version=latest --overwrite
+helm install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.18.2 --set 'crds.enabled=true' --namespace cert-manager --create-namespace
+helm install slurm-operator-crds oci://ghcr.io/slinkyproject/charts/slurm-operator-crds
+helm install slurm-operator oci://ghcr.io/slinkyproject/charts/slurm-operator --namespace=slinky --create-namespace
+helm install slurm oci://ghcr.io/slinkyproject/charts/slurm -f slurm-cluster.yaml --set-file "loginsets.slinky.rootSshAuthorizedKeys=${HOME}/.ssh/id_rsa.pub" --namespace=slurm --create-namespace
+```
+
 
 ## Contributing
 
