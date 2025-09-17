@@ -35,6 +35,14 @@ nodesets:
                 operator: In
                 values:
                 - "compute"
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - "slurmd"
 restapi:
   podSpec:
     affinity:

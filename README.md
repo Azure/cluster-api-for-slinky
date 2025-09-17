@@ -130,6 +130,24 @@ squeue
 sacct
 ```
 
+## Autoscaling
+
+The autoscaling logical workflow behaves as follows:
+- Slurm jobs are submitted
+- slurm-exporter exports Slurm job queue data into Prometheus
+- Keda (or some other more sophisticated custom logic) scales Slinky NodeSet replicas based on Prometheus data
+- more NodeSet replicas lead to unschedulable NodeSet pods
+- Cluster Autoscaler sees unschedulable pods, and Cluster API cloud provider of Cluster Autoscaler scales up the MachinePool
+- MachinePool increases its number of replicas, which brings more nodes into the workload cluster
+- NodeSet pods is now schedulable onto the newly-introduced nodes
+- new nodes join the Slurm cluster and pick up the jobs
+
+To set up the autoscaling configuration, we first connect the Cluster Autoscaler to Cluster API. For our CAPD setup,
+```bash
+# Switch your kubectl context/kubeconfig to the management cluster first
+# apply the patch yaml to switch the CAPD cluster compute MachinePool from manual scaling to auto-scalable by CA
+kubectl apply -f capi-quickstart-autoscale-patch.yaml
+```
 
 ## Contributing
 

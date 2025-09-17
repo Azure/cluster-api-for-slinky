@@ -1,36 +1,26 @@
 #!/usr/bin/env python3
 """Generate capi-quickstart.yaml using clusterctl and apply project-specific customizations.
 
-In the current v0.1 version of CAPS, we hold the following conventions for the k8s workload cluster:
-  - 1 MachineDeployment with 1 replica, dedicated to being the Slurm head node
-  - 1 MachinePool with x replicas, acting as Slurm/k8s compute nodes
+Conventions (v0.1 CAPS):
+  - 1 MachineDeployment (controller / Slurm head)
+  - 1 MachinePool (compute) optionally managed by Cluster Autoscaler
 
-This script automates regeneration of a Cluster API quickstart manifest and applies
-custom modifications (SSH enablement + machinePool). Useful when upgrading clusterctl/CAPI.
+Autoscaling Mode (default):
+  - Enabled via --autoscale (default True; disable with --no-autoscale)
+  - MachinePool `replicas` omitted so Cluster Autoscaler can manage size
+  - Annotation `cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size=1` ensured
+  - You can later add max-size manually or extend script similarly
 
-Dependencies:
-  - clusterctl in PATH
-  - Python 3.9+
-  - ruamel.yaml (pip install ruamel.yaml)  # switched from PyYAML to preserve comments/formatting
-  - An SSH public key (~/.ssh/id_rsa.pub by default) (TODO: instead of reading from file, bridge the SSH key with awx-operator)
+Non-Autoscale Mode (--no-autoscale):
+  - MachinePool `replicas` set explicitly from --machinepool-replicas
+  - Autoscaler annotation removed if previously present (idempotent rollback)
 
-What it does:
-  1. Determines Kubernetes version (flag or parsed from kind-config.yaml so that workload cluster has same k8s version as management cluster for convenience)
-  2. Runs `clusterctl generate cluster` with provided replica counts
-  3. Parses all YAML documents (round-trip) preserving order, comments, formatting where possible
-  4. Adds/updates preKubeadmCommands in each KubeadmConfigTemplate to install & configure SSH
-  5. Ensures a machinePool entry (default name mp-0) with desired replicas exists in Cluster topology
-  6. Writes final YAML to capi-quickstart.yaml (configurable) with preserved style
-
-Idempotency:
-  - Re-running will not duplicate SSH commands; authorized key line is updated if key changes.
-  - MachinePool entry is created once and replicas updated if changed.
-
-Examples:
-  ./scripts/generate_capi_quickstart.py --ssh-public-key ~/.ssh/id_rsa.pub
-  ./scripts/generate_capi_quickstart.py --kubernetes-version v1.34.0 \
-      --machinedeployment-replicas 1 --machinepool-replicas 2
-  ./scripts/generate_capi_quickstart.py --machinepool-name mp-workers --machinepool-replicas 4
+Other Features:
+  - Kubernetes version detection from kind-config.yaml (override with --kubernetes-version)
+  - SSH enablement on node bootstrap (preKubeadmCommands, idempotent public key injection)
+  - Role labels: MachineDeployment=controller, MachinePool=compute
+  - Round-trip YAML preservation with ruamel.yaml
+  - Idempotent mutations (safe to re-run after manual edits)
 
 Exit codes:
   0 success
@@ -82,6 +72,9 @@ MACHINEPOOL_DEFAULT_NAME = "mp-0"
 LABEL_KEY = "slinky.slurm.net/node-type"
 LABEL_VALUE_CONTROLLER = "controller"
 LABEL_VALUE_COMPUTE = "compute"
+
+AUTOSCALER_MIN_ANNOTATION = "cluster.x.k8s.io/cluster-api-autoscaler-node-group-min-size"
+AUTOSCALER_MIN_VALUE = "1"
 
 # Track style/preamble for multi-doc YAML
 _MULTI_DOC_STYLE: dict[str, Any] = {
@@ -219,7 +212,13 @@ def ensure_ssh_on_kubeadm_config_templates(docs: List[CommentedMap], public_key:
     return modified
 
 
-def ensure_machine_pool(docs: List[CommentedMap], replicas: int, pool_name: str = MACHINEPOOL_DEFAULT_NAME, pool_class: str = MACHINEPOOL_DEFAULT_CLASS) -> bool:
+def ensure_machine_pool(
+    docs: List[CommentedMap],
+    replicas: int,
+    autoscale: bool,
+    pool_name: str = MACHINEPOOL_DEFAULT_NAME,
+    pool_class: str = MACHINEPOOL_DEFAULT_CLASS,
+) -> bool:
     mutated = False
     for doc in docs:
         if doc.get("kind") != "Cluster":
@@ -235,17 +234,32 @@ def ensure_machine_pool(docs: List[CommentedMap], replicas: int, pool_name: str 
             if isinstance(p, dict) and p.get("name") == pool_name:
                 entry = p
                 break
-        if entry:
+        if entry is None:
+            entry = CommentedMap()
+            entry["class"] = pool_class
+            entry["name"] = pool_name
+            pools.append(entry)
+            mutated = True
+        meta = entry.setdefault("metadata", CommentedMap())
+        annotations = meta.setdefault("annotations", CommentedMap())
+        if autoscale:
+            if "replicas" in entry:
+                del entry["replicas"]
+                mutated = True
+            if annotations.get(AUTOSCALER_MIN_ANNOTATION) != AUTOSCALER_MIN_VALUE:
+                annotations[AUTOSCALER_MIN_ANNOTATION] = AUTOSCALER_MIN_VALUE
+                mutated = True
+        else:
             if entry.get("replicas") != replicas:
                 entry["replicas"] = replicas
                 mutated = True
-        else:
-            new_entry = CommentedMap()
-            new_entry["class"] = pool_class
-            new_entry["name"] = pool_name
-            new_entry["replicas"] = replicas
-            pools.append(new_entry)
-            mutated = True
+            if AUTOSCALER_MIN_ANNOTATION in annotations:
+                del annotations[AUTOSCALER_MIN_ANNOTATION]
+                mutated = True
+            if not annotations:
+                meta.pop("annotations", None)
+        if not meta:
+            entry.pop("metadata", None)
     return mutated
 
 
@@ -289,11 +303,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--kubernetes-version", dest="k8s_version", help="Explicit Kubernetes version (e.g. v1.34.0); if omitted, parsed from kind-config.yaml")
     parser.add_argument("--control-plane-replicas", type=int, default=1, help="Control plane replicas (default: 1)")
     parser.add_argument("--machinedeployment-replicas", type=int, default=1, help="MachineDeployment replicas (default: 1)")
-    parser.add_argument("--machinepool-replicas", type=int, default=2, help="MachinePool replicas (default: 2)")
+    parser.add_argument("--machinepool-replicas", type=int, default=1, help="MachinePool replicas (default: 1)")
     parser.add_argument("--machinepool-name", default=MACHINEPOOL_DEFAULT_NAME, help=f"MachinePool name (default: {MACHINEPOOL_DEFAULT_NAME})")
     parser.add_argument("--machinepool-class", default=MACHINEPOOL_DEFAULT_CLASS, help=f"MachinePool class (default: {MACHINEPOOL_DEFAULT_CLASS})")
     parser.add_argument("--ssh-public-key", type=Path, help="Path to SSH public key file; if omitted, uses ~/.ssh/id_rsa.pub")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help=f"Output file (default: {DEFAULT_OUTPUT})")
+    parser.add_argument("--autoscale", dest="autoscale", action=argparse.BooleanOptionalAction, default=True, help="Enable autoscaler mode (omit MachinePool replicas & add autoscaler annotations). Use --no-autoscale to set fixed replicas.")
     return parser.parse_args()
 
 
@@ -332,6 +347,7 @@ def main() -> int:
     mp_modified = ensure_machine_pool(
         docs,
         replicas=args.machinepool_replicas,
+        autoscale=args.autoscale,
         pool_name=args.machinepool_name,
         pool_class=args.machinepool_class,
     )
@@ -340,7 +356,7 @@ def main() -> int:
     final_yaml = dump_documents(docs)
     args.output.write_text(final_yaml)
     print(
-        f"Wrote {args.output} (SSH modified docs: {ssh_modified}, machinePool changed: {mp_modified}, labels changed: {labels_changed})"
+        f"Wrote {args.output} (SSH modified docs: {ssh_modified}, machinePool changed: {mp_modified}, labels changed: {labels_changed}, autoscale={args.autoscale})"
     )
     return 0
 
