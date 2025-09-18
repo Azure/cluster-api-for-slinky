@@ -160,8 +160,7 @@ The autoscaling logical workflow behaves as follows:
 To set up the autoscaling configuration, we first connect the Cluster Autoscaler to Cluster API. For our CAPD setup,
 ```bash
 # Switch your kubectl context/kubeconfig to the management cluster first
-# apply the patch yaml to switch the CAPD cluster compute MachinePool from manual scaling to auto-scalable by CA
-kubectl apply -f capi-quickstart-autoscale-patch.yaml
+
 ```
 
 ## Contributing
