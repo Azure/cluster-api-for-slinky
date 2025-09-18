@@ -7,6 +7,8 @@ autoDiscovery:
   namespace: default
   labels:
   - slinky.slurm.net/node-type: compute
+extraArgs:
+  scale-down-unneeded-time: 2m # for demo purposes
 extraVolumes:
 - name: kubeconfig-volume
   hostPath:

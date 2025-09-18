@@ -95,6 +95,24 @@ watch -c clusterctl describe cluster capi-quickstart --color
 
 Run the job in AWX. The job should now output the hostnames of all pseudo-nodes of the CAPD cluster (which are Docker containers under the hood), and the inventory's host list should also contain those hosts. This means that AWX is now aware of these nodes and Ansible can bootstrap SSSD/Storage/networking/etc.
 
+Next, we set up Prometheus/Grafana on the workload cluster:
+```bash
+# switch to CAPI workload cluster again
+export KUBECONFIG="$(pwd)/capi-quickstart.kubeconfig"
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install prometheus prometheus-community/kube-prometheus-stack --namespace=prometheus --create-namespace
+kubectl label ns prometheus pod-security.kubernetes.io/enforce=privileged --overwrite
+kubectl label ns prometheus pod-security.kubernetes.io/enforce-version=latest --overwrite
+# check status
+kubectl --namespace prometheus get pods -l "release=prometheus"
+# get Grafana 'admin' user password
+kubectl --namespace prometheus get secrets prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo
+# access Grafana local instance
+export POD_NAME=$(kubectl --namespace prometheus get pod -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance=prometheus" -oname)
+kubectl --namespace prometheus port-forward $POD_NAME 3000
+```
+
 Next, we introduce Slurm into the cluster by installing `slurm-operator`. We need to switch to the CAPD cluster's k8s context first.
 ```bash
 export KUBECONFIG="$(pwd)/capi-quickstart.kubeconfig"
