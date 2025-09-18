@@ -355,6 +355,13 @@ spec:
         .ssh/authorized_keys2" >> /etc/ssh/sshd_config
       - systemctl enable ssh
       - systemctl start ssh
+      - if ! grep -q SLINKY-REGISTRY-START /etc/containerd/config.toml; then [ 
+        -f /etc/containerd/config.toml ] || containerd config default > 
+        /etc/containerd/config.toml; { echo '# SLINKY-REGISTRY-START'; echo 
+        '[plugins."io.containerd.grpc.v1.cri".registry.mirrors."host.docker.internal:5000"]';
+        echo '  endpoint = ["http://host.docker.internal:5000"]'; echo '# 
+        SLINKY-REGISTRY-END'; } >> /etc/containerd/config.toml; systemctl 
+        restart containerd; fi
 ---
 apiVersion: cluster.x-k8s.io/v1beta2
 kind: Cluster
@@ -400,7 +407,8 @@ spec:
       machinePools:
       - class: default-worker
         name: mp-0
-        replicas: 1
         metadata:
+          annotations:
+            cluster.x.k8s.io/cluster-api-autoscaler-node-group-min-size: '1'
           labels:
             slinky.slurm.net/node-type: compute

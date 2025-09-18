@@ -130,6 +130,13 @@ squeue
 sacct
 ```
 
+## Locally building Slinky
+
+```bash
+# host.docker.internal:5000 is our local container registry for Slinky development
+docker run -d --restart=always -p 5000:5000 --name slinky-reg registry:2
+```
+
 ## Autoscaling
 
 The autoscaling logical workflow behaves as follows:

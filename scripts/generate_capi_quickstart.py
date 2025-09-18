@@ -18,6 +18,7 @@ Non-Autoscale Mode (--no-autoscale):
 Other Features:
   - Kubernetes version detection from kind-config.yaml (override with --kubernetes-version)
   - SSH enablement on node bootstrap (preKubeadmCommands, idempotent public key injection)
+    - Insecure HTTP registry enablement for host.docker.internal:5000 (containerd config.toml patch, idempotent)
   - Role labels: MachineDeployment=controller, MachinePool=compute
   - Round-trip YAML preservation with ruamel.yaml
   - Idempotent mutations (safe to re-run after manual edits)
@@ -75,6 +76,8 @@ LABEL_VALUE_COMPUTE = "compute"
 
 AUTOSCALER_MIN_ANNOTATION = "cluster.x.k8s.io/cluster-api-autoscaler-node-group-min-size"
 AUTOSCALER_MIN_VALUE = "1"
+
+DEFAULT_HOST_REGISTRY = "host.docker.internal:5000"
 
 # Track style/preamble for multi-doc YAML
 _MULTI_DOC_STYLE: dict[str, Any] = {
@@ -212,6 +215,58 @@ def ensure_ssh_on_kubeadm_config_templates(docs: List[CommentedMap], public_key:
     return modified
 
 
+def build_registry_command(registry: str) -> str:
+    """
+    Return a single shell line that safely appends a mirror stanza if absent.
+    """
+    return (
+        f"if ! grep -q SLINKY-REGISTRY-START /etc/containerd/config.toml; then "
+        f"[ -f /etc/containerd/config.toml ] || containerd config default > /etc/containerd/config.toml; "
+        f"{{ echo '# SLINKY-REGISTRY-START'; "
+        f"echo '[plugins.\"io.containerd.grpc.v1.cri\".registry.mirrors.\"{registry}\"]'; "
+        f"echo '  endpoint = [\"http://{registry}\"]'; "
+        f"echo '# SLINKY-REGISTRY-END'; }} >> /etc/containerd/config.toml; "
+        f"systemctl restart containerd; fi"
+    )
+
+
+def ensure_insecure_registry(docs: List[CommentedMap], registry: str = DEFAULT_HOST_REGISTRY) -> int:
+    """Inject containerd config patch commands to enable pulling from an HTTP registry.
+
+    Strategy:
+      - Ensures /etc/containerd/config.toml exists (generates default if missing)
+      - Appends a mirror stanza for the registry inside config.toml if not already present
+      - Uses a sentinel comment # SLINKY-REGISTRY-START for idempotency
+      - Restarts containerd only on first injection
+    Returns count of modified KubeadmConfigTemplate docs.
+    """
+    added = 0
+    cmd = build_registry_command(registry)
+    for doc in docs:
+        if doc.get("kind") != "KubeadmConfigTemplate":
+            continue
+        api = doc.get("apiVersion", "")
+        if not isinstance(api, str) or not api.startswith("bootstrap.cluster.x-k8s.io/"):
+            continue
+        spec = doc.setdefault("spec", CommentedMap())
+        template = spec.setdefault("template", CommentedMap())
+        tmpl_spec = template.setdefault("spec", CommentedMap())
+        existing = tmpl_spec.get("preKubeadmCommands")
+        if existing is None:
+            existing_list: List[str] = []
+        elif isinstance(existing, list):
+            existing_list = [c for c in existing if isinstance(c, str)]
+        else:
+            continue
+        # If any existing command already references sentinel or registry assume configured
+        already = any("SLINKY-REGISTRY-START" in c or registry in c for c in existing_list)
+        if not already:
+            existing_list.append(cmd)
+            tmpl_spec["preKubeadmCommands"] = existing_list
+            added += 1
+    return added
+
+
 def ensure_machine_pool(
     docs: List[CommentedMap],
     replicas: int,
@@ -309,6 +364,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ssh-public-key", type=Path, help="Path to SSH public key file; if omitted, uses ~/.ssh/id_rsa.pub")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help=f"Output file (default: {DEFAULT_OUTPUT})")
     parser.add_argument("--autoscale", dest="autoscale", action=argparse.BooleanOptionalAction, default=True, help="Enable autoscaler mode (omit MachinePool replicas & add autoscaler annotations). Use --no-autoscale to set fixed replicas.")
+    parser.add_argument("--enable-host-registry", dest="enable_host_registry", action=argparse.BooleanOptionalAction, default=True, help="Inject containerd config to allow HTTP pulls from host.docker.internal:5000 (default enabled). Use --no-enable-host-registry to skip.")
     return parser.parse_args()
 
 
@@ -344,6 +400,9 @@ def main() -> int:
     docs = load_documents(raw_yaml)
 
     ssh_modified = ensure_ssh_on_kubeadm_config_templates(docs, public_key)
+    registry_modified = 0
+    if args.enable_host_registry:
+        registry_modified = ensure_insecure_registry(docs, DEFAULT_HOST_REGISTRY)
     mp_modified = ensure_machine_pool(
         docs,
         replicas=args.machinepool_replicas,
@@ -356,7 +415,7 @@ def main() -> int:
     final_yaml = dump_documents(docs)
     args.output.write_text(final_yaml)
     print(
-        f"Wrote {args.output} (SSH modified docs: {ssh_modified}, machinePool changed: {mp_modified}, labels changed: {labels_changed}, autoscale={args.autoscale})"
+        f"Wrote {args.output} (SSH modified: {ssh_modified}, registry modified: {registry_modified}, machinePool changed: {mp_modified}, labels changed: {labels_changed}, autoscale={args.autoscale}, host-registry={args.enable_host_registry})"
     )
     return 0
 
