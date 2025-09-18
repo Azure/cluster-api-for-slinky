@@ -109,6 +109,8 @@ helm install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v
 helm install slurm-operator-crds oci://ghcr.io/slinkyproject/charts/slurm-operator-crds
 helm install slurm-operator oci://ghcr.io/slinkyproject/charts/slurm-operator --namespace=slinky --create-namespace
 helm install slurm oci://ghcr.io/slinkyproject/charts/slurm -f slurm-cluster.yaml --set-file "loginsets.slinky.rootSshAuthorizedKeys=${HOME}/.ssh/id_rsa.pub" --namespace=slurm --create-namespace
+kubectl label ns slurm pod-security.kubernetes.io/enforce=privileged --overwrite
+kubectl label ns slurm pod-security.kubernetes.io/enforce-version=latest --overwrite
 ```
 
 In a separate terminal, port forward the Slurm login node:
@@ -135,6 +137,12 @@ sacct
 ```bash
 # host.docker.internal:5000 is our local container registry for Slinky development
 docker run -d --restart=always -p 5000:5000 --name slinky-reg registry:2
+# in another slurm-operator repo, run `make push REGISTRY=host.docker.internal:5000/slinky`, then we switch to CAPD cluster and install:
+helm install slurm-operator-crds oci://host.docker.internal:5000/slinky/charts/slurm-operator-crds
+helm install slurm-operator oci://host.docker.internal:5000/slinky/charts/slurm-operator --namespace=slinky --create-namespace
+helm install slurm oci://host.docker.internal:5000/slinky/charts/slurm -f slurm-cluster.yaml --set-file "loginsets.slinky.rootSshAuthorizedKeys=${HOME}/.ssh/id_rsa.pub" --namespace=slurm --create-namespace
+kubectl label ns slurm pod-security.kubernetes.io/enforce=privileged --overwrite
+kubectl label ns slurm pod-security.kubernetes.io/enforce-version=latest --overwrite
 ```
 
 ## Autoscaling

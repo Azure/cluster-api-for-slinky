@@ -43,6 +43,7 @@ nodesets:
                 operator: In
                 values:
                 - "slurmd"
+            topologyKey: "kubernetes.io/hostname"
 restapi:
   podSpec:
     affinity:
