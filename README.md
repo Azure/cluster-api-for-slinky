@@ -86,7 +86,7 @@ kubectl apply -f capi-quickstart.yaml
 clusterctl get kubeconfig capi-quickstart > capi-quickstart.kubeconfig
 # https://cluster-api.sigs.k8s.io/clusterctl/developers#fix-kubeconfig-when-using-docker-desktop-and-clusterctl
 # Point the kubeconfig to the exposed port of the load balancer, rather than the inaccessible container IP.
-sed -i -e "s/server:.*/server: https:\/\/$(docker port capi-quickstart-lb 6443/tcp | sed "s/0.0.0.0/127.0.0.1/")/g" ./capi-quickstart.kubeconfig
+sed -i -e "s/server:.*/server: https:\/\/$(docker port capi-quickstart-lb 6443/tcp | sed "s/0.0.0.0/host.docker.internal/")/g" ./capi-quickstart.kubeconfig
 # CAPD nodes won't be ready until we install CNI
 kubectl --kubeconfig=./capi-quickstart.kubeconfig apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.3/manifests/calico.yaml
 # monitor CAPD cluster and wait for it to become ready
@@ -160,7 +160,12 @@ The autoscaling logical workflow behaves as follows:
 To set up the autoscaling configuration, we first connect the Cluster Autoscaler to Cluster API. For our CAPD setup,
 ```bash
 # Switch your kubectl context/kubeconfig to the management cluster first
-
+unset KUBECONFIG # go back to Kind's kubeconfig
+clusterctl get kubeconfig capi-quickstart > ${HOME}/.kube/capi-quickstart.kubeconfig # this time we actually want the in-management-cluster load-balancer IP!
+helm repo add autoscaler https://kubernetes.github.io/autoscaler
+helm install cluster-autoscaler autoscaler/cluster-autoscaler -f cluster-autoscaler.yaml --namespace=cluster-autoscaler --create-namespace
+kubectl label ns cluster-autoscaler pod-security.kubernetes.io/enforce=privileged --overwrite
+kubectl label ns cluster-autoscaler pod-security.kubernetes.io/enforce-version=latest --overwrite
 ```
 
 ## Contributing

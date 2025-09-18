@@ -8,8 +8,10 @@ Conventions (v0.1 CAPS):
 Autoscaling Mode (default):
   - Enabled via --autoscale (default True; disable with --no-autoscale)
   - MachinePool `replicas` omitted so Cluster Autoscaler can manage size
-  - Annotation `cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size=1` ensured
-  - You can later add max-size manually or extend script similarly
+    - Annotations set:
+            * `cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size=1`
+            * `cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size=10`
+        (Defaults; adjust manually or extend script for flags later)
 
 Non-Autoscale Mode (--no-autoscale):
   - MachinePool `replicas` set explicitly from --machinepool-replicas
@@ -74,8 +76,10 @@ LABEL_KEY = "slinky.slurm.net/node-type"
 LABEL_VALUE_CONTROLLER = "controller"
 LABEL_VALUE_COMPUTE = "compute"
 
-AUTOSCALER_MIN_ANNOTATION = "cluster.x.k8s.io/cluster-api-autoscaler-node-group-min-size"
+AUTOSCALER_MIN_ANNOTATION = "cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size"
 AUTOSCALER_MIN_VALUE = "1"
+AUTOSCALER_MAX_ANNOTATION = "cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size"
+AUTOSCALER_MAX_VALUE = "10"
 
 DEFAULT_HOST_REGISTRY = "host.docker.internal:5000"
 
@@ -304,12 +308,18 @@ def ensure_machine_pool(
             if annotations.get(AUTOSCALER_MIN_ANNOTATION) != AUTOSCALER_MIN_VALUE:
                 annotations[AUTOSCALER_MIN_ANNOTATION] = AUTOSCALER_MIN_VALUE
                 mutated = True
+            if annotations.get(AUTOSCALER_MAX_ANNOTATION) != AUTOSCALER_MAX_VALUE:
+                annotations[AUTOSCALER_MAX_ANNOTATION] = AUTOSCALER_MAX_VALUE
+                mutated = True
         else:
             if entry.get("replicas") != replicas:
                 entry["replicas"] = replicas
                 mutated = True
             if AUTOSCALER_MIN_ANNOTATION in annotations:
                 del annotations[AUTOSCALER_MIN_ANNOTATION]
+                mutated = True
+            if AUTOSCALER_MAX_ANNOTATION in annotations:
+                del annotations[AUTOSCALER_MAX_ANNOTATION]
                 mutated = True
             if not annotations:
                 meta.pop("annotations", None)

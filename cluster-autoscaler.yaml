@@ -1,0 +1,17 @@
+cloudProvider: clusterapi
+securityContext:
+  privileged: true
+clusterAPIMode: kubeconfig-incluster
+clusterAPIWorkloadKubeconfigPath: /mnt/kubeconfig/capi-quickstart.kubeconfig
+autoDiscovery:
+  namespace: default
+  labels:
+  - slinky.slurm.net/node-type: compute
+extraVolumes:
+- name: kubeconfig-volume
+  hostPath:
+    path: /root/.kube
+extraVolumeMounts:
+- mountPath: /mnt/kubeconfig
+  name: kubeconfig-volume
+  readOnly: true
