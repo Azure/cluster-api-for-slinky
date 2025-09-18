@@ -186,6 +186,24 @@ kubectl label ns cluster-autoscaler pod-security.kubernetes.io/enforce=privilege
 kubectl label ns cluster-autoscaler pod-security.kubernetes.io/enforce-version=latest --overwrite
 ```
 
+We then install KEDA to scale the Slurm NodeSet based on Prometheus metrics of pending jobs:
+```bash
+# Switch to CAPI workload cluster again
+export KUBECONFIG="$(pwd)/capi-quickstart.kubeconfig"
+helm repo add kedacore https://kedacore.github.io/charts
+helm repo update
+helm install keda kedacore/keda --namespace keda --create-namespace
+kubectl apply -f nodeset-scaledobject.yaml
+```
+
+Finally, with login node still port forwarded to port 2222, let's do some autoscale testing:
+```bash
+scp -P 2222 scripts/sleep-exclusive.slurm root@127.0.0.1:~/
+scp -P 2222 scripts/slurm_load_generator.sh root@127.0.0.1:~/
+ssh -p 2222 root@127.0.0.1 'chmod +x slurm_load_generator.sh'
+ssh -p 2222 root@127.0.0.1 './slurm_load_generator.sh'
+```
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
