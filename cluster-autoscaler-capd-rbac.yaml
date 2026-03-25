@@ -1,0 +1,31 @@
+# Extra RBAC for Cluster Autoscaler to manage CAPD infrastructure resources.
+# The default Helm chart only grants access to core CAPI types; the CAPD
+# provider registers its own API group that the autoscaler also needs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-autoscaler-capd
+rules:
+  - apiGroups:
+      - infrastructure.cluster.x-k8s.io
+    resources:
+      - "*"
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-autoscaler-capd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-autoscaler-capd
+subjects:
+  - kind: ServiceAccount
+    name: cluster-autoscaler
+    namespace: cluster-autoscaler

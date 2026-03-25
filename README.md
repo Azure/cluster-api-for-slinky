@@ -167,7 +167,7 @@ kubectl label ns slurm pod-security.kubernetes.io/enforce-version=latest --overw
 
 The autoscaling logical workflow behaves as follows:
 - Slurm jobs are submitted
-- slurm-exporter exports Slurm job queue data into Prometheus
+- slurmctld built-in metrics endpoint exports Slurm job queue data into Prometheus
 - Keda (or some other more sophisticated custom logic) scales Slinky NodeSet replicas based on Prometheus data
 - more NodeSet replicas lead to unschedulable NodeSet pods
 - Cluster Autoscaler sees unschedulable pods, and Cluster API cloud provider of Cluster Autoscaler scales up the MachinePool
@@ -184,6 +184,8 @@ helm repo add autoscaler https://kubernetes.github.io/autoscaler
 helm install cluster-autoscaler autoscaler/cluster-autoscaler -f cluster-autoscaler.yaml --namespace=cluster-autoscaler --create-namespace
 kubectl label ns cluster-autoscaler pod-security.kubernetes.io/enforce=privileged --overwrite
 kubectl label ns cluster-autoscaler pod-security.kubernetes.io/enforce-version=latest --overwrite
+# Extra RBAC so the autoscaler can access CAPD infrastructure resources
+kubectl apply -f cluster-autoscaler-capd-rbac.yaml
 ```
 
 We then install KEDA to scale the Slurm NodeSet based on Prometheus metrics of pending jobs:

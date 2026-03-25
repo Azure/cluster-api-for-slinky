@@ -14,7 +14,7 @@ spec:
   - type: prometheus
     metadata:
       serverAddress: http://prometheus-kube-prometheus-prometheus.prometheus.svc.cluster.local:9090
-      query: slurm_partition_jobs_pending_total{partition="all"}
+      query: slurm_partition_jobs_pending{partition="all"}
       threshold: '1'
       activationThreshold: '1'
       unsafeSsl: 'true'

@@ -6,4 +6,7 @@
 # CAPD workload cluster kubeconfig shall not be committed to source control
 *.kubeconfig
 
+# Local working notes
+ROADMAP.local
+
 gitea-admin-secret.yaml

@@ -1,3 +1,6 @@
+configFiles:
+  cgroup.conf: |
+    CgroupPlugin=disabled
 controller:
   metrics:
     enabled: true
@@ -16,7 +19,21 @@ controller:
 loginsets:
   slinky:
     enabled: true
-    # sssdConf: "" # default sssd.conf is some non-working placeholder
+    sssdConf: |
+      [sssd]
+      config_file_version = 2
+      services = nss,pam
+      domains = LOCAL
+
+      [nss]
+      filter_groups = root,slurm
+      filter_users = root,slurm
+
+      [pam]
+
+      [domain/LOCAL]
+      id_provider = files
+      auth_provider = none
     podSpec:
       affinity:
         nodeAffinity:
