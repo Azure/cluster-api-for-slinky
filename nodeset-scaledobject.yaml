@@ -5,7 +5,7 @@ metadata:
   namespace: slurm
 spec:
   scaleTargetRef:
-    apiVersion: slinky.slurm.net/v1alpha1
+    apiVersion: slinky.slurm.net/v1beta1
     kind: NodeSet
     name: slurm-worker-slinky
   minReplicaCount: 1
