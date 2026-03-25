@@ -2,6 +2,10 @@ configFiles:
   cgroup.conf: |
     CgroupPlugin=disabled
 controller:
+  logfile:
+    image:
+      repository: public.ecr.aws/docker/library/alpine
+      tag: "3.21"
   metrics:
     enabled: true
     serviceMonitor:
@@ -19,6 +23,10 @@ controller:
 loginsets:
   slinky:
     enabled: true
+    initconf:
+      image:
+        repository: public.ecr.aws/docker/library/alpine
+        tag: "3.21"
     sssdConf: |
       [sssd]
       config_file_version = 2
@@ -46,6 +54,10 @@ loginsets:
                 - "controller"
 nodesets:
   slinky:
+    logfile:
+      image:
+        repository: public.ecr.aws/docker/library/alpine
+        tag: "3.21"
     podSpec:
       affinity:
         nodeAffinity:
