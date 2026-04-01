@@ -87,13 +87,11 @@ clusterctl get kubeconfig capi-quickstart > capi-quickstart.kubeconfig
 # https://cluster-api.sigs.k8s.io/clusterctl/developers#fix-kubeconfig-when-using-docker-desktop-and-clusterctl
 # Point the kubeconfig to the exposed port of the load balancer, rather than the inaccessible container IP.
 sed -i -e "s/server:.*/server: https:\/\/$(docker port capi-quickstart-lb 6443/tcp | sed "s/0.0.0.0/host.docker.internal/")/g" ./capi-quickstart.kubeconfig
-# CAPD nodes won't be ready until we install CNI (use quay.io to avoid Docker Hub rate limits)
-kubectl --kubeconfig=./capi-quickstart.kubeconfig apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.3/manifests/calico.yaml
-kubectl --kubeconfig=./capi-quickstart.kubeconfig set image -n kube-system daemonset/calico-node \
-  upgrade-ipam=quay.io/calico/cni:v3.30.3 install-cni=quay.io/calico/cni:v3.30.3 \
-  mount-bpffs=quay.io/calico/node:v3.30.3 calico-node=quay.io/calico/node:v3.30.3
-kubectl --kubeconfig=./capi-quickstart.kubeconfig set image -n kube-system deployment/calico-kube-controllers \
-  calico-kube-controllers=quay.io/calico/kube-controllers:v3.30.3
+# CAPD nodes won't be ready until we install CNI
+# Download Calico manifest and replace docker.io images with quay.io to avoid Docker Hub rate limits
+curl -sL https://raw.githubusercontent.com/projectcalico/calico/v3.30.3/manifests/calico.yaml \
+  | sed 's|docker.io/calico/|quay.io/calico/|g' \
+  | kubectl --kubeconfig=./capi-quickstart.kubeconfig apply -f -
 # monitor CAPD cluster and wait for it to become ready
 watch -c clusterctl describe cluster capi-quickstart --color
 ```
