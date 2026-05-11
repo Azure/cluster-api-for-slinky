@@ -108,9 +108,12 @@ kubectl patch storageclass local-path -p '{"metadata":{"annotations":{"defaultVo
 # relax pod security for local storage to work
 kubectl label ns local-path-storage pod-security.kubernetes.io/enforce=privileged --overwrite
 kubectl label ns local-path-storage pod-security.kubernetes.io/enforce-version=latest --overwrite
-helm install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.18.2 --set 'crds.enabled=true' --namespace cert-manager --create-namespace
+# Pin platform Deployments installed as raw manifests (calico-kube-controllers, coredns,
+# local-path-provisioner) to the controller node, so cluster-autoscaler can scale compute in.
+./scripts/pin-platform-pods.sh
+helm install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.18.2 -f cert-manager-values.yaml --namespace cert-manager --create-namespace
 helm install slurm-operator-crds oci://ghcr.io/slinkyproject/charts/slurm-operator-crds
-helm install slurm-operator oci://ghcr.io/slinkyproject/charts/slurm-operator --namespace=slinky --create-namespace
+helm install slurm-operator oci://ghcr.io/slinkyproject/charts/slurm-operator -f slurm-operator-values.yaml --namespace=slinky --create-namespace
 helm install slurm oci://ghcr.io/slinkyproject/charts/slurm -f slurm-cluster.yaml --set-file "loginsets.slinky.rootSshAuthorizedKeys=${HOME}/.ssh/id_rsa.pub" --namespace=slurm --create-namespace
 kubectl label ns slurm pod-security.kubernetes.io/enforce=privileged --overwrite
 kubectl label ns slurm pod-security.kubernetes.io/enforce-version=latest --overwrite
@@ -122,7 +125,9 @@ Next, we set up Prometheus/Grafana on the workload cluster:
 export KUBECONFIG="$(pwd)/capi-quickstart.kubeconfig"
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
-helm install prometheus prometheus-community/kube-prometheus-stack --set 'prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false' --set 'prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false' --namespace=prometheus --create-namespace
+# All non-DaemonSet prometheus components are pinned to controller via prometheus-values.yaml;
+# prometheus-node-exporter (DaemonSet) is intentionally left to run on every node.
+helm install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml --namespace=prometheus --create-namespace
 kubectl label ns prometheus pod-security.kubernetes.io/enforce=privileged --overwrite
 kubectl label ns prometheus pod-security.kubernetes.io/enforce-version=latest --overwrite
 # check status
@@ -153,6 +158,21 @@ squeue
 sacct
 ```
 
+## Platform pod placement
+
+Compute nodes are tainted with `slinky.slurm.net/controller:NoSchedule` on the controller MachineDeployment only; the MachinePool used for compute is untainted so general Kubernetes workloads can land freely. Slurm NodeSet pods reach compute nodes via `nodeAffinity` (no toleration needed).
+
+Every other platform component (`cert-manager`, `slurm-operator`, `kube-prometheus-stack`, `keda`, `local-path-provisioner`, `coredns`, `calico-kube-controllers`) is pinned to the controller node so that **no non-DaemonSet pod ever lands on a compute node and blocks cluster-autoscaler scale-in**. DaemonSets (`calico-node`, `kube-proxy`, `prometheus-node-exporter`) intentionally run everywhere — they don't block scale-in.
+
+| File | Used by |
+|---|---|
+| `cert-manager-values.yaml` | `helm install cert-manager -f cert-manager-values.yaml` |
+| `slurm-operator-values.yaml` | `helm install slurm-operator -f slurm-operator-values.yaml` |
+| `slurm-cluster.yaml` | `helm install slurm -f slurm-cluster.yaml` (head pods + NodeSet affinity) |
+| `prometheus-values.yaml` | `helm install prometheus -f prometheus-values.yaml` |
+| `keda-values.yaml` | `helm install keda -f keda-values.yaml` |
+| `scripts/pin-platform-pods.sh` | Post-install patches for raw-manifest Deployments (coredns, calico-kube-controllers, local-path-provisioner) |
+
 ## Locally building Slinky
 
 ```bash
@@ -160,7 +180,7 @@ sacct
 docker run -d --restart=always -p 5000:5000 --name slinky-reg registry:2
 # in another slurm-operator repo, run `make push REGISTRY=host.docker.internal:5000/slinky`, then we switch to CAPD cluster and install:
 helm install slurm-operator-crds oci://host.docker.internal:5000/slinky/charts/slurm-operator-crds
-helm install slurm-operator oci://host.docker.internal:5000/slinky/charts/slurm-operator --namespace=slinky --create-namespace
+helm install slurm-operator oci://host.docker.internal:5000/slinky/charts/slurm-operator -f slurm-operator-values.yaml --namespace=slinky --create-namespace
 helm install slurm oci://host.docker.internal:5000/slinky/charts/slurm -f slurm-cluster.yaml --set-file "loginsets.slinky.rootSshAuthorizedKeys=${HOME}/.ssh/id_rsa.pub" --namespace=slurm --create-namespace
 kubectl label ns slurm pod-security.kubernetes.io/enforce=privileged --overwrite
 kubectl label ns slurm pod-security.kubernetes.io/enforce-version=latest --overwrite
@@ -197,7 +217,7 @@ We then install KEDA to scale the Slurm NodeSet based on Prometheus metrics of p
 export KUBECONFIG="$(pwd)/capi-quickstart.kubeconfig"
 helm repo add kedacore https://kedacore.github.io/charts
 helm repo update
-helm install keda kedacore/keda --namespace keda --create-namespace
+helm install keda kedacore/keda -f keda-values.yaml --namespace keda --create-namespace
 kubectl apply -f nodeset-scaledobject.yaml
 ```
 

@@ -1,0 +1,26 @@
+# Pins all KEDA components to the controller (head) node.
+# None of KEDA's components are DaemonSets, so any pod on a compute node
+# would block cluster-autoscaler scale-in.
+
+nodeSelector:
+  slinky.slurm.net/node-type: controller
+tolerations:
+- key: slinky.slurm.net/controller
+  operator: Exists
+  effect: NoSchedule
+
+metricsServer:
+  nodeSelector:
+    slinky.slurm.net/node-type: controller
+  tolerations:
+  - key: slinky.slurm.net/controller
+    operator: Exists
+    effect: NoSchedule
+
+webhooks:
+  nodeSelector:
+    slinky.slurm.net/node-type: controller
+  tolerations:
+  - key: slinky.slurm.net/controller
+    operator: Exists
+    effect: NoSchedule

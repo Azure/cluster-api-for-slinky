@@ -101,7 +101,7 @@ spec:
         matchResources:
           machinePoolClass:
             names:
-            - default-worker
+            - compute-worker
     - jsonPatches:
       - op: add
         path: /spec/template/spec/customImage
@@ -249,8 +249,8 @@ spec:
         templateRef:
           apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
           kind: KubeadmConfigTemplate
-          name: quick-start-default-worker-bootstraptemplate
-      class: default-worker
+          name: quick-start-compute-worker-bootstraptemplate
+      class: compute-worker
       infrastructure:
         templateRef:
           apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
@@ -342,6 +342,43 @@ spec:
           kubeletExtraArgs:
           - name: eviction-hard
             value: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
+          taints:
+          - key: slinky.slurm.net/controller
+            effect: NoSchedule
+      preKubeadmCommands:
+      - apt update -y
+      - apt install -y openssh-server
+      - mkdir -p /etc/ssh
+      - echo "ssh-rsa 
+        AAAAB3NzaC1yc2EAAAADAQABAAACAQDAP2jl12fcVLLlgPguzNGT70RVKNbkTz2lcRdnE3XjZs2Fo/y8Qx4Tio1sC72agwV1HdvhsiRxFcy6L78KbQD+TVqkXAP7m/nUNCOR8jc9zAB4abL3QiO5pYAuIkTMkvxrOUas7rXAgUfvKpHJn3wnAYpC+i9p4AJiSbc0KOq/e7TvopqIBxQc7fays3qH7i2CmUqkDDgJYfma1rM1M8N3SJvRlo9posHgGte3BRib8Anh1YwKJtIvAJ+dChylJf2iilgQId5BCVGcquTveBHB44GZwh6ilegV4PcdBLNSTChhExSMcLopb/5asWKx//V8AH7+9YO+rwycH3OzX7iDCGWL8w+xU2LY3xsAb59XmTHvy5SbQKJW8rIrQE1RM6Ak/scDtQLDTAi7aLqKM1YHv8use+iw8Ila3NgItg4y4vRX1DCTp+M+syllE65tPPRbKaWGJFhleLCa2eyhIM7Sb+kg70fhGcO9CPAlGeE+lanzOZzS2vQR6ApkYVDpL01FpAabeBpC/x29M4n4anhN0OAm8If7gMdrQ7p1mj/YfwzdKee+inGpjYDACaKSEO9jPhQmPOIxwt4W6qSPfsPC7nC6/HRUKijhFnc26XweMErhMgUD5d37fIN1SFaZi2IKqDujsYuYftRwLJjn6Njqu1BRhgWmjgj6MNEH95BhNQ==
+        arsdr@DESKTOP-NARBG5S" > /etc/ssh/authorized_keys
+      - echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
+      - echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
+      - echo "AuthorizedKeysFile /etc/ssh/authorized_keys .ssh/authorized_keys 
+        .ssh/authorized_keys2" >> /etc/ssh/sshd_config
+      - systemctl enable ssh
+      - systemctl start ssh
+      - if ! grep -q SLINKY-REGISTRY-START /etc/containerd/config.toml; then [ 
+        -f /etc/containerd/config.toml ] || containerd config default > 
+        /etc/containerd/config.toml; { echo '# SLINKY-REGISTRY-START'; echo 
+        '[plugins."io.containerd.grpc.v1.cri".registry.mirrors."host.docker.internal:5000"]';
+        echo '  endpoint = ["http://host.docker.internal:5000"]'; echo '# 
+        SLINKY-REGISTRY-END'; } >> /etc/containerd/config.toml; systemctl 
+        restart containerd; fi
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
+kind: KubeadmConfigTemplate
+metadata:
+  name: quick-start-compute-worker-bootstraptemplate
+  namespace: default
+spec:
+  template:
+    spec:
+      joinConfiguration:
+        nodeRegistration:
+          kubeletExtraArgs:
+          - name: eviction-hard
+            value: nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%
       preKubeadmCommands:
       - apt update -y
       - apt install -y openssh-server
@@ -405,7 +442,7 @@ spec:
           labels:
             slinky.slurm.net/node-type: controller
       machinePools:
-      - class: default-worker
+      - class: compute-worker
         name: mp-0
         metadata:
           annotations:

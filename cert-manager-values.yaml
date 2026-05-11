@@ -1,0 +1,36 @@
+# Pins all cert-manager components to the controller (head) node.
+# Any non-DaemonSet pod on a compute node would block cluster-autoscaler scale-in.
+
+crds:
+  enabled: true
+
+nodeSelector:
+  slinky.slurm.net/node-type: controller
+tolerations:
+- key: slinky.slurm.net/controller
+  operator: Exists
+  effect: NoSchedule
+
+webhook:
+  nodeSelector:
+    slinky.slurm.net/node-type: controller
+  tolerations:
+  - key: slinky.slurm.net/controller
+    operator: Exists
+    effect: NoSchedule
+
+cainjector:
+  nodeSelector:
+    slinky.slurm.net/node-type: controller
+  tolerations:
+  - key: slinky.slurm.net/controller
+    operator: Exists
+    effect: NoSchedule
+
+startupapicheck:
+  nodeSelector:
+    slinky.slurm.net/node-type: controller
+  tolerations:
+  - key: slinky.slurm.net/controller
+    operator: Exists
+    effect: NoSchedule

@@ -11,6 +11,10 @@ controller:
     serviceMonitor:
       enabled: true
   podSpec:
+    tolerations:
+    - key: slinky.slurm.net/controller
+      operator: Exists
+      effect: NoSchedule
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
@@ -43,6 +47,10 @@ loginsets:
       id_provider = files
       auth_provider = none
     podSpec:
+      tolerations:
+      - key: slinky.slurm.net/controller
+        operator: Exists
+        effect: NoSchedule
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -79,6 +87,10 @@ nodesets:
             topologyKey: "kubernetes.io/hostname"
 restapi:
   podSpec:
+    tolerations:
+    - key: slinky.slurm.net/controller
+      operator: Exists
+      effect: NoSchedule
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:

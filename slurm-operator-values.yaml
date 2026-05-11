@@ -1,0 +1,31 @@
+# Pins slurm-operator and its webhook to the controller (head) node, so they
+# never land on compute nodes and block cluster-autoscaler scale-in.
+operator:
+  tolerations:
+  - key: slinky.slurm.net/controller
+    operator: Exists
+    effect: NoSchedule
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: "slinky.slurm.net/node-type"
+            operator: In
+            values:
+            - "controller"
+
+webhook:
+  tolerations:
+  - key: slinky.slurm.net/controller
+    operator: Exists
+    effect: NoSchedule
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: "slinky.slurm.net/node-type"
+            operator: In
+            values:
+            - "controller"
