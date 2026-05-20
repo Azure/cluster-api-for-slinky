@@ -9,6 +9,7 @@ nodes:
 - role: control-plane
   image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
   extraPortMappings:
+  # Expose AWX service on localhost:32000 for local UI access.
   - containerPort: 32000
     hostPort: 32000
     listenAddress: "0.0.0.0" # Optional, defaults to "0.0.0.0"
@@ -23,7 +24,11 @@ nodes:
   # uncomment the following only if you want to fix the "project from filesystem" feature of AWX (i.e. getting rid of Gitea)
   # - hostPath: ./projects
   #   containerPath: /data/projects
+  # Exposes the host kubeconfig to in-cluster consumers via hostPath /root/.kube:
+  #   - AWX / ansible-runner (mounted at /runner/.kube, see awx.yaml, pod-spec-override.yaml)
+  #   - cluster-autoscaler   (mounted at /mnt/kubeconfig, see cluster-autoscaler.yaml)
   - hostPath: ${HOME}/.kube
     containerPath: /root/.kube
+  # required by CAPD (capd-controller-manager may be scheduled on either kind node)
   - hostPath: /var/run/docker.sock
     containerPath: /var/run/docker.sock
