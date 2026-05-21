@@ -18,7 +18,7 @@ Non-Autoscale Mode (--no-autoscale):
   - Autoscaler annotation removed if previously present (idempotent rollback)
 
 Other Features:
-  - Kubernetes version detection from kind-config.yaml (override with --kubernetes-version)
+  - Default Kubernetes version baked in as DEFAULT_K8S_VERSION (override with --kubernetes-version)
   - SSH enablement on node bootstrap (preKubeadmCommands, idempotent public key injection)
     - Insecure HTTP registry enablement for host.docker.internal:5000 (containerd config.toml patch, idempotent)
   - Role labels: MachineDeployment=controller, MachinePool=compute
@@ -27,7 +27,6 @@ Other Features:
 
 Exit codes:
   0 success
-  1 missing kubernetes version determination
   2 SSH key issues
   3 ruamel.yaml missing
 
@@ -54,7 +53,9 @@ yaml_rt.preserve_quotes = True
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT = REPO_ROOT / "capi-quickstart.yaml"
-KIND_CONFIG = REPO_ROOT / "kind-config.yaml"
+# Default Kubernetes version for the workload (CAPD) cluster. Keep in sync with
+# the kindest/node image pinned in pulumi/infra-local/ca4s_local/ctlptl_cluster.py.
+DEFAULT_K8S_VERSION = "v1.34.0"
 DEFAULT_SSH_KEY_PATH = Path.home() / ".ssh" / "id_rsa.pub"
 
 SSH_COMMANDS_TEMPLATE = [
@@ -81,6 +82,12 @@ AUTOSCALER_MIN_VALUE = "1"
 AUTOSCALER_MAX_ANNOTATION = "cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size"
 AUTOSCALER_MAX_VALUE = "10"
 
+# TODO(host-registry-port): hardcoded for now to match the legacy ctlptl.yaml
+# behavior. Now that ctlptl.yaml uses ${RANDOM_PORT}, the registry's host port
+# is chosen by Pulumi at create-time (see pulumi/infra-local). This constant
+# should accept the port via CLI flag / env var (e.g. CA4S_HOST_REGISTRY_PORT)
+# and the bootstrap stack should pass `pulumi stack output random_port` into
+# it so the CAPD containerd mirror matches the registry's actual port.
 DEFAULT_HOST_REGISTRY = "host.docker.internal:5000"
 
 # Track style/preamble for multi-doc YAML
@@ -90,19 +97,6 @@ _MULTI_DOC_STYLE: dict[str, Any] = {
 }
 
 # ---------------- Utility Functions ---------------- #
-
-def detect_k8s_version(kind_config: Path) -> Optional[str]:
-    if not kind_config.exists():
-        return None
-    for line in kind_config.read_text().splitlines():
-        line = line.strip()
-        if line.startswith("image:") and "kindest/node:v" in line:
-            part = line.split("kindest/node:", 1)[1]
-            tag = part.split("@", 1)[0]
-            if tag.startswith("v"):
-                return tag
-    return None
-
 
 def run_clusterctl(cluster_name: str, flavor: str, k8s_version: str, cp_replicas: int, md_replicas: int) -> str:
     cmd = [
@@ -365,7 +359,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate customized capi-quickstart.yaml")
     parser.add_argument("--cluster-name", default="capi-quickstart", help="Cluster name (default: capi-quickstart)")
     parser.add_argument("--flavor", default="development", help="clusterctl flavor to use (default: development)")
-    parser.add_argument("--kubernetes-version", dest="k8s_version", help="Explicit Kubernetes version (e.g. v1.34.0); if omitted, parsed from kind-config.yaml")
+    parser.add_argument("--kubernetes-version", dest="k8s_version", default=DEFAULT_K8S_VERSION, help=f"Kubernetes version (default: {DEFAULT_K8S_VERSION})")
     parser.add_argument("--control-plane-replicas", type=int, default=1, help="Control plane replicas (default: 1)")
     parser.add_argument("--machinedeployment-replicas", type=int, default=1, help="MachineDeployment replicas (default: 1)")
     parser.add_argument("--machinepool-replicas", type=int, default=1, help="MachinePool replicas (default: 1)")
@@ -394,16 +388,12 @@ def read_ssh_key(path_arg: Optional[Path]) -> str:
 
 def main() -> int:
     args = parse_args()
-    k8s_version = args.k8s_version or detect_k8s_version(KIND_CONFIG)
-    if not k8s_version:
-        print("ERROR: Could not determine Kubernetes version (provide --kubernetes-version)", file=sys.stderr)
-        return 1
     public_key = read_ssh_key(args.ssh_public_key)
 
     raw_yaml = run_clusterctl(
         cluster_name=args.cluster_name,
         flavor=args.flavor,
-        k8s_version=k8s_version,
+        k8s_version=args.k8s_version,
         cp_replicas=args.control_plane_replicas,
         md_replicas=args.machinedeployment_replicas,
     )

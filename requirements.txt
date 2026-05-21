@@ -2,3 +2,6 @@
 
 # YAML round-trip preservation for generate_capi_quickstart.py
 ruamel.yaml>=0.18,<0.19
+
+# Pulumi Python SDK (used by stacks under pulumi/*/)
+pulumi>=3.0,<4.0

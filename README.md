@@ -14,11 +14,34 @@ CAPS enables efficient management at scale of Slinky-based converged Slurm and K
 
 Currently only local clusters powered by Cluster API Provider Docker (CAPD) is supported.
 
-Create a local Kubernetes cluster as the management cluster.
+### Prerequisites
+
+Install the following on a Linux host (or WSL2 on Windows; macOS support is TODO):
+
+| Tool | Purpose | Install |
+|---|---|---|
+| [Docker](https://docs.docker.com/engine/install/) | Container runtime hosting both the kind nodes and the CAPD workload-cluster containers | distro package or Docker Desktop |
+| [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) | Spins up the management Kubernetes cluster | `go install sigs.k8s.io/kind@latest` |
+| [`ctlptl`](https://github.com/tilt-dev/ctlptl) | Declarative front-end that wraps `kind` to create the management cluster + local image registry (driven by Pulumi, see below) | `go install github.com/tilt-dev/ctlptl/cmd/ctlptl@latest` |
+| [`pulumi`](https://www.pulumi.com/docs/install/) | Drives the local bootstrap stack (`pulumi/infra-local`), which is the sole supported way to bring up the management cluster | `curl -fsSL https://get.pulumi.com \| sh` |
+| `kubectl`, `helm`, `clusterctl` | Standard tooling for the post-bootstrap steps below | upstream binaries |
+
+### Bringing up the management cluster
+
+The repo ships a Pulumi program under [`pulumi/infra-local`](pulumi/infra-local) that:
+1. Creates a local image registry (`CtlptlRegistry`) on an ephemeral host port that ctlptl picks via [freeport](https://github.com/phayes/freeport) and persists in Pulumi state.
+2. Creates the management kind cluster (`CtlptlCluster`) from a vendored manifest, wired to the registry created in step 1 and to your `$HOME/.kube` for in-cluster kubeconfig mounts.
+
+The ctlptl manifest is vendored inside the Pulumi program ([`pulumi/infra-local/ca4s_local/ctlptl_cluster.py`](pulumi/infra-local/ca4s_local/ctlptl_cluster.py)); there is no on-disk YAML to edit. The legacy [`ctlptl.yaml`](ctlptl.yaml) and [`setup.sh`](setup.sh) at the repo root are **deprecated** and only kept as historical references.
 
 ```bash
-envsubst < kind-config.yaml | kind create cluster --config -
-kubectl cluster-info --context kind-kind
+cd pulumi/infra-local
+pulumi up
+# Read what Pulumi created:
+CONTEXT=$(pulumi stack output context)           # e.g. kind-mgmt-<hash>
+REGISTRY_PORT=$(pulumi stack output registry_port) # e.g. 43181
+kubectl cluster-info --context "$CONTEXT"
+echo "local registry at localhost:${REGISTRY_PORT}"
 ```
 
 To work around an AWX missing feature regarding using manual projects (see [this](https://github.com/ansible/awx/issues/1288) and [this](https://forum.ansible.com/t/how-to-import-inventory-files-from-ansible/28655/7)), we need to install a Git server, e.g. Gitea.
@@ -55,7 +78,13 @@ helm install my-awx-operator awx-operator/awx-operator -n awx --create-namespace
 kubectl get secret awx-admin-password -n awx -o jsonpath="{.data.password}" | base64 --decode ; echo
 ```
 
-Using your AWX `admin` username and password, log in to AWX portal at `localhost:32000`.
+Using your AWX `admin` username and password, log in to AWX. Forward the AWX service to a local port (the kind cluster no longer publishes 32000 on the host — we use just-in-time port forwarding instead to avoid conflicts):
+
+```bash
+kubectl -n awx port-forward svc/awx-service 8080:80
+```
+
+Then browse to `http://localhost:8080`.
 
 Go to `Administration -> Instance Groups -> default`, press `Edit`, then check `Customize pod specification` and paste `pod-spec-override.yaml` into the `Custom pod spec` field, in order for the kubeconfig directory to properly mount into AWX runners, so that AWX can access data of management cluster. (TODO: instead of this kubeconfig mounting hack, properly introduce k8s credentials into AWX via awx-operator or some other methods)
 
@@ -175,9 +204,25 @@ Every other platform component (`cert-manager`, `slurm-operator`, `kube-promethe
 
 ## Locally building Slinky
 
+<!--
+TODO(host-registry-port): the helm-oci pulls below hardcode
+`host.docker.internal:5000`. The registry's host port is now allocated at
+runtime by Pulumi (see `pulumi -C pulumi/infra-local stack output
+registry_port`), so these commands will fail until callers either:
+  (a) read the chosen port from the stack output and substitute it in, or
+  (b) reach the registry by its container name on the kind network
+      (`pulumi -C pulumi/infra-local stack output registry_name`, port 5000)
+      from inside the cluster.
+The matching containerd mirror in capi-quickstart.yaml is also stale; see
+the TODO in scripts/generate_capi_quickstart.py.
+-->
+
 ```bash
-# host.docker.internal:5000 is our local container registry for Slinky development
-docker run -d --restart=always -p 5000:5000 --name slinky-reg registry:2
+# Local container registry for Slinky development, created by the Pulumi
+# bootstrap stack (pulumi/infra-local). Read its host-side address with:
+#   pulumi -C pulumi/infra-local stack output registry_port
+# and its in-cluster container name with:
+#   pulumi -C pulumi/infra-local stack output registry_name
 # in another slurm-operator repo, run `make push REGISTRY=host.docker.internal:5000/slinky`, then we switch to CAPD cluster and install:
 helm install slurm-operator-crds oci://host.docker.internal:5000/slinky/charts/slurm-operator-crds
 helm install slurm-operator oci://host.docker.internal:5000/slinky/charts/slurm-operator -f slurm-operator-values.yaml --namespace=slinky --create-namespace

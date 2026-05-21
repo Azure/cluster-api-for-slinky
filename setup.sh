@@ -3,8 +3,30 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-# Create a local Kubernetes cluster as the management cluster
-envsubst < kind-config.yaml | kind create cluster --config -
+# =============================================================================
+# DEPRECATED — DO NOT USE
+# =============================================================================
+# This script is kept only as a historical reference for the manual command
+# sequence. It is NOT exercised in CI and is known to be out of date with the
+# rest of the repo. Concretely:
+#
+#   * The kind cluster + image registry are now provisioned by the Pulumi
+#     stack at pulumi/infra-local (see README "Bringing up the management
+#     cluster"). The sed-based render below targets a stale on-disk
+#     ctlptl.yaml whose port handling no longer matches what downstream
+#     consumers expect.
+#   * The registry's host port is allocated at runtime by Pulumi and exposed
+#     via `pulumi -C pulumi/infra-local stack output registry_port`; the
+#     hardcoded `host.docker.internal:5000` references below are wrong.
+#   * Cluster context is no longer `kind-kind` — it is the Pulumi-managed
+#     `kind-mgmt-*` context (`pulumi stack output context`).
+#
+# Use the Pulumi bootstrap instead. This file will be removed in a future
+# cleanup pass.
+# =============================================================================
+
+# Create a local Kubernetes cluster (and its local registry) as the management cluster
+sed "s|\${HOME}|$HOME|g" ctlptl.yaml | ctlptl apply -f -
 kubectl cluster-info --context kind-kind
 
 # TODO: remove this workaround by allowing AWX to use manual projects directly
