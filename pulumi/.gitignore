@@ -1,4 +1,4 @@
-# Pulumi local backend state (if used) and editor leftovers.
+# Pulumi local backend state for the umbrella stack at this project root.
 .state/
 __pycache__/
 *.pyc
@@ -8,3 +8,8 @@ __pycache__/
 # Output.secret). Pulumi recreates this file on every invocation, so it
 # can't be deleted; it just doesn't belong in Git for a local-backend PoC.
 Pulumi.*.yaml
+
+# pytest / mypy caches generated when running the test scaffold under
+# tests/. Safe to delete at any time.
+.pytest_cache/
+.mypy_cache/

@@ -95,7 +95,7 @@ Pickling note
 -------------
 Pulumi serializes the provider class into stack state via cloudpickle. Keep
 this module dependency-light (stdlib + ``pulumi`` only) and stable in module
-path (``ca4s_local.ctlptl_registry``) so the cloudpickled state round-trips.
+path (``ctlptl.ctlptl_registry``) so the cloudpickled state round-trips.
 """
 
 from __future__ import annotations

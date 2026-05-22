@@ -3,5 +3,22 @@
 # YAML round-trip preservation for generate_capi_quickstart.py
 ruamel.yaml>=0.18,<0.19
 
-# Pulumi Python SDK (used by stacks under pulumi/*/)
+# Pulumi Python SDK (used by the umbrella stack at pulumi/)
 pulumi>=3.0,<4.0
+
+# Pulumi providers used by the gitops phase of pulumi/__main__.py
+pulumi-kubernetes>=4.0,<5.0
+pulumi-random>=4.0,<5.0
+
+# ---------------------------------------------------------------------------
+# Test / dev tooling. Imported only from pulumi/tests/. Not needed at
+# runtime for ``pulumi up``; kept in the same file (instead of a separate
+# requirements-dev.txt) to keep ``setup.sh`` to one ``pip install -r`` call.
+# ---------------------------------------------------------------------------
+
+# Test runner + plugins.
+pytest>=8.0,<9.0
+pytest-mock>=3.10,<4.0
+
+# HTTP mocking for the Gitea API wrappers in pulumi/gitrepo/gitea_*.py.
+responses>=0.25,<1.0

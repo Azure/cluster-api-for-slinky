@@ -1,0 +1,67 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+#
+# Declarative ctlptl manifest for the local kind cluster.
+#
+# The companion image registry is no longer defined here: it's a separate
+# Pulumi resource (``CtlptlRegistry`` in pulumi/) that lets ctlptl
+# pick the host port itself via freeport, and whose ``Registry.name`` is
+# Pulumi-autonamed. The Pulumi program substitutes the autonamed value into
+# the ``${REGISTRY_NAME}`` placeholder below before calling ``ctlptl apply``,
+# and declares the necessary depends_on edge so the registry container
+# exists before this manifest is applied.
+#
+# This file uses shell-style ${VAR} placeholders which ctlptl itself does NOT
+# expand. The Pulumi bootstrap stack (pulumi/) substitutes:
+#   - ${HOME}          → expanded from the program's $HOME environment.
+#   - ${REGISTRY_NAME} → expanded from ``CtlptlRegistry.registry_name``.
+#   - ${CLUSTER_NAME}  → expanded from ``CtlptlCluster.cluster_name``
+#                        (substituted inside the provider because the value
+#                        only resolves during the resource's ``check()``).
+#
+# TODO(host-registry-port): Downstream consumers that bake in
+# `host.docker.internal:5000` are out of sync once the registry's port is
+# chosen by ctlptl at runtime. They need to read the chosen port from the
+# Pulumi stack output `registry_port`. Affected sites:
+#   - capi-quickstart.yaml (containerd mirror in CAPD workload nodes)
+#   - scripts/generate_capi_quickstart.py (DEFAULT_HOST_REGISTRY)
+#   - README.md (helm install oci://host.docker.internal:5000/...)
+# Wiring those through is the next step; see the matching TODOs in each file.
+---
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: kind
+name: ${CLUSTER_NAME}
+registry: ${REGISTRY_NAME}
+kindV1Alpha4Cluster:
+  apiVersion: kind.x-k8s.io/v1alpha4
+  kind: Cluster
+  networking:
+    ipFamily: dual
+  nodes:
+  - role: control-plane
+    image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
+    extraPortMappings:
+    # Expose AWX service on localhost:32000 for local UI access.
+    - containerPort: 32000
+      hostPort: 32000
+      listenAddress: "0.0.0.0"
+      protocol: tcp
+    extraMounts:
+    # required by CAPD
+    - hostPath: /var/run/docker.sock
+      containerPath: /var/run/docker.sock
+  - role: worker
+    image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
+    extraMounts:
+    # uncomment the following only if you want to fix the "project from filesystem" feature of AWX (i.e. getting rid of Gitea)
+    # - hostPath: ./projects
+    #   containerPath: /data/projects
+    # Exposes the host kubeconfig to in-cluster consumers via hostPath /root/.kube:
+    #   - AWX / ansible-runner (mounted at /runner/.kube, see awx.yaml, pod-spec-override.yaml)
+    #   - cluster-autoscaler   (mounted at /mnt/kubeconfig, see cluster-autoscaler.yaml)
+    - hostPath: ${HOME}/.kube
+      containerPath: /root/.kube
+    # required by CAPD (capd-controller-manager may be scheduled on either kind node)
+    - hostPath: /var/run/docker.sock
+      containerPath: /var/run/docker.sock

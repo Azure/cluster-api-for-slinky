@@ -11,12 +11,12 @@
 # rest of the repo. Concretely:
 #
 #   * The kind cluster + image registry are now provisioned by the Pulumi
-#     stack at pulumi/infra-local (see README "Bringing up the management
+#     stack at pulumi/ (see README "Bringing up the management
 #     cluster"). The sed-based render below targets a stale on-disk
 #     ctlptl.yaml whose port handling no longer matches what downstream
 #     consumers expect.
 #   * The registry's host port is allocated at runtime by Pulumi and exposed
-#     via `pulumi -C pulumi/infra-local stack output registry_port`; the
+#     via `pulumi -C pulumi stack output registry_port`; the
 #     hardcoded `host.docker.internal:5000` references below are wrong.
 #   * Cluster context is no longer `kind-kind` — it is the Pulumi-managed
 #     `kind-mgmt-*` context (`pulumi stack output context`).

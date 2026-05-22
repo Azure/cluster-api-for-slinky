@@ -1,0 +1,34 @@
+name: ca4s-infra-local
+description: |
+  End-to-end local bootstrap for the management cluster. Single ``pulumi up``
+  brings up:
+
+    * kind cluster + image registry + cloud-provider-kind LoadBalancer
+      controller (``ctlptl`` package, sibling of this file).
+    * GitOps source-of-truth — by default an in-cluster Gitea seeded with
+      this repo's current HEAD; swappable via ``gitops_provider`` config
+      (``gitrepo`` package, sibling of this file).
+    * Flux bootstrap — *not yet implemented*; see the TODO block in
+      ``__main__.py``.
+
+  Layout: this project's root is ``pulumi/``. Both ``ctlptl/`` and
+  ``gitrepo/`` are sibling Python packages of this file. Pulumi puts the
+  project root on ``sys.path`` for both the language host and every
+  dynamic-Resource worker subprocess it spawns, so ``import ctlptl`` /
+  ``import gitrepo`` work everywhere without any editable install,
+  ``sys.path`` shim, or ``PYTHONPATH`` wiring.
+
+  TODO(multi-target): the project name still includes ``-local`` because
+  phase 1 currently only knows how to bring up a kind cluster. When we add
+  EKS / GKE / AKS variants, expect to either rename to ``ca4s-infra`` and
+  dispatch on a ``cluster_provider`` config key (mirror of the existing
+  ``gitops_provider`` pattern), or split the cloud and local entrypoints
+  into sibling subprojects (``pulumi/local/Pulumi.yaml``,
+  ``pulumi/aws/Pulumi.yaml``, ...) that share ``ctlptl/`` / ``gitrepo/``
+  via an editable install of a ``pulumi/libs/`` package — see the matching
+  TODO at the top of ``__main__.py``.
+runtime:
+  name: python
+  options:
+    # Reuse the repo-root .venv so we don't fragment Python environments.
+    virtualenv: ../.venv

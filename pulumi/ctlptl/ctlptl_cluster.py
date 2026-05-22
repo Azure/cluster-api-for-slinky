@@ -117,7 +117,7 @@ Pickling note
 -------------
 Pulumi serializes the provider class into stack state via cloudpickle. Keeping
 this module dependency-light (stdlib + ``pulumi`` only) and stable in module
-path (``ca4s_local.ctlptl_cluster``) keeps that round-trip robust.
+path (``ctlptl.ctlptl_cluster``) keeps that round-trip robust.
 """
 
 from __future__ import annotations
