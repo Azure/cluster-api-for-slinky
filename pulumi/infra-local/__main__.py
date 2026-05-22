@@ -1,6 +1,7 @@
-"""Pulumi program: bring up the local management cluster + registry via ctlptl.
+"""Pulumi program: bring up the local management cluster + registry + LB
+controller via ctlptl + cloud-provider-kind.
 
-Two dynamic resources compose the local bootstrap:
+Three dynamic resources compose the local bootstrap:
 
 * ``CtlptlRegistry`` creates a Docker-backed image registry via ``ctlptl apply``
   with no port pin. ctlptl picks a free port using its built-in
@@ -12,19 +13,40 @@ Two dynamic resources compose the local bootstrap:
   reads it from a file. ``${HOME}``, ``${CLUSTER_NAME}``, and
   ``${REGISTRY_NAME}`` are all substituted inside the provider, so
   caller-side code stays plain string + Output passing.
+* ``CloudProviderKind`` spawns the ``cloud-provider-kind`` host daemon
+  which turns ``type: LoadBalancer`` Services on kind into real
+  host-reachable IPs. Host-singleton (one daemon services every kind
+  cluster on this host); no DAG edge to the cluster is needed because
+  the daemon polls Docker and picks up clusters as they appear.
 
 Pulumi's Output→Input dependency tracking enforces creation order
 (registry → cluster) and reverse-order teardown (cluster → registry) so the
 registry container outlives the kind cluster on destroy. No explicit
 ``depends_on`` needed: passing ``registry.registry_name`` as an Input is
-the DAG edge.
+the DAG edge. ``CloudProviderKind`` is independent — it has no Outputs
+that anyone else consumes and creates/destroys in parallel with the rest.
 """
 
 from __future__ import annotations
 
 import pulumi
 
-from ca4s_local import CtlptlCluster, CtlptlRegistry
+from ca4s_local import CloudProviderKind, CtlptlCluster, CtlptlRegistry
+
+# ---------------------------------------------------------------------------
+# Config.
+# ---------------------------------------------------------------------------
+
+_config = pulumi.Config()
+# Default ``True``: on WSL2/Mac/Windows the kind docker bridge is not
+# routable from the host, so we want cloud-provider-kind to publish each
+# LoadBalancer Service via ``docker run -p 127.0.0.1:<port>:<port>`` and
+# advertise ``EXTERNAL-IP=127.0.0.1``. On a pure-Linux host with native
+# Docker, you can override to ``false`` for bridge-IP semantics:
+#     pulumi config set enable_lb_port_mapping false
+_enable_lb_port_mapping = _config.get_bool("enable_lb_port_mapping")
+if _enable_lb_port_mapping is None:
+    _enable_lb_port_mapping = True
 
 # ---------------------------------------------------------------------------
 # Declare the resources.
@@ -50,6 +72,13 @@ cluster = CtlptlCluster(
     registry_name=registry.registry_name,
 )
 
+# Host-side daemon that turns ``type: LoadBalancer`` Services on kind into
+# real host-reachable IPs. The daemon is host-singleton (one process
+# services all kind clusters), so it's a sibling resource, not a child of
+# CtlptlCluster. It needs no DAG edge to the cluster — the daemon polls
+# Docker continuously and picks up new kind clusters as they appear.
+lb = CloudProviderKind("lb", enable_lb_port_mapping=_enable_lb_port_mapping)
+
 # ---------------------------------------------------------------------------
 # Stack outputs.
 # ---------------------------------------------------------------------------
@@ -70,3 +99,6 @@ pulumi.export("registry_port", registry.port)
 pulumi.export("cluster_name", cluster.cluster_name)
 pulumi.export("context", cluster.context)
 pulumi.export("kubeconfig", cluster.kubeconfig)
+pulumi.export("cloud_provider_kind_pid", lb.pid)
+pulumi.export("cloud_provider_kind_log", lb.log_path)
+pulumi.export("cloud_provider_kind_lb_port_mapping", lb.enable_lb_port_mapping)

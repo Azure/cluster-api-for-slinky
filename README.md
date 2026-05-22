@@ -14,23 +14,75 @@ CAPS enables efficient management at scale of Slinky-based converged Slurm and K
 
 Currently only local clusters powered by Cluster API Provider Docker (CAPD) is supported.
 
+### Recommended local setup
+
+| Platform | Recommended | Also supported | Why it matters |
+|---|---|---|---|
+| **Windows (WSL2)** | **Native Docker inside your WSL2 distro** + WSL2 mirrored networking (`networkingMode=mirrored` in `%USERPROFILE%\.wslconfig` on the Windows host) | Docker Desktop with WSL2 integration | Native Docker keeps dockerd + kind bridge + your shell in one network namespace, so the LB EXTERNAL-IP is directly curlable. Docker Desktop runs dockerd in a separate `docker-desktop` distro and isolates the bridge — `localhost:<port>` works, but EXTERNAL-IP does not. |
+| **Linux** | Native Docker (distro package) | — | Just works. |
+| **macOS** | **OrbStack** (proxies container subnets back to the host) | Docker Desktop, Colima, Rancher Desktop, Podman Machine | OrbStack makes LB EXTERNAL-IPs directly curlable from the Mac shell; the others restrict you to `localhost:<port>`. Note: validation of the Gitea hydration path on each Mac runtime is still pending (see [TODOs](#todo)). |
+
+**Windows (WSL2) one-time setup:**
+
+Two files are involved — `.wslconfig` lives on the **Windows side** (global, applies to all distros), `/etc/wsl.conf` lives **inside the distro** (per-distro):
+
+```powershell
+# From PowerShell on Windows — global WSL2 settings (mirrored networking):
+@"
+[wsl2]
+networkingMode=mirrored
+"@ | Set-Content -NoNewline "$env:USERPROFILE\.wslconfig"
+```
+
+```bash
+# Inside your WSL2 distro — per-distro settings (enable systemd):
+sudo tee /etc/wsl.conf >/dev/null <<'EOF'
+[boot]
+systemd=true
+EOF
+
+# install native Docker (replaces Docker Desktop if you had it integrated)
+sudo apt install docker.io docker-buildx
+sudo usermod -aG docker $USER
+```
+
+```powershell
+# Then from PowerShell on Windows, restart the WSL2 VM so both files take effect:
+wsl --shutdown
+# Reopen the distro; systemd will start dockerd. Re-login to pick up docker group.
+# Verify:  wslinfo --networking-mode   # should print: mirrored
+```
+
 ### Prerequisites
 
-Install the following on a Linux host (or WSL2 on Windows; macOS support is TODO):
+Install the following:
 
 | Tool | Purpose | Install |
 |---|---|---|
-| [Docker](https://docs.docker.com/engine/install/) | Container runtime hosting both the kind nodes and the CAPD workload-cluster containers | distro package or Docker Desktop |
+| [Docker](https://docs.docker.com/engine/install/) | Container runtime hosting both the kind nodes and the CAPD workload-cluster containers | see *Recommended local setup* above |
 | [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) | Spins up the management Kubernetes cluster | `go install sigs.k8s.io/kind@latest` |
+| [`cloud-provider-kind`](https://github.com/kubernetes-sigs/cloud-provider-kind) | Host-side daemon that makes `type: LoadBalancer` Services on kind reachable from the host (Pulumi spawns/kills it via the `CloudProviderKind` resource) | `go install sigs.k8s.io/cloud-provider-kind@latest` |
 | [`ctlptl`](https://github.com/tilt-dev/ctlptl) | Declarative front-end that wraps `kind` to create the management cluster + local image registry (driven by Pulumi, see below) | `go install github.com/tilt-dev/ctlptl/cmd/ctlptl@latest` |
 | [`pulumi`](https://www.pulumi.com/docs/install/) | Drives the local bootstrap stack (`pulumi/infra-local`), which is the sole supported way to bring up the management cluster | `curl -fsSL https://get.pulumi.com \| sh` |
 | `kubectl`, `helm`, `clusterctl` | Standard tooling for the post-bootstrap steps below | upstream binaries |
+
+<a id="todo"></a>
+
+#### TODOs (macOS Gitea-hydration path)
+
+The forthcoming GitOps stack (`pulumi/gitops`) will seed Gitea via a one-time
+`git push` from the Pulumi host. Before declaring macOS supported:
+
+- Validate the `kubectl port-forward` + `git push http://localhost:<port>/…` path on **Docker Desktop**, **Colima**, **Rancher Desktop**, **OrbStack**.
+- Decide whether `GiteaSeed` should special-case OrbStack to skip port-forward (uses direct EXTERNAL-IP for speed) or always use port-forward for consistency.
+- Add a Mac-equivalent of the Linux `setcap` preflight in `CloudProviderKind` — likely a `run_as_root: bool` input that wraps `argv` in `sudo -n` and `delete()` in `sudo -n kill`. Only needed if a Mac user wants bridge-IP mode; the default port-mapping mode does not need it.
 
 ### Bringing up the management cluster
 
 The repo ships a Pulumi program under [`pulumi/infra-local`](pulumi/infra-local) that:
 1. Creates a local image registry (`CtlptlRegistry`) on an ephemeral host port that ctlptl picks via [freeport](https://github.com/phayes/freeport) and persists in Pulumi state.
 2. Creates the management kind cluster (`CtlptlCluster`) from a vendored manifest, wired to the registry created in step 1 and to your `$HOME/.kube` for in-cluster kubeconfig mounts.
+3. Spawns the [`cloud-provider-kind`](https://github.com/kubernetes-sigs/cloud-provider-kind) daemon (`CloudProviderKind`) as a detached host process so `type: LoadBalancer` Services on kind get real `127.0.0.1:<port>` IPs. PID + log file are persisted in Pulumi state; the daemon is killed on `pulumi destroy`.
 
 The ctlptl manifest is vendored inside the Pulumi program ([`pulumi/infra-local/ca4s_local/ctlptl_cluster.py`](pulumi/infra-local/ca4s_local/ctlptl_cluster.py)); there is no on-disk YAML to edit. The legacy [`ctlptl.yaml`](ctlptl.yaml) and [`setup.sh`](setup.sh) at the repo root are **deprecated** and only kept as historical references.
 
