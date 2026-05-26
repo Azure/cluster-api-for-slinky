@@ -8,8 +8,8 @@ default ctlptl picks the host port itself when the manifest omits ``port``
 
 Auto-naming
 -----------
-Following the Pulumi convention used by ``aws.s3.Bucket``, ``azure-native``
-resources, etc., the underlying ``Registry.name`` is auto-generated unless
+Following the Pulumi convention used by ``azure-native`` resources, etc.,
+the underlying ``Registry.name`` is auto-generated unless
 the caller pins it explicitly:
 
 * If ``registry_name`` is omitted, ``create()`` derives a name of the form

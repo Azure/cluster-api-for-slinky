@@ -63,7 +63,7 @@ Install the following:
 | [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) | Spins up the management Kubernetes cluster | `go install sigs.k8s.io/kind@latest` |
 | [`cloud-provider-kind`](https://github.com/kubernetes-sigs/cloud-provider-kind) | Host-side daemon that makes `type: LoadBalancer` Services on kind reachable from the host (Pulumi spawns/kills it via the `CloudProviderKind` resource) | `go install sigs.k8s.io/cloud-provider-kind@latest` |
 | [`ctlptl`](https://github.com/tilt-dev/ctlptl) | Declarative front-end that wraps `kind` to create the management cluster + local image registry (driven by Pulumi, see below) | `go install github.com/tilt-dev/ctlptl/cmd/ctlptl@latest` |
-| [`pulumi`](https://www.pulumi.com/docs/install/) | Drives the local bootstrap stack ([`pulumi/`](pulumi/)), which is the sole supported way to bring up the management cluster + Gitea + (eventually) Flux | `curl -fsSL https://get.pulumi.com \| sh` |
+| [`pulumi`](https://www.pulumi.com/docs/install/) | Drives the local bootstrap stack ([`pulumi/`](pulumi/)), which is the sole supported way to bring up the management cluster + Gitea + (eventually) PKO | `curl -fsSL https://get.pulumi.com \| sh` |
 | `kubectl`, `helm`, `clusterctl` | Standard tooling for the post-bootstrap steps below | upstream binaries |
 
 <a id="todo"></a>
@@ -85,33 +85,34 @@ The repo ships a single umbrella Pulumi program under [`pulumi/`](pulumi/) that 
 2. Creates the management kind cluster (`CtlptlCluster`) from a vendored manifest, wired to the registry created in step 1 and to your `$HOME/.kube` for in-cluster kubeconfig mounts.
 3. Spawns the [`cloud-provider-kind`](https://github.com/kubernetes-sigs/cloud-provider-kind) daemon (`CloudProviderKind`) as a detached host process so `type: LoadBalancer` Services on kind get real `127.0.0.1:<port>` IPs. PID + log file are persisted in Pulumi state; the daemon is killed on `pulumi destroy`.
 
-The ctlptl manifest is vendored inside the Pulumi program ([`pulumi/ctlptl/ctlptl_cluster.py`](pulumi/ctlptl/ctlptl_cluster.py)); there is no on-disk YAML to edit. The legacy [`ctlptl.yaml`](ctlptl.yaml) and [`setup.sh`](setup.sh) at the repo root are **deprecated** and only kept as historical references.
+The ctlptl manifest is vendored inside the Pulumi program ([`pulumi/ctlptl/ctlptl_cluster.py`](pulumi/ctlptl/ctlptl_cluster.py)); there is no on-disk YAML to edit. The [`ctlptl.yaml`](ctlptl.yaml) and [`setup.sh`](setup.sh) at the repo root are **deprecated** and will be removed.
 
 Phase 2 — GitOps source (in-cluster Gitea by default; see [`pulumi/gitrepo/`](pulumi/gitrepo/)):
 
 1. Installs Gitea via the upstream Helm chart (pinned in [`gitea_builtin.py`](pulumi/gitrepo/gitea_builtin.py)) into the management cluster — sqlite + in-memory cache, single 2 GiB PVC backing `/data` so the seeded repo survives pod restarts.
-2. Generates a random admin password, stores it as `gitea-credentials` (`username` / `password` keys) in the `gitea` namespace — same Secret consumed by the Gitea chart's `existingSecret` and by downstream Flux `GitRepository.spec.secretRef`.
+2. Generates a random admin password, stores it as `gitea-credentials` (`username` / `password` keys) in the `gitea` namespace — same Secret consumed by the Gitea chart's `existingSecret` and by downstream PKO `Stack.spec.gitAuth.basicAuth` (both `userName` and `password` `SecretKeySelector`s point at this Secret's matching keys).
 3. Exposes Gitea's HTTP service as `type: LoadBalancer` so `cloud-provider-kind` publishes a host-reachable address.
 4. Creates the empty `<admin>/cluster-api-provider-slinky` repository via Gitea's REST API ([`gitea_repo.py`](pulumi/gitrepo/gitea_repo.py)).
 5. Force-pushes the local working tree's current `HEAD` into that repo's default branch ([`gitea_seed.py`](pulumi/gitrepo/gitea_seed.py)) — the seed re-runs only when local `HEAD` moves.
 
-Phase 3 — Flux bootstrap: *not yet implemented*; tracked as a TODO block in [`pulumi/__main__.py`](pulumi/__main__.py).
+Phase 3 — PKO bootstrap: *not yet implemented*; tracked as a TODO block in [`pulumi/stack_local.py`](pulumi/stack_local.py).
 
 ```bash
 cd pulumi
-pulumi up
+pulumi stack init local        # first time only; creates Pulumi.local.yaml
+pulumi up -s local
 # Phase 1 outputs:
-CONTEXT=$(pulumi stack output context)             # e.g. kind-mgmt-<hash>
-REGISTRY_PORT=$(pulumi stack output registry_port) # e.g. 43181
+CONTEXT=$(pulumi stack output context -s local)             # e.g. kind-mgmt-<hash>
+REGISTRY_PORT=$(pulumi stack output registry_port -s local) # e.g. 43181
 kubectl cluster-info --context "$CONTEXT"
 echo "local registry at localhost:${REGISTRY_PORT}"
 
-# Phase 2 outputs (GitOpsRepository contract — consumed by Flux):
-pulumi stack output gitops_url                          # in-cluster URL for Flux GitRepository.spec.url
-pulumi stack output gitops_url_external                 # host-reachable URL, e.g. http://172.18.0.5:3000/...
-pulumi stack output gitops_default_branch               # main
-pulumi stack output gitops_credentials_secret_name      # gitea-credentials
-pulumi stack output gitops_credentials_secret_namespace # gitea
+# Phase 2 outputs (GitOpsRepository contract — consumed by PKO):
+pulumi stack output gitops_url -s local                          # in-cluster URL for PKO Stack.spec.projectRepo
+pulumi stack output gitops_url_external -s local                 # host-reachable URL, e.g. http://172.18.0.5:3000/...
+pulumi stack output gitops_default_branch -s local               # main
+pulumi stack output gitops_credentials_secret_name -s local      # gitea-credentials
+pulumi stack output gitops_credentials_secret_namespace -s local # gitea
 ```
 
 The admin password is stored encrypted in Pulumi state; surface it for AWX / browser use with:
@@ -260,10 +261,10 @@ Every other platform component (`cert-manager`, `slurm-operator`, `kube-promethe
 TODO(host-registry-port): the helm-oci pulls below hardcode
 `host.docker.internal:5000`. The registry's host port is now allocated at
 runtime by Pulumi (see `pulumi -C pulumi stack output
-registry_port`), so these commands will fail until callers either:
+registry_port -s local`), so these commands will fail until callers either:
   (a) read the chosen port from the stack output and substitute it in, or
   (b) reach the registry by its container name on the kind network
-      (`pulumi -C pulumi stack output registry_name`, port 5000)
+      (`pulumi -C pulumi stack output registry_name -s local`, port 5000)
       from inside the cluster.
 The matching containerd mirror in capi-quickstart.yaml is also stale; see
 the TODO in scripts/generate_capi_quickstart.py.
@@ -272,9 +273,9 @@ the TODO in scripts/generate_capi_quickstart.py.
 ```bash
 # Local container registry for Slinky development, created by the Pulumi
 # bootstrap stack (pulumi/). Read its host-side address with:
-#   pulumi -C pulumi stack output registry_port
+#   pulumi -C pulumi stack output registry_port -s local
 # and its in-cluster container name with:
-#   pulumi -C pulumi stack output registry_name
+#   pulumi -C pulumi stack output registry_name -s local
 # in another slurm-operator repo, run `make push REGISTRY=host.docker.internal:5000/slinky`, then we switch to CAPD cluster and install:
 helm install slurm-operator-crds oci://host.docker.internal:5000/slinky/charts/slurm-operator-crds
 helm install slurm-operator oci://host.docker.internal:5000/slinky/charts/slurm-operator -f slurm-operator-values.yaml --namespace=slinky --create-namespace

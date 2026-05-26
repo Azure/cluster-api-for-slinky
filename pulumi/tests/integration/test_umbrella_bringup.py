@@ -19,7 +19,7 @@ import pytest
 
 
 @pytest.mark.integration
-@pytest.mark.skip(reason="TODO: Automation API harness \u2014 create a LocalWorkspace pointing at this pulumi/ dir, init a temp ``ca4s-infra-local`` stack on a file:// backend in tmp_path/.state, set PULUMI_CONFIG_PASSPHRASE='', call stack.up(), assert each of the 12 expected resources is in the result.summary, then stack.destroy() in a finally block")
+@pytest.mark.skip(reason="TODO: Automation API harness \u2014 create a LocalWorkspace pointing at this pulumi/ dir, init a temp ``local`` stack of project ``ca4s-infra`` on a file:// backend in tmp_path/.state, set PULUMI_CONFIG_PASSPHRASE='', call stack.up(), assert each of the 12 expected resources is in the result.summary, then stack.destroy() in a finally block")
 def test_umbrella_up_creates_expected_resources() -> None:
     pass
 

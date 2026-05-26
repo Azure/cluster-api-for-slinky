@@ -54,7 +54,7 @@ yaml_rt.preserve_quotes = True
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT = REPO_ROOT / "capi-quickstart.yaml"
 # Default Kubernetes version for the workload (CAPD) cluster. Keep in sync with
-# the kindest/node image pinned in pulumi/infra-local/ca4s_local/ctlptl_cluster.py.
+# the kindest/node image pinned in pulumi/ctlptl/ctlptl_cluster.py.
 DEFAULT_K8S_VERSION = "v1.34.0"
 DEFAULT_SSH_KEY_PATH = Path.home() / ".ssh" / "id_rsa.pub"
 
@@ -84,7 +84,7 @@ AUTOSCALER_MAX_VALUE = "10"
 
 # TODO(host-registry-port): hardcoded for now to match the legacy ctlptl.yaml
 # behavior. Now that ctlptl.yaml uses ${RANDOM_PORT}, the registry's host port
-# is chosen by Pulumi at create-time (see pulumi/infra-local). This constant
+# is chosen by Pulumi at create-time (see pulumi/). This constant
 # should accept the port via CLI flag / env var (e.g. CA4S_HOST_REGISTRY_PORT)
 # and the bootstrap stack should pass `pulumi stack output random_port` into
 # it so the CAPD containerd mirror matches the registry's actual port.

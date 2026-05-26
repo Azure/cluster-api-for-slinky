@@ -16,10 +16,10 @@
 #     ctlptl.yaml whose port handling no longer matches what downstream
 #     consumers expect.
 #   * The registry's host port is allocated at runtime by Pulumi and exposed
-#     via `pulumi -C pulumi stack output registry_port`; the
+#     via `pulumi -C pulumi stack output registry_port -s local`; the
 #     hardcoded `host.docker.internal:5000` references below are wrong.
 #   * Cluster context is no longer `kind-kind` — it is the Pulumi-managed
-#     `kind-mgmt-*` context (`pulumi stack output context`).
+#     `kind-mgmt-*` context (`pulumi stack output context -s local`).
 #
 # Use the Pulumi bootstrap instead. This file will be removed in a future
 # cleanup pass.

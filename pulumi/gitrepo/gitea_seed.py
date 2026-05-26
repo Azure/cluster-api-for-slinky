@@ -3,17 +3,17 @@
 After :class:`~gitrepo.gitea_repo.GiteaRepo` lands an empty repo
 inside Gitea, this resource force-pushes the current ``HEAD`` of a local
 git working tree to that repo's default branch — the "seed" that gives
-Flux something to reconcile from on its first pass.
+PKO something to reconcile from on its first pass.
 
-Why not just point Flux at GitHub / origin directly?
-----------------------------------------------------
+Why not just point PKO at GitHub / origin directly?
+---------------------------------------------------
 Two reasons this stack exists at all:
 
 1. Air-gapped / offline-dev parity. The reconcile loop should not depend
    on external network availability once the cluster is up.
-2. We want Flux to see exactly the working-tree state the developer is
+2. We want PKO to see exactly the working-tree state the developer is
    iterating on, not the latest push to ``origin``. Hand-editing the
-   manifests, ``pulumi up``, and immediately seeing Flux pick the change
+   manifests, ``pulumi up``, and immediately seeing PKO pick the change
    up is the whole loop this enables.
 
 When the seed re-pushes
@@ -114,8 +114,8 @@ class _GiteaSeedProvider(ResourceProvider):
         # ``HEAD:refs/heads/<branch>`` pushes whatever commit ``HEAD``
         # points at into the named *remote* branch, regardless of what
         # the local branch is called. That's important: the developer
-        # might be on ``feat/whatever`` locally, but the Flux GitOps
-        # repo should always present a clean ``main`` (or whatever
+        # might be on ``feat/whatever`` locally, but the GitOps repo
+        # should always present a clean ``main`` (or whatever
         # ``default_branch`` is). ``--force`` because we *are* the
         # canonical source for this repo.
         subprocess.run(

@@ -8,3 +8,11 @@
 
 # Local working notes
 ROADMAP.local
+
+# Python build / cache artefacts (per-tree .gitignore in pulumi/ also
+# covers its subtree; this root-level entry catches everything else,
+# e.g. scripts/__pycache__/).
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/

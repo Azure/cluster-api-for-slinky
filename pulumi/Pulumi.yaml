@@ -1,34 +1,43 @@
-name: ca4s-infra-local
+name: ca4s-infra
 description: |
-  End-to-end local bootstrap for the management cluster. Single ``pulumi up``
-  brings up:
+  End-to-end Pulumi bootstrap for the management cluster, parameterized by
+  *stack* over multiple target environments.
 
-    * kind cluster + image registry + cloud-provider-kind LoadBalancer
-      controller (``ctlptl`` package, sibling of this file).
-    * GitOps source-of-truth — by default an in-cluster Gitea seeded with
-      this repo's current HEAD; swappable via ``gitops_provider`` config
-      (``gitrepo`` package, sibling of this file).
-    * Flux bootstrap — *not yet implemented*; see the TODO block in
-      ``__main__.py``.
+  Stack-per-target dispatch
+  -------------------------
+  ``main: __main__.py`` is a ~30-line dispatcher that switches on
+  ``pulumi.get_stack()`` and imports the matching ``stack_<name>.py``
+  module:
 
-  Layout: this project's root is ``pulumi/``. Both ``ctlptl/`` and
-  ``gitrepo/`` are sibling Python packages of this file. Pulumi puts the
-  project root on ``sys.path`` for both the language host and every
-  dynamic-Resource worker subprocess it spawns, so ``import ctlptl`` /
-  ``import gitrepo`` work everywhere without any editable install,
-  ``sys.path`` shim, or ``PYTHONPATH`` wiring.
+    * stack ``local``  → ``stack_local.py`` (kind + ctlptl + Gitea — only
+      target currently implemented)
+    * stack ``azure``  → ``stack_azure.py`` *(TODO)*
 
-  TODO(multi-target): the project name still includes ``-local`` because
-  phase 1 currently only knows how to bring up a kind cluster. When we add
-  EKS / GKE / AKS variants, expect to either rename to ``ca4s-infra`` and
-  dispatch on a ``cluster_provider`` config key (mirror of the existing
-  ``gitops_provider`` pattern), or split the cloud and local entrypoints
-  into sibling subprojects (``pulumi/local/Pulumi.yaml``,
-  ``pulumi/aws/Pulumi.yaml``, ...) that share ``ctlptl/`` / ``gitrepo/``
-  via an editable install of a ``pulumi/libs/`` package — see the matching
-  TODO at the top of ``__main__.py``.
+  Each ``stack_<name>.py`` is a self-contained program — it builds its own
+  resources from scratch and exposes its own ``pulumi.export(...)``s.
+  Shared building blocks live in sibling packages:
+
+    * ``ctlptl/``  — kind / cloud-provider-kind / local image registry
+      dynamic resources
+    * ``gitrepo/`` — GitOpsRepository ComponentResource contract +
+      provider implementations (``gitea-builtin`` today; ``github``,
+      ``gitlab`` to follow)
+
+  Both packages are auto-importable because Pulumi adds the project root
+  (``pulumi/``) to ``sys.path`` for the language host AND for every
+  dynamic-Resource worker subprocess. No editable install, no
+  ``sys.path`` shim, no ``PYTHONPATH`` wiring.
+
+  Per-target configuration lives in the corresponding stack config file
+  (``Pulumi.local.yaml``, ``Pulumi.azure.yaml``, ...). ``pulumi config
+  set <key> <value> -s <stack>`` is the canonical way to populate them;
+  they are NOT meant to be hand-edited as a primary workflow.
 runtime:
   name: python
   options:
     # Reuse the repo-root .venv so we don't fragment Python environments.
     virtualenv: ../.venv
+
+# Explicit (matches Pulumi's default). ``__main__.py`` is the dispatcher;
+# the per-target stack body it imports is ``stack_<stackname>.py``.
+main: __main__.py

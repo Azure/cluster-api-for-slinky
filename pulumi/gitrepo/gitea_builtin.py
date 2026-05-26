@@ -2,8 +2,8 @@
 
 This module stands up a self-contained, ephemeral Gitea instance inside the
 management cluster and exposes it through the
-:class:`~gitrepo._base.GitOpsRepository` contract so downstream Flux
-``GitRepository`` resources can consume it without knowing how the git server
+:class:`~gitrepo._base.GitOpsRepository` contract so downstream PKO
+``Stack`` resources can consume it without knowing how the git server
 was created.
 
 What we deploy
@@ -19,10 +19,11 @@ What we deploy
     - The Gitea Helm chart, via ``gitea.admin.existingSecret`` — bootstraps
       the admin user on first boot. (``email`` is sourced from chart
       values directly, not from the Secret, so it isn't a Secret key.)
-    - Downstream Flux ``GitRepository.spec.secretRef`` — expects exactly
-      the same two keys.
+    - Downstream PKO ``Stack.spec.gitAuth.basicAuth`` — both the
+      ``userName`` and ``password`` ``SecretKeySelector`` fields point
+      at this Secret's matching keys.
 
-  Flux only ever reads from this repo and the cluster is single-tenant
+  PKO only ever reads from this repo and the cluster is single-tenant
   by construction, so reusing the admin pair is fine for now.
 * A ``helm.v3.Release`` of ``gitea-charts/gitea`` (pinned version below)
   configured for the minimal footprint: no postgres, no redis, no
@@ -46,11 +47,11 @@ What we don't deploy (yet)
 --------------------------
 * No Ingress / TLS. The HTTP Service rides on cloud-provider-kind's
   per-cluster-bridge LB IP (e.g. ``172.18.0.x:3000``) — host-reachable
-  but not exposed off-host. A future Flux Kustomization can drop in
+  but not exposed off-host. A future PKO Stack can drop in
   ingress-nginx + a real cert if/when needed.
 * No dedicated read-only user. The seed pushes as the admin user and
   ``gitea-credentials`` reuses the admin password. If multi-tenancy
-  starts to matter, introduce a ``gitea-flux`` user via the REST API
+  starts to matter, introduce a ``gitea-pko`` user via the REST API
   and point the credentials Secret at that instead.
 
 Pin policy
@@ -62,7 +63,7 @@ matching the rest of this stack's conservative defaults.
 
 from __future__ import annotations
 
-from pathlib import Path
+import os
 from typing import Any, Mapping, Optional
 
 import pulumi
@@ -84,15 +85,15 @@ _GITEA_CHART_VERSION = "12.6.0"
 _GITEA_APP_VERSION = "1.26.1"  # informational
 
 # Namespace this component owns. We don't make it configurable — there's
-# no real use case for renaming it and hard-coding keeps the Flux side
-# simpler. We deliberately don't pre-create a Flux-specific namespace
-# here; whoever installs Flux owns that decision.
+# no real use case for renaming it and hard-coding keeps the consumer
+# side simpler. We deliberately don't pre-create a PKO-specific namespace
+# here; whoever installs PKO owns that decision.
 _GITEA_NAMESPACE = "gitea"
 
 # The single credentials Secret name. The Gitea Helm chart reads it via
 # ``gitea.admin.existingSecret`` (pulling ``username`` / ``password`` keys
-# out of it to bootstrap the admin user on first boot); downstream Flux
-# resources read the same two keys via ``GitRepository.spec.secretRef``.
+# out of it to bootstrap the admin user on first boot); downstream PKO
+# resources read the same two keys via ``Stack.spec.gitAuth.basicAuth``.
 # One Secret, two consumers.
 _CREDENTIALS_SECRET = "gitea-credentials"
 
@@ -114,12 +115,31 @@ _DEFAULT_BRANCH = "main"
 _GITEA_HTTP_SERVICE = "gitea-http"
 _GITEA_HTTP_PORT = 3000
 
-# Default location of the local working tree the seed pushes from.
-# Computed relative to this source file: ``gitrepo/gitea_builtin.py``
-# → ``gitrepo/`` → ``pulumi/`` → repo root.
-# Picking the repo root by default mirrors how a developer would naturally
-# invoke ``pulumi up`` from the project they're iterating on.
-_DEFAULT_SOURCE_DIR = str(Path(__file__).resolve().parents[2])
+# Default location of the local working tree the seed pushes from is
+# resolved lazily by :func:`_default_source_dir` — see the docstring there
+# for why this is not a module-level constant.
+
+
+def _default_source_dir() -> str:
+    """Resolve the repo root as a path relative to the working directory.
+
+    Uses the documented :func:`pulumi.get_root_directory` API to discover
+    the dir holding ``Pulumi.yaml`` (the Pulumi project root), then walks
+    up one level to the enclosing repo root. The result is converted to a
+    CWD-relative path so the stored resource input does not shift between
+    machines with different absolute repo roots — see
+    https://www.pulumi.com/docs/iac/concepts/projects/#root-relative-paths
+
+    Evaluated lazily (rather than at module import) because Pulumi's
+    dynamic-Resource subprocesses import this module *without* the runtime
+    settings initialized, in which case ``get_root_directory()`` returns a
+    placeholder string. Deferring to call time means only the language
+    host — where settings *are* populated — ever runs this.
+    """
+    return os.path.relpath(
+        os.path.dirname(pulumi.get_root_directory()),
+        start=os.getcwd(),
+    )
 
 
 def _chart_values(admin_secret_name: str, admin_email: str) -> Mapping[str, Any]:
@@ -127,9 +147,7 @@ def _chart_values(admin_secret_name: str, admin_email: str) -> Mapping[str, Any]
 
     Kept as a module-level function (rather than inlined in ``__init__``) so
     the policy choices are easy to diff in isolation when the chart version
-    moves and the values schema shifts under us. Mirrors the legacy
-    ``gitea-values.yaml`` this stack replaces, minus the bits the chart
-    schema has since renamed.
+    moves and the values schema shifts under us.
 
     ``admin_email`` is passed in (rather than read from the Secret) because
     the chart's init script sources ``email`` from
@@ -144,8 +162,8 @@ def _chart_values(admin_secret_name: str, admin_email: str) -> Mapping[str, Any]
         # stable and predictable. Crucial because we hard-code the
         # in-cluster URL (``gitea-http.gitea.svc.cluster.local``) into the
         # GitOpsRepository ``url`` output — if the service name drifted
-        # with each Pulumi release, every Flux Kustomization downstream
-        # would have to re-resolve it.
+        # with each Pulumi release, every PKO Stack downstream would have
+        # to re-resolve it.
         "fullnameOverride": "gitea",
         # No external datastore: sqlite + in-process queue + memory cache.
         # State lands on a small PVC mounted at ``/data`` (see below) so
@@ -283,7 +301,7 @@ class GiteaBuiltinRepository(GitOpsRepository):
         repo_owner: Optional[str] = None,
         repo_name: str = _DEFAULT_REPO_NAME,
         default_branch: str = _DEFAULT_BRANCH,
-        source_dir: str = _DEFAULT_SOURCE_DIR,
+        source_dir: Optional[str] = None,
         opts: Optional[ResourceOptions] = None,
     ) -> None:
         super().__init__(
@@ -291,6 +309,9 @@ class GiteaBuiltinRepository(GitOpsRepository):
             t="ca4s:gitrepo:GiteaBuiltinRepository",
             opts=opts,
         )
+
+        if source_dir is None:
+            source_dir = _default_source_dir()
 
         if admin_username.lower() == "admin":
             # Fail loud — Gitea will reject this on first boot and the
@@ -335,18 +356,21 @@ class GiteaBuiltinRepository(GitOpsRepository):
         #     reads ``username``/``password`` on first boot and runs
         #     ``gitea admin user create``. Order matters: must exist
         #     before the Helm release reaches its admin-init job.
-        #   * Downstream Flux ``GitRepository.spec.secretRef`` — reads
-        #     the same two keys. Lives in the ``gitea`` namespace
-        #     alongside the server, *not* in a separate ``flux-system``
-        #     namespace. Rationale: ``secretRef`` is always namespace-
-        #     local, so whoever consumes these credentials (Flux, AWX,
-        #     anything else) will need a copy in *its* namespace anyway.
-        #     Putting it next to the server it authenticates against is
-        #     the honest place to expose it; consumers handle propagation.
+        #   * Downstream PKO ``Stack.spec.gitAuth.basicAuth`` — reads
+        #     the same two keys via ``SecretKeySelector`` references.
+        #     Lives in the ``gitea`` namespace alongside the server,
+        #     *not* in PKO's own (``pulumi-kubernetes-operator``)
+        #     namespace. Rationale: PKO's ``gitAuth`` references are
+        #     namespace-local, so whoever consumes these credentials
+        #     (PKO, AWX, anything else) will need a copy in *its*
+        #     namespace anyway. Putting it next to the server it
+        #     authenticates against is the honest place to expose it;
+        #     consumers handle propagation.
         #
-        # Type ``Opaque`` (not ``kubernetes.io/basic-auth``) because Flux
-        # documents ``Opaque`` with ``username``/``password`` keys as the
-        # canonical shape; using the typed flavor works too but is less
+        # Type ``Opaque`` (not ``kubernetes.io/basic-auth``) because the
+        # ``Opaque`` shape with explicit ``username``/``password`` keys
+        # is what PKO's ``SecretKeySelector``-based ``gitAuth`` reads
+        # most naturally; the typed flavor works too but is less
         # explicit when grepping by key.
         credentials_secret = k8s.core.v1.Secret(
             f"{name}-credentials",
@@ -363,10 +387,6 @@ class GiteaBuiltinRepository(GitOpsRepository):
                 parent=self,
                 provider=k8s_provider,
                 depends_on=[gitea_ns],
-                # Preserve Pulumi state across the rename from the
-                # earlier two-Secret layout so this is an in-place
-                # update rather than a destroy+recreate.
-                aliases=[pulumi.Alias(name=f"{name}-flux-credentials")],
             ),
         )
 
@@ -470,7 +490,7 @@ class GiteaBuiltinRepository(GitOpsRepository):
         )
 
         # Outputs. All five are required by the GitOpsRepository contract.
-        # ``url`` is the in-cluster URL Flux will pull from; ``url_external``
+        # ``url`` is the in-cluster URL PKO will pull from; ``url_external``
         # is the host-reachable URL the seed uses (and a developer can
         # also browse to in a web browser).
         in_cluster = _in_cluster_url(owner, repo_name)

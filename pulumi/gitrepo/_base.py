@@ -1,25 +1,24 @@
 """Provider-agnostic ``GitOpsRepository`` contract.
 
-This module defines the abstract shape every "git source for Flux" implementation
+This module defines the abstract shape every "git source for PKO" implementation
 must produce. Concrete implementations live alongside it (see
-``gitea_builtin.py``) and are selected by the umbrella stack's
-``__main__.py`` based on the ``ca4s-infra-local:gitops_provider`` config
-knob.
+``gitea_builtin.py``) and are selected by each ``stack_<name>.py`` target
+module based on the ``ca4s-infra:gitops_provider`` config key.
 
 Why an explicit contract?
 -------------------------
-Flux's ``GitRepository`` CRD is the only thing downstream consumers actually
+PKO's ``Stack`` CRD is the only thing downstream consumers actually
 care about — it has a small, well-defined input surface (URL, branch, optional
-credentials Secret reference). Anything *upstream* of that — built-in Gitea,
-externally-hosted Gitea, GitHub, GitLab, Bitbucket, your own gitolite — is
-implementation detail. We model that contract here so swapping providers is a
-one-line config change and the rest of the program (Flux Kustomizations,
-seeding scripts, dashboards) doesn't care which one is in use.
+credentials Secret reference via ``spec.gitAuth``). Anything *upstream* of
+that — built-in Gitea, externally-hosted Gitea, GitHub, GitLab, Bitbucket,
+your own gitolite — is implementation detail. We model that contract here so
+swapping providers is a one-line config change and the rest of the program
+(PKO Stacks, seeding scripts, dashboards) doesn't care which one is in use.
 
 Outputs that every concrete subclass must populate
 --------------------------------------------------
-* ``url``                          — In-cluster git URL the ``GitRepository``
-                                     CRD will point at, e.g.
+* ``url``                          — In-cluster git URL the ``Stack.spec.projectRepo``
+                                     will point at, e.g.
                                      ``http://gitea-http.gitea.svc.cluster.local:3000/owner/repo.git``.
                                      Always set; for external providers this is
                                      the same as ``url_external``.
@@ -30,18 +29,17 @@ Outputs that every concrete subclass must populate
                                      different scheme (in-cluster providers
                                      surface a port-forwarded ``localhost:N``).
 * ``default_branch``               — Branch name the seed push targeted and
-                                     ``GitRepository.spec.ref.branch`` should
-                                     watch. Conventionally ``main``.
-* ``credentials_secret_name``      — Name of the Flux-shaped credentials
-                                     ``Secret`` (keys ``username`` +
-                                     ``password``, or ``identity`` +
-                                     ``known_hosts`` for SSH) that
-                                     ``GitRepository.spec.secretRef.name`` will
-                                     reference.
+                                     ``Stack.spec.branch`` (or ``spec.commit``)
+                                     should track. Conventionally ``main``.
+* ``credentials_secret_name``      — Name of the credentials ``Secret`` (keys
+                                     ``username`` + ``password``, or ``identity``
+                                     + ``known_hosts`` for SSH) that
+                                     ``Stack.spec.gitAuth.basicAuth.{userName,password}.name``
+                                     (or the ssh equivalent) will reference.
 * ``credentials_secret_namespace`` — Namespace the credentials Secret lives in.
-                                     Conventionally ``gitops`` (the namespace
-                                     Flux itself runs in for source-related
-                                     plumbing).
+                                     Conventionally the namespace PKO itself
+                                     runs in for Stack-related plumbing
+                                     (``pulumi-kubernetes-operator``).
 
 Lifetime model
 --------------
@@ -73,7 +71,7 @@ _BASE_TYPE = "ca4s:gitrepo:GitOpsRepository"
 
 
 class GitOpsRepository(pulumi.ComponentResource):
-    """Abstract-ish base for a Flux-shaped git source.
+    """Abstract-ish base for a PKO-consumed git source.
 
     Subclasses MUST:
       1. Call ``super().__init__(name, t=<their own type token>, opts=opts)``.

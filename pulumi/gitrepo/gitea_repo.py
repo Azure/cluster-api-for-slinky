@@ -143,14 +143,14 @@ class _GiteaRepoProvider(ResourceProvider):
         # GiteaSeed, which force-pushes the local working tree. An
         # auto-init README would just be in the way (and create a
         # divergent history that the seed would have to clobber).
-        # ``private=True`` because this repo is consumed only by Flux
+        # ``private=True`` because this repo is consumed only by PKO
         # inside the cluster — there's no anonymous reader to consider.
         payload = {
             "name": repo,
             "default_branch": branch,
             "auto_init": False,
             "private": True,
-            "description": "Bootstrap GitOps repo managed by ca4s-infra-local",
+            "description": "Bootstrap GitOps repo managed by ca4s-infra",
         }
         resp = s.post(create_url, json=payload, timeout=15)
 

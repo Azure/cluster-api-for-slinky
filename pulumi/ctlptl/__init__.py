@@ -1,4 +1,4 @@
-"""ctlptl-based dynamic-resource bindings for the ca4s-infra-local stack.
+"""ctlptl-based dynamic-resource bindings for the ``stack_local.py`` target.
 
 Three Pulumi dynamic providers that wrap the ``ctlptl`` and
 ``cloud-provider-kind`` CLIs:
@@ -13,11 +13,11 @@ thin compatibility shim around the ctlptl CLI, not a general-purpose
 kind-control library.
 
 TODO(multi-target): all three resources are kind-specific by design.
-When the umbrella entrypoint grows a ``cluster_provider`` dispatch (see
-the TODO in ``__main__.py``), this package becomes one of several
-sibling provider packages (``aws_eks``, ``gke``, ...) under the same
-contract: ``cluster_name``, ``context``, ``kubeconfig`` outputs plus an
-optional registry handle.
+The project-level dispatcher in ``__main__.py`` selects ``stack_local.py``
+for the ``local`` stack; future cloud-target stack modules
+(``stack_azure.py``, ...) will reach for sibling provider packages under
+the same contract: ``cluster_name``, ``context``, ``kubeconfig`` outputs
+plus an optional registry handle.
 """
 
 from ctlptl.cloud_provider_kind import CloudProviderKind
