@@ -172,11 +172,72 @@ def run() -> None:
     # ----------------------------------------------------------------------
     #
     # TODO: install the Pulumi Kubernetes Operator (PKO) into the
-    # management cluster and point it at the GitOpsRepository above. PKO
-    # then runs each ``stacks/<name>/`` Pulumi program committed in the
-    # seeded repo, switching between the YAML and Python runtimes per
-    # Stack depending on whether composition logic is needed. Sketch of
-    # what this block will look like once the ``pko`` package is written:
+    # management cluster and hand off everything else to it. PKO then
+    # runs three inner Pulumi programs from this same seeded repo, all
+    # authored in Python (no YAML composition tier). They live as
+    # sibling Pulumi projects under this same ``pulumi/`` tree, so the
+    # outer dispatcher and the three inner ones can share a single
+    # ``../.venv`` and a single ``pyproject``/lockfile story:
+    #
+    #     pulumi/stacks/control_plane/    - installs CAPI providers,
+    #                                       slinky CRDs, AWX, ingress
+    #                                       (mgmt-cluster operators
+    #                                       only; tenant-agnostic).
+    #     pulumi/stacks/tenants/          - reads a hard-coded TENANTS
+    #                                       list and emits one
+    #                                       ``pulumi.com/v1`` Stack CR
+    #                                       per tenant pointing at
+    #                                       ``pulumi/stacks/workload_cluster/``.
+    #     pulumi/stacks/workload_cluster/ - per-tenant CAPI Cluster +
+    #                                       slinky NodeSets;
+    #                                       instantiated by the
+    #                                       tenants stack, one Stack
+    #                                       CR each.
+    #
+    # PKO Stack CR ``spec.repoDir`` values are therefore
+    # ``pulumi/stacks/<name>/`` (relative to the repo root).
+    #
+    # Naming clarification: the *outer* program (this file, plus
+    # everything directly under ``pulumi/`` excluding ``pulumi/stacks/``)
+    # IS the bootstrap — it brings up kind, Gitea, and PKO from the
+    # dev host. The word "bootstrap" stops here. The three inner
+    # programs are named for what they ARE, not for the phase that
+    # birthed them.
+    #
+    # Per-env dispatch in every inner program follows the same
+    # ``__main__.py`` -> ``<project>_<env>.py`` trick this outer file
+    # uses (see ``pulumi/__main__.py``). The env moniker propagates via
+    # PKO's ``spec.stack`` field; inside the workspace pod
+    # ``pulumi.get_stack()`` returns the third segment unchanged:
+    #
+    #     ca4s-control-plane    -> spec.stack=organization/ca4s-control-plane/local
+    #                              -> dispatcher picks ``control_plane_local.py``
+    #     ca4s-tenants          -> spec.stack=organization/ca4s-tenants/local
+    #                              -> picks ``tenants_local.py``
+    #     ca4s-workload-cluster -> spec.stack=organization/ca4s-workload-cluster/<outer_env>-<tenant>
+    #                              -> dispatcher splits on first '-':
+    #                                 outer_env picks the module,
+    #                                 tenant is passed as a parameter.
+    #
+    # Constraint that falls out: outer env names (``local``, future
+    # ``prod``, ...) must not contain ``-``. Tenant names may.
+    #
+    # Directory / project naming split:
+    #   * Directories: snake_case (matches Python module imports inside
+    #     each dispatcher).
+    #   * Pulumi project names in ``Pulumi.yaml``: kebab-case
+    #     (``ca4s-control-plane``, etc.) — idiomatic Pulumi.
+    #   * Filenames within: snake_case (Python modules).
+    #
+    # The outer PKOBootstrap creates the FIRST TWO Stack CRs directly
+    # (control-plane and tenants). Tenants gets a
+    # ``spec.prerequisites: [ca4s-control-plane]`` so it waits for
+    # operators to land. Workload-cluster Stack CRs are then created BY
+    # the tenants stack at reconcile time — the outer never touches
+    # them.
+    #
+    # Sketch of what this block will look like once the ``pko`` package
+    # is written:
     #
     #     from pko import PKOBootstrap
     #
@@ -185,26 +246,41 @@ def run() -> None:
     #         kubeconfig=cluster.kubeconfig,
     #         repo_url=repo.url,
     #         repo_branch=repo.default_branch,
-    #         credentials_secret_name=repo.credentials_secret_name,
-    #         credentials_secret_namespace=repo.credentials_secret_namespace,
+    #         upstream_credentials_secret_name=repo.credentials_secret_name,
+    #         upstream_credentials_secret_namespace=repo.credentials_secret_namespace,
     #     )
     #
-    # Open design questions to settle when implementing:
-    #   * Install via the upstream Helm chart vs. the
-    #     ``pulumi-kubernetes-operator`` install manifest? Helm chart
-    #     gives Pulumi a real resource to track; the manifest is simpler.
-    #   * Where do per-environment ``Stack`` CRs live — managed here, or
-    #     committed into the seeded repo so they become self-reconciling?
-    #     The latter is the GitOps-purist answer (and lets PKO bootstrap
-    #     additional Stacks without a fresh ``pulumi up`` of this stack).
-    #   * If credentials live in the ``gitea`` namespace and PKO lives in
-    #     ``pulumi-kubernetes-operator``, who copies the Secret across?
-    #     (Reflector? Pulumi k8s.core.v1.Secret with a manual ``data=``
-    #     copy? ExternalSecrets?)
-    #   * Stack backend choice: PKO needs a Pulumi state backend for the
-    #     Stacks it runs. For local dev, file:// inside a PVC mounted
-    #     into the operator pod is workable; for shared environments,
-    #     S3 / Azure Blob / Pulumi Cloud.
+    # Design points already settled (don't re-litigate):
+    #   * Install: Helm OCI chart
+    #     ``oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator``
+    #     v2.3.0, namespace ``pulumi-kubernetes-operator``. Matches the
+    #     Phase 2 Gitea Helm-release pattern; the quickstart manifest
+    #     hard-codes a ``default/pulumi`` SA we want to override.
+    #   * Per-environment Stack CRs live in the seeded repo
+    #     (GitOps-purist). Only the two top-level CRs are created by
+    #     this stack; workload-cluster CRs are emitted by the tenants
+    #     stack at reconcile time.
+    #   * Credentials projection: Pulumi-managed ``k8s.core.v1.Secret``
+    #     copy in ``pulumi-kubernetes-operator`` ns, populated from the
+    #     ``GitOpsRepository`` upstream Outputs. No Reflector /
+    #     ExternalSecrets dep.
+    #   * State backend: ``file://`` in a PVC (kind ``local-path``)
+    #     mounted at ``/state`` in every workspace pod via
+    #     ``spec.workspaceTemplate``. ``PULUMI_CONFIG_PASSPHRASE`` is a
+    #     ``RandomPassword``-backed Secret shared across all three
+    #     inner stacks. Swap to S3 / Azure Blob / Pulumi Cloud later by
+    #     pointing one component input elsewhere.
+    #   * Tenant enumeration: hard-coded TENANTS list in
+    #     ``tenants_local.py``. Under GitOps, editing+committing a
+    #     Python literal IS the operator workflow — no ConfigMap watch
+    #     or external schema needed.
+    #
+    # Open design points NOT yet settled:
+    #   * Trimming the workspace-pod ServiceAccount from
+    #     ``cluster-admin`` to a least-privilege ClusterRole, once we
+    #     know which providers each inner stack actually exercises.
+    #     Tracked as a TODO inside ``pulumi/pko/_service_account.py``
+    #     when it lands.
 
     # ----------------------------------------------------------------------
     # Stack outputs.
