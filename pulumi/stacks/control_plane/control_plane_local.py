@@ -33,23 +33,47 @@ from __future__ import annotations
 
 import pulumi
 
+from awx import AWXOperator
+from certmanager import CertManager
+
 
 def run() -> None:
     """Build the control-plane stack's resource graph.
 
-    Placeholder body. TODO: port the contents of the top-level
-    ``capi-quickstart.yaml`` (CAPI core + infra-docker provider) and
-    ``awx.yaml``. Each becomes a child Pulumi resource here.
-    ``slurm-cluster.yaml`` is NOT mirrored here — it lands on the
-    workload cluster (see ``../workload_cluster/``). No ingress
-    controller for now: LoadBalancer Services on the management
-    cluster get a routable IP from cloud-provider-kind directly.
+    First wave landed: foundational operators that everything else
+    depends on.
+
+    * :class:`certmanager.CertManager` — cert-manager + CRDs, a
+      prerequisite for the CAPI operator's webhooks (and AWX ingress
+      TLS).
+    * :class:`awx.AWXOperator` — the AWX operator + ``AWX`` CRD.
+
+    These two are independent (the AWX operator does not require
+    cert-manager), so they install in parallel.
+
+    Still TODO: the CAPI pieces (``cluster-api-operator`` +
+    ``CoreProvider``/``BootstrapProvider``/``ControlPlaneProvider``/
+    ``InfrastructureProvider`` CRs + the ``ClusterClass`` and templates
+    from ``capi-quickstart.yaml``), the ``AWX`` instance CR + its
+    configuration, and the cluster-autoscaler. ``slurm-cluster.yaml`` is
+    NOT mirrored here — it lands on the workload cluster (see
+    ``../workload_cluster/``). No ingress controller for now:
+    LoadBalancer Services on the management cluster get a routable IP
+    from cloud-provider-kind directly.
+
+    Runs inside a PKO workspace pod with ``cluster-admin`` via the
+    ``pulumi-runner`` SA, so resources use the pod's ambient in-cluster
+    kubeconfig (no explicit provider).
     """
-    # Emit a marker so ``pulumi stack output`` shows something useful
-    # while the real implementation is still being built. Replace with
-    # the real outputs (CAPI version, AWX URL, ...) as they land.
+    cert_manager = CertManager("cert-manager")
+    awx_operator = AWXOperator("awx-operator")
+
+    pulumi.export("cert_manager_namespace", cert_manager.namespace)
+    pulumi.export("awx_operator_namespace", awx_operator.namespace)
+
+    # Flip to True once the remaining CAPI + AWX-instance waves land.
     pulumi.export("control_plane_ready", False)
     pulumi.export(
         "todo",
-        "Install CAPI providers and AWX here.",
+        "Install CAPI operator + providers + ClusterClass and the AWX instance.",
     )
