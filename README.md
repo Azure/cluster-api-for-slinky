@@ -77,6 +77,24 @@ The GitOps phase of the bootstrap stack seeds Gitea via a one-time
 - Decide whether `GiteaSeed` should special-case OrbStack to skip port-forward (uses direct EXTERNAL-IP for speed) or always use port-forward for consistency.
 - Add a Mac-equivalent of the Linux `setcap` preflight in `CloudProviderKind` — likely a `run_as_root: bool` input that wraps `argv` in `sudo -n` and `delete()` in `sudo -n kill`. Only needed if a Mac user wants bridge-IP mode; the default port-mapping mode does not need it.
 
+### Local Python environment (Pulumi + tests)
+
+The umbrella stack and its test suite share a single virtualenv at the repo root. [`pulumi/Pulumi.yaml`](pulumi/Pulumi.yaml) pins `runtime.options.virtualenv` to `../.venv`, so `pulumi up` and `pytest` resolve the same `pulumi`, `pulumi-kubernetes`, `pulumi-random`, `ruamel.yaml`, `pytest`, `pytest-mock`, and `responses` versions out of [`requirements.txt`](requirements.txt). One-time setup:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+Running the tests (unit tier, fast, no Docker required):
+
+```bash
+cd pulumi
+../.venv/bin/python -m pytest
+```
+
+The pytest config lives in [`pulumi/pyproject.toml`](pulumi/pyproject.toml). Default `addopts` skip the `integration`-marked end-to-end suite that drives a real `pulumi up`/`destroy` cycle; opt in with `../.venv/bin/python -m pytest -m integration` once you have Docker running and ~2 min to spare.
+
 ### Bringing up the management cluster (+ Gitea)
 
 The repo ships a single umbrella Pulumi program under [`pulumi/`](pulumi/) that brings up everything the developer loop needs in dependency order. Phase 1 — cluster + registry + LB controller:
