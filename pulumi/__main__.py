@@ -17,6 +17,19 @@ Stack config is read by the target module from ``Pulumi.<stack>.yaml``,
 which Pulumi auto-creates on ``pulumi stack init <stack>`` and updates
 on ``pulumi config set ...``. The dispatcher itself reads no config.
 
+Project layout
+--------------
+Each ``stack_<name>.py`` is a self-contained Pulumi program — it builds
+its resources from scratch and exposes its own ``pulumi.export(...)``s.
+Cross-target shared code stays in sibling Python packages of this file:
+
+* ``ctlptl/``  — kind / cloud-provider-kind / local image registry
+  dynamic resources (consumed by ``stack_local.py`` today).
+* ``gitrepo/`` — provider-agnostic ``GitOpsRepository`` ComponentResource
+  contract + concrete provider impls (``gitea-builtin`` today;
+  ``github`` / ``gitlab`` to follow). Reused unchanged by every target.
+* ``pko/``     — Pulumi Kubernetes Operator for continuous GitOps IaC.
+
 Adding a new target
 -------------------
 1. ``pulumi stack init <target>`` — creates ``Pulumi.<target>.yaml``.

@@ -1,0 +1,28 @@
+name: ca4s-control-plane
+description: |
+  Management-cluster operators stack — runs inside a PKO workspace pod
+  out of ``pulumi/stacks/control_plane/`` of the seeded GitOps repo.
+
+  Installs the tenant-AGNOSTIC pieces: CAPI core + provider charts +
+  AWX. Slinky CRDs + slurm-operator + Slurm chart are NOT installed
+  here — they belong workload-cluster-side (see
+  ``../workload_cluster/``). No ingress controller for now either:
+  LoadBalancer Services on mgmt get a routable IP from the cloud
+  provider (cloud-provider-kind locally) directly. The per-tenant
+  workload-cluster Stack CRs (emitted by the outer ``PKOBootstrap``
+  via the ``Tenants`` component) take a hard dependency on this
+  stack via PKO's ``spec.prerequisites``, so CAPI + AWX land before
+  any per-tenant workload cluster is attempted.
+
+  Same dispatcher pattern as the outer ``pulumi/`` project:
+  ``main: __main__.py`` switches on ``pulumi.get_stack()`` (which
+  reflects the third segment of PKO's ``spec.stack`` —
+  ``organization/ca4s-control-plane/local`` → ``local``) and imports
+  ``control_plane_<env>.py``. Adding ``azure`` etc. is purely additive.
+runtime:
+  name: python
+  options:
+    # Share the repo-root venv with the outer project and the other
+    # two inner stacks. Three levels up from this directory.
+    virtualenv: ../../../.venv
+main: __main__.py

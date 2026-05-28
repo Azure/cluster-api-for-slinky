@@ -1,0 +1,102 @@
+"""Helm OCI install of the Pulumi Kubernetes Operator (PKO).
+
+Owns:
+  * The ``pulumi-kubernetes-operator`` Namespace.
+  * One ``helm.v3.Release`` of
+    ``oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator``
+    pinned to :data:`PKO_CHART_VERSION`.
+
+The chart's defaults are already minimal (single-replica operator, no
+metrics service, no webhook). We override only the bits we need: nothing
+yet — chart defaults plus the namespace are enough. The Stack-CRD's
+ServiceAccount knob (the chart bakes one called ``default/pulumi``) is
+sidestepped at the per-Stack level by setting
+``spec.serviceAccountName`` to our own SA (see :mod:`pko._service_account`).
+
+Pin policy mirrors the rest of the stack: explicit chart version bumps,
+no implicit "latest". Bump :data:`PKO_CHART_VERSION` and review release
+notes before letting ``pulumi up`` reconcile it.
+"""
+
+from __future__ import annotations
+
+import pulumi
+import pulumi_kubernetes as k8s
+from pulumi import ResourceOptions
+
+
+# Pinned PKO chart. See https://github.com/pulumi/pulumi-kubernetes-operator
+# for the release matrix. v2.x is the current major.
+PKO_CHART_OCI = "oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator"
+PKO_CHART_VERSION = "2.3.0"
+
+# The conventional namespace for PKO. We don't make this configurable —
+# downstream Stack CRs are pinned to land in the same namespace by the
+# component and there is no real use case for renaming it.
+PKO_NAMESPACE = "pulumi-kubernetes-operator"
+
+
+class PKORelease(pulumi.ComponentResource):
+    """Namespace + Helm OCI release of PKO.
+
+    Children:
+      * ``Namespace/pulumi-kubernetes-operator``
+      * ``helm.sh/v3:Release`` of the pinned chart.
+
+    Outputs:
+      * ``namespace``  — the namespace name (constant, surfaced as Output
+        for DAG-edge tracking).
+      * ``release_status`` — the Release's ``status`` Output, anchored so
+        downstream Stack CRs wait for the operator to be Ready.
+    """
+
+    namespace: pulumi.Output[str]
+    release_status: pulumi.Output[object]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        provider: k8s.Provider,
+        opts: ResourceOptions | None = None,
+    ) -> None:
+        super().__init__("ca4s:pko:PKORelease", name, props={}, opts=opts)
+
+        ns = k8s.core.v1.Namespace(
+            f"{name}-ns",
+            metadata={"name": PKO_NAMESPACE},
+            opts=ResourceOptions(parent=self, provider=provider),
+        )
+
+        # OCI chart install. ``helm.v3.Release`` treats ``chart`` that
+        # starts with ``oci://`` as an OCI ref; no ``repository_opts``
+        # needed.
+        release = k8s.helm.v3.Release(
+            f"{name}-helm",
+            chart=PKO_CHART_OCI,
+            version=PKO_CHART_VERSION,
+            namespace=PKO_NAMESPACE,
+            cleanup_on_fail=True,
+            atomic=True,
+            wait_for_jobs=True,
+            timeout=600,
+            # No values overrides yet. The chart's defaults are fine; we
+            # override per-Stack via ``spec.serviceAccountName`` rather
+            # than swapping the chart's bundled SA.
+            values={},
+            opts=ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=[ns],
+            ),
+        )
+
+        self.namespace = pulumi.Output.from_input(PKO_NAMESPACE)
+        self.release_status = release.status
+
+        self.register_outputs(
+            {
+                "namespace": self.namespace,
+                "release_status": self.release_status,
+            }
+        )

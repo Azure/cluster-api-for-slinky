@@ -390,10 +390,7 @@ class GiteaBuiltinRepository(GitOpsRepository):
             ),
         )
 
-        # The Helm release itself. ``skip_await=False`` (default) makes
-        # Pulumi block on chart readiness; ``cleanup_on_fail=True`` keeps
-        # failed installs from leaving dangling resources that confuse the
-        # next ``pulumi up``.
+        # The Helm release itself.
         gitea = k8s.helm.v3.Release(
             f"{name}-gitea",
             chart=_GITEA_CHART_NAME,
@@ -401,6 +398,9 @@ class GiteaBuiltinRepository(GitOpsRepository):
             repository_opts={"repo": _GITEA_CHART_REPO},
             namespace=_GITEA_NAMESPACE,
             cleanup_on_fail=True,
+            atomic=True,
+            wait_for_jobs=True,
+            timeout=600,
             values=_chart_values(_CREDENTIALS_SECRET, admin_email),
             opts=ResourceOptions(
                 parent=self,
