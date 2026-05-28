@@ -40,7 +40,7 @@ class Tenants(pulumi.ComponentResource):
     """Dispatch to the per-env concrete tenants impl.
 
     Instantiated by :class:`pko.pko_bootstrap.PKOBootstrap` as a
-    sibling of ``StateBackend``, ``CredentialsProjection`` etc. —
+    sibling of ``StateBackend``, ``WorkspaceServiceAccount`` etc. —
     the outer stack itself never references this class directly.
 
     Args:

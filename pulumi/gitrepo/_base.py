@@ -17,29 +17,32 @@ swapping providers is a one-line config change and the rest of the program
 
 Outputs that every concrete subclass must populate
 --------------------------------------------------
-* ``url``                          — In-cluster git URL the ``Stack.spec.projectRepo``
-                                     will point at, e.g.
-                                     ``http://gitea-http.gitea.svc.cluster.local:3000/owner/repo.git``.
-                                     Always set; for external providers this is
-                                     the same as ``url_external``.
-* ``url_external``                 — Host-reachable git URL, suitable for the
-                                     one-time hydration ``git push`` we do
-                                     from the Pulumi runner. May coincide with
-                                     ``url`` (external providers) or be a
-                                     different scheme (in-cluster providers
-                                     surface a port-forwarded ``localhost:N``).
-* ``default_branch``               — Branch name the seed push targeted and
-                                     ``Stack.spec.branch`` (or ``spec.commit``)
-                                     should track. Conventionally ``main``.
-* ``credentials_secret_name``      — Name of the credentials ``Secret`` (keys
-                                     ``username`` + ``password``, or ``identity``
-                                     + ``known_hosts`` for SSH) that
-                                     ``Stack.spec.gitAuth.basicAuth.{userName,password}.name``
-                                     (or the ssh equivalent) will reference.
-* ``credentials_secret_namespace`` — Namespace the credentials Secret lives in.
-                                     Conventionally the namespace PKO itself
-                                     runs in for Stack-related plumbing
-                                     (``pulumi-kubernetes-operator``).
+* ``url``               — In-cluster SSH git URL the ``Stack.spec.projectRepo``
+                          will point at, e.g.
+                          ``ssh://git@gitea-ssh.gitea.svc.cluster.local:22/owner/repo.git``.
+                          Always SSH because PKO's gitutil only accepts
+                          ``https`` and ``ssh`` schemes; in-cluster Gitea
+                          ships no TLS, so SSH it is.
+* ``url_external``      — Host-reachable git URL (typically HTTP/HTTPS) suitable
+                          for the one-time hydration ``git push`` we do from
+                          the Pulumi runner. May coincide with ``url`` for
+                          external providers or be a different scheme (host-
+                          side HTTP for in-cluster Gitea).
+* ``default_branch``    — Branch name the seed push targeted and
+                          ``Stack.spec.branch`` (or ``spec.commit``) should
+                          track. Conventionally ``main``.
+* ``ssh_private_key``   — OpenSSH-format PEM (``-----BEGIN OPENSSH PRIVATE KEY-----``)
+                          of the admin SSH key the provider granted us push +
+                          pull rights on the repo with. Secret-marked. Flowed
+                          into a Secret in PKO's ns by :class:`PKOBootstrap`
+                          and referenced by ``Stack.spec.gitAuth.sshAuth.sshPrivateKey``.
+* ``ssh_known_hosts``   — Single-line ``known_hosts`` entry for the in-cluster
+                          SSH endpoint (``<hostname> <alg> <pubkey-base64>``).
+                          Mounted into the PKO operator + workspace pods so
+                          go-git's default ``StrictHostKeyChecking`` semantics
+                          pass without manual TOFU. Secret-marked is unnecessary
+                          (public host pubkey) but it's grouped with the
+                          private key for plumbing convenience.
 
 Lifetime model
 --------------
@@ -93,8 +96,8 @@ class GitOpsRepository(pulumi.ComponentResource):
     url: "Output[str]"
     url_external: "Output[str]"
     default_branch: "Output[str]"
-    credentials_secret_name: "Output[str]"
-    credentials_secret_namespace: "Output[str]"
+    ssh_private_key: "Output[str]"
+    ssh_known_hosts: "Output[str]"
 
     def __init__(
         self,

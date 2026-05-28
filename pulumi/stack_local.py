@@ -137,12 +137,12 @@ def run() -> None:
     # TODO(multi-target): add cloud-hosted GitOps impls (GitHub,
     # GitLab). Each impl populates the same five-field contract
     # defined in ``gitrepo/_base.py`` (``url``, ``url_external``,
-    # ``default_branch``, ``credentials_secret_name``,
-    # ``credentials_secret_namespace``). Cloud impls won't need
-    # ``kubeconfig`` for the *source* of truth (the git server lives
-    # off-cluster) but DO need it to project the credentials Secret into
-    # the management cluster's ``pulumi-kubernetes-operator`` namespace
-    # — so keep the parameter on the contract.
+    # ``default_branch``, ``ssh_private_key``, ``ssh_known_hosts``).
+    # Cloud impls won't need ``kubeconfig`` for the *source* of
+    # truth (the git server lives off-cluster) but DO need it to
+    # project the SSH credentials Secret into the management
+    # cluster's ``pulumi-kubernetes-operator`` namespace — so keep
+    # the parameter on the contract.
 
     repo: GitOpsRepository
     if gitops_provider == "gitea-builtin":
@@ -214,8 +214,8 @@ def run() -> None:
         kubeconfig=cluster.kubeconfig,
         repo_url=repo.url,
         repo_branch=repo.default_branch,
-        upstream_credentials_secret_name=repo.credentials_secret_name,
-        upstream_credentials_secret_namespace=repo.credentials_secret_namespace,
+        ssh_private_key=repo.ssh_private_key,
+        ssh_known_hosts=repo.ssh_known_hosts,
         env=pulumi.get_stack(),
     )
 
@@ -250,15 +250,14 @@ def run() -> None:
     # Phase 2: GitOpsRepository contract — five outputs every concrete
     # provider exposes, plus an echo of which provider this run chose.
     # Don't rename without simultaneously updating the consumers (PKO,
-    # dashboards, ...).
+    # dashboards, ...). ``ssh_private_key`` is secret-marked so Pulumi
+    # will refuse to print it in plaintext.
     pulumi.export("gitops_provider", gitops_provider)
     pulumi.export("gitops_url", repo.url)
     pulumi.export("gitops_url_external", repo.url_external)
     pulumi.export("gitops_default_branch", repo.default_branch)
-    pulumi.export("gitops_credentials_secret_name", repo.credentials_secret_name)
-    pulumi.export(
-        "gitops_credentials_secret_namespace", repo.credentials_secret_namespace
-    )
+    pulumi.export("gitops_ssh_known_hosts", repo.ssh_known_hosts)
+    pulumi.export("gitops_ssh_private_key", repo.ssh_private_key)
 
     # Phase 3: PKO bootstrap handles + the control-plane Stack CR name
     # + per-tenant workload-cluster Stack CR names. These variables are exported

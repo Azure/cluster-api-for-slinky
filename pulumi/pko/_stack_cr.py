@@ -3,10 +3,21 @@
 Both :class:`pko.pko_bootstrap.PKOBootstrap` (control-plane CR) and
 :class:`pko._tenants_local.TenantsLocal` (per-tenant workload-cluster
 CRs) emit Stack CRs with the same boilerplate: ``serviceAccountName``,
-``gitAuth.basicAuth``, ``envRefs``, ``backend``, ``workspaceTemplate``
-volume mount, ``refresh: true``. Factoring that boilerplate here keeps
-the two callers thin and makes the CR shape self-documenting in one
-place.
+``projectRepo`` + ``branch`` + ``gitAuth.sshAuth``, ``envRefs``,
+``backend``, ``workspaceTemplate`` volume mounts, ``refresh: true``.
+Factoring that boilerplate here keeps the two callers thin and makes
+the CR shape self-documenting in one place.
+
+Source model: SSH against the in-cluster Gitea. PKO's ``projectRepo``
+path only accepts ``https`` and ``ssh`` schemes (the ``gitutil``
+allow-list rejects plain HTTP outright), and our in-cluster Gitea
+ships no TLS — SSH is the only viable scheme. The admin private key
+is projected into PKO's namespace as a Secret named in
+``StackCRSpec.ssh_secret_name``; this builder references it via
+``gitAuth.sshAuth.sshPrivateKey`` and ALSO mounts the same Secret
+into the workspace pod at ``/etc/gitea-ssh/`` so the workspace pod’s
+``git clone`` step (run by the auto-api ``pulumi-go`` binary)
+trusts the same host key the operator does.
 
 This module exposes :func:`build_stack_spec` only; callers own the
 ``k8s.apiextensions.CustomResource`` instantiation itself. Splitting
@@ -49,6 +60,13 @@ _STATE_VOLUME_NAME = "state"
 # URL in :mod:`pko._backend`.
 _STATE_MOUNT_PATH = "/state"
 
+# Volume name + mount path for the in-cluster Gitea SSH credentials
+# Secret (private key + known_hosts). Mirrors the PKO operator pod's
+# own mount (see :mod:`pko._release`) so the workspace pod's
+# ``git clone`` step trusts the same host key by the same env var.
+_SSH_VOLUME_NAME = "gitea-ssh"
+_SSH_MOUNT_PATH = "/etc/gitea-ssh"
+
 
 @dataclass(frozen=True)
 class StackCRSpec:
@@ -74,20 +92,23 @@ class StackCRSpec:
 
     # Where the Stack CRs themselves live. The PKO operator watches
     # this namespace for Stack CRs; same ns as the workspace SA and
-    # credentials Secret.
+    # the shared Flux GitRepository CR.
     pko_namespace: pulumi.Input[str]
 
     # Workspace pod identity. References the SA created by
     # :class:`pko._service_account.WorkspaceServiceAccount`.
     service_account_name: pulumi.Input[str]
 
-    # GitOps source (in-cluster URL + default branch + credentials
-    # Secret in the same ns as the Stack CR). The credentials Secret
-    # is projected into ``pko_namespace`` by
-    # :class:`pko._credentials.CredentialsProjection`.
+    # Git source. SSH URL (``ssh://git@...``) + branch the inner stack
+    # tracks. The branch is conventionally ``main`` — see
+    # :mod:`gitrepo._base`.
     repo_url: pulumi.Input[str]
     repo_branch: pulumi.Input[str]
-    credentials_secret_name: pulumi.Input[str]
+
+    # SSH Secret in ``pko_namespace`` exposing the admin private key
+    # plus the ``known_hosts`` entry for the in-cluster Gitea endpoint.
+    # Two keys: ``id_ed25519`` (the private key) + ``known_hosts``.
+    ssh_secret_name: pulumi.Input[str]
 
     # State backend. The PVC is mounted at ``/state`` and the backend
     # URL is ``file:///state``; the passphrase Secret feeds
@@ -95,6 +116,12 @@ class StackCRSpec:
     state_pvc_name: pulumi.Input[str]
     state_backend_url: pulumi.Input[str]
     passphrase_secret_name: pulumi.Input[str]
+
+    # Key names inside the SSH Secret. Defaulted because every caller
+    # uses the canonical names; kept as fields so a future cloud-hosted
+    # gitops provider can override without touching the Stack CR code.
+    ssh_private_key_key: str = "id_ed25519"
+    ssh_known_hosts_key: str = "known_hosts"
 
 
 def build_stack_spec(
@@ -141,19 +168,21 @@ def build_stack_spec(
         f"{_ORG_PLACEHOLDER}/{project_name}/", env
     )
 
-    # gitAuth.basicAuth references the projected ``gitea-credentials``
-    # Secret (or whatever the GitOps impl chose). Both userName and
-    # password come out of the same Secret object — that's the contract
-    # the GiteaBuiltinRepository implements.
+    # ``gitAuth.sshAuth.sshPrivateKey`` points the PKO controller at
+    # the ``id_ed25519`` key inside our shared SSH Secret (the same
+    # Secret the workspace pod mounts at ``/etc/gitea-ssh/`` for its
+    # own ``git clone``). PKO's go-git client signs the connection
+    # with this key. NB: previously we routed through Flux to dodge
+    # PKO's HTTP-scheme rejection; now that we speak SSH directly,
+    # ``projectRepo`` is back on the menu and Flux is gone.
     git_auth = {
-        "basicAuth": {
-            "userName": {
-                "name": spec.credentials_secret_name,
-                "key": "username",
-            },
-            "password": {
-                "name": spec.credentials_secret_name,
-                "key": "password",
+        "sshAuth": {
+            "sshPrivateKey": {
+                "type": "Secret",
+                "secret": {
+                    "name": spec.ssh_secret_name,
+                    "key": spec.ssh_private_key_key,
+                },
             },
         },
     }
@@ -175,8 +204,10 @@ def build_stack_spec(
 
     # Strategic merge patch onto PKO's default workspace pod template.
     # PKO matches containers by ``name``; the default container is
-    # ``pulumi`` (constant above). We add ONE volume + ONE volumeMount
-    # to expose the state PVC at /state.
+    # ``pulumi`` (constant above). We add the state PVC mount + the
+    # Gitea SSH Secret mount, plus a ``SSH_KNOWN_HOSTS`` env var
+    # pointing at the mounted file so go-git inside the auto-api
+    # ``pulumi-go`` binary trusts our pre-computed host key entry.
     workspace_template = {
         "spec": {
             "podTemplate": {
@@ -184,10 +215,24 @@ def build_stack_spec(
                     "containers": [
                         {
                             "name": _WORKSPACE_CONTAINER,
+                            "env": [
+                                {
+                                    "name": "SSH_KNOWN_HOSTS",
+                                    "value": (
+                                        f"{_SSH_MOUNT_PATH}/"
+                                        f"{spec.ssh_known_hosts_key}"
+                                    ),
+                                },
+                            ],
                             "volumeMounts": [
                                 {
                                     "name": _STATE_VOLUME_NAME,
                                     "mountPath": _STATE_MOUNT_PATH,
+                                },
+                                {
+                                    "name": _SSH_VOLUME_NAME,
+                                    "mountPath": _SSH_MOUNT_PATH,
+                                    "readOnly": True,
                                 },
                             ],
                         },
@@ -197,6 +242,21 @@ def build_stack_spec(
                             "name": _STATE_VOLUME_NAME,
                             "persistentVolumeClaim": {
                                 "claimName": spec.state_pvc_name,
+                            },
+                        },
+                        {
+                            "name": _SSH_VOLUME_NAME,
+                            "secret": {
+                                "secretName": spec.ssh_secret_name,
+                                # 0o400: read-only for the SSH client.
+                                # go-git's ssh transport rejects key
+                                # files with permissions broader than
+                                # ``0o600`` and the chmod isn't safe
+                                # to do at runtime when the file is
+                                # owned by another uid via a Secret
+                                # mount, so we ship it tight from the
+                                # start.
+                                "defaultMode": 0o400,
                             },
                         },
                     ],

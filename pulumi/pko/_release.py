@@ -7,11 +7,19 @@ Owns:
     pinned to :data:`PKO_CHART_VERSION`.
 
 The chart's defaults are already minimal (single-replica operator, no
-metrics service, no webhook). We override only the bits we need: nothing
-yet — chart defaults plus the namespace are enough. The Stack-CRD's
-ServiceAccount knob (the chart bakes one called ``default/pulumi``) is
-sidestepped at the per-Stack level by setting
-``spec.serviceAccountName`` to our own SA (see :mod:`pko._service_account`).
+metrics service, no webhook). We override only the bits we need:
+``extraVolumes`` + ``extraVolumeMounts`` + ``extraEnv`` to project the
+in-cluster Gitea SSH credentials (private key + ``known_hosts``) into
+the operator pod — PKO's stack-controller invokes go-git's
+``ListContext`` from inside this pod, so the host-key trust store and
+the key bytes must live alongside the controller process.
+
+The SSH Secret is created in the same namespace by
+:class:`pko.pko_bootstrap.PKOBootstrap` BEFORE this release reconciles
+(a ``depends_on`` edge on the release ties the two together). The pod
+must come up with the Secret already in place; absent that, kubelet's
+volume mount would block startup, and with ``atomic=True`` the Helm
+install would time out and roll back.
 
 Pin policy mirrors the rest of the stack: explicit chart version bumps,
 no implicit "latest". Bump :data:`PKO_CHART_VERSION` and review release
@@ -34,6 +42,13 @@ PKO_CHART_VERSION = "2.3.0"
 # downstream Stack CRs are pinned to land in the same namespace by the
 # component and there is no real use case for renaming it.
 PKO_NAMESPACE = "pulumi-kubernetes-operator"
+
+# Volume + mount path for the in-cluster Gitea SSH Secret. Mirrored
+# in :mod:`pko._stack_cr` so workspace pods get the same mount layout
+# under the same env var — keeps the contract a single constant set.
+_SSH_VOLUME_NAME = "gitea-ssh"
+_SSH_MOUNT_PATH = "/etc/gitea-ssh"
+_SSH_KNOWN_HOSTS_KEY = "known_hosts"
 
 
 class PKORelease(pulumi.ComponentResource):
@@ -58,19 +73,31 @@ class PKORelease(pulumi.ComponentResource):
         name: str,
         *,
         provider: k8s.Provider,
+        namespace_resource: pulumi.Resource,
+        ssh_secret_name: pulumi.Input[str],
+        ssh_secret_resource: pulumi.Resource,
         opts: ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:pko:PKORelease", name, props={}, opts=opts)
 
-        ns = k8s.core.v1.Namespace(
-            f"{name}-ns",
-            metadata={"name": PKO_NAMESPACE},
-            opts=ResourceOptions(parent=self, provider=provider),
-        )
-
         # OCI chart install. ``helm.v3.Release`` treats ``chart`` that
         # starts with ``oci://`` as an OCI ref; no ``repository_opts``
         # needed.
+        #
+        # The namespace is owned by :class:`pko.pko_bootstrap.PKOBootstrap`
+        # (passed in via ``namespace_resource``) rather than this release,
+        # so the SSH Secret can be created in the same namespace BEFORE
+        # the Helm install kicks off. Without that ordering the chart's
+        # Deployment would block on a missing Secret mount and
+        # ``atomic=True`` would roll back.
+        #
+        # ``extraVolumes`` + ``extraVolumeMounts`` + ``extraEnv`` carry
+        # the Gitea SSH credentials into the operator pod. ``defaultMode:
+        # 0o400`` ships the key bytes with permissions go-git's SSH
+        # transport will accept (anything looser than 0o600 is rejected).
+        # ``SSH_KNOWN_HOSTS`` overrides go-git's default lookup path so
+        # we don't have to write into a user home dir (which may not even
+        # exist for the operator pod's uid).
         release = k8s.helm.v3.Release(
             f"{name}-helm",
             chart=PKO_CHART_OCI,
@@ -80,14 +107,37 @@ class PKORelease(pulumi.ComponentResource):
             atomic=True,
             wait_for_jobs=True,
             timeout=600,
-            # No values overrides yet. The chart's defaults are fine; we
-            # override per-Stack via ``spec.serviceAccountName`` rather
-            # than swapping the chart's bundled SA.
-            values={},
+            values={
+                "extraVolumes": [
+                    {
+                        "name": _SSH_VOLUME_NAME,
+                        "secret": {
+                            "secretName": ssh_secret_name,
+                            "defaultMode": 0o400,
+                        },
+                    },
+                ],
+                "extraVolumeMounts": [
+                    {
+                        "name": _SSH_VOLUME_NAME,
+                        "mountPath": _SSH_MOUNT_PATH,
+                        "readOnly": True,
+                    },
+                ],
+                "extraEnv": [
+                    {
+                        "name": "SSH_KNOWN_HOSTS",
+                        "value": f"{_SSH_MOUNT_PATH}/{_SSH_KNOWN_HOSTS_KEY}",
+                    },
+                ],
+            },
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,
-                depends_on=[ns],
+                # Both the namespace AND the SSH Secret must exist before
+                # the chart's Deployment can come up Ready (atomic=True
+                # rolls back otherwise).
+                depends_on=[namespace_resource, ssh_secret_resource],
             ),
         )
 

@@ -4,14 +4,13 @@ Composes the building blocks in this package into a single
 ComponentResource the outer stack calls once:
 
     PKOBootstrap
-    ├── PKORelease              # Namespace + Helm OCI install
-    ├── ESORelease              # External Secrets Operator (Helm)
-    ├── ESOSourceAccess         # source-ns RBAC grant for ESO
-    ├── StateBackend            # PVC + passphrase Secret
-    ├── CredentialsProjection   # SecretStore + ExternalSecret in PKO ns
-    ├── WorkspaceServiceAccount # pulumi-runner + ClusterRoleBindings
+    ├── Namespace/pulumi-kubernetes-operator
+    ├── Secret/gitea-ssh             # admin SSH private key + known_hosts
+    ├── PKORelease                   # Helm OCI install w/ SSH Secret mount
+    ├── StateBackend                 # PVC + passphrase Secret
+    ├── WorkspaceServiceAccount      # pulumi-runner + ClusterRoleBindings
     ├── Stack/ca4s-control-plane
-    └── Tenants                 # per-env fan-out → N workload-cluster Stack CRs
+    └── Tenants                      # per-env fan-out → N workload-cluster Stack CRs
 
 The control-plane Stack CR reconciles from the same repo as this
 stack itself — it's how subsequent waves of management-cluster
@@ -26,14 +25,19 @@ as a sibling building block; there is no intermediate
 ``pulumi up`` against the appropriate per-env concrete impl in
 :mod:`pko._tenants_<env>`.
 
-ESO is installed unconditionally as part of the bootstrap: it's
-what keeps the GitOps credentials Secret in PKO's namespace live
-against out-of-band rotation of the upstream Secret (see
-:mod:`pko._credentials`). The per-source-ns RBAC grant is split out
-into :class:`pko._eso_source_access.ESOSourceAccess` because it's a
-per-Secret concern — if/when we project a second source Secret
-(another GitOps repo, a Vault → ESO source, etc.) we instantiate
-another grant + projection pair without touching the ESO install.
+The SSH path replaced the previous Flux + ESO indirection. PKO's
+``projectRepo`` only accepts ``https`` and ``ssh`` schemes; our
+in-cluster Gitea ships no TLS, so SSH is the only viable scheme.
+The repo component (:mod:`gitrepo.gitea_builtin`) generates an
+admin ed25519 keypair AND a Gitea host keypair deterministically
+from ``RandomBytes`` seeds; the public user-key is uploaded to
+Gitea via the REST API, the private user-key + the known_hosts
+entry derived from the host pubkey both land in a single Secret
+(``gitea-ssh``) in PKO's namespace via the projection below.
+:mod:`pko._release` and :mod:`pko._stack_cr` both mount that same
+Secret \u2014 the operator pod uses it for the controller-side
+``git ls-remote``; the workspace pod uses it for the ``git clone``
+the inner stack's first step performs.
 """
 
 from __future__ import annotations
@@ -43,10 +47,7 @@ import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
 from pko._backend import StateBackend
-from pko._credentials import CredentialsProjection
-from pko._eso_release import ESORelease
-from pko._eso_source_access import ESOSourceAccess
-from pko._release import PKORelease
+from pko._release import PKO_NAMESPACE, PKORelease
 from pko._service_account import WorkspaceServiceAccount
 from pko._stack_cr import StackCRSpec, build_stack_spec
 from pko._tenants import Tenants
@@ -60,6 +61,15 @@ from pko._tenants import Tenants
 CONTROL_PLANE_PROJECT = "ca4s-control-plane"
 CONTROL_PLANE_REPO_DIR = "pulumi/stacks/control_plane/"
 
+# Name of the Secret PKOBootstrap projects into PKO's namespace
+# holding the admin SSH credentials. The two keys it carries
+# (private key + known_hosts) are referenced by both
+# :mod:`pko._release` (operator pod mount) and :mod:`pko._stack_cr`
+# (workspace pod mount + Stack CR ``gitAuth.sshAuth.sshPrivateKey``).
+_SSH_SECRET_NAME = "gitea-ssh"
+_SSH_PRIVATE_KEY_KEY = "id_ed25519"
+_SSH_KNOWN_HOSTS_KEY = "known_hosts"
+
 
 class PKOBootstrap(pulumi.ComponentResource):
     """Install PKO and hand off control to the inner Stack CRs.
@@ -71,17 +81,19 @@ class PKOBootstrap(pulumi.ComponentResource):
             Output[str] kubeconfig for the management cluster.
             Drives the Kubernetes provider scoped to this component.
         repo_url:
-            Output[str] in-cluster URL of the GitOps repo
+            Output[str] in-cluster SSH URL of the GitOps repo
             (``GitOpsRepository.url``).
         repo_branch:
             Output[str] default branch the seed push targeted
             (``GitOpsRepository.default_branch``).
-        upstream_credentials_secret_name:
-            Output[str] name of the upstream credentials Secret
-            (``GitOpsRepository.credentials_secret_name``).
-        upstream_credentials_secret_namespace:
-            Output[str] namespace of the upstream credentials Secret
-            (``GitOpsRepository.credentials_secret_namespace``).
+        ssh_private_key:
+            Secret-marked Output[str] OpenSSH PEM admin private key
+            (``GitOpsRepository.ssh_private_key``). Projected into the
+            ``gitea-ssh`` Secret under key ``id_ed25519``.
+        ssh_known_hosts:
+            Output[str] single-line ``known_hosts`` entry for the SSH
+            endpoint (``GitOpsRepository.ssh_known_hosts``). Projected
+            into the same Secret under key ``known_hosts``.
         env:
             Outer-stack environment moniker (``pulumi.get_stack()``).
             Propagated to the control-plane Stack CR's ``spec.stack``
@@ -115,8 +127,8 @@ class PKOBootstrap(pulumi.ComponentResource):
         kubeconfig: pulumi.Input[str],
         repo_url: pulumi.Input[str],
         repo_branch: pulumi.Input[str],
-        upstream_credentials_secret_name: pulumi.Input[str],
-        upstream_credentials_secret_namespace: pulumi.Input[str],
+        ssh_private_key: pulumi.Input[str],
+        ssh_known_hosts: pulumi.Input[str],
         env: str,
         opts: ResourceOptions | None = None,
     ) -> None:
@@ -131,39 +143,48 @@ class PKOBootstrap(pulumi.ComponentResource):
             opts=ResourceOptions(parent=self),
         )
 
+        # Namespace owned here (not in PKORelease) so the SSH Secret
+        # below can be created in the same ns BEFORE the Helm install
+        # references it. The chart install is ``atomic=True``, so a
+        # missing Secret at install time would cause a rollback.
+        ns = k8s.core.v1.Namespace(
+            f"{name}-ns",
+            metadata={"name": PKO_NAMESPACE},
+            opts=ResourceOptions(parent=self, provider=k8s_provider),
+        )
+
+        # The single Secret PKO reads admin SSH credentials from. Two
+        # keys: ``id_ed25519`` (the private key, secret-marked at the
+        # repo component's output) and ``known_hosts`` (the host-key
+        # entry derived deterministically from the Gitea host keypair).
+        # Mounted into the operator pod by :mod:`pko._release` and into
+        # workspace pods by :mod:`pko._stack_cr`; referenced by the
+        # Stack CR's ``gitAuth.sshAuth.sshPrivateKey``.
+        ssh_secret = k8s.core.v1.Secret(
+            f"{name}-ssh",
+            metadata={
+                "name": _SSH_SECRET_NAME,
+                "namespace": PKO_NAMESPACE,
+            },
+            type="Opaque",
+            string_data={
+                _SSH_PRIVATE_KEY_KEY: ssh_private_key,
+                _SSH_KNOWN_HOSTS_KEY: ssh_known_hosts,
+            },
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[ns],
+            ),
+        )
+
         release = PKORelease(
             f"{name}-release",
             provider=k8s_provider,
+            namespace_resource=ns,
+            ssh_secret_name=_SSH_SECRET_NAME,
+            ssh_secret_resource=ssh_secret,
             opts=ResourceOptions(parent=self),
-        )
-
-        # External Secrets Operator. Installed in parallel with PKO
-        # (no edge between them) since neither uses the other's CRDs
-        # or runtime. CredentialsProjection takes a hard dependency
-        # on this release so the SecretStore / ExternalSecret CRs
-        # land after ESO's CRDs and controller are Ready.
-        eso = ESORelease(
-            f"{name}-eso",
-            provider=k8s_provider,
-            opts=ResourceOptions(parent=self),
-        )
-
-        # Per-source-ns RBAC grant for ESO: reader SA in the source
-        # namespace + the TokenRequest binding to the ESO controller
-        # SA. One instance per source Secret; today we only have the
-        # gitea credentials. Lives between ESORelease (provides the
-        # controller SA identity) and CredentialsProjection (consumes
-        # the reader SA identity in its SecretStore spec).
-        eso_access = ESOSourceAccess(
-            f"{name}-eso-access",
-            upstream_secret_name=upstream_credentials_secret_name,
-            upstream_secret_namespace=upstream_credentials_secret_namespace,
-            eso_namespace=eso.namespace,
-            eso_controller_service_account_name=(
-                eso.controller_service_account_name
-            ),
-            provider=k8s_provider,
-            opts=ResourceOptions(parent=self, depends_on=[eso]),
         )
 
         backend = StateBackend(
@@ -171,23 +192,6 @@ class PKOBootstrap(pulumi.ComponentResource):
             namespace=release.namespace,
             provider=k8s_provider,
             opts=ResourceOptions(parent=self),
-        )
-
-        creds = CredentialsProjection(
-            f"{name}-credentials",
-            upstream_secret_name=upstream_credentials_secret_name,
-            upstream_secret_namespace=upstream_credentials_secret_namespace,
-            pko_namespace=release.namespace,
-            reader_service_account_name=(
-                eso_access.reader_service_account_name
-            ),
-            reader_service_account_namespace=(
-                eso_access.reader_service_account_namespace
-            ),
-            provider=k8s_provider,
-            opts=ResourceOptions(
-                parent=self, depends_on=[release, eso, eso_access]
-            ),
         )
 
         sa = WorkspaceServiceAccount(
@@ -205,7 +209,7 @@ class PKOBootstrap(pulumi.ComponentResource):
             service_account_name=sa.service_account_name,
             repo_url=repo_url,
             repo_branch=repo_branch,
-            credentials_secret_name=creds.projected_secret_name,
+            ssh_secret_name=_SSH_SECRET_NAME,
             state_pvc_name=backend.pvc_name,
             state_backend_url=backend.backend_url,
             passphrase_secret_name=backend.passphrase_secret_name,
@@ -215,7 +219,7 @@ class PKOBootstrap(pulumi.ComponentResource):
         # the release's status Output is enough — pulumi-kubernetes
         # blocks the Release on its readiness before emitting the
         # ``status`` Output.
-        cr_deps: list[pulumi.Resource] = [release, creds, sa, backend]
+        cr_deps: list[pulumi.Resource] = [release, ssh_secret, sa, backend]
 
         control_plane_spec = build_stack_spec(
             spec=stack_spec,
@@ -227,12 +231,14 @@ class PKOBootstrap(pulumi.ComponentResource):
             f"{name}-control-plane",
             api_version="pulumi.com/v1",
             kind="Stack",
-            metadata={"namespace": stack_spec.pko_namespace},
+            metadata={"namespace": PKO_NAMESPACE},
             spec=control_plane_spec,
             opts=ResourceOptions(
                 parent=self, provider=k8s_provider, depends_on=cr_deps
             ),
         )
+
+        control_plane_metadata_name = control_plane.metadata["name"]
 
         # Per-env tenant fan-out. ``Tenants`` is a sibling building
         # block (like ``StateBackend``) that dispatches on ``env`` to
@@ -245,7 +251,7 @@ class PKOBootstrap(pulumi.ComponentResource):
             f"{name}-tenants",
             env=env,
             stack_spec=stack_spec,
-            control_plane_stack=control_plane.metadata.name,
+            control_plane_stack=control_plane_metadata_name,
             provider=k8s_provider,
             opts=ResourceOptions(
                 parent=self, depends_on=cr_deps + [control_plane]
@@ -254,7 +260,7 @@ class PKOBootstrap(pulumi.ComponentResource):
 
         self.namespace = release.namespace
         self.service_account = sa.service_account_name
-        self.control_plane_stack = control_plane.metadata.name
+        self.control_plane_stack = control_plane_metadata_name
         self.workload_cluster_stacks = tenants.workload_cluster_stacks
 
         self.register_outputs(

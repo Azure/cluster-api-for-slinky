@@ -103,7 +103,7 @@ class TenantsLocal(pulumi.ComponentResource):
             opts=ResourceOptions(parent=self, provider=provider),
         )
 
-        self.workload_cluster_stacks = [cr.metadata.name]
+        self.workload_cluster_stacks = [cr.metadata["name"]]
         self.register_outputs(
             {"workload_cluster_stacks": self.workload_cluster_stacks}
         )

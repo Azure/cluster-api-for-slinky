@@ -38,7 +38,7 @@ def test_helm_values_pin_pvc_2gi() -> None:
     pass
 
 
-@pytest.mark.skip(reason="TODO: GiteaBuiltinRepository must expose all five GitOpsRepository contract Outputs (url, url_external, default_branch, credentials_secret_name, credentials_secret_namespace); assert getattr(repo, field) is not None for each")
+@pytest.mark.skip(reason="TODO: GiteaBuiltinRepository must expose all five GitOpsRepository contract Outputs (url, url_external, default_branch, ssh_private_key, ssh_known_hosts); assert getattr(repo, field) is not None for each")
 def test_contract_outputs_all_populated() -> None:
     pass
 
