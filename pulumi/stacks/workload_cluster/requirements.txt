@@ -1,0 +1,5 @@
+# Python dependencies for the ca4s-workload-cluster inner stack.
+#
+# Mirrors the host-side pins in the repo-root requirements.txt.
+pulumi>=3.0,<4.0
+pulumi-kubernetes>=4.0,<5.0

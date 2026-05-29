@@ -92,12 +92,16 @@ class PKORelease(pulumi.ComponentResource):
         # ``atomic=True`` would roll back.
         #
         # ``extraVolumes`` + ``extraVolumeMounts`` + ``extraEnv`` carry
-        # the Gitea SSH credentials into the operator pod. ``defaultMode:
-        # 0o400`` ships the key bytes with permissions go-git's SSH
-        # transport will accept (anything looser than 0o600 is rejected).
-        # ``SSH_KNOWN_HOSTS`` overrides go-git's default lookup path so
-        # we don't have to write into a user home dir (which may not even
-        # exist for the operator pod's uid).
+        # the Gitea SSH credentials into the operator pod.
+        # ``defaultMode: 0o444`` ships the bytes world-readable (the
+        # mount lives inside the operator pod's filesystem; nobody
+        # else can see it) so the non-root operator uid — 65532 with
+        # no ``fsGroup`` set by the chart — can still open the files.
+        # go-git's pure-Go SSH transport reads the key bytes directly
+        # via ``ssh.ParsePrivateKey`` and does not enforce OpenSSH-style
+        # 0o600 mode checks, so the loose mode is fine on the consumer
+        # side. ``SSH_KNOWN_HOSTS`` overrides go-git's default lookup
+        # path so we don't have to write into a user home dir.
         release = k8s.helm.v3.Release(
             f"{name}-helm",
             chart=PKO_CHART_OCI,
@@ -113,7 +117,7 @@ class PKORelease(pulumi.ComponentResource):
                         "name": _SSH_VOLUME_NAME,
                         "secret": {
                             "secretName": ssh_secret_name,
-                            "defaultMode": 0o400,
+                            "defaultMode": 0o444,
                         },
                     },
                 ],

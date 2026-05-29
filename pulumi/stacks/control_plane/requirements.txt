@@ -1,0 +1,8 @@
+# Python dependencies for the ca4s-control-plane inner stack.
+#
+# Mirrors the host-side pins in the repo-root requirements.txt so
+# both ``pulumi up`` execution contexts (host venv at ``.venv/`` and
+# PKO workspace venv at ``/share/source/.venv/`` created by ``pulumi
+# install``) resolve to the same SDK versions.
+pulumi>=3.0,<4.0
+pulumi-kubernetes>=4.0,<5.0

@@ -51,6 +51,14 @@ _ORG_PLACEHOLDER = "organization"
 # this constant is the single place to update.
 _WORKSPACE_CONTAINER = "pulumi"
 
+# Default init container name PKO injects to do the ``git clone`` of
+# the inner project repo. The strategic merge by ``name`` targets it
+# so we can mount the SSH Secret + set ``SSH_KNOWN_HOSTS`` there too;
+# without it the clone runs without host-key trust and fails with
+# "unable to find any valid known_hosts file" before the main
+# ``pulumi`` container ever starts.
+_WORKSPACE_FETCH_CONTAINER = "fetch"
+
 # Volume name used inside the workspace pod for the file:// backend's
 # PVC mount. Arbitrary string, just has to match between volume and
 # volumeMount entries.
@@ -203,37 +211,50 @@ def build_stack_spec(
     }
 
     # Strategic merge patch onto PKO's default workspace pod template.
-    # PKO matches containers by ``name``; the default container is
-    # ``pulumi`` (constant above). We add the state PVC mount + the
-    # Gitea SSH Secret mount, plus a ``SSH_KNOWN_HOSTS`` env var
-    # pointing at the mounted file so go-git inside the auto-api
-    # ``pulumi-go`` binary trusts our pre-computed host key entry.
+    # PKO matches containers by ``name``; the default main container is
+    # ``pulumi`` (constant above) and the default init container that
+    # runs the ``git clone`` is ``fetch``. Both need the SSH Secret
+    # mount + ``SSH_KNOWN_HOSTS`` env: ``fetch`` so go-git inside
+    # PKO's clone init can verify the Gitea host key, and ``pulumi``
+    # so the auto-api inside the workspace can re-resolve the same
+    # remote if the inner program ever does its own git ops. The main
+    # container also gets the state PVC mount; the init container
+    # doesn't (it writes only into the shared ``/share`` emptyDir
+    # that PKO injects automatically).
+    ssh_env = [
+        {
+            "name": "SSH_KNOWN_HOSTS",
+            "value": (
+                f"{_SSH_MOUNT_PATH}/{spec.ssh_known_hosts_key}"
+            ),
+        },
+    ]
+    ssh_volume_mount = {
+        "name": _SSH_VOLUME_NAME,
+        "mountPath": _SSH_MOUNT_PATH,
+        "readOnly": True,
+    }
     workspace_template = {
         "spec": {
             "podTemplate": {
                 "spec": {
+                    "initContainers": [
+                        {
+                            "name": _WORKSPACE_FETCH_CONTAINER,
+                            "env": ssh_env,
+                            "volumeMounts": [ssh_volume_mount],
+                        },
+                    ],
                     "containers": [
                         {
                             "name": _WORKSPACE_CONTAINER,
-                            "env": [
-                                {
-                                    "name": "SSH_KNOWN_HOSTS",
-                                    "value": (
-                                        f"{_SSH_MOUNT_PATH}/"
-                                        f"{spec.ssh_known_hosts_key}"
-                                    ),
-                                },
-                            ],
+                            "env": ssh_env,
                             "volumeMounts": [
                                 {
                                     "name": _STATE_VOLUME_NAME,
                                     "mountPath": _STATE_MOUNT_PATH,
                                 },
-                                {
-                                    "name": _SSH_VOLUME_NAME,
-                                    "mountPath": _SSH_MOUNT_PATH,
-                                    "readOnly": True,
-                                },
+                                ssh_volume_mount,
                             ],
                         },
                     ],
@@ -248,15 +269,18 @@ def build_stack_spec(
                             "name": _SSH_VOLUME_NAME,
                             "secret": {
                                 "secretName": spec.ssh_secret_name,
-                                # 0o400: read-only for the SSH client.
-                                # go-git's ssh transport rejects key
-                                # files with permissions broader than
-                                # ``0o600`` and the chmod isn't safe
-                                # to do at runtime when the file is
-                                # owned by another uid via a Secret
-                                # mount, so we ship it tight from the
-                                # start.
-                                "defaultMode": 0o400,
+                                # 0o444: world-readable inside the
+                                # pod's filesystem. The workspace
+                                # container runs as a non-root uid
+                                # with no ``fsGroup`` set by PKO's
+                                # workspace template, so 0o400/0o440
+                                # would leave the file as root:root
+                                # with no group access for the
+                                # workspace user. go-git's pure-Go
+                                # SSH transport reads the key bytes
+                                # directly and does not enforce
+                                # OpenSSH-style 0o600 perm checks.
+                                "defaultMode": 0o444,
                             },
                         },
                     ],
