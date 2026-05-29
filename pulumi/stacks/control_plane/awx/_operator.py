@@ -40,7 +40,7 @@ from pulumi import ResourceOptions
 # Helm chart version equals the operator version.
 AWX_OPERATOR_CHART_REPO = "https://ansible-community.github.io/awx-operator-helm/"
 AWX_OPERATOR_CHART_NAME = "awx-operator"
-AWX_OPERATOR_CHART_VERSION = "2.19.1"
+AWX_OPERATOR_CHART_VERSION = "3.2.1"
 
 # Conventional namespace for the operator and the AWX instance it will
 # manage. Kept constant: the forthcoming ``AWXInstance`` and
