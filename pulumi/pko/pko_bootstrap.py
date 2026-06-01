@@ -5,8 +5,9 @@ ComponentResource the outer stack calls once:
 
     PKOBootstrap
     ├── Namespace/pulumi-kubernetes-operator
-    ├── Secret/gitea-ssh             # admin SSH private key + known_hosts
-    ├── PKORelease                   # Helm OCI install w/ SSH Secret mount
+    ├── Secret/gitea-ssh             # admin SSH private key
+    ├── ConfigMap/gitea-known-hosts  # SSH host-key trust
+    ├── PKORelease                   # Helm OCI install w/ known_hosts mount
     ├── StateBackend                 # PVC + passphrase Secret
     ├── WorkspaceServiceAccount      # pulumi-runner + ClusterRoleBindings
     ├── Stack/ca4s-control-plane
@@ -31,13 +32,11 @@ in-cluster Gitea ships no TLS, so SSH is the only viable scheme.
 The repo component (:mod:`gitrepo.gitea_builtin`) generates an
 admin ed25519 keypair AND a Gitea host keypair deterministically
 from ``RandomBytes`` seeds; the public user-key is uploaded to
-Gitea via the REST API, the private user-key + the known_hosts
-entry derived from the host pubkey both land in a single Secret
-(``gitea-ssh``) in PKO's namespace via the projection below.
-:mod:`pko._release` and :mod:`pko._stack_cr` both mount that same
-Secret \u2014 the operator pod uses it for the controller-side
-``git ls-remote``; the workspace pod uses it for the ``git clone``
-the inner stack's first step performs.
+Gitea via the REST API, the private user-key lands in a Secret
+(``gitea-ssh``), and the known_hosts entry derived from the host
+pubkey lands in a ConfigMap (``gitea-known-hosts``). PKO reads the
+private key through ``Stack.spec.gitAuth``; :mod:`pko._release` and
+:mod:`pko._stack_cr` mount only the public host-key trust file.
 """
 
 from __future__ import annotations
@@ -61,13 +60,12 @@ from pko._tenants import Tenants
 CONTROL_PLANE_PROJECT = "ca4s-control-plane"
 CONTROL_PLANE_REPO_DIR = "pulumi/stacks/control_plane/"
 
-# Name of the Secret PKOBootstrap projects into PKO's namespace
-# holding the admin SSH credentials. The two keys it carries
-# (private key + known_hosts) are referenced by both
-# :mod:`pko._release` (operator pod mount) and :mod:`pko._stack_cr`
-# (workspace pod mount + Stack CR ``gitAuth.sshAuth.sshPrivateKey``).
+# Names PKOBootstrap projects into PKO's namespace. The Secret holds
+# auth material and is referenced by Stack CR ``gitAuth``; the ConfigMap
+# holds public host-key trust and is mounted into operator/workspace pods.
 _SSH_SECRET_NAME = "gitea-ssh"
 _SSH_PRIVATE_KEY_KEY = "id_ed25519"
+_SSH_KNOWN_HOSTS_CONFIG_MAP_NAME = "gitea-known-hosts"
 _SSH_KNOWN_HOSTS_KEY = "known_hosts"
 
 
@@ -93,7 +91,8 @@ class PKOBootstrap(pulumi.ComponentResource):
         ssh_known_hosts:
             Output[str] single-line ``known_hosts`` entry for the SSH
             endpoint (``GitOpsRepository.ssh_known_hosts``). Projected
-            into the same Secret under key ``known_hosts``.
+            into the ``gitea-known-hosts`` ConfigMap under key
+            ``known_hosts``.
         env:
             Outer-stack environment moniker (``pulumi.get_stack()``).
             Propagated to the control-plane Stack CR's ``spec.stack``
@@ -143,23 +142,19 @@ class PKOBootstrap(pulumi.ComponentResource):
             opts=ResourceOptions(parent=self),
         )
 
-        # Namespace owned here (not in PKORelease) so the SSH Secret
-        # below can be created in the same ns BEFORE the Helm install
-        # references it. The chart install is ``atomic=True``, so a
-        # missing Secret at install time would cause a rollback.
+        # Namespace owned here (not in PKORelease) so the known_hosts
+        # ConfigMap can be created in the same ns BEFORE the Helm install
+        # references it. The chart install is ``atomic=True``, so a missing
+        # ConfigMap volume at install time would cause a rollback.
         ns = k8s.core.v1.Namespace(
             f"{name}-ns",
             metadata={"name": PKO_NAMESPACE},
             opts=ResourceOptions(parent=self, provider=k8s_provider),
         )
 
-        # The single Secret PKO reads admin SSH credentials from. Two
-        # keys: ``id_ed25519`` (the private key, secret-marked at the
-        # repo component's output) and ``known_hosts`` (the host-key
-        # entry derived deterministically from the Gitea host keypair).
-        # Mounted into the operator pod by :mod:`pko._release` and into
-        # workspace pods by :mod:`pko._stack_cr`; referenced by the
-        # Stack CR's ``gitAuth.sshAuth.sshPrivateKey``.
+        # The Secret PKO reads admin SSH credentials from. The private
+        # key is referenced by Stack CR ``gitAuth.sshAuth.sshPrivateKey``;
+        # it is not mounted into operator or workspace pods as a file.
         ssh_secret = k8s.core.v1.Secret(
             f"{name}-ssh",
             metadata={
@@ -169,8 +164,21 @@ class PKOBootstrap(pulumi.ComponentResource):
             type="Opaque",
             string_data={
                 _SSH_PRIVATE_KEY_KEY: ssh_private_key,
-                _SSH_KNOWN_HOSTS_KEY: ssh_known_hosts,
             },
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[ns],
+            ),
+        )
+
+        known_hosts = k8s.core.v1.ConfigMap(
+            f"{name}-known-hosts",
+            metadata={
+                "name": _SSH_KNOWN_HOSTS_CONFIG_MAP_NAME,
+                "namespace": PKO_NAMESPACE,
+            },
+            data={_SSH_KNOWN_HOSTS_KEY: ssh_known_hosts},
             opts=ResourceOptions(
                 parent=self,
                 provider=k8s_provider,
@@ -182,8 +190,8 @@ class PKOBootstrap(pulumi.ComponentResource):
             f"{name}-release",
             provider=k8s_provider,
             namespace_resource=ns,
-            ssh_secret_name=_SSH_SECRET_NAME,
-            ssh_secret_resource=ssh_secret,
+            known_hosts_config_map_name=_SSH_KNOWN_HOSTS_CONFIG_MAP_NAME,
+            known_hosts_resource=known_hosts,
             opts=ResourceOptions(parent=self),
         )
 
@@ -210,6 +218,7 @@ class PKOBootstrap(pulumi.ComponentResource):
             repo_url=repo_url,
             repo_branch=repo_branch,
             ssh_secret_name=_SSH_SECRET_NAME,
+            known_hosts_config_map_name=_SSH_KNOWN_HOSTS_CONFIG_MAP_NAME,
             state_pvc_name=backend.pvc_name,
             state_backend_url=backend.backend_url,
             passphrase_secret_name=backend.passphrase_secret_name,
@@ -219,7 +228,13 @@ class PKOBootstrap(pulumi.ComponentResource):
         # the release's status Output is enough — pulumi-kubernetes
         # blocks the Release on its readiness before emitting the
         # ``status`` Output.
-        cr_deps: list[pulumi.Resource] = [release, ssh_secret, sa, backend]
+        cr_deps: list[pulumi.Resource] = [
+            release,
+            ssh_secret,
+            known_hosts,
+            sa,
+            backend,
+        ]
 
         control_plane_spec = build_stack_spec(
             spec=stack_spec,

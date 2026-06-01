@@ -14,10 +14,9 @@ allow-list rejects plain HTTP outright), and our in-cluster Gitea
 ships no TLS — SSH is the only viable scheme. The admin private key
 is projected into PKO's namespace as a Secret named in
 ``StackCRSpec.ssh_secret_name``; this builder references it via
-``gitAuth.sshAuth.sshPrivateKey`` and ALSO mounts the same Secret
-into the workspace pod at ``/etc/gitea-ssh/`` so the workspace pod’s
-``git clone`` step (run by the auto-api ``pulumi-go`` binary)
-trusts the same host key the operator does.
+``gitAuth.sshAuth.sshPrivateKey``. The public Gitea host key is
+projected separately as a known_hosts ConfigMap and mounted into
+workspace pods so go-git's SSH host-key verification passes.
 
 This module exposes :func:`build_stack_spec` only; callers own the
 ``k8s.apiextensions.CustomResource`` instantiation itself. Splitting
@@ -53,7 +52,7 @@ _WORKSPACE_CONTAINER = "pulumi"
 
 # Default init container name PKO injects to do the ``git clone`` of
 # the inner project repo. The strategic merge by ``name`` targets it
-# so we can mount the SSH Secret + set ``SSH_KNOWN_HOSTS`` there too;
+# so we can mount known_hosts + set ``SSH_KNOWN_HOSTS`` there too;
 # without it the clone runs without host-key trust and fails with
 # "unable to find any valid known_hosts file" before the main
 # ``pulumi`` container ever starts.
@@ -68,11 +67,11 @@ _STATE_VOLUME_NAME = "state"
 # URL in :mod:`pko._backend`.
 _STATE_MOUNT_PATH = "/state"
 
-# Volume name + mount path for the in-cluster Gitea SSH credentials
-# Secret (private key + known_hosts). Mirrors the PKO operator pod's
-# own mount (see :mod:`pko._release`) so the workspace pod's
-# ``git clone`` step trusts the same host key by the same env var.
-_SSH_VOLUME_NAME = "gitea-ssh"
+# Volume name + mount path for the in-cluster Gitea known_hosts ConfigMap.
+# Mirrors the PKO operator pod's own mount (see :mod:`pko._release`) so the
+# workspace pod's ``git clone`` step trusts the same host key by the same env
+# var.
+_KNOWN_HOSTS_VOLUME_NAME = "gitea-known-hosts"
 _SSH_MOUNT_PATH = "/etc/gitea-ssh"
 
 
@@ -113,10 +112,12 @@ class StackCRSpec:
     repo_url: pulumi.Input[str]
     repo_branch: pulumi.Input[str]
 
-    # SSH Secret in ``pko_namespace`` exposing the admin private key
-    # plus the ``known_hosts`` entry for the in-cluster Gitea endpoint.
-    # Two keys: ``id_ed25519`` (the private key) + ``known_hosts``.
+    # SSH Secret in ``pko_namespace`` exposing the admin private key.
     ssh_secret_name: pulumi.Input[str]
+
+    # ConfigMap in ``pko_namespace`` exposing the known_hosts entry for
+    # go-git's SSH host-key verification.
+    known_hosts_config_map_name: pulumi.Input[str]
 
     # State backend. The PVC is mounted at ``/state`` and the backend
     # URL is ``file:///state``; the passphrase Secret feeds
@@ -125,7 +126,7 @@ class StackCRSpec:
     state_backend_url: pulumi.Input[str]
     passphrase_secret_name: pulumi.Input[str]
 
-    # Key names inside the SSH Secret. Defaulted because every caller
+    # Key names inside the Secret/ConfigMap. Defaulted because every caller
     # uses the canonical names; kept as fields so a future cloud-hosted
     # gitops provider can override without touching the Stack CR code.
     ssh_private_key_key: str = "id_ed25519"
@@ -177,12 +178,10 @@ def build_stack_spec(
     )
 
     # ``gitAuth.sshAuth.sshPrivateKey`` points the PKO controller at
-    # the ``id_ed25519`` key inside our shared SSH Secret (the same
-    # Secret the workspace pod mounts at ``/etc/gitea-ssh/`` for its
-    # own ``git clone``). PKO's go-git client signs the connection
-    # with this key. NB: previously we routed through Flux to dodge
-    # PKO's HTTP-scheme rejection; now that we speak SSH directly,
-    # ``projectRepo`` is back on the menu and Flux is gone.
+    # the ``id_ed25519`` key inside our SSH Secret. PKO's go-git client
+    # signs the connection with this key. NB: previously we routed through
+    # Flux to dodge PKO's HTTP-scheme rejection; now that we speak SSH
+    # directly, ``projectRepo`` is back on the menu and Flux is gone.
     git_auth = {
         "sshAuth": {
             "sshPrivateKey": {
@@ -213,7 +212,7 @@ def build_stack_spec(
     # Strategic merge patch onto PKO's default workspace pod template.
     # PKO matches containers by ``name``; the default main container is
     # ``pulumi`` (constant above) and the default init container that
-    # runs the ``git clone`` is ``fetch``. Both need the SSH Secret
+    # runs the ``git clone`` is ``fetch``. Both need the known_hosts
     # mount + ``SSH_KNOWN_HOSTS`` env: ``fetch`` so go-git inside
     # PKO's clone init can verify the Gitea host key, and ``pulumi``
     # so the auto-api inside the workspace can re-resolve the same
@@ -230,7 +229,7 @@ def build_stack_spec(
         },
     ]
     ssh_volume_mount = {
-        "name": _SSH_VOLUME_NAME,
+        "name": _KNOWN_HOSTS_VOLUME_NAME,
         "mountPath": _SSH_MOUNT_PATH,
         "readOnly": True,
     }
@@ -266,20 +265,15 @@ def build_stack_spec(
                             },
                         },
                         {
-                            "name": _SSH_VOLUME_NAME,
-                            "secret": {
-                                "secretName": spec.ssh_secret_name,
-                                # 0o444: world-readable inside the
-                                # pod's filesystem. The workspace
-                                # container runs as a non-root uid
-                                # with no ``fsGroup`` set by PKO's
-                                # workspace template, so 0o400/0o440
-                                # would leave the file as root:root
-                                # with no group access for the
-                                # workspace user. go-git's pure-Go
-                                # SSH transport reads the key bytes
-                                # directly and does not enforce
-                                # OpenSSH-style 0o600 perm checks.
+                            "name": _KNOWN_HOSTS_VOLUME_NAME,
+                            "configMap": {
+                                "name": spec.known_hosts_config_map_name,
+                                "items": [
+                                    {
+                                        "key": spec.ssh_known_hosts_key,
+                                        "path": spec.ssh_known_hosts_key,
+                                    },
+                                ],
                                 "defaultMode": 0o444,
                             },
                         },

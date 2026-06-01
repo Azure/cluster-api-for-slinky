@@ -13,18 +13,13 @@ What we deploy
 * A ``RandomPassword`` for the admin user. Held in Pulumi state and never
   surfaced as a stack output.
 * One credentials ``Secret`` in the ``gitea`` namespace named
-  ``gitea-credentials`` with two keys: ``username`` and ``password``.
-  Two consumers read it:
+    ``gitea-credentials`` with two keys: ``username`` and ``password``.
+    The Gitea Helm chart reads it via ``gitea.admin.existingSecret`` to
+    bootstrap the admin user on first boot. (``email`` is sourced from
+    chart values directly, not from the Secret, so it isn't a Secret key.)
 
-    - The Gitea Helm chart, via ``gitea.admin.existingSecret`` — bootstraps
-      the admin user on first boot. (``email`` is sourced from chart
-      values directly, not from the Secret, so it isn't a Secret key.)
-    - Downstream PKO ``Stack.spec.gitAuth.basicAuth`` — both the
-      ``userName`` and ``password`` ``SecretKeySelector`` fields point
-      at this Secret's matching keys.
-
-  PKO only ever reads from this repo and the cluster is single-tenant
-  by construction, so reusing the admin pair is fine for now.
+    PKO reads the repo through an uploaded admin SSH public key, not this
+    HTTP admin password.
 * A ``helm.v3.Release`` of ``gitea-charts/gitea`` (pinned version below)
   configured for the minimal footprint: no postgres, no redis, no
   external cache, sqlite3 DB, memory session/cache, level queue. A
@@ -94,11 +89,10 @@ _GITEA_APP_VERSION = "1.26.1"  # informational
 # here; whoever installs PKO owns that decision.
 _GITEA_NAMESPACE = "gitea"
 
-# The single credentials Secret name. The Gitea Helm chart reads it via
+# The credentials Secret name. The Gitea Helm chart reads it via
 # ``gitea.admin.existingSecret`` (pulling ``username`` / ``password`` keys
-# out of it to bootstrap the admin user on first boot); downstream PKO
-# resources read the same two keys via ``Stack.spec.gitAuth.basicAuth``.
-# One Secret, two consumers.
+# out of it to bootstrap the admin user on first boot). PKO uses SSH auth
+# instead and never consumes this Secret directly.
 _CREDENTIALS_SECRET = "gitea-credentials"
 
 # Gitea refuses the literal string ``admin`` as an administrator username
@@ -473,28 +467,10 @@ class GiteaBuiltinRepository(GitOpsRepository):
             opts=ResourceOptions(parent=self),
         )
 
-        # The single credentials Secret. Two consumers:
-        #
-        #   * The Gitea Helm chart, via ``gitea.admin.existingSecret`` —
-        #     reads ``username``/``password`` on first boot and runs
-        #     ``gitea admin user create``. Order matters: must exist
-        #     before the Helm release reaches its admin-init job.
-        #   * Downstream PKO ``Stack.spec.gitAuth.basicAuth`` — reads
-        #     the same two keys via ``SecretKeySelector`` references.
-        #     Lives in the ``gitea`` namespace alongside the server,
-        #     *not* in PKO's own (``pulumi-kubernetes-operator``)
-        #     namespace. Rationale: PKO's ``gitAuth`` references are
-        #     namespace-local, so whoever consumes these credentials
-        #     (PKO, AWX, anything else) will need a copy in *its*
-        #     namespace anyway. Putting it next to the server it
-        #     authenticates against is the honest place to expose it;
-        #     consumers handle propagation.
-        #
-        # Type ``Opaque`` (not ``kubernetes.io/basic-auth``) because the
-        # ``Opaque`` shape with explicit ``username``/``password`` keys
-        # is what PKO's ``SecretKeySelector``-based ``gitAuth`` reads
-        # most naturally; the typed flavor works too but is less
-        # explicit when grepping by key.
+        # The Gitea Helm chart reads this via ``gitea.admin.existingSecret``
+        # on first boot and runs ``gitea admin user create``. Order matters:
+        # it must exist before the Helm release reaches its admin-init job.
+        # Type ``Opaque`` keeps the exact chart-expected keys explicit.
         credentials_secret = k8s.core.v1.Secret(
             f"{name}-credentials",
             metadata={

@@ -9,17 +9,15 @@ Owns:
 The chart's defaults are already minimal (single-replica operator, no
 metrics service, no webhook). We override only the bits we need:
 ``extraVolumes`` + ``extraVolumeMounts`` + ``extraEnv`` to project the
-in-cluster Gitea SSH credentials (private key + ``known_hosts``) into
-the operator pod — PKO's stack-controller invokes go-git's
-``ListContext`` from inside this pod, so the host-key trust store and
-the key bytes must live alongside the controller process.
+in-cluster Gitea ``known_hosts`` entry into the operator pod. PKO's
+stack-controller invokes go-git's ``ListContext`` from inside this pod,
+and go-git requires a host-key trust file for SSH remotes.
 
-The SSH Secret is created in the same namespace by
-:class:`pko.pko_bootstrap.PKOBootstrap` BEFORE this release reconciles
-(a ``depends_on`` edge on the release ties the two together). The pod
-must come up with the Secret already in place; absent that, kubelet's
-volume mount would block startup, and with ``atomic=True`` the Helm
-install would time out and roll back.
+The ``known_hosts`` ConfigMap is created in the same namespace by
+:class:`pko.pko_bootstrap.PKOBootstrap` BEFORE this release reconciles.
+The pod must come up with the ConfigMap already in place; absent that,
+kubelet's volume mount would block startup, and with ``atomic=True`` the
+Helm install would time out and roll back.
 
 Pin policy mirrors the rest of the stack: explicit chart version bumps,
 no implicit "latest". Bump :data:`PKO_CHART_VERSION` and review release
@@ -43,10 +41,10 @@ PKO_CHART_VERSION = "2.3.0"
 # component and there is no real use case for renaming it.
 PKO_NAMESPACE = "pulumi-kubernetes-operator"
 
-# Volume + mount path for the in-cluster Gitea SSH Secret. Mirrored
+# Volume + mount path for the in-cluster Gitea known_hosts ConfigMap. Mirrored
 # in :mod:`pko._stack_cr` so workspace pods get the same mount layout
 # under the same env var — keeps the contract a single constant set.
-_SSH_VOLUME_NAME = "gitea-ssh"
+_KNOWN_HOSTS_VOLUME_NAME = "gitea-known-hosts"
 _SSH_MOUNT_PATH = "/etc/gitea-ssh"
 _SSH_KNOWN_HOSTS_KEY = "known_hosts"
 
@@ -74,8 +72,8 @@ class PKORelease(pulumi.ComponentResource):
         *,
         provider: k8s.Provider,
         namespace_resource: pulumi.Resource,
-        ssh_secret_name: pulumi.Input[str],
-        ssh_secret_resource: pulumi.Resource,
+        known_hosts_config_map_name: pulumi.Input[str],
+        known_hosts_resource: pulumi.Resource,
         opts: ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:pko:PKORelease", name, props={}, opts=opts)
@@ -86,22 +84,10 @@ class PKORelease(pulumi.ComponentResource):
         #
         # The namespace is owned by :class:`pko.pko_bootstrap.PKOBootstrap`
         # (passed in via ``namespace_resource``) rather than this release,
-        # so the SSH Secret can be created in the same namespace BEFORE
-        # the Helm install kicks off. Without that ordering the chart's
-        # Deployment would block on a missing Secret mount and
-        # ``atomic=True`` would roll back.
-        #
-        # ``extraVolumes`` + ``extraVolumeMounts`` + ``extraEnv`` carry
-        # the Gitea SSH credentials into the operator pod.
-        # ``defaultMode: 0o444`` ships the bytes world-readable (the
-        # mount lives inside the operator pod's filesystem; nobody
-        # else can see it) so the non-root operator uid — 65532 with
-        # no ``fsGroup`` set by the chart — can still open the files.
-        # go-git's pure-Go SSH transport reads the key bytes directly
-        # via ``ssh.ParsePrivateKey`` and does not enforce OpenSSH-style
-        # 0o600 mode checks, so the loose mode is fine on the consumer
-        # side. ``SSH_KNOWN_HOSTS`` overrides go-git's default lookup
-        # path so we don't have to write into a user home dir.
+        # so the known_hosts ConfigMap can be created in the same namespace
+        # BEFORE the Helm install kicks off. ``SSH_KNOWN_HOSTS`` overrides
+        # go-git's default lookup path so we don't have to write into a user
+        # home dir inside the operator image.
         release = k8s.helm.v3.Release(
             f"{name}-helm",
             chart=PKO_CHART_OCI,
@@ -114,16 +100,22 @@ class PKORelease(pulumi.ComponentResource):
             values={
                 "extraVolumes": [
                     {
-                        "name": _SSH_VOLUME_NAME,
-                        "secret": {
-                            "secretName": ssh_secret_name,
+                        "name": _KNOWN_HOSTS_VOLUME_NAME,
+                        "configMap": {
+                            "name": known_hosts_config_map_name,
+                            "items": [
+                                {
+                                    "key": _SSH_KNOWN_HOSTS_KEY,
+                                    "path": _SSH_KNOWN_HOSTS_KEY,
+                                },
+                            ],
                             "defaultMode": 0o444,
                         },
                     },
                 ],
                 "extraVolumeMounts": [
                     {
-                        "name": _SSH_VOLUME_NAME,
+                        "name": _KNOWN_HOSTS_VOLUME_NAME,
                         "mountPath": _SSH_MOUNT_PATH,
                         "readOnly": True,
                     },
@@ -138,10 +130,7 @@ class PKORelease(pulumi.ComponentResource):
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,
-                # Both the namespace AND the SSH Secret must exist before
-                # the chart's Deployment can come up Ready (atomic=True
-                # rolls back otherwise).
-                depends_on=[namespace_resource, ssh_secret_resource],
+                depends_on=[namespace_resource, known_hosts_resource],
             ),
         )
 
