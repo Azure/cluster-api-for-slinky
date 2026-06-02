@@ -75,6 +75,15 @@ def run() -> None:
     awx_operator = AWXOperator("awx-operator")
     awx_instance = AWXInstance("awx-instance", operator=awx_operator)
 
+    # TODO(awx-plumbing): keep AWX installed as a management-plane surface, but
+    # defer wiring it until the CAPI/CAPD path is solid. Useful follow-ups:
+    # create a scoped ServiceAccount/token credential so AWX can reach this
+    # cluster reflexively through the Kubernetes API; create the matching AWX
+    # credential via the AWX API; register the GitOps repo/project as an AWX
+    # project/source; sync a CAPI-derived inventory from workload clusters;
+    # add job templates for day-2 operations; decide how AWX credentials map to
+    # tenant boundaries; and expose any AWX URL/admin details needed by users.
+
     pulumi.export("cert_manager_namespace", cert_manager.namespace)
     pulumi.export("capi_operator_namespace", capi.namespace)
     pulumi.export("capi_provider_version", capi.provider_version)
