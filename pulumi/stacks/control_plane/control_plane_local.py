@@ -58,10 +58,10 @@ def run() -> None:
     install in parallel. The AWX instance waits for the operator release so
     the CRD and controller exist before the ``AWX`` CR is submitted.
 
-    Still TODO: the ``ClusterClass`` and templates from
-    ``capi-quickstart.yaml``, AWX API configuration, and the
-    cluster-autoscaler. ``slurm-cluster.yaml`` is
-    NOT mirrored here — it lands on the workload cluster (see
+    Still TODO here: AWX API configuration and the cluster-autoscaler.
+    ``ClusterClass`` / templates from ``capi-quickstart.yaml`` and
+    ``slurm-cluster.yaml`` are NOT mirrored here — cluster shape and workload
+    contents land through the workload-cluster path (see
     ``../workload_cluster/``). No ingress controller for now:
     LoadBalancer Services on the management cluster get a routable IP
     from cloud-provider-kind directly.
