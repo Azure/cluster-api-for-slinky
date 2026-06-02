@@ -23,20 +23,20 @@ What we deploy
 * A ``helm.v3.Release`` of ``gitea-charts/gitea`` (pinned version below)
   configured for the minimal footprint: no postgres, no redis, no
   external cache, sqlite3 DB, memory session/cache, level queue. A
-  small (2 GiB) PVC backs ``/data`` via kind's local-path provisioner
-  so the seeded repo + admin DB survive pod restarts; the chart's
+    small (2 GiB) PVC backs ``/data`` via kind's local-path provisioner
+    so the synced repo + admin DB survive pod restarts; the chart's
   ``helm.sh/resource-policy: keep`` annotation is explicitly stripped
   so ``pulumi destroy`` / ``helm uninstall`` reclaims the PVC rather
   than leaking it. The HTTP Service is exposed as ``LoadBalancer`` so
   cloud-provider-kind can publish a host-reachable address for
-  ``GiteaRepo`` / ``GiteaSeed`` to use; SSH stays on ``ClusterIP``.
+    ``GiteaRepo`` / ``GiteaSync`` to use; SSH stays on ``ClusterIP``.
 * A ``GiteaRepo`` (``gitrepo.gitea_repo``) that ``POST``s to
   ``/api/v1/user/repos`` and lands an empty ``<owner>/<repo_name>``
   inside Gitea. Re-adopts on 409 so partial failures are recoverable.
-* A ``GiteaSeed`` (``gitrepo.gitea_seed``) that does a one-time
-  ``git push --force`` of the local working tree's current ``HEAD``
-  into the repo's default branch. Re-runs (replace) only when
-  ``HEAD`` advances, never on URL or credential drift.
+* A ``GiteaSync`` (``gitrepo.gitea_sync``) that pushes the local working
+    tree's current ``HEAD`` into the repo's default branch when the remote
+    branch is missing or stale. It never force-pushes and resolves the
+    current LoadBalancer address right before talking to Git.
 
 What we don't deploy (yet)
 --------------------------
@@ -44,7 +44,7 @@ What we don't deploy (yet)
   per-cluster-bridge LB IP (e.g. ``172.18.0.x:3000``) — host-reachable
   but not exposed off-host. A future PKO Stack can drop in
   ingress-nginx + a real cert if/when needed.
-* No dedicated read-only user. The seed pushes as the admin user and
+* No dedicated read-only user. The sync pushes as the admin user and
   ``gitea-credentials`` reuses the admin password. If multi-tenancy
   starts to matter, introduce a ``gitea-pko`` user via the REST API
   and point the credentials Secret at that instead.
@@ -59,6 +59,7 @@ matching the rest of this stack's conservative defaults.
 from __future__ import annotations
 
 import base64
+import hashlib
 import os
 from typing import Any, Mapping, Optional
 
@@ -71,7 +72,7 @@ from pulumi import Output, ResourceOptions
 
 from gitrepo._base import GitOpsRepository
 from gitrepo.gitea_repo import GiteaRepo
-from gitrepo.gitea_seed import GiteaSeed
+from gitrepo.gitea_sync import GiteaSync
 from gitrepo.gitea_sshkey import GiteaSSHKey
 
 
@@ -101,8 +102,8 @@ _CREDENTIALS_SECRET = "gitea-credentials"
 _DEFAULT_ADMIN_USERNAME = "caps-admin"
 _DEFAULT_ADMIN_EMAIL = "caps-admin@example.invalid"
 
-# Repo coordinates the seed phase will use. ``_DEFAULT_REPO_OWNER`` is the
-# Gitea org / user that will own the seeded repo; defaulting it to the admin
+# Repo coordinates the sync phase will use. ``_DEFAULT_REPO_OWNER`` is the
+# Gitea org / user that will own the synced repo; defaulting it to the admin
 # username keeps the URL self-describing.
 _DEFAULT_REPO_NAME = "cluster-api-provider-slinky"
 _DEFAULT_BRANCH = "main"
@@ -123,21 +124,28 @@ _GITEA_HTTP_PORT = 3000
 _GITEA_SSH_SERVICE = "gitea-ssh"
 _GITEA_SSH_PORT = 22
 
-# Secret holding the pre-generated Gitea SSH *host* keypair. Mounted
+# Prefix for the Secret holding the pre-generated Gitea SSH *host* keypair. Mounted
 # into the Gitea pod via the chart's ``extraVolumes`` +
 # ``extraContainerVolumeMounts`` so Gitea boots with a deterministic
 # host key (instead of auto-generating one on first boot, which would
 # bust our pre-computed ``known_hosts`` entry). Two keys:
-#   * ``ssh_host_ed25519_key``      — OpenSSH-format private key.
+#   * ``ssh_host_ed25519_key``      — PKCS8 PEM private key.
 #   * ``ssh_host_ed25519_key.pub``  — OpenSSH-format public key.
-_HOST_KEY_SECRET = "gitea-ssh-host-keys"
+_HOST_KEY_SECRET_PREFIX = "gitea-ssh-host-keys-pkcs8"
+
+# Prefix for the PKO namespace Secret that will hold the admin user's SSH
+# private key. The Secret is created by :class:`pko.pko_bootstrap.PKOBootstrap`,
+# but the name is derived here from the matching public key so every consumer
+# follows the same key-version identity.
+_USER_KEY_SECRET_PREFIX = "gitea-ssh"
+_USER_PRIVATE_KEY_SECRET_KEY = "id_ed25519"
 
 # Title we give the admin user's SSH key inside Gitea. Surfaces in the
 # Gitea web UI under the admin user's SSH keys list — useful when
 # eyeballing what Pulumi actually wired up.
 _ADMIN_SSH_KEY_TITLE = "ca4s-pko"
 
-# Default location of the local working tree the seed pushes from is
+# Default location of the local working tree the sync pushes from is
 # resolved lazily by :func:`_default_source_dir` — see the docstring there
 # for why this is not a module-level constant.
 
@@ -167,7 +175,7 @@ def _default_source_dir() -> str:
 def _chart_values(
     admin_secret_name: str,
     admin_email: str,
-    host_key_secret_name: str,
+    host_key_secret_name: pulumi.Input[str],
 ) -> Mapping[str, Any]:
     """Return the Helm values dict for the pinned Gitea chart.
 
@@ -219,17 +227,9 @@ def _chart_values(
         # straight-up wasteful for an ephemeral dev instance.
         #
         # ``annotations.helm.sh/resource-policy: None`` is the important
-        # bit: the chart's default value bakes in
-        # ``helm.sh/resource-policy: keep``, which makes ``helm uninstall``
-        # (and therefore ``pulumi destroy``) skip reclaiming the PVC.
-        # That's the right call for a production stateful service \u2014 you
-        # don't want a misclick to destroy years of data \u2014 but for this
-        # ephemeral, re-seedable Gitea it just leaks 2 GiB per
-        # destroy/up cycle. Helm v3 won't drop a default map key when
-        # you pass an empty ``{}`` override (deep-merge keeps defaults);
-        # the only way to actually strip the annotation is to set that
-        # specific key to ``None`` (rendered as YAML ``null``), which
-        # the chart template emits as an empty annotations block.
+        # bit: the chart defaults to keeping the PVC after uninstall,
+        # but this is a disposable local git server and ``pulumi destroy``
+        # should clean up the repo data too.
         "persistence": {
             "enabled": True,
             "size": "2Gi",
@@ -237,14 +237,17 @@ def _chart_values(
                 "helm.sh/resource-policy": None,
             },
         },
+        "strategy": {
+            "type": "Recreate",
+        },
         # HTTP exposed as ``LoadBalancer`` so cloud-provider-kind can
         # publish it on a host-reachable address. We need that address
         # at two points in this stack:
         #   * GiteaRepo, to call the Gitea REST admin API from the host;
-        #   * GiteaSeed, to ``git push`` the local working tree.
-        # SSH stays ``ClusterIP`` — we don't seed over SSH, and exposing
-        # an unauthenticated SSH endpoint to the LAN would be a needless
-        # foot-gun.
+        #   * GiteaSync, to ``git push`` the local working tree.
+        # SSH stays ``ClusterIP`` — host-side sync reaches it through a
+        # short-lived kubectl port-forward, avoiding a LAN-visible SSH
+        # endpoint.
         #
         # ``clusterIP: ""`` is critical here: the chart defaults this to
         # ``None`` (i.e. a *headless* Service), which is incompatible
@@ -347,13 +350,31 @@ def _in_cluster_ssh_host() -> str:
     return f"{_GITEA_SSH_SERVICE}.{_GITEA_NAMESPACE}.svc.cluster.local"
 
 
+def _short_public_key_hash(public_key: str) -> str:
+    """Return a short stable hash for an OpenSSH public key string."""
+    parts = public_key.strip().split()
+    if len(parts) < 2:
+        raise ValueError(f"expected OpenSSH public key, got {public_key!r}")
+    normalized = " ".join(parts[:2])
+    return hashlib.sha256(normalized.encode("ascii")).hexdigest()[:12]
+
+
+def _name_with_public_key_hash(prefix: str, public_key: str) -> str:
+    """Build a Kubernetes-safe name that changes only when the public key does."""
+    return f"{prefix}-{_short_public_key_hash(public_key)}"
+
+
+def _k8s_secret_data(value: str) -> str:
+    return base64.b64encode(value.encode("ascii")).decode("ascii")
+
+
 def _derive_ed25519_keypair(seed_b64: str) -> dict[str, str]:
     """Derive an ed25519 keypair from 32 bytes of randomness.
 
     Pulumi state already persists the seed bytes (via
     :class:`pulumi_random.RandomBytes`), so derivation is deterministic
     across reapplies — changing the seed bytes is the only thing that
-    rotates the key. Returns OpenSSH-formatted private (PEM) and public
+    rotates the key. Returns PKCS8 PEM private and OpenSSH public
     (single-line ``ssh-ed25519 <base64> <comment>``-style without the
     comment) strings.
     """
@@ -366,7 +387,7 @@ def _derive_ed25519_keypair(seed_b64: str) -> dict[str, str]:
     pub = priv.public_key()
     priv_pem = priv.private_bytes(
         encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.OpenSSH,
+        format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("ascii")
     pub_openssh = pub.public_bytes(
@@ -392,18 +413,21 @@ class GiteaBuiltinRepository(GitOpsRepository):
         Override the defaults for the Gitea admin user. ``admin_username``
         must not be the literal ``"admin"`` (Gitea reserves it).
     repo_owner, repo_name, default_branch :
-        Coordinates for the ``GiteaRepo`` / ``GiteaSeed`` children:
+        Coordinates for the ``GiteaRepo`` / ``GiteaSync`` children:
         which Gitea user/org owns the seeded repo, what it's called,
         and what branch the local working tree gets pushed to.
         ``repo_owner`` defaults to ``admin_username`` so the URL is
         self-describing. Surfaced verbatim into the ``url`` /
         ``url_external`` outputs.
     source_dir :
-        Local git working tree the seed force-pushes from. Defaults to
+        Local git working tree the sync pushes from. Defaults to
         the repo root that contains this Pulumi project. ``HEAD`` of
         this directory is resolved at construction time and captured
-        as a seed input — when it advances, the seed re-pushes; URL /
-        credential drift alone never triggers a re-push.
+        as a sync input — when it advances, the sync pushes. ``sync_triggers``
+        can force the same push path without changing ``HEAD``.
+    sync_triggers :
+        Optional operator-controlled replacement inputs for ``GiteaSync``.
+        Changing any key/value forces a non-force push attempt.
     opts :
         Standard Pulumi ``ResourceOptions``.
     """
@@ -419,6 +443,7 @@ class GiteaBuiltinRepository(GitOpsRepository):
         repo_name: str = _DEFAULT_REPO_NAME,
         default_branch: str = _DEFAULT_BRANCH,
         source_dir: Optional[str] = None,
+        sync_triggers: Optional[dict[str, Any]] = None,
         opts: Optional[ResourceOptions] = None,
     ) -> None:
         super().__init__(
@@ -515,9 +540,16 @@ class GiteaBuiltinRepository(GitOpsRepository):
         user_keypair = user_seed.base64.apply(_derive_ed25519_keypair)
 
         host_private_pem: Output[str] = host_keypair["private"]
-        host_public_openssh: Output[str] = host_keypair["public"]
+        host_public_openssh: Output[str] = Output.unsecret(host_keypair["public"])
         user_private_pem: Output[str] = user_keypair["private"]
-        user_public_openssh: Output[str] = user_keypair["public"]
+        user_public_openssh: Output[str] = Output.unsecret(user_keypair["public"])
+
+        host_key_secret_name = host_public_openssh.apply(
+            lambda pub: _name_with_public_key_hash(_HOST_KEY_SECRET_PREFIX, pub)
+        )
+        user_key_secret_name = user_public_openssh.apply(
+            lambda pub: _name_with_public_key_hash(_USER_KEY_SECRET_PREFIX, pub)
+        )
 
         # Secret holding the Gitea SSH host keypair. Mounted into the
         # Gitea pod by ``_chart_values`` so the first-boot host-key
@@ -527,13 +559,15 @@ class GiteaBuiltinRepository(GitOpsRepository):
         host_key_secret = k8s.core.v1.Secret(
             f"{name}-ssh-host-keys",
             metadata={
-                "name": _HOST_KEY_SECRET,
+                "name": host_key_secret_name,
                 "namespace": _GITEA_NAMESPACE,
             },
             type="Opaque",
-            string_data={
-                "ssh_host_ed25519_key": host_private_pem,
-                "ssh_host_ed25519_key.pub": host_public_openssh,
+            data={
+                "ssh_host_ed25519_key": host_private_pem.apply(_k8s_secret_data),
+                "ssh_host_ed25519_key.pub": host_public_openssh.apply(
+                    _k8s_secret_data
+                ),
             },
             opts=ResourceOptions(
                 parent=self,
@@ -552,6 +586,28 @@ class GiteaBuiltinRepository(GitOpsRepository):
             lambda pub: f"{_in_cluster_ssh_host()} {pub.strip()}\n"
         )
 
+        # Source Secret holding the admin user's private key. Downstream
+        # components copy from this Secret into their own namespaces rather
+        # than accepting raw private-key material as an input.
+        user_key_secret = k8s.core.v1.Secret(
+            f"{name}-ssh-user-key",
+            metadata={
+                "name": user_key_secret_name,
+                "namespace": _GITEA_NAMESPACE,
+            },
+            type="Opaque",
+            data={
+                _USER_PRIVATE_KEY_SECRET_KEY: user_private_pem.apply(
+                    _k8s_secret_data
+                ),
+            },
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[gitea_ns],
+            ),
+        )
+
         # The Helm release itself.
         gitea = k8s.helm.v3.Release(
             f"{name}-gitea",
@@ -564,7 +620,7 @@ class GiteaBuiltinRepository(GitOpsRepository):
             wait_for_jobs=True,
             timeout=600,
             values=_chart_values(
-                _CREDENTIALS_SECRET, admin_email, _HOST_KEY_SECRET
+                _CREDENTIALS_SECRET, admin_email, host_key_secret_name
             ),
             opts=ResourceOptions(
                 parent=self,
@@ -636,23 +692,6 @@ class GiteaBuiltinRepository(GitOpsRepository):
             ),
         )
 
-        seed = GiteaSeed(
-            f"{name}-seed",
-            api_url=external_base,
-            admin_username=admin_username,
-            admin_password=admin_password.result,
-            owner=owner,
-            repo_name=repo_name,
-            default_branch=default_branch,
-            source_dir=source_dir,
-            opts=ResourceOptions(
-                parent=self,
-                # The repo must exist before we push into it. ``git push``
-                # to a non-existent Gitea repo returns 404.
-                depends_on=[repo],
-            ),
-        )
-
         # Upload the admin user's SSH public key to Gitea so PKO can
         # authenticate as the admin user over SSH (push + pull on every
         # repo). We POST to ``/api/v1/user/keys`` (the per-user endpoint
@@ -678,23 +717,45 @@ class GiteaBuiltinRepository(GitOpsRepository):
             ),
         )
 
-        # Outputs. The five required by the GitOpsRepository contract
-        # are ``url`` / ``url_external`` / ``default_branch`` /
-        # ``ssh_private_key`` / ``ssh_known_hosts``. The credentials
+        sync = GiteaSync(
+            f"{name}-sync",
+            ssh_private_key=user_private_pem,
+            ssh_known_hosts=ssh_known_hosts,
+            owner=owner,
+            repo_name=repo_name,
+            default_branch=default_branch,
+            source_dir=source_dir,
+            kubeconfig=kubeconfig,
+            service_namespace=_GITEA_NAMESPACE,
+            service_name=_GITEA_SSH_SERVICE,
+            service_port=_GITEA_SSH_PORT,
+            triggers=sync_triggers,
+            opts=ResourceOptions(
+                parent=self,
+                # The repo must exist and the admin SSH public key must be
+                # registered before we can push over SSH.
+                depends_on=[repo, ssh_key],
+            ),
+        )
+
+        # Outputs. The required GitOpsRepository contract values are
+        # ``url`` / ``url_external`` / ``default_branch`` /
+        # ``ssh_private_key_secret`` / ``ssh_known_hosts``. The credentials
         # Secret stays an in-package detail (the Gitea chart needs it
         # for first-boot admin bootstrap) and is no longer part of the
         # contract.
         self.url = Output.from_input(_in_cluster_ssh_url(owner, repo_name))
         self.url_external = Output.concat(external_base, "/", owner, "/", repo_name, ".git")
         self.default_branch = Output.from_input(default_branch)
-        self.ssh_private_key = Output.secret(user_private_pem)
+        self.ssh_private_key_secret = user_key_secret
         self.ssh_known_hosts = ssh_known_hosts
 
         # Useful for human eyeballing of the deployed state.
         self.repo_full_name = repo.full_name
         self.repo_html_url = repo.html_url
-        self.seed_head_sha = seed.head_sha
+        self.sync_head_sha = sync.head_sha
         self.ssh_key_id = ssh_key.key_id
+        self.gitea_host_key_secret_name = host_key_secret_name
 
         # Surface a few helpful diagnostics in addition to the contract
         # outputs — these are not part of GitOpsRepository but exist so a
@@ -712,14 +773,14 @@ class GiteaBuiltinRepository(GitOpsRepository):
                 "url": self.url,
                 "url_external": self.url_external,
                 "default_branch": self.default_branch,
-                "ssh_private_key": self.ssh_private_key,
                 "ssh_known_hosts": self.ssh_known_hosts,
                 "gitea_chart_version": self.gitea_chart_version,
                 "gitea_app_version": self.gitea_app_version,
                 "admin_username": self.admin_username,
                 "repo_full_name": self.repo_full_name,
                 "repo_html_url": self.repo_html_url,
-                "seed_head_sha": self.seed_head_sha,
+                "sync_head_sha": self.sync_head_sha,
                 "ssh_key_id": self.ssh_key_id,
+                "gitea_host_key_secret_name": self.gitea_host_key_secret_name,
             }
         )

@@ -19,7 +19,7 @@ cryptography>=42,<46
 
 # HTTP for Pulumi dynamic resources that wrap the Gitea REST API.
 # Imported lazily inside provider methods (gitrepo/gitea_repo.py,
-# gitrepo/gitea_sshkey.py, gitrepo/gitea_seed.py) so it must be in
+# gitrepo/gitea_sshkey.py, gitrepo/gitea_sync.py) so it must be in
 # the same venv the language host launches workers from.
 requests>=2.31,<3.0
 

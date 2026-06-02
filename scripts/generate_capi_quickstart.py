@@ -106,16 +106,10 @@ def run_clusterctl(cluster_name: str, flavor: str, k8s_version: str, cp_replicas
         f"--control-plane-machine-count={cp_replicas}",
         f"--worker-machine-count={md_replicas}",
     ]
-    with tempfile.NamedTemporaryFile("w+", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile("w+") as tmp:
         subprocess.run(cmd, check=True, stdout=tmp)
-        tmp_path = tmp.name
-    try:
-        return Path(tmp_path).read_text()
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+        tmp.seek(0)
+        return tmp.read()
 
 
 def load_documents(yaml_text: str) -> List[CommentedMap]:

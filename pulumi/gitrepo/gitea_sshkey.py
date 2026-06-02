@@ -1,10 +1,9 @@
 """Pulumi dynamic resource that uploads an SSH public key to Gitea.
 
 The :class:`~gitrepo._base.GitOpsRepository` contract promises a ``url``
-output pointing at an SSH endpoint and an ``ssh_private_key`` output
-holding the matching private key. For PKO to authenticate against
-Gitea over SSH, the *public* half of that keypair must be registered
-against the admin user inside Gitea — via
+output pointing at an SSH endpoint and a source Secret holding the matching
+private key. For PKO to authenticate against Gitea over SSH, the *public*
+half of that keypair must be registered against the admin user inside Gitea — via
 ``POST /api/v1/user/keys`` (HTTP basic auth as the admin user). This
 dynamic resource owns that lifecycle: create on first apply, delete
 on tear-down, and adopt-by-title on conflict so partial-failure

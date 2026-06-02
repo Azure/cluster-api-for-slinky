@@ -16,7 +16,7 @@ We want create / delete / read / diff lifecycle hooks so:
 * Renaming ``owner`` / ``repo_name`` triggers a *replace* (delete +
   create) instead of silently leaving the old repo behind.
 * Pulumi state mirrors actual repository identity, so the dependent
-  :class:`~gitrepo.gitea_seed.GiteaSeed` resource gets a stable
+    :class:`~gitrepo.gitea_sync.GiteaSync` resource gets a stable
   handle to push to.
 
 Idempotency on create
@@ -140,9 +140,9 @@ class _GiteaRepoProvider(ResourceProvider):
             create_url = f"{api_url}/api/v1/admin/users/{owner}/repos"
 
         # ``auto_init=False`` because the very next thing that runs is
-        # GiteaSeed, which force-pushes the local working tree. An
+        # GiteaSync, which pushes the local working tree. An
         # auto-init README would just be in the way (and create a
-        # divergent history that the seed would have to clobber).
+        # divergent history that the sync would have to reject).
         # ``private=True`` because this repo is consumed only by PKO
         # inside the cluster — there's no anonymous reader to consider.
         payload = {

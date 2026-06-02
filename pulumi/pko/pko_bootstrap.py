@@ -5,8 +5,8 @@ ComponentResource the outer stack calls once:
 
     PKOBootstrap
     ├── Namespace/pulumi-kubernetes-operator
-    ├── Secret/gitea-ssh             # admin SSH private key
-    ├── ConfigMap/gitea-known-hosts  # SSH host-key trust
+    ├── Secret/gitea-ssh-<hash>             # admin SSH private key
+    ├── ConfigMap/gitea-known-hosts-<hash>  # SSH host-key trust
     ├── PKORelease                   # Helm OCI install w/ known_hosts mount
     ├── StateBackend                 # PVC + passphrase Secret
     ├── WorkspaceServiceAccount      # pulumi-runner + ClusterRoleBindings
@@ -32,14 +32,18 @@ in-cluster Gitea ships no TLS, so SSH is the only viable scheme.
 The repo component (:mod:`gitrepo.gitea_builtin`) generates an
 admin ed25519 keypair AND a Gitea host keypair deterministically
 from ``RandomBytes`` seeds; the public user-key is uploaded to
-Gitea via the REST API, the private user-key lands in a Secret
-(``gitea-ssh``), and the known_hosts entry derived from the host
-pubkey lands in a ConfigMap (``gitea-known-hosts``). PKO reads the
-private key through ``Stack.spec.gitAuth``; :mod:`pko._release` and
-:mod:`pko._stack_cr` mount only the public host-key trust file.
+Gitea via the REST API, the private user-key lands in a public-key-hash
+named source Secret, and the known_hosts entry derived from the host pubkey
+lands in a content-hash named ConfigMap. PKOBootstrap copies the private key
+Secret into PKO's namespace for ``Stack.spec.gitAuth``;
+:mod:`pko._release` and :mod:`pko._stack_cr` mount only the public host-key
+trust file.
 """
 
 from __future__ import annotations
+
+import hashlib
+from collections.abc import Mapping
 
 import pulumi
 import pulumi_kubernetes as k8s
@@ -60,13 +64,34 @@ from pko._tenants import Tenants
 CONTROL_PLANE_PROJECT = "ca4s-control-plane"
 CONTROL_PLANE_REPO_DIR = "pulumi/stacks/control_plane/"
 
-# Names PKOBootstrap projects into PKO's namespace. The Secret holds
-# auth material and is referenced by Stack CR ``gitAuth``; the ConfigMap
-# holds public host-key trust and is mounted into operator/workspace pods.
-_SSH_SECRET_NAME = "gitea-ssh"
+# Names PKOBootstrap projects into PKO's namespace. The Secret name is supplied
+# by the GitOpsRepository because it is derived from the matching public key;
+# the ConfigMap name is derived here from the known_hosts content. Both names
+# change only when their underlying key material changes.
 _SSH_PRIVATE_KEY_KEY = "id_ed25519"
-_SSH_KNOWN_HOSTS_CONFIG_MAP_NAME = "gitea-known-hosts"
+_SSH_KNOWN_HOSTS_CONFIG_MAP_PREFIX = "gitea-known-hosts"
 _SSH_KNOWN_HOSTS_KEY = "known_hosts"
+
+
+def _name_with_content_hash(prefix: str, content: str) -> str:
+    """Build a Kubernetes-safe name that changes only when content changes."""
+    normalized = content.strip()
+    if not normalized:
+        raise ValueError(f"cannot build {prefix!r} name from empty content")
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}-{digest}"
+
+
+def _copy_secret_data_key(
+    data: Mapping[str, str] | None,
+    source_key: str,
+) -> str:
+    if not data or source_key not in data:
+        available = sorted(data.keys()) if data else []
+        raise ValueError(
+            f"source SSH Secret is missing key {source_key!r}; available keys: {available!r}"
+        )
+    return data[source_key]
 
 
 class PKOBootstrap(pulumi.ComponentResource):
@@ -84,14 +109,14 @@ class PKOBootstrap(pulumi.ComponentResource):
         repo_branch:
             Output[str] default branch the seed push targeted
             (``GitOpsRepository.default_branch``).
-        ssh_private_key:
-            Secret-marked Output[str] OpenSSH PEM admin private key
-            (``GitOpsRepository.ssh_private_key``). Projected into the
-            ``gitea-ssh`` Secret under key ``id_ed25519``.
+        ssh_private_key_secret:
+            Source Kubernetes Secret resource containing the PKCS8 PEM admin
+            private key. PKOBootstrap copies from this Secret into the PKO
+            namespace.
         ssh_known_hosts:
             Output[str] single-line ``known_hosts`` entry for the SSH
             endpoint (``GitOpsRepository.ssh_known_hosts``). Projected
-            into the ``gitea-known-hosts`` ConfigMap under key
+            into a hash-named ConfigMap under key
             ``known_hosts``.
         env:
             Outer-stack environment moniker (``pulumi.get_stack()``).
@@ -116,6 +141,8 @@ class PKOBootstrap(pulumi.ComponentResource):
 
     namespace: Output[str]
     service_account: Output[str]
+    ssh_secret_name: Output[str]
+    known_hosts_config_map_name: Output[str]
     control_plane_stack: Output[str]
     workload_cluster_stacks: list[Output[str]]
 
@@ -126,7 +153,7 @@ class PKOBootstrap(pulumi.ComponentResource):
         kubeconfig: pulumi.Input[str],
         repo_url: pulumi.Input[str],
         repo_branch: pulumi.Input[str],
-        ssh_private_key: pulumi.Input[str],
+        ssh_private_key_secret: k8s.core.v1.Secret,
         ssh_known_hosts: pulumi.Input[str],
         env: str,
         opts: ResourceOptions | None = None,
@@ -152,30 +179,46 @@ class PKOBootstrap(pulumi.ComponentResource):
             opts=ResourceOptions(parent=self, provider=k8s_provider),
         )
 
+        ssh_secret_name = Output.unsecret(
+            Output.from_input(ssh_private_key_secret.metadata["name"])
+        )
+        known_hosts_content = Output.from_input(ssh_known_hosts)
+        known_hosts_config_map_name = known_hosts_content.apply(
+            lambda content: _name_with_content_hash(
+                _SSH_KNOWN_HOSTS_CONFIG_MAP_PREFIX, content
+            )
+        )
+
+        ssh_private_key_data = Output.secret(
+            ssh_private_key_secret.data.apply(
+                lambda data: _copy_secret_data_key(data, _SSH_PRIVATE_KEY_KEY)
+            )
+        )
+
         # The Secret PKO reads admin SSH credentials from. The private
         # key is referenced by Stack CR ``gitAuth.sshAuth.sshPrivateKey``;
         # it is not mounted into operator or workspace pods as a file.
         ssh_secret = k8s.core.v1.Secret(
             f"{name}-ssh",
             metadata={
-                "name": _SSH_SECRET_NAME,
+                "name": ssh_secret_name,
                 "namespace": PKO_NAMESPACE,
             },
             type="Opaque",
-            string_data={
-                _SSH_PRIVATE_KEY_KEY: ssh_private_key,
+            data={
+                _SSH_PRIVATE_KEY_KEY: ssh_private_key_data,
             },
             opts=ResourceOptions(
                 parent=self,
                 provider=k8s_provider,
-                depends_on=[ns],
+                depends_on=[ns, ssh_private_key_secret],
             ),
         )
 
         known_hosts = k8s.core.v1.ConfigMap(
             f"{name}-known-hosts",
             metadata={
-                "name": _SSH_KNOWN_HOSTS_CONFIG_MAP_NAME,
+                "name": known_hosts_config_map_name,
                 "namespace": PKO_NAMESPACE,
             },
             data={_SSH_KNOWN_HOSTS_KEY: ssh_known_hosts},
@@ -190,7 +233,7 @@ class PKOBootstrap(pulumi.ComponentResource):
             f"{name}-release",
             provider=k8s_provider,
             namespace_resource=ns,
-            known_hosts_config_map_name=_SSH_KNOWN_HOSTS_CONFIG_MAP_NAME,
+            known_hosts_config_map_name=known_hosts_config_map_name,
             known_hosts_resource=known_hosts,
             opts=ResourceOptions(parent=self),
         )
@@ -217,8 +260,8 @@ class PKOBootstrap(pulumi.ComponentResource):
             service_account_name=sa.service_account_name,
             repo_url=repo_url,
             repo_branch=repo_branch,
-            ssh_secret_name=_SSH_SECRET_NAME,
-            known_hosts_config_map_name=_SSH_KNOWN_HOSTS_CONFIG_MAP_NAME,
+            ssh_secret_name=ssh_secret_name,
+            known_hosts_config_map_name=known_hosts_config_map_name,
             state_pvc_name=backend.pvc_name,
             state_backend_url=backend.backend_url,
             passphrase_secret_name=backend.passphrase_secret_name,
@@ -275,6 +318,8 @@ class PKOBootstrap(pulumi.ComponentResource):
 
         self.namespace = release.namespace
         self.service_account = sa.service_account_name
+        self.ssh_secret_name = ssh_secret_name
+        self.known_hosts_config_map_name = known_hosts_config_map_name
         self.control_plane_stack = control_plane_metadata_name
         self.workload_cluster_stacks = tenants.workload_cluster_stacks
 
@@ -282,6 +327,8 @@ class PKOBootstrap(pulumi.ComponentResource):
             {
                 "namespace": self.namespace,
                 "service_account": self.service_account,
+                "ssh_secret_name": self.ssh_secret_name,
+                "known_hosts_config_map_name": self.known_hosts_config_map_name,
                 "control_plane_stack": self.control_plane_stack,
                 "workload_cluster_stacks": self.workload_cluster_stacks,
             }

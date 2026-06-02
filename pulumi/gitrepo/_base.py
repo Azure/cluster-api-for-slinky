@@ -15,8 +15,8 @@ your own gitolite — is implementation detail. We model that contract here so
 swapping providers is a one-line config change and the rest of the program
 (PKO Stacks, seeding scripts, dashboards) doesn't care which one is in use.
 
-Outputs that every concrete subclass must populate
---------------------------------------------------
+Attributes that every concrete subclass must populate
+-----------------------------------------------------
 * ``url``               — In-cluster SSH git URL the ``Stack.spec.projectRepo``
                           will point at, e.g.
                           ``ssh://git@gitea-ssh.gitea.svc.cluster.local:22/owner/repo.git``.
@@ -31,18 +31,23 @@ Outputs that every concrete subclass must populate
 * ``default_branch``    — Branch name the seed push targeted and
                           ``Stack.spec.branch`` (or ``spec.commit``) should
                           track. Conventionally ``main``.
-* ``ssh_private_key``   — OpenSSH-format PEM (``-----BEGIN OPENSSH PRIVATE KEY-----``)
-                          of the admin SSH key the provider granted us push +
-                          pull rights on the repo with. Secret-marked. Flowed
-                          into a Secret in PKO's ns by :class:`PKOBootstrap`
-                          and referenced by ``Stack.spec.gitAuth.sshAuth.sshPrivateKey``.
+* ``ssh_private_key_secret`` — Source Kubernetes Secret resource itself.
+                          Its name is usually derived from the matching public
+                          key hash so rotations create a new Secret and update
+                          downstream references instead of replacing a
+                          fixed-name Secret in place.
+                          Downstream components use its ``data`` Output to
+                          copy the conventional ``id_ed25519`` key into their own namespaces without
+                          rereading a just-created Secret from the API server
+                          during preview. Callers that need a serializable
+                          reference can read ``metadata.name`` and
+                          ``metadata.namespace`` from this resource.
 * ``ssh_known_hosts``   — Single-line ``known_hosts`` entry for the in-cluster
                           SSH endpoint (``<hostname> <alg> <pubkey-base64>``).
                           Mounted into the PKO operator + workspace pods so
                           go-git's default ``StrictHostKeyChecking`` semantics
-                          pass without manual TOFU. Secret-marked is unnecessary
-                          (public host pubkey) but it's grouped with the
-                          private key for plumbing convenience.
+                          pass without manual TOFU. This is public host-key
+                          material, not a secret.
 
 Lifetime model
 --------------
@@ -62,6 +67,7 @@ import pulumi
 
 if TYPE_CHECKING:
     from pulumi import Output
+    from pulumi_kubernetes.core.v1 import Secret
 
 
 # Single source of truth for the Pulumi resource type token used by the
@@ -78,12 +84,13 @@ class GitOpsRepository(pulumi.ComponentResource):
 
     Subclasses MUST:
       1. Call ``super().__init__(name, t=<their own type token>, opts=opts)``.
-      2. Populate every attribute declared in the ``Outputs`` section of the
-         module docstring as a ``pulumi.Output`` (use ``Output.from_input(...)``
-         for plain Python values).
-      3. Call ``self.register_outputs({...})`` with the same dict so the values
-         show up in ``pulumi stack output`` when the component is used at the
-         top level.
+         2. Populate every attribute declared in the module docstring. Plain values
+            should be wrapped with ``Output.from_input(...)``; resource attributes
+            such as ``ssh_private_key_secret`` should hold the resource object.
+         3. Call ``self.register_outputs({...})`` with the serializable Output
+            values so they show up in ``pulumi stack output`` when the component is
+            used at the top level. Resource-object attributes do not need to be
+            registered as outputs.
 
     The base class itself doesn't construct child resources — it's a pure
     contract holder. We deliberately don't make it an ``abc.ABC`` because
@@ -96,7 +103,7 @@ class GitOpsRepository(pulumi.ComponentResource):
     url: "Output[str]"
     url_external: "Output[str]"
     default_branch: "Output[str]"
-    ssh_private_key: "Output[str]"
+    ssh_private_key_secret: "Secret"
     ssh_known_hosts: "Output[str]"
 
     def __init__(

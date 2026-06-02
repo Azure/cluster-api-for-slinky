@@ -1,9 +1,8 @@
 """Provider-agnostic GitOps source package.
 
-Re-exports the abstract :class:`GitOpsRepository` contract plus the concrete
-implementations a ``stack_<name>.py`` target module can dispatch to. Keep
-this list minimal: it's also the API surface other stacks would consume if
-they ever import from us.
+Re-exports the abstract :class:`GitOpsRepository` contract. Concrete
+implementations live in their own modules and should be imported directly by
+the ``stack_<name>.py`` target module that dispatches to them.
 
 Layout
 ------
@@ -24,6 +23,5 @@ intentionally cloud-agnostic.
 """
 
 from gitrepo._base import GitOpsRepository
-from gitrepo.gitea_builtin import GiteaBuiltinRepository
 
-__all__ = ["GitOpsRepository", "GiteaBuiltinRepository"]
+__all__ = ["GitOpsRepository"]

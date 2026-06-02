@@ -42,7 +42,8 @@ from __future__ import annotations
 import pulumi
 
 from ctlptl import CloudProviderKind, CtlptlCluster, CtlptlRegistry
-from gitrepo import GiteaBuiltinRepository, GitOpsRepository
+from gitrepo import GitOpsRepository
+from gitrepo.gitea_builtin import GiteaBuiltinRepository
 from pko import PKOBootstrap
 
 
@@ -79,6 +80,12 @@ def run() -> None:
     # wrong git server, which is exactly the kind of subtle bug GitOps
     # stacks tend to be loud about in much less friendly ways.
     gitops_provider = config.get("gitops_provider") or "gitea-builtin"
+
+    # Operator-controlled replacement inputs for the one-shot Gitea sync.
+    # Example:
+    #     pulumi config set --path 'gitea_sync_triggers.generation' rerun-1 -s local
+    # Bump any key/value to force a normal non-force push without changing HEAD.
+    gitea_sync_triggers = config.get_object("gitea_sync_triggers") or {}
 
     # ----------------------------------------------------------------------
     # Phase 1 — cluster + registry + LB controller.
@@ -135,20 +142,20 @@ def run() -> None:
     # here.
     #
     # TODO(multi-target): add cloud-hosted GitOps impls (GitHub,
-    # GitLab). Each impl populates the same five-field contract
+    # GitLab). Each impl populates the same GitOpsRepository contract
     # defined in ``gitrepo/_base.py`` (``url``, ``url_external``,
-    # ``default_branch``, ``ssh_private_key``, ``ssh_known_hosts``).
+    # ``default_branch``, ``ssh_private_key_secret``, ``ssh_known_hosts``).
     # Cloud impls won't need ``kubeconfig`` for the *source* of
     # truth (the git server lives off-cluster) but DO need it to
-    # project the SSH credentials Secret into the management
-    # cluster's ``pulumi-kubernetes-operator`` namespace — so keep
-    # the parameter on the contract.
+    # project the source SSH credentials Secret into the management
+    # cluster; PKOBootstrap then copies it into the operator namespace.
 
     repo: GitOpsRepository
     if gitops_provider == "gitea-builtin":
         repo = GiteaBuiltinRepository(
             "gitops",
             kubeconfig=cluster.kubeconfig,
+            sync_triggers=gitea_sync_triggers,
             # Other knobs (admin_username, repo_name, default_branch, ...)
             # keep their defaults. Surface them as config later if/when a
             # real use case for overriding shows up.
@@ -214,7 +221,7 @@ def run() -> None:
         kubeconfig=cluster.kubeconfig,
         repo_url=repo.url,
         repo_branch=repo.default_branch,
-        ssh_private_key=repo.ssh_private_key,
+        ssh_private_key_secret=repo.ssh_private_key_secret,
         ssh_known_hosts=repo.ssh_known_hosts,
         env=pulumi.get_stack(),
     )
@@ -247,22 +254,30 @@ def run() -> None:
     pulumi.export("cloud_provider_kind_log", lb.log_path)
     pulumi.export("cloud_provider_kind_lb_port_mapping", lb.enable_lb_port_mapping)
 
-    # Phase 2: GitOpsRepository contract — five outputs every concrete
+    # Phase 2: GitOpsRepository contract — outputs every concrete
     # provider exposes, plus an echo of which provider this run chose.
     # Don't rename without simultaneously updating the consumers (PKO,
-    # dashboards, ...). ``ssh_private_key`` is secret-marked so Pulumi
-    # will refuse to print it in plaintext.
+    # dashboards, ...).
     pulumi.export("gitops_provider", gitops_provider)
     pulumi.export("gitops_url", repo.url)
     pulumi.export("gitops_url_external", repo.url_external)
     pulumi.export("gitops_default_branch", repo.default_branch)
     pulumi.export("gitops_ssh_known_hosts", repo.ssh_known_hosts)
-    pulumi.export("gitops_ssh_private_key", repo.ssh_private_key)
+    pulumi.export(
+        "gitops_ssh_private_key_secret_name",
+        repo.ssh_private_key_secret.metadata["name"],
+    )
+    pulumi.export(
+        "gitops_ssh_private_key_secret_namespace",
+        repo.ssh_private_key_secret.metadata["namespace"],
+    )
 
     # Phase 3: PKO bootstrap handles + the control-plane Stack CR name
     # + per-tenant workload-cluster Stack CR names. These variables are exported
     # for transparency.
     pulumi.export("pko_namespace", pko.namespace)
     pulumi.export("pko_service_account", pko.service_account)
+    pulumi.export("pko_ssh_secret_name", pko.ssh_secret_name)
+    pulumi.export("pko_known_hosts_config_map_name", pko.known_hosts_config_map_name)
     pulumi.export("pko_control_plane_stack", pko.control_plane_stack)
     pulumi.export("pko_workload_cluster_stacks", pko.workload_cluster_stacks)
