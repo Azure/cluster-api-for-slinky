@@ -67,6 +67,8 @@ substitutes at apply/diff time:
   expands to a host-local filesystem path (used for ``hostPath`` mounts);
   the provider runs in the user's environment, so reading ``$HOME`` there
   is correct.
+* ``${DOCKER_IO_CERTS_DIR}`` → host-side ``docker.io`` certs directory generated
+    by the provider for containerd's Docker Hub mirror config.
 
 * Inputs:
     - ``cluster_name``  : optional explicit ctlptl ``Cluster.name`` value.
@@ -126,6 +128,7 @@ import os
 import secrets
 import shutil
 import subprocess
+from pathlib import Path
 from typing import List, Optional
 
 from pulumi import Input, Output, ResourceOptions
@@ -138,6 +141,12 @@ from pulumi.dynamic import (
 )
 
 _RESOURCE_TYPE = "ca4s:local:CtlptlCluster"
+_DOCKER_IO_HOSTS_TOML = """\
+server = "https://registry-1.docker.io"
+
+[host."https://mirror.gcr.io"]
+  capabilities = ["pull", "resolve"]
+"""
 
 # ---------------------------------------------------------------------------
 # Vendored ctlptl manifest.
@@ -164,12 +173,22 @@ kindV1Alpha4Cluster:
   - role: control-plane
     image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
     extraMounts:
+    # Docker Hub mirror for in-cluster pod pulls. Host Docker still handles the
+    # node image pull before these containers exist.
+    - hostPath: ${DOCKER_IO_CERTS_DIR}
+      containerPath: /etc/containerd/certs.d/docker.io
+      readOnly: true
     # required by CAPD
     - hostPath: /var/run/docker.sock
       containerPath: /var/run/docker.sock
   - role: worker
     image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
     extraMounts:
+    # Docker Hub mirror for in-cluster pod pulls. Host Docker still handles the
+    # node image pull before these containers exist.
+    - hostPath: ${DOCKER_IO_CERTS_DIR}
+      containerPath: /etc/containerd/certs.d/docker.io
+      readOnly: true
     # Exposes the host kubeconfig to in-cluster consumers via hostPath /root/.kube:
     #   - AWX / ansible-runner (mounted at /runner/.kube, see awx.yaml, pod-spec-override.yaml)
     #   - cluster-autoscaler   (mounted at /mnt/kubeconfig, see cluster-autoscaler.yaml)
@@ -258,11 +277,16 @@ def _render(cluster_name: str, registry_name: Optional[str] = None) -> str:
             "HOME environment variable is not set; required for ctlptl manifest "
             "${HOME} substitution (hostPath mount of ~/.kube into the worker)"
         )
+    docker_io_certs_dir = Path(".state/containerd-certs.d/docker.io").resolve()
+    docker_io_certs_dir.mkdir(parents=True, exist_ok=True)
+    docker_io_hosts_toml = docker_io_certs_dir / "hosts.toml"
+    docker_io_hosts_toml.write_text(_DOCKER_IO_HOSTS_TOML, encoding="utf-8")
     rendered = _MANIFEST_TEMPLATE
     rendered = rendered.replace("${CLUSTER_NAME}", cluster_name)
     if registry_name:
         rendered = rendered.replace("${REGISTRY_NAME}", registry_name)
     rendered = rendered.replace("${HOME}", home)
+    rendered = rendered.replace("${DOCKER_IO_CERTS_DIR}", str(docker_io_certs_dir))
     return rendered
 
 
