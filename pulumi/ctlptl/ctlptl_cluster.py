@@ -83,7 +83,8 @@ substitutes when rendering the manifest:
     - ``kubeconfig``   : standalone kubeconfig YAML for the new cluster.
     - ``context``      : kube context name (== ``cluster_name``).
 * Lifecycle:
-    - ``check``  : pure pass-through (the SDK default).
+    - ``check``  : validates explicit ``cluster_name`` values. Autonaming still
+                   happens in ``create()`` so previews stay deterministic.
     - ``create`` : resolves the cluster name (pinned value or freshly
                    minted ``kind-<seed>-<hex>``), renders the vendored
                    manifest, runs ``ctlptl apply -f -`` on stdin, then
@@ -131,6 +132,8 @@ from typing import List, Optional
 
 from pulumi import Input, Output, ResourceOptions
 from pulumi.dynamic import (
+    CheckFailure,
+    CheckResult,
     CreateResult,
     DiffResult,
     ReadResult,
@@ -288,9 +291,17 @@ def _render(cluster_name: str, registry_name: Optional[str] = None) -> str:
 class _CtlptlClusterProvider(ResourceProvider):
     """Lifecycle hooks for the CtlptlCluster dynamic resource."""
 
-    # ``check`` is intentionally the SDK default (pass-through). Random
-    # ``cluster_name`` generation lives in ``create()`` so it runs exactly
-    # once per resource lifetime; see the module docstring for why.
+    def check(self, olds: dict, news: dict) -> CheckResult:
+        failures: list[CheckFailure] = []
+        cluster_name = news.get("cluster_name")
+        if cluster_name and not cluster_name.startswith("kind-"):
+            failures.append(
+                CheckFailure(
+                    "cluster_name",
+                    "ctlptl kind cluster names must start with 'kind-'",
+                )
+            )
+        return CheckResult(inputs=news, failures=failures)
 
     def create(self, props: dict) -> CreateResult:
         _require_binary("ctlptl")
