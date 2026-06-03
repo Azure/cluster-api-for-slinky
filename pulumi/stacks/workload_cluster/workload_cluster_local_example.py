@@ -77,7 +77,7 @@ _CONTAINERD_DOCKER_IO_MIRROR_COMMANDS = [
 
 
 @dataclass(frozen=True)
-class WorkerNodeClass:
+class WorkerClassSpec:
     name: str
     node_type: str
     replicas: int | None = 1
@@ -86,12 +86,12 @@ class WorkerNodeClass:
 
 
 _WORKER_NODE_CLASSES = (
-    WorkerNodeClass(
+    WorkerClassSpec(
         name="head",
         node_type=_CONTROLLER_NODE_TYPE,
         controller=True,
     ),
-    WorkerNodeClass(
+    WorkerClassSpec(
         name="compute",
         node_type=_COMPUTE_NODE_TYPE,
         replicas=None,
@@ -206,7 +206,7 @@ def _object_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
     return {"apiGroup": _api_group(api_version), "kind": kind, "name": name}
 
 
-def _worker_labels(cluster_name: str, worker: WorkerNodeClass) -> dict[str, str]:
+def _worker_labels(cluster_name: str, worker: WorkerClassSpec) -> dict[str, str]:
     return {
         "cluster.x-k8s.io/cluster-name": cluster_name,
         _NODE_TYPE_LABEL: worker.node_type,
@@ -230,6 +230,130 @@ def _calico_values() -> dict[str, object]:
             },
         },
     }
+
+
+class WorkerClass(pulumi.ComponentResource):
+    machine_deployment_name: pulumi.Output[str]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        tenant: str,
+        cluster_name: str,
+        node_image: str,
+        worker: WorkerClassSpec,
+        provider: k8s.Provider,
+        cluster: pulumi.Resource,
+        control_plane: pulumi.Resource,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__("ca4s:workload:WorkerClass", name, props={}, opts=opts)
+
+        machine_template_name = _resource_name(tenant, f"{worker.name}-machine")
+        bootstrap_template_name = _resource_name(tenant, f"{worker.name}-bootstrap")
+        machine_deployment_name = _resource_name(tenant, worker.name)
+        labels = _worker_labels(cluster_name, worker)
+
+        def child_options(
+            *, depends_on: list[pulumi.Resource] | None = None
+        ) -> pulumi.ResourceOptions:
+            return pulumi.ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=depends_on,
+                aliases=[pulumi.Alias(parent=pulumi.ROOT_STACK_RESOURCE)],
+            )
+
+        machine_template = _docker_machine_template(
+            machine_template_name,
+            f"cluster-{worker.name}-machine-template",
+            custom_image=node_image,
+            opts=child_options(),
+        )
+        bootstrap_template = _kubeadm_config_template(
+            bootstrap_template_name,
+            f"cluster-{worker.name}-bootstrap-template",
+            controller=worker.controller,
+            opts=child_options(),
+        )
+
+        machine_deployment_spec: dict[str, Any] = {
+            "clusterName": cluster_name,
+            "selector": {"matchLabels": labels},
+            "template": {
+                "metadata": {
+                    "labels": labels,
+                    **(
+                        {"annotations": worker.annotations}
+                        if worker.annotations
+                        else {}
+                    ),
+                },
+                "spec": {
+                    "clusterName": cluster_name,
+                    "version": _KUBERNETES_VERSION,
+                    "deletion": {"nodeDeletionTimeoutSeconds": 10},
+                    "bootstrap": {
+                        "configRef": _object_ref(
+                            _BOOTSTRAP_API_VERSION,
+                            "KubeadmConfigTemplate",
+                            bootstrap_template_name,
+                        ),
+                    },
+                    "infrastructureRef": _object_ref(
+                        _INFRASTRUCTURE_API_VERSION,
+                        "DockerMachineTemplate",
+                        machine_template_name,
+                    ),
+                },
+            },
+        }
+        if worker.replicas is not None:
+            machine_deployment_spec["replicas"] = worker.replicas
+
+        machine_deployment = k8s.apiextensions.CustomResource(
+            f"cluster-{worker.name}-machine-deployment",
+            api_version=_CAPI_API_VERSION,
+            kind="MachineDeployment",
+            metadata={
+                "name": machine_deployment_name,
+                "namespace": _NAMESPACE,
+                **({"annotations": worker.annotations} if worker.annotations else {}),
+            },
+            spec=machine_deployment_spec,
+            opts=child_options(
+                depends_on=[
+                    cluster,
+                    control_plane,
+                    machine_template,
+                    bootstrap_template,
+                ]
+            ),
+        )
+
+        k8s.apiextensions.CustomResource(
+            f"cluster-{worker.name}-health-check",
+            api_version=_CAPI_API_VERSION,
+            kind="MachineHealthCheck",
+            metadata={
+                "name": _resource_name(tenant, f"{worker.name}-health"),
+                "namespace": _NAMESPACE,
+            },
+            spec={
+                "clusterName": cluster_name,
+                "selector": {"matchLabels": labels},
+                **_health_check(),
+            },
+            opts=child_options(depends_on=[machine_deployment]),
+        )
+
+        self.machine_deployment_name = pulumi.Output.from_input(
+            machine_deployment_name
+        )
+        self.register_outputs(
+            {"machine_deployment_name": self.machine_deployment_name}
+        )
 
 
 class ManagementKubeconfig(pulumi.ComponentResource):
@@ -482,102 +606,19 @@ def run() -> None:
         ),
     )
 
-    worker_machine_deployment_names: list[str] = []
-    worker_health_checks: list[k8s.apiextensions.CustomResource] = []
+    worker_machine_deployment_names: list[pulumi.Output[str]] = []
     for worker in _WORKER_NODE_CLASSES:
-        machine_template_name = _resource_name(_TENANT, f"{worker.name}-machine")
-        bootstrap_template_name = _resource_name(_TENANT, f"{worker.name}-bootstrap")
-        machine_deployment_name = _resource_name(_TENANT, worker.name)
-        labels = _worker_labels(cluster_name, worker)
-
-        machine_template = _docker_machine_template(
-            machine_template_name,
-            f"cluster-{worker.name}-machine-template",
-            custom_image=node_image,
-            opts=pulumi.ResourceOptions(provider=management_provider),
+        worker_class = WorkerClass(
+            f"cluster-{worker.name}",
+            tenant=_TENANT,
+            cluster_name=cluster_name,
+            node_image=node_image,
+            worker=worker,
+            provider=management_provider,
+            cluster=cluster,
+            control_plane=kubeadm_control_plane,
         )
-        bootstrap_template = _kubeadm_config_template(
-            bootstrap_template_name,
-            f"cluster-{worker.name}-bootstrap-template",
-            controller=worker.controller,
-            opts=pulumi.ResourceOptions(provider=management_provider),
-        )
-
-        machine_deployment_spec: dict[str, Any] = {
-            "clusterName": cluster_name,
-            "selector": {"matchLabels": labels},
-            "template": {
-                "metadata": {
-                    "labels": labels,
-                    **(
-                        {"annotations": worker.annotations}
-                        if worker.annotations
-                        else {}
-                    ),
-                },
-                "spec": {
-                    "clusterName": cluster_name,
-                    "version": _KUBERNETES_VERSION,
-                    "deletion": {"nodeDeletionTimeoutSeconds": 10},
-                    "bootstrap": {
-                        "configRef": _object_ref(
-                            _BOOTSTRAP_API_VERSION,
-                            "KubeadmConfigTemplate",
-                            bootstrap_template_name,
-                        ),
-                    },
-                    "infrastructureRef": _object_ref(
-                        _INFRASTRUCTURE_API_VERSION,
-                        "DockerMachineTemplate",
-                        machine_template_name,
-                    ),
-                },
-            },
-        }
-        if worker.replicas is not None:
-            machine_deployment_spec["replicas"] = worker.replicas
-
-        machine_deployment = k8s.apiextensions.CustomResource(
-            f"cluster-{worker.name}-machine-deployment",
-            api_version=_CAPI_API_VERSION,
-            kind="MachineDeployment",
-            metadata={
-                "name": machine_deployment_name,
-                "namespace": _NAMESPACE,
-                **({"annotations": worker.annotations} if worker.annotations else {}),
-            },
-            spec=machine_deployment_spec,
-            opts=pulumi.ResourceOptions(
-                provider=management_provider,
-                depends_on=[
-                    cluster,
-                    kubeadm_control_plane,
-                    machine_template,
-                    bootstrap_template,
-                ],
-            ),
-        )
-        worker_machine_deployment_names.append(machine_deployment_name)
-
-        worker_health_check = k8s.apiextensions.CustomResource(
-            f"cluster-{worker.name}-health-check",
-            api_version=_CAPI_API_VERSION,
-            kind="MachineHealthCheck",
-            metadata={
-                "name": _resource_name(_TENANT, f"{worker.name}-health"),
-                "namespace": _NAMESPACE,
-            },
-            spec={
-                "clusterName": cluster_name,
-                "selector": {"matchLabels": labels},
-                **_health_check(),
-            },
-            opts=pulumi.ResourceOptions(
-                provider=management_provider,
-                depends_on=[machine_deployment],
-            ),
-        )
-        worker_health_checks.append(worker_health_check)
+        worker_machine_deployment_names.append(worker_class.machine_deployment_name)
 
     workload_kubeconfig_secret = k8s.core.v1.Secret.get(
         "workload-kubeconfig-secret",
