@@ -23,9 +23,7 @@ import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
 
-CAPI_OPERATOR_CHART_REPO = (
-    "https://kubernetes-sigs.github.io/cluster-api-operator"
-)
+CAPI_OPERATOR_CHART_REPO = "https://kubernetes-sigs.github.io/cluster-api-operator"
 CAPI_OPERATOR_CHART_NAME = "cluster-api-operator"
 CAPI_OPERATOR_CHART_VERSION = "0.27.0"
 CAPI_OPERATOR_RELEASE_NAME = "cluster-api-operator"
@@ -41,6 +39,9 @@ CAPI_CONTROL_PLANE_NAMESPACE = "kubeadm-control-plane-system"
 CAPI_DOCKER_INFRASTRUCTURE_NAMESPACE = "docker-infrastructure-system"
 
 _PROVIDER_API_VERSION = "operator.cluster.x-k8s.io/v1alpha2"
+_PROVIDER_FEATURE_GATES = {
+    "ClusterTopology": True,
+}
 
 
 class ClusterAPIOperator(pulumi.ComponentResource):
@@ -97,9 +98,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             ),
         )
 
-        core_ns = self._provider_namespace(
-            name, "core", CAPI_CORE_NAMESPACE, provider
-        )
+        core_ns = self._provider_namespace(name, "core", CAPI_CORE_NAMESPACE, provider)
         bootstrap_ns = self._provider_namespace(
             name, "bootstrap", CAPI_BOOTSTRAP_NAMESPACE, provider
         )
@@ -158,9 +157,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             "core": Output.from_input(CAPI_CORE_NAMESPACE),
             "bootstrap": Output.from_input(CAPI_BOOTSTRAP_NAMESPACE),
             "control_plane": Output.from_input(CAPI_CONTROL_PLANE_NAMESPACE),
-            "infrastructure": Output.from_input(
-                CAPI_DOCKER_INFRASTRUCTURE_NAMESPACE
-            ),
+            "infrastructure": Output.from_input(CAPI_DOCKER_INFRASTRUCTURE_NAMESPACE),
         }
 
         self.register_outputs(
@@ -213,6 +210,9 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             },
             spec={
                 "version": CAPI_PROVIDER_VERSION,
+                "manager": {
+                    "featureGates": _PROVIDER_FEATURE_GATES,
+                },
             },
             opts=ResourceOptions(
                 parent=self,
