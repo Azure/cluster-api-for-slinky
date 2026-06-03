@@ -3,10 +3,10 @@
 Selected by ``workload_cluster_local.py`` when the workload-cluster stack name
 is ``local-example``. Produces, for that env/tenant pair:
 
-1. On the management cluster (via ``pulumi-runner`` SA): a CAPI
-    ``ClusterClass`` + templates + ``Cluster`` with head/compute
-    MachineDeployments. CAPI then provisions the tenant's workload k8s
-    cluster on the docker infrastructure provider.
+1. On the management cluster (via ``pulumi-runner`` SA): explicit CAPI
+    ``Cluster`` / ``DockerCluster`` / ``KubeadmControlPlane`` /
+    ``MachineDeployment`` resources. CAPI then provisions the tenant's
+    workload k8s cluster on the docker infrastructure provider.
 2. On the resulting workload cluster (via a second k8s provider built
    from the ``${cluster}-kubeconfig`` Secret CAPI publishes on mgmt):
    ``slurm-operator-crds`` + ``slurm-operator`` + the Slurm chart +
@@ -36,6 +36,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass, field
 from typing import Any
 
 import pulumi
@@ -95,9 +96,36 @@ _SKIP_AWAIT_ANNOTATION = "pulumi.com/skipAwait"
 
 _CONTAINERD_DOCKER_IO_MIRROR_COMMANDS = [
     "mkdir -p /etc/containerd/certs.d/docker.io",
-    "cat >/etc/containerd/certs.d/docker.io/hosts.toml <<'EOF'\nserver = \"https://registry-1.docker.io\"\n\n[host.\"https://mirror.gcr.io\"]\n  capabilities = [\"pull\", \"resolve\"]\nEOF",
+    'cat >/etc/containerd/certs.d/docker.io/hosts.toml <<\'EOF\'\nserver = "https://registry-1.docker.io"\n\n[host."https://mirror.gcr.io"]\n  capabilities = ["pull", "resolve"]\nEOF',
     "systemctl restart containerd",
 ]
+
+
+@dataclass(frozen=True)
+class WorkerNodeClass:
+    name: str
+    node_type: str
+    replicas: int | None = 1
+    controller: bool = False
+    annotations: dict[str, str] = field(default_factory=dict)
+
+
+_WORKER_NODE_CLASSES = (
+    WorkerNodeClass(
+        name="head",
+        node_type=_CONTROLLER_NODE_TYPE,
+        controller=True,
+    ),
+    WorkerNodeClass(
+        name="compute",
+        node_type=_COMPUTE_NODE_TYPE,
+        replicas=None,
+        annotations={
+            _AUTOSCALER_MIN_ANNOTATION: "1",
+            _AUTOSCALER_MAX_ANNOTATION: "10",
+        },
+    ),
+)
 
 
 def _resource_name(tenant: str, suffix: str) -> str:
@@ -144,6 +172,7 @@ def _docker_machine_template(
     name: str,
     resource_name: str,
     *,
+    custom_image: str,
     opts: pulumi.ResourceOptions | None = None,
 ) -> k8s.apiextensions.CustomResource:
     return k8s.apiextensions.CustomResource(
@@ -154,6 +183,7 @@ def _docker_machine_template(
         spec={
             "template": {
                 "spec": {
+                    "customImage": custom_image,
                     "extraMounts": [
                         {
                             "containerPath": "/var/run/docker.sock",
@@ -193,8 +223,19 @@ def _kubeadm_config_template(
     )
 
 
-def _template_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
-    return {"apiVersion": api_version, "kind": kind, "name": name}
+def _api_group(api_version: str) -> str:
+    return api_version.split("/", 1)[0]
+
+
+def _object_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
+    return {"apiGroup": _api_group(api_version), "kind": kind, "name": name}
+
+
+def _worker_labels(cluster_name: str, worker: WorkerNodeClass) -> dict[str, str]:
+    return {
+        "cluster.x-k8s.io/cluster-name": cluster_name,
+        _NODE_TYPE_LABEL: worker.node_type,
+    }
 
 
 def _calico_values() -> dict[str, object]:
@@ -572,224 +613,30 @@ def run() -> None:
     """Build the local/example workload-cluster resource graph.
 
     This first CAPI pass creates only the management-cluster side: a local
-    CAPD ``ClusterClass`` plus templates, then one tenant ``Cluster`` using
-    two MachineDeployments: one Slurm head node and one compute node group.
+    CAPD ``Cluster`` plus explicit control-plane and worker resources: one
+    Slurm head node and one compute node group.
     It intentionally does not add the old SSH ``preKubeadmCommands`` from
     ``capi-quickstart.yaml``.
 
     Still TODO for this tenant:
-            * Workload-cluster side: install ``slurm-operator-crds`` +
-        ``slurm-operator`` (mirroring ``slurm-operator-values.yaml``)
-        + the Slurm chart + NodeSets (mirroring ``slurm-cluster.yaml``).
+        * Workload-cluster side: install ``slurm-operator-crds`` +
+          ``slurm-operator`` (mirroring ``slurm-operator-values.yaml``)
+          + the Slurm chart + NodeSets (mirroring ``slurm-cluster.yaml``).
     """
     cluster_name = _resource_name(_TENANT, "workload")
-    cluster_class_name = _resource_name(_TENANT, "capd")
+    node_image = f"kindest/node:{_KUBERNETES_VERSION}"
 
     capi_webhooks_ready = KubernetesServicesReady(
         "capi-webhooks-ready",
         services=_CAPI_WEBHOOK_SERVICES,
     )
 
-    docker_cluster_template_name = _resource_name(_TENANT, "docker-cluster")
     control_plane_template_name = _resource_name(_TENANT, "control-plane")
-    head_machine_template_name = _resource_name(_TENANT, "head-machine")
-    compute_machine_template_name = _resource_name(_TENANT, "compute-machine")
-    head_bootstrap_template_name = _resource_name(_TENANT, "head-bootstrap")
-    compute_bootstrap_template_name = _resource_name(_TENANT, "compute-bootstrap")
-
-    docker_cluster_template = k8s.apiextensions.CustomResource(
-        "cluster-docker-cluster-template",
-        api_version=_INFRASTRUCTURE_API_VERSION,
-        kind="DockerClusterTemplate",
-        metadata={"name": docker_cluster_template_name, "namespace": _NAMESPACE},
-        spec={"template": {"spec": {}}},
-        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
-    )
-
-    control_plane_template = k8s.apiextensions.CustomResource(
-        "cluster-control-plane-template",
-        api_version=_CONTROL_PLANE_API_VERSION,
-        kind="KubeadmControlPlaneTemplate",
-        metadata={"name": control_plane_template_name, "namespace": _NAMESPACE},
-        spec={
-            "template": {
-                "spec": {
-                    "kubeadmConfigSpec": {
-                        "clusterConfiguration": {
-                            "apiServer": {
-                                "certSANs": [
-                                    "localhost",
-                                    "127.0.0.1",
-                                    "0.0.0.0",
-                                    "host.docker.internal",
-                                ],
-                            },
-                        },
-                        "initConfiguration": {
-                            "nodeRegistration": _node_registration(),
-                        },
-                        "joinConfiguration": {
-                            "nodeRegistration": _node_registration(),
-                        },
-                        "preKubeadmCommands": _CONTAINERD_DOCKER_IO_MIRROR_COMMANDS,
-                    },
-                },
-            },
-        },
-        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
-    )
-
     control_plane_machine_template = _docker_machine_template(
         control_plane_template_name,
         "cluster-control-plane-machine-template",
+        custom_image=node_image,
         opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
-    )
-    head_machine_template = _docker_machine_template(
-        head_machine_template_name,
-        "cluster-head-machine-template",
-        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
-    )
-    compute_machine_template = _docker_machine_template(
-        compute_machine_template_name,
-        "cluster-compute-machine-template",
-        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
-    )
-    head_bootstrap_template = _kubeadm_config_template(
-        head_bootstrap_template_name,
-        "cluster-head-bootstrap-template",
-        controller=True,
-        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
-    )
-    compute_bootstrap_template = _kubeadm_config_template(
-        compute_bootstrap_template_name,
-        "cluster-compute-bootstrap-template",
-        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
-    )
-
-    cluster_class = k8s.apiextensions.CustomResource(
-        "cluster-class",
-        api_version=_CAPI_API_VERSION,
-        kind="ClusterClass",
-        metadata={"name": cluster_class_name, "namespace": _NAMESPACE},
-        spec={
-            "infrastructure": {
-                "templateRef": _template_ref(
-                    _INFRASTRUCTURE_API_VERSION,
-                    "DockerClusterTemplate",
-                    docker_cluster_template_name,
-                ),
-            },
-            "controlPlane": {
-                "healthCheck": _health_check(),
-                "machineInfrastructure": {
-                    "templateRef": _template_ref(
-                        _INFRASTRUCTURE_API_VERSION,
-                        "DockerMachineTemplate",
-                        control_plane_template_name,
-                    ),
-                },
-                "templateRef": _template_ref(
-                    _CONTROL_PLANE_API_VERSION,
-                    "KubeadmControlPlaneTemplate",
-                    control_plane_template_name,
-                ),
-            },
-            "workers": {
-                "machineDeployments": [
-                    {
-                        "class": "head-node",
-                        "bootstrap": {
-                            "templateRef": _template_ref(
-                                _BOOTSTRAP_API_VERSION,
-                                "KubeadmConfigTemplate",
-                                head_bootstrap_template_name,
-                            ),
-                        },
-                        "infrastructure": {
-                            "templateRef": _template_ref(
-                                _INFRASTRUCTURE_API_VERSION,
-                                "DockerMachineTemplate",
-                                head_machine_template_name,
-                            ),
-                        },
-                        "healthCheck": _health_check(),
-                    },
-                    {
-                        "class": "compute-node",
-                        "bootstrap": {
-                            "templateRef": _template_ref(
-                                _BOOTSTRAP_API_VERSION,
-                                "KubeadmConfigTemplate",
-                                compute_bootstrap_template_name,
-                            ),
-                        },
-                        "infrastructure": {
-                            "templateRef": _template_ref(
-                                _INFRASTRUCTURE_API_VERSION,
-                                "DockerMachineTemplate",
-                                compute_machine_template_name,
-                            ),
-                        },
-                        "healthCheck": _health_check(),
-                    },
-                ],
-            },
-            "patches": [
-                {
-                    "name": "customImage",
-                    "description": "Sets the kind node image used by control-plane and MachineDeployment nodes.",
-                    "definitions": [
-                        {
-                            "selector": {
-                                "apiVersion": _INFRASTRUCTURE_API_VERSION,
-                                "kind": "DockerMachineTemplate",
-                                "matchResources": {"controlPlane": True},
-                            },
-                            "jsonPatches": [
-                                {
-                                    "op": "add",
-                                    "path": "/spec/template/spec/customImage",
-                                    "valueFrom": {
-                                        "template": 'kindest/node:{{ .builtin.controlPlane.version | replace "+" "_" }}',
-                                    },
-                                }
-                            ],
-                        },
-                        {
-                            "selector": {
-                                "apiVersion": _INFRASTRUCTURE_API_VERSION,
-                                "kind": "DockerMachineTemplate",
-                                "matchResources": {
-                                    "machineDeploymentClass": {
-                                        "names": ["head-node", "compute-node"],
-                                    },
-                                },
-                            },
-                            "jsonPatches": [
-                                {
-                                    "op": "add",
-                                    "path": "/spec/template/spec/customImage",
-                                    "valueFrom": {
-                                        "template": 'kindest/node:{{ .builtin.machineDeployment.version | replace "+" "_" }}',
-                                    },
-                                }
-                            ],
-                        },
-                    ],
-                }
-            ],
-        },
-        opts=pulumi.ResourceOptions(
-            depends_on=[
-                docker_cluster_template,
-                control_plane_template,
-                control_plane_machine_template,
-                head_machine_template,
-                compute_machine_template,
-                head_bootstrap_template,
-                compute_bootstrap_template,
-            ]
-        ),
     )
 
     cluster = k8s.apiextensions.CustomResource(
@@ -807,46 +654,196 @@ def run() -> None:
                 "services": {"cidrBlocks": [_SERVICE_CIDR]},
                 "serviceDomain": _SERVICE_DOMAIN,
             },
-            "topology": {
-                "classRef": {"name": cluster_class_name},
-                "version": _KUBERNETES_VERSION,
-                "controlPlane": {"replicas": 1},
-                "workers": {
-                    "machineDeployments": [
-                        {
-                            "class": "head-node",
-                            "name": "head",
-                            "replicas": 1,
-                            "metadata": {
-                                "labels": {
-                                    _NODE_TYPE_LABEL: _CONTROLLER_NODE_TYPE,
-                                },
-                            },
-                        },
-                        {
-                            "class": "compute-node",
-                            "name": "compute",
-                            "metadata": {
-                                "annotations": {
-                                    _AUTOSCALER_MIN_ANNOTATION: "1",
-                                    _AUTOSCALER_MAX_ANNOTATION: "10",
-                                },
-                                "labels": {_NODE_TYPE_LABEL: _COMPUTE_NODE_TYPE},
-                            },
-                        },
-                    ],
+            "controlPlaneRef": _object_ref(
+                _CONTROL_PLANE_API_VERSION,
+                "KubeadmControlPlane",
+                control_plane_template_name,
+            ),
+            "infrastructureRef": _object_ref(
+                _INFRASTRUCTURE_API_VERSION,
+                "DockerCluster",
+                cluster_name,
+            ),
+        },
+        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
+    )
+
+    docker_cluster = k8s.apiextensions.CustomResource(
+        "cluster-docker-cluster",
+        api_version=_INFRASTRUCTURE_API_VERSION,
+        kind="DockerCluster",
+        metadata={"name": cluster_name, "namespace": _NAMESPACE},
+        spec={},
+        opts=pulumi.ResourceOptions(depends_on=[cluster]),
+    )
+
+    # We intentionally do not use ClusterClass/topology here. Topology hides the
+    # concrete DockerCluster/KubeadmControlPlane/MachineDeployment resources from
+    # Pulumi, so Kubernetes starts deleting the DockerCluster sibling while the
+    # final control-plane DockerMachine may still need the CAPD load balancer.
+    # In CAPD v1.11.1 that can strand the DockerMachine finalizer after the load
+    # balancer is gone. ClusterClass mostly removes boilerplate that Pulumi is
+    # already good at generating, while costing us the ordering surface we need
+    # for this local provider's brittle finalization path.
+    kubeadm_control_plane = k8s.apiextensions.CustomResource(
+        "cluster-control-plane",
+        api_version=_CONTROL_PLANE_API_VERSION,
+        kind="KubeadmControlPlane",
+        metadata={"name": control_plane_template_name, "namespace": _NAMESPACE},
+        spec={
+            "replicas": 1,
+            "version": _KUBERNETES_VERSION,
+            "machineTemplate": {
+                "spec": {
+                    "infrastructureRef": _object_ref(
+                        _INFRASTRUCTURE_API_VERSION,
+                        "DockerMachineTemplate",
+                        control_plane_template_name,
+                    ),
+                    "deletion": {"nodeDeletionTimeoutSeconds": 10},
                 },
+            },
+            "kubeadmConfigSpec": {
+                "clusterConfiguration": {
+                    "apiServer": {
+                        "certSANs": [
+                            "localhost",
+                            "127.0.0.1",
+                            "0.0.0.0",
+                            "host.docker.internal",
+                        ],
+                    },
+                },
+                "initConfiguration": {
+                    "nodeRegistration": _node_registration(),
+                },
+                "joinConfiguration": {
+                    "nodeRegistration": _node_registration(),
+                },
+                "preKubeadmCommands": _CONTAINERD_DOCKER_IO_MIRROR_COMMANDS,
             },
         },
         opts=pulumi.ResourceOptions(
-            depends_on=[cluster_class],
+            depends_on=[cluster, docker_cluster, control_plane_machine_template],
         ),
     )
+
+    control_plane_health_check = k8s.apiextensions.CustomResource(
+        "cluster-control-plane-health-check",
+        api_version=_CAPI_API_VERSION,
+        kind="MachineHealthCheck",
+        metadata={
+            "name": _resource_name(_TENANT, "control-plane-health"),
+            "namespace": _NAMESPACE,
+        },
+        spec={
+            "clusterName": cluster_name,
+            "selector": {
+                "matchLabels": {"cluster.x-k8s.io/control-plane": ""},
+            },
+            **_health_check(),
+        },
+        opts=pulumi.ResourceOptions(depends_on=[kubeadm_control_plane]),
+    )
+
+    worker_machine_deployments: list[k8s.apiextensions.CustomResource] = []
+    worker_health_checks: list[k8s.apiextensions.CustomResource] = []
+    for worker in _WORKER_NODE_CLASSES:
+        machine_template_name = _resource_name(_TENANT, f"{worker.name}-machine")
+        bootstrap_template_name = _resource_name(_TENANT, f"{worker.name}-bootstrap")
+        machine_deployment_name = _resource_name(_TENANT, worker.name)
+        labels = _worker_labels(cluster_name, worker)
+
+        machine_template = _docker_machine_template(
+            machine_template_name,
+            f"cluster-{worker.name}-machine-template",
+            custom_image=node_image,
+            opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
+        )
+        bootstrap_template = _kubeadm_config_template(
+            bootstrap_template_name,
+            f"cluster-{worker.name}-bootstrap-template",
+            controller=worker.controller,
+            opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
+        )
+
+        machine_deployment_spec: dict[str, Any] = {
+            "clusterName": cluster_name,
+            "selector": {"matchLabels": labels},
+            "template": {
+                "metadata": {
+                    "labels": labels,
+                    **(
+                        {"annotations": worker.annotations}
+                        if worker.annotations
+                        else {}
+                    ),
+                },
+                "spec": {
+                    "clusterName": cluster_name,
+                    "version": _KUBERNETES_VERSION,
+                    "deletion": {"nodeDeletionTimeoutSeconds": 10},
+                    "bootstrap": {
+                        "configRef": _object_ref(
+                            _BOOTSTRAP_API_VERSION,
+                            "KubeadmConfigTemplate",
+                            bootstrap_template_name,
+                        ),
+                    },
+                    "infrastructureRef": _object_ref(
+                        _INFRASTRUCTURE_API_VERSION,
+                        "DockerMachineTemplate",
+                        machine_template_name,
+                    ),
+                },
+            },
+        }
+        if worker.replicas is not None:
+            machine_deployment_spec["replicas"] = worker.replicas
+
+        machine_deployment = k8s.apiextensions.CustomResource(
+            f"cluster-{worker.name}-machine-deployment",
+            api_version=_CAPI_API_VERSION,
+            kind="MachineDeployment",
+            metadata={
+                "name": machine_deployment_name,
+                "namespace": _NAMESPACE,
+                **({"annotations": worker.annotations} if worker.annotations else {}),
+            },
+            spec=machine_deployment_spec,
+            opts=pulumi.ResourceOptions(
+                depends_on=[
+                    cluster,
+                    kubeadm_control_plane,
+                    machine_template,
+                    bootstrap_template,
+                ]
+            ),
+        )
+        worker_machine_deployments.append(machine_deployment)
+
+        worker_health_check = k8s.apiextensions.CustomResource(
+            f"cluster-{worker.name}-health-check",
+            api_version=_CAPI_API_VERSION,
+            kind="MachineHealthCheck",
+            metadata={
+                "name": _resource_name(_TENANT, f"{worker.name}-health"),
+                "namespace": _NAMESPACE,
+            },
+            spec={
+                "clusterName": cluster_name,
+                "selector": {"matchLabels": labels},
+                **_health_check(),
+            },
+            opts=pulumi.ResourceOptions(depends_on=[machine_deployment]),
+        )
+        worker_health_checks.append(worker_health_check)
+
     workload_kubeconfig = KubeconfigSecret(
         "workload-kubeconfig",
         namespace=_NAMESPACE,
         secret_name=f"{cluster_name}-kubeconfig",
-        opts=pulumi.ResourceOptions(depends_on=[cluster]),
+        opts=pulumi.ResourceOptions(depends_on=[kubeadm_control_plane]),
     )
     workload_provider = k8s.Provider(
         "workload-k8s",
@@ -890,7 +887,15 @@ def run() -> None:
     # the dispatcher routed correctly.
     pulumi.export("tenant", _TENANT)
     pulumi.export("cluster_name", cluster.metadata["name"])
-    pulumi.export("cluster_class_name", cluster_class.metadata["name"])
+    pulumi.export("docker_cluster_name", docker_cluster.metadata["name"])
+    pulumi.export("control_plane_name", kubeadm_control_plane.metadata["name"])
+    pulumi.export(
+        "worker_machine_deployments",
+        [
+            machine_deployment.metadata["name"]
+            for machine_deployment in worker_machine_deployments
+        ],
+    )
     pulumi.export("calico_operator_chart_version", _CALICO_CHART_VERSION)
     pulumi.export("calico_operator_status", calico_operator.status)
     pulumi.export("workload_cluster_ready", False)
