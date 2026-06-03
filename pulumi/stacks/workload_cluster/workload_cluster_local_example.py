@@ -31,6 +31,7 @@ import os
 import re
 import ssl
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -40,6 +41,7 @@ from typing import Any
 import pulumi
 import pulumi.dynamic as dynamic
 import pulumi_kubernetes as k8s
+import yaml
 
 
 _CAPI_API_VERSION = "cluster.x-k8s.io/v1beta2"
@@ -345,13 +347,81 @@ def _wait_for_secret_value(
         if secret is not None:
             encoded_value = secret.get("data", {}).get(key)
             if encoded_value:
-                return base64.b64decode(encoded_value).decode("utf-8")
+                kubeconfig = base64.b64decode(encoded_value).decode("utf-8")
+                _wait_for_workload_api(kubeconfig, deadline)
+                return kubeconfig
 
         if time.monotonic() >= deadline:
             raise TimeoutError(
                 f"timed out waiting for Secret {namespace}/{name} data[{key!r}]"
             )
         time.sleep(5)
+
+
+def _current_kubeconfig_cluster_and_user(
+    kubeconfig: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    parsed = yaml.safe_load(kubeconfig)
+    current_context_name = parsed["current-context"]
+    context = next(
+        context_entry["context"]
+        for context_entry in parsed["contexts"]
+        if context_entry["name"] == current_context_name
+    )
+    cluster = next(
+        cluster_entry["cluster"]
+        for cluster_entry in parsed["clusters"]
+        if cluster_entry["name"] == context["cluster"]
+    )
+    user = next(
+        user_entry["user"]
+        for user_entry in parsed["users"]
+        if user_entry["name"] == context["user"]
+    )
+    return cluster, user
+
+
+def _write_kubeconfig_pem_file(content_b64: str) -> tempfile.NamedTemporaryFile[str]:
+    handle = tempfile.NamedTemporaryFile("w", delete=True)
+    handle.write(base64.b64decode(content_b64).decode("utf-8"))
+    handle.flush()
+    return handle
+
+
+def _wait_for_workload_api(kubeconfig: str, deadline: float) -> None:
+    cluster, user = _current_kubeconfig_cluster_and_user(kubeconfig)
+    server = cluster["server"].rstrip("/")
+
+    with (
+        _write_kubeconfig_pem_file(cluster["certificate-authority-data"]) as ca_file,
+        _write_kubeconfig_pem_file(user["client-certificate-data"]) as cert_file,
+        _write_kubeconfig_pem_file(user["client-key-data"]) as key_file,
+    ):
+        context = ssl.create_default_context(cafile=ca_file.name)
+        context.load_cert_chain(certfile=cert_file.name, keyfile=key_file.name)
+        while True:
+            if _workload_api_endpoint_ready(
+                server, context, "/readyz"
+            ) and _workload_api_endpoint_ready(
+                server, context, "/openapi/v2?timeout=32s"
+            ):
+                return
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"timed out waiting for workload API {server} readiness/openapi"
+                )
+            time.sleep(5)
+
+
+def _workload_api_endpoint_ready(
+    server: str, context: ssl.SSLContext, path: str
+) -> bool:
+    request = urllib.request.Request(f"{server}{path}")
+    try:
+        with urllib.request.urlopen(request, timeout=10, context=context) as response:
+            return response.status == 200
+    except (OSError, urllib.error.URLError, urllib.error.HTTPError, ssl.SSLError):
+        return False
 
 
 class _KubeconfigSecretProvider(dynamic.ResourceProvider):
