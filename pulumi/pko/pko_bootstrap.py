@@ -296,8 +296,7 @@ class PKOBootstrap(pulumi.ComponentResource):
                 parent=self, provider=k8s_provider, depends_on=cr_deps
             ),
         )
-
-        control_plane_metadata_name = control_plane.metadata["name"]
+        control_plane_stack_name = control_plane.metadata["name"]  # type: ignore[attr-defined]
 
         # Per-env tenant fan-out. ``Tenants`` is a sibling building
         # block (like ``StateBackend``) that dispatches on ``env`` to
@@ -310,7 +309,7 @@ class PKOBootstrap(pulumi.ComponentResource):
             f"{name}-tenants",
             env=env,
             stack_spec=stack_spec,
-            control_plane_stack=control_plane_metadata_name,
+            control_plane_stack=control_plane_stack_name,
             provider=k8s_provider,
             opts=ResourceOptions(
                 parent=self, depends_on=cr_deps + [control_plane]
@@ -321,7 +320,7 @@ class PKOBootstrap(pulumi.ComponentResource):
         self.service_account = sa.service_account_name
         self.ssh_secret_name = ssh_secret_name
         self.known_hosts_config_map_name = known_hosts_config_map_name
-        self.control_plane_stack = control_plane_metadata_name
+        self.control_plane_stack = control_plane_stack_name
         self.workload_cluster_stacks = tenants.workload_cluster_stacks
 
         self.register_outputs(

@@ -32,7 +32,7 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Mapping
 
 import pulumi
 import pulumi.dynamic as dynamic
@@ -316,7 +316,7 @@ class ManagementKubeconfig(pulumi.ComponentResource):
         )
 
 
-def _decode_secret_data_value(data: dict[str, str], key: str) -> str:
+def _decode_secret_data_value(data: Mapping[str, str], key: str) -> str:
     encoded_value = data.get(key)
     if not encoded_value:
         raise KeyError(f"Secret data[{key!r}] is missing")
@@ -346,7 +346,7 @@ def _current_kubeconfig_cluster_and_user(
     return cluster, user
 
 
-def _write_kubeconfig_pem_file(content_b64: str) -> tempfile.NamedTemporaryFile[str]:
+def _write_kubeconfig_pem_file(content_b64: str) -> Any:
     handle = tempfile.NamedTemporaryFile("w", delete=True)
     handle.write(base64.b64decode(content_b64).decode("utf-8"))
     handle.flush()
@@ -584,7 +584,7 @@ def run() -> None:
         ),
     )
 
-    worker_machine_deployments: list[k8s.apiextensions.CustomResource] = []
+    worker_machine_deployment_names: list[str] = []
     worker_health_checks: list[k8s.apiextensions.CustomResource] = []
     for worker in _WORKER_NODE_CLASSES:
         machine_template_name = _resource_name(_TENANT, f"{worker.name}-machine")
@@ -659,7 +659,7 @@ def run() -> None:
                 ],
             ),
         )
-        worker_machine_deployments.append(machine_deployment)
+        worker_machine_deployment_names.append(machine_deployment_name)
 
         worker_health_check = k8s.apiextensions.CustomResource(
             f"cluster-{worker.name}-health-check",
@@ -743,15 +743,12 @@ def run() -> None:
     # Echo the tenant + a marker so ``pulumi stack output`` confirms
     # the dispatcher routed correctly.
     pulumi.export("tenant", _TENANT)
-    pulumi.export("cluster_name", cluster.metadata["name"])
-    pulumi.export("docker_cluster_name", docker_cluster.metadata["name"])
-    pulumi.export("control_plane_name", kubeadm_control_plane.metadata["name"])
+    pulumi.export("cluster_name", cluster_name)
+    pulumi.export("docker_cluster_name", cluster_name)
+    pulumi.export("control_plane_name", control_plane_template_name)
     pulumi.export(
         "worker_machine_deployments",
-        [
-            machine_deployment.metadata["name"]
-            for machine_deployment in worker_machine_deployments
-        ],
+        worker_machine_deployment_names,
     )
     pulumi.export("calico_operator_chart_version", _CALICO_CHART_VERSION)
     pulumi.export("calico_operator_status", calico_operator.status)
