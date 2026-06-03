@@ -225,6 +225,7 @@ def run() -> None:
         ssh_private_key_secret=repo.ssh_private_key_secret,
         ssh_known_hosts=repo.ssh_known_hosts,
         env=pulumi.get_stack(),
+        opts=pulumi.ResourceOptions(depends_on=[repo]),
     )
 
     # ----------------------------------------------------------------------
