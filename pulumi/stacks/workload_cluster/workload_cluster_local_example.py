@@ -26,16 +26,10 @@ from __future__ import annotations
 import base64
 import os
 import re
-import ssl
-import tempfile
-import time
-import urllib.error
-import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 import pulumi
-import pulumi.dynamic as dynamic
 import pulumi_kubernetes as k8s
 import pulumi_local as local
 import yaml
@@ -57,7 +51,6 @@ _CALICO_CHART_NAME = "tigera-operator"
 _CALICO_CHART_VERSION = "v3.30.3"
 _CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
-_WORKLOAD_KUBECONFIG_TIMEOUT_SECONDS = 30 * 60
 
 _NODE_TYPE_LABEL = "slinky.slurm.net/node-type"
 _CONTROLLER_NODE_TYPE = "controller"
@@ -72,6 +65,7 @@ _AUTOSCALER_MAX_ANNOTATION = (
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
+_WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneAvailable"
 _SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
@@ -323,119 +317,6 @@ def _decode_secret_data_value(data: Mapping[str, str], key: str) -> str:
     return base64.b64decode(encoded_value).decode("utf-8")
 
 
-def _current_kubeconfig_cluster_and_user(
-    kubeconfig: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    parsed = yaml.safe_load(kubeconfig)
-    current_context_name = parsed["current-context"]
-    context = next(
-        context_entry["context"]
-        for context_entry in parsed["contexts"]
-        if context_entry["name"] == current_context_name
-    )
-    cluster = next(
-        cluster_entry["cluster"]
-        for cluster_entry in parsed["clusters"]
-        if cluster_entry["name"] == context["cluster"]
-    )
-    user = next(
-        user_entry["user"]
-        for user_entry in parsed["users"]
-        if user_entry["name"] == context["user"]
-    )
-    return cluster, user
-
-
-def _write_kubeconfig_pem_file(content_b64: str) -> Any:
-    handle = tempfile.NamedTemporaryFile("w", delete=True)
-    handle.write(base64.b64decode(content_b64).decode("utf-8"))
-    handle.flush()
-    return handle
-
-
-def _wait_for_workload_api(kubeconfig: str, deadline: float) -> None:
-    cluster, user = _current_kubeconfig_cluster_and_user(kubeconfig)
-    server = cluster["server"].rstrip("/")
-
-    with (
-        _write_kubeconfig_pem_file(cluster["certificate-authority-data"]) as ca_file,
-        _write_kubeconfig_pem_file(user["client-certificate-data"]) as cert_file,
-        _write_kubeconfig_pem_file(user["client-key-data"]) as key_file,
-    ):
-        context = ssl.create_default_context(cafile=ca_file.name)
-        context.load_cert_chain(certfile=cert_file.name, keyfile=key_file.name)
-        while True:
-            if _workload_api_endpoint_ready(
-                server, context, "/readyz"
-            ) and _workload_api_endpoint_ready(
-                server, context, "/openapi/v2?timeout=32s"
-            ):
-                return
-            if time.monotonic() >= deadline:
-                raise TimeoutError(
-                    f"timed out waiting for workload API {server} readiness/openapi"
-                )
-            time.sleep(5)
-
-
-def _workload_api_endpoint_ready(
-    server: str, context: ssl.SSLContext, path: str
-) -> bool:
-    request = urllib.request.Request(f"{server}{path}")
-    try:
-        with urllib.request.urlopen(request, timeout=10, context=context) as response:
-            return response.status == 200
-    except (OSError, urllib.error.URLError, urllib.error.HTTPError, ssl.SSLError):
-        return False
-
-
-class _WorkloadApiReadyProvider(dynamic.ResourceProvider):
-    def create(self, props: dict[str, Any]) -> dynamic.CreateResult:
-        deadline = time.monotonic() + int(props["timeout_seconds"])
-        _wait_for_workload_api(props["kubeconfig"], deadline)
-        return dynamic.CreateResult(id_=props["id"], outs=props)
-
-    def diff(
-        self,
-        id_: str,
-        olds: dict[str, Any],
-        news: dict[str, Any],
-    ) -> dynamic.DiffResult:
-        replaces = [
-            key for key in ("id", "kubeconfig") if olds.get(key) != news.get(key)
-        ]
-        return dynamic.DiffResult(
-            changes=bool(replaces),
-            replaces=replaces,
-        )
-
-    def read(self, id_: str, props: dict[str, Any]) -> dynamic.ReadResult:
-        deadline = time.monotonic() + int(props["timeout_seconds"])
-        _wait_for_workload_api(props["kubeconfig"], deadline)
-        return dynamic.ReadResult(id_=id_, outs=props)
-
-
-class WorkloadApiReady(dynamic.Resource):
-    def __init__(
-        self,
-        name: str,
-        *,
-        kubeconfig: pulumi.Input[str],
-        timeout_seconds: pulumi.Input[int] = _WORKLOAD_KUBECONFIG_TIMEOUT_SECONDS,
-        opts: pulumi.ResourceOptions | None = None,
-    ) -> None:
-        super().__init__(
-            _WorkloadApiReadyProvider(),
-            name,
-            {
-                "id": name,
-                "timeout_seconds": timeout_seconds,
-                "kubeconfig": kubeconfig,
-            },
-            opts,
-        )
-
-
 def run() -> None:
     """Build the local/example workload-cluster resource graph.
 
@@ -563,6 +444,23 @@ def run() -> None:
         ),
     )
 
+    cluster_control_plane_available = k8s.apiextensions.CustomResourcePatch(
+        "cluster-control-plane-available",
+        api_version=_CAPI_API_VERSION,
+        kind="Cluster",
+        metadata={
+            "name": cluster_name,
+            "namespace": _NAMESPACE,
+            "annotations": {
+                _WAIT_FOR_ANNOTATION: _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
+            },
+        },
+        opts=pulumi.ResourceOptions(
+            provider=management_provider,
+            depends_on=[kubeadm_control_plane],
+        ),
+    )
+
     control_plane_health_check = k8s.apiextensions.CustomResource(
         "cluster-control-plane-health-check",
         api_version=_CAPI_API_VERSION,
@@ -686,7 +584,7 @@ def run() -> None:
         id=f"{_NAMESPACE}/{cluster_name}-kubeconfig",
         opts=pulumi.ResourceOptions(
             provider=management_provider,
-            depends_on=[kubeadm_control_plane],
+            depends_on=[cluster_control_plane_available],
         ),
     )
     workload_kubeconfig = pulumi.Output.secret(
@@ -697,15 +595,10 @@ def run() -> None:
             )
         )
     )
-    workload_api_ready = WorkloadApiReady(
-        "workload-api-ready",
-        kubeconfig=workload_kubeconfig,
-        opts=pulumi.ResourceOptions(depends_on=[workload_kubeconfig_secret]),
-    )
     workload_provider = k8s.Provider(
         "workload-k8s",
         kubeconfig=workload_kubeconfig,
-        opts=pulumi.ResourceOptions(depends_on=[workload_api_ready]),
+        opts=pulumi.ResourceOptions(depends_on=[workload_kubeconfig_secret]),
     )
 
     calico_namespace = k8s.core.v1.Namespace(
