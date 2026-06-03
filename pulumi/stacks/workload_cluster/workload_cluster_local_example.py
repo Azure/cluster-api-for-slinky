@@ -26,11 +26,9 @@ state is isolated even though the backend is shared.
 from __future__ import annotations
 
 import base64
-import json
 import os
 import re
 import ssl
-import subprocess
 import tempfile
 import time
 import urllib.error
@@ -62,23 +60,6 @@ _CALICO_CHART_VERSION = "v3.30.3"
 _CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
 _WORKLOAD_KUBECONFIG_TIMEOUT_SECONDS = 30 * 60
-_CAPI_WEBHOOK_TIMEOUT_SECONDS = 10 * 60
-_CAPI_WEBHOOK_POLL_SECONDS = 5
-_CAPI_WEBHOOK_SERVICES = [
-    {"namespace": "capi-system", "name": "capi-webhook-service"},
-    {
-        "namespace": "kubeadm-bootstrap-system",
-        "name": "capi-kubeadm-bootstrap-webhook-service",
-    },
-    {
-        "namespace": "kubeadm-control-plane-system",
-        "name": "capi-kubeadm-control-plane-webhook-service",
-    },
-    {
-        "namespace": "docker-infrastructure-system",
-        "name": "capd-webhook-service",
-    },
-]
 
 _NODE_TYPE_LABEL = "slinky.slurm.net/node-type"
 _CONTROLLER_NODE_TYPE = "controller"
@@ -92,7 +73,7 @@ _AUTOSCALER_MAX_ANNOTATION = (
 )
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
-_SKIP_AWAIT_ANNOTATION = "pulumi.com/skipAwait"
+_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _MANAGEMENT_KUBECONFIG_ENV = "CA4S_MANAGEMENT_KUBECONFIG"
 _SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
@@ -335,74 +316,6 @@ def _management_kubeconfig_from_service_account() -> pulumi.Output[str]:
     )
 
 
-def _kubectl_get_json(
-    kubeconfig: str, resource: str, namespace: str, name: str
-) -> dict[str, Any] | None:
-    with tempfile.NamedTemporaryFile("w", delete=True) as kubeconfig_file:
-        kubeconfig_file.write(kubeconfig)
-        kubeconfig_file.flush()
-        result = subprocess.run(
-            [
-                "kubectl",
-                "--kubeconfig",
-                kubeconfig_file.name,
-                "-n",
-                namespace,
-                "get",
-                resource,
-                name,
-                "-o",
-                "json",
-            ],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-    if result.returncode == 0:
-        return json.loads(result.stdout)
-    if "NotFound" in result.stderr:
-        return None
-    raise RuntimeError(result.stderr.strip() or result.stdout.strip())
-
-
-def _endpoints_ready(endpoints: dict[str, Any] | None) -> bool:
-    if endpoints is None:
-        return False
-    for subset in endpoints.get("subsets", []):
-        if subset.get("addresses") and subset.get("ports"):
-            return True
-    return False
-
-
-def _wait_for_capi_webhooks(
-    kubeconfig: str, services: list[dict[str, str]], timeout_seconds: int
-) -> None:
-    deadline = time.monotonic() + timeout_seconds
-    pending = services
-    while True:
-        pending = [
-            service
-            for service in services
-            if not _endpoints_ready(
-                _kubectl_get_json(
-                    kubeconfig,
-                    "endpoints",
-                    service["namespace"],
-                    service["name"],
-                )
-            )
-        ]
-        if not pending:
-            return
-        if time.monotonic() >= deadline:
-            names = ", ".join(
-                f"{service['namespace']}/{service['name']}" for service in pending
-            )
-            raise TimeoutError(f"timed out waiting for CAPI webhooks: {names}")
-        time.sleep(_CAPI_WEBHOOK_POLL_SECONDS)
-
-
 def _decode_secret_data_value(data: dict[str, str], key: str) -> str:
     encoded_value = data.get(key)
     if not encoded_value:
@@ -523,55 +436,6 @@ class WorkloadApiReady(dynamic.Resource):
         )
 
 
-class _KubernetesServicesReadyProvider(dynamic.ResourceProvider):
-    def create(self, props: dict[str, Any]) -> dynamic.CreateResult:
-        _wait_for_capi_webhooks(
-            props["kubeconfig"],
-            props["services"],
-            int(props["timeout_seconds"]),
-        )
-        return dynamic.CreateResult(id_=props["id"], outs=props)
-
-    def diff(
-        self,
-        id_: str,
-        olds: dict[str, Any],
-        news: dict[str, Any],
-    ) -> dynamic.DiffResult:
-        replaces = [
-            key
-            for key in ("id", "kubeconfig", "services", "timeout_seconds")
-            if olds.get(key) != news.get(key)
-        ]
-        return dynamic.DiffResult(changes=bool(replaces), replaces=replaces)
-
-    def read(self, id_: str, props: dict[str, Any]) -> dynamic.ReadResult:
-        return dynamic.ReadResult(id_=id_, outs=props)
-
-
-class KubernetesServicesReady(dynamic.Resource):
-    def __init__(
-        self,
-        name: str,
-        *,
-        kubeconfig: pulumi.Input[str],
-        services: pulumi.Input[list[dict[str, str]]],
-        timeout_seconds: pulumi.Input[int] = _CAPI_WEBHOOK_TIMEOUT_SECONDS,
-        opts: pulumi.ResourceOptions | None = None,
-    ) -> None:
-        super().__init__(
-            _KubernetesServicesReadyProvider(),
-            name,
-            {
-                "id": name,
-                "kubeconfig": kubeconfig,
-                "services": services,
-                "timeout_seconds": timeout_seconds,
-            },
-            opts,
-        )
-
-
 def run() -> None:
     """Build the local/example workload-cluster resource graph.
 
@@ -594,18 +458,12 @@ def run() -> None:
         kubeconfig=management_kubeconfig,
     )
 
-    capi_webhooks_ready = KubernetesServicesReady(
-        "capi-webhooks-ready",
-        kubeconfig=management_kubeconfig,
-        services=_CAPI_WEBHOOK_SERVICES,
-    )
-
     control_plane_template_name = _resource_name(_TENANT, "control-plane")
     control_plane_machine_template = _docker_machine_template(
         control_plane_template_name,
         "cluster-control-plane-machine-template",
         custom_image=node_image,
-        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
+        opts=pulumi.ResourceOptions(provider=management_provider),
     )
 
     cluster = k8s.apiextensions.CustomResource(
@@ -615,7 +473,6 @@ def run() -> None:
         metadata={
             "name": cluster_name,
             "namespace": _NAMESPACE,
-            "annotations": {_SKIP_AWAIT_ANNOTATION: "true"},
         },
         spec={
             "clusterNetwork": {
@@ -634,16 +491,20 @@ def run() -> None:
                 cluster_name,
             ),
         },
-        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
+        opts=pulumi.ResourceOptions(provider=management_provider),
     )
 
     docker_cluster = k8s.apiextensions.CustomResource(
         "cluster-docker-cluster",
         api_version=_INFRASTRUCTURE_API_VERSION,
         kind="DockerCluster",
-        metadata={"name": cluster_name, "namespace": _NAMESPACE},
+        metadata={
+            "name": cluster_name,
+            "namespace": _NAMESPACE,
+            "annotations": {_WAIT_FOR_ANNOTATION: "condition=Ready"},
+        },
         spec={},
-        opts=pulumi.ResourceOptions(depends_on=[cluster]),
+        opts=pulumi.ResourceOptions(provider=management_provider, depends_on=[cluster]),
     )
 
     # We intentionally do not use ClusterClass/topology here. Topology hides the
@@ -658,7 +519,11 @@ def run() -> None:
         "cluster-control-plane",
         api_version=_CONTROL_PLANE_API_VERSION,
         kind="KubeadmControlPlane",
-        metadata={"name": control_plane_template_name, "namespace": _NAMESPACE},
+        metadata={
+            "name": control_plane_template_name,
+            "namespace": _NAMESPACE,
+            "annotations": {_WAIT_FOR_ANNOTATION: "condition=Initialized"},
+        },
         spec={
             "replicas": 1,
             "version": _KUBERNETES_VERSION,
@@ -693,6 +558,7 @@ def run() -> None:
             },
         },
         opts=pulumi.ResourceOptions(
+            provider=management_provider,
             depends_on=[cluster, docker_cluster, control_plane_machine_template],
         ),
     )
@@ -712,7 +578,10 @@ def run() -> None:
             },
             **_health_check(),
         },
-        opts=pulumi.ResourceOptions(depends_on=[kubeadm_control_plane]),
+        opts=pulumi.ResourceOptions(
+            provider=management_provider,
+            depends_on=[kubeadm_control_plane],
+        ),
     )
 
     worker_machine_deployments: list[k8s.apiextensions.CustomResource] = []
@@ -727,13 +596,13 @@ def run() -> None:
             machine_template_name,
             f"cluster-{worker.name}-machine-template",
             custom_image=node_image,
-            opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
+            opts=pulumi.ResourceOptions(provider=management_provider),
         )
         bootstrap_template = _kubeadm_config_template(
             bootstrap_template_name,
             f"cluster-{worker.name}-bootstrap-template",
             controller=worker.controller,
-            opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
+            opts=pulumi.ResourceOptions(provider=management_provider),
         )
 
         machine_deployment_spec: dict[str, Any] = {
@@ -781,12 +650,13 @@ def run() -> None:
             },
             spec=machine_deployment_spec,
             opts=pulumi.ResourceOptions(
+                provider=management_provider,
                 depends_on=[
                     cluster,
                     kubeadm_control_plane,
                     machine_template,
                     bootstrap_template,
-                ]
+                ],
             ),
         )
         worker_machine_deployments.append(machine_deployment)
@@ -804,7 +674,10 @@ def run() -> None:
                 "selector": {"matchLabels": labels},
                 **_health_check(),
             },
-            opts=pulumi.ResourceOptions(depends_on=[machine_deployment]),
+            opts=pulumi.ResourceOptions(
+                provider=management_provider,
+                depends_on=[machine_deployment],
+            ),
         )
         worker_health_checks.append(worker_health_check)
 

@@ -42,6 +42,7 @@ _PROVIDER_API_VERSION = "operator.cluster.x-k8s.io/v1alpha2"
 _PROVIDER_FEATURE_GATES = {
     "ClusterTopology": True,
 }
+_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 
 
 class ClusterAPIOperator(pulumi.ComponentResource):
@@ -207,6 +208,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             metadata={
                 "name": provider_name,
                 "namespace": namespace,
+                "annotations": {_WAIT_FOR_ANNOTATION: "condition=Ready"},
             },
             spec={
                 "version": CAPI_PROVIDER_VERSION,
