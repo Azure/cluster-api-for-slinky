@@ -237,6 +237,10 @@ def _chart_values(
                 "helm.sh/resource-policy": None,
             },
         },
+        # Keep exactly one Gitea pod touching the PVC-backed sqlite DB and
+        # level queue. With the chart's default rolling strategy, Kubernetes
+        # can briefly run old+new pods at once and Gitea fails on the queue
+        # lock. This is independent of Valkey, which is disabled above.
         "strategy": {
             "type": "Recreate",
         },

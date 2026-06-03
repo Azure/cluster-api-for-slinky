@@ -210,8 +210,9 @@ def run() -> None:
     #                              -> dispatcher picks ``control_plane_local.py``
     #     ca4s-workload-cluster -> spec.stack=organization/ca4s-workload-cluster/<outer_env>-<tenant>
     #                              -> dispatcher splits on first '-':
-    #                                 outer_env picks the module,
-    #                                 tenant is passed as a parameter.
+    #                                 outer_env picks the env dispatcher,
+    #                                 then tenant picks the concrete
+    #                                 env+tenant module.
     #
     # Constraint that falls out: outer env names (``local``, future
     # ``prod``, ...) must not contain ``-``. Tenant names may.

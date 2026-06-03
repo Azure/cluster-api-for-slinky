@@ -1,56 +1,50 @@
-"""Per-env body for the ``local`` outer env of ``ca4s-workload-cluster``.
+"""Dispatcher for the ``local`` outer env of ``ca4s-workload-cluster``.
 
-Takes a ``tenant`` argument from the dispatcher (which peeled it off
-the second segment of the stack name ``<outer_env>-<tenant>``) and
-produces, for that tenant:
+The workload-cluster project stack name is ``<outer_env>-<tenant>``. The
+top-level ``__main__.py`` peels off ``outer_env`` and imports this module for
+``local`` stacks. This module then dispatches to a concrete per-env/per-tenant
+sibling module named ``workload_cluster_local_<tenant_module>.py``.
 
-1. On the management cluster (via ``pulumi-runner`` SA): a CAPI
-   ``Cluster`` + control-plane config + machine deployment (mirroring
-   ``capi-quickstart.yaml``). CAPI then provisions the tenant's
-   workload k8s cluster on the docker infrastructure provider.
-2. On the resulting workload cluster (via a second k8s provider built
-   from the ``${cluster}-kubeconfig`` Secret CAPI publishes on mgmt):
-   ``slurm-operator-crds`` + ``slurm-operator`` + the Slurm chart +
-   per-tenant ``NodeSet``s (mirroring ``slurm-cluster.yaml`` /
-   ``slurm-operator-values.yaml``). This is where the Slinky CRDs
-   actually live — NOT on the management cluster.
-
-State backend
--------------
-Shared ``file:///state`` PVC, same as the other two inner stacks.
-Each per-tenant stack instance gets its own subdirectory under the
-PVC keyed by Pulumi's ``<org>/<project>/<stack>`` naming —
-``organization/ca4s-workload-cluster/local-<tenant>/`` — so tenant
-state is isolated even though the backend is shared.
+The extra dispatch layer keeps tenant resource graphs independent. Local today
+has one tenant, ``example``, but a future tenant can have a substantially
+different CAPI/Slurm shape by adding a new sibling module rather than growing
+conditionals here.
 """
 
 from __future__ import annotations
 
-import pulumi
+import importlib
+import re
+
+
+_TENANT_MODULE_PREFIX = "workload_cluster_local_"
+_TENANT_MODULE_INVALID_CHARS = re.compile(r"[^a-z0-9_]+")
+
+
+def _tenant_module_suffix(tenant: str) -> str:
+    suffix = _TENANT_MODULE_INVALID_CHARS.sub("_", tenant.lower()).strip("_")
+    if not suffix:
+        raise ValueError("tenant must contain at least one module-safe character")
+    if suffix[0].isdigit():
+        suffix = f"tenant_{suffix}"
+    return suffix
 
 
 def run(tenant: str) -> None:
-    """Build the workload-cluster resource graph for one tenant.
+    """Dispatch a local workload-cluster stack to its tenant module."""
+    tenant_module_suffix = _tenant_module_suffix(tenant)
+    module_name = f"{_TENANT_MODULE_PREFIX}{tenant_module_suffix}"
 
-    Args:
-        tenant: Tenant identifier (third segment of the Pulumi stack
-            name's tenant half). Used to namespace / label / select
-            every resource this body creates.
+    try:
+        module = importlib.import_module(module_name)
+    except ModuleNotFoundError as exc:
+        if exc.name != module_name:
+            raise
+        raise ValueError(
+            f"unsupported local workload tenant {tenant!r}: expected sibling "
+            f"module {module_name!r}. Create "
+            f"pulumi/stacks/workload_cluster/{module_name}.py exposing "
+            "``def run() -> None: ...`` to register this tenant."
+        ) from None
 
-    Placeholder body. TODO, parameterized by ``tenant``:
-      * Mgmt-cluster side: port ``capi-quickstart.yaml`` (one CAPI
-        ``Cluster`` + control-plane config + machine deployment).
-      * Workload-cluster side: build a second ``pulumi_kubernetes``
-        provider from the ``${cluster}-kubeconfig`` Secret CAPI
-        publishes on mgmt, then install ``slurm-operator-crds`` +
-        ``slurm-operator`` (mirroring ``slurm-operator-values.yaml``)
-        + the Slurm chart + NodeSets (mirroring ``slurm-cluster.yaml``).
-    """
-    # Echo the tenant + a marker so ``pulumi stack output`` confirms
-    # the dispatcher routed correctly.
-    pulumi.export("tenant", tenant)
-    pulumi.export("workload_cluster_ready", False)
-    pulumi.export(
-        "todo",
-        "Build CAPI Cluster on mgmt; install slurm-operator + NodeSets on workload cluster.",
-    )
+    module.run()

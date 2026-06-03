@@ -92,13 +92,11 @@ def run() -> None:
     pulumi.export("awx_instance_name", awx_instance.name)
     pulumi.export("awx_service_name", awx_instance.service_name)
     pulumi.export("awx_admin_user", awx_instance.admin_user)
-    pulumi.export(
-        "awx_admin_password_secret", awx_instance.admin_password_secret
-    )
+    pulumi.export("awx_admin_password_secret", awx_instance.admin_password_secret)
 
     # Flip to True once the remaining CAPI pieces and AWX API config land.
     pulumi.export("control_plane_ready", False)
     pulumi.export(
         "todo",
-        "Install ClusterClass/topology resources and AWX API config.",
+        "Wire AWX API config and cluster-autoscaler; ClusterClass lives in workload stack.",
     )

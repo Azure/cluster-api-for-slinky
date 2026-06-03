@@ -5,15 +5,16 @@ on the first ``-`` to peel off the outer env from the tenant name:
 
     ``<outer_env>-<tenant>`` ──split('-', 1)──> (outer_env, tenant)
 
-``outer_env`` selects the per-env sibling module by name
+``outer_env`` selects the per-env sibling dispatcher module by name
 (``workload_cluster_<outer_env>.py``); ``tenant`` is passed through as
-a ``run(tenant=...)`` keyword argument. The split-on-first ``-`` is
-why outer env names (``local``, ``prod``, ...) are forbidden from
-containing ``-`` themselves — tenant names may.
+a ``run(tenant=...)`` keyword argument. The per-env dispatcher can then
+select a per-env/per-tenant module such as
+``workload_cluster_local_example.py``. The split-on-first ``-`` is why
+outer env names (``local``, ``prod``, ...) are forbidden from containing
+``-`` themselves — tenant names may.
 
-Each per-env module is responsible for the actual CAPI ``Cluster``
-build using ``tenant`` to namespace/label its resources. Adding a
-new environment is purely additive — drop a new
+Each per-env module is responsible for dispatching to the actual tenant
+resource graph. Adding a new environment is purely additive — drop a new
 ``workload_cluster_<env>.py`` exposing
 ``def run(*, tenant: str) -> None: ...`` and it's dispatchable.
 """
