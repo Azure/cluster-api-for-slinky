@@ -34,7 +34,7 @@ from pulumi import ResourceOptions
 # Pinned PKO chart. See https://github.com/pulumi/pulumi-kubernetes-operator
 # for the release matrix. v2.x is the current major.
 PKO_CHART_OCI = "oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator"
-PKO_CHART_VERSION = "2.3.0"
+PKO_CHART_VERSION = "2.7.0"
 
 # The conventional namespace for PKO. We don't make this configurable —
 # downstream Stack CRs are pinned to land in the same namespace by the

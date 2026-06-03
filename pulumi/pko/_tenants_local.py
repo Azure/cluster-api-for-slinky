@@ -30,7 +30,7 @@ _OUTER_ENV = "local"
 
 # Local tenants. Each entry becomes the second segment of a workload-cluster
 # Stack CR's stack name and must be DNS-label safe.
-_TENANTS: tuple[str, ...] = ()
+_TENANTS: tuple[str, ...] = ("example",)
 
 # Workload-cluster inner stack identity. Kebab-case Pulumi project
 # name; must match the ``name:`` field in
