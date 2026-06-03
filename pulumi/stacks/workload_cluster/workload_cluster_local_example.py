@@ -63,8 +63,6 @@ _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
 _WORKLOAD_KUBECONFIG_TIMEOUT_SECONDS = 30 * 60
 _CAPI_WEBHOOK_TIMEOUT_SECONDS = 10 * 60
 _CAPI_WEBHOOK_POLL_SECONDS = 5
-_CAPI_TEARDOWN_TIMEOUT_SECONDS = 20 * 60
-_CAPI_TEARDOWN_POLL_SECONDS = 5
 _CAPI_WEBHOOK_SERVICES = [
     {"namespace": "capi-system", "name": "capi-webhook-service"},
     {
@@ -352,128 +350,6 @@ def _wait_for_capi_webhooks(
         time.sleep(_CAPI_WEBHOOK_POLL_SECONDS)
 
 
-def _cluster_api_path(namespace: str, plural: str, name: str | None = None) -> str:
-    base = f"/apis/cluster.x-k8s.io/v1beta2/namespaces/{namespace}/{plural}"
-    return f"{base}/{name}" if name else base
-
-
-def _infrastructure_api_path(namespace: str, plural: str) -> str:
-    return (
-        f"/apis/infrastructure.cluster.x-k8s.io/v1beta2/namespaces/{namespace}/{plural}"
-    )
-
-
-def _list_cluster_objects(
-    namespace: str, plural: str, cluster_name: str
-) -> list[dict[str, Any]]:
-    selector = urllib.parse.quote(
-        f"cluster.x-k8s.io/cluster-name={cluster_name}", safe=""
-    )
-    result = _mgmt_json_request(
-        "GET",
-        f"{_cluster_api_path(namespace, plural)}?labelSelector={selector}",
-    )
-    return [] if result is None else result.get("items", [])
-
-
-def _list_infrastructure_objects(
-    namespace: str, plural: str, cluster_name: str
-) -> list[dict[str, Any]]:
-    selector = urllib.parse.quote(
-        f"cluster.x-k8s.io/cluster-name={cluster_name}", safe=""
-    )
-    result = _mgmt_json_request(
-        "GET",
-        f"{_infrastructure_api_path(namespace, plural)}?labelSelector={selector}",
-    )
-    return [] if result is None else result.get("items", [])
-
-
-def _scale_topology_to_zero(namespace: str, cluster_name: str) -> None:
-    cluster = _mgmt_json_request(
-        "GET", _cluster_api_path(namespace, "clusters", cluster_name)
-    )
-    if cluster is None:
-        return
-
-    machine_deployments = (
-        cluster.get("spec", {})
-        .get("topology", {})
-        .get("workers", {})
-        .get("machineDeployments", [])
-    )
-    patch: list[dict[str, Any]] = [
-        {"op": "add", "path": "/spec/topology/controlPlane/replicas", "value": 0},
-    ]
-    for index, _machine_deployment in enumerate(machine_deployments):
-        patch.append(
-            {
-                "op": "add",
-                "path": f"/spec/topology/workers/machineDeployments/{index}/replicas",
-                "value": 0,
-            }
-        )
-
-    _mgmt_json_request(
-        "PATCH",
-        _cluster_api_path(namespace, "clusters", cluster_name),
-        body=patch,
-        content_type="application/json-patch+json",
-    )
-
-
-def _wait_for_no_cluster_machines(
-    namespace: str, cluster_name: str, deadline: float
-) -> None:
-    while True:
-        machines = _list_cluster_objects(namespace, "machines", cluster_name)
-        docker_machines = _list_infrastructure_objects(
-            namespace, "dockermachines", cluster_name
-        )
-        if not machines and not docker_machines:
-            return
-        if time.monotonic() >= deadline:
-            names = [item["metadata"]["name"] for item in machines + docker_machines]
-            raise TimeoutError(
-                f"timed out waiting for Machines/DockerMachines to delete for {cluster_name}: {names}"
-            )
-        time.sleep(_CAPI_TEARDOWN_POLL_SECONDS)
-
-
-def _wait_for_cluster_deleted(
-    namespace: str, cluster_name: str, deadline: float
-) -> None:
-    while True:
-        cluster = _mgmt_json_request(
-            "GET", _cluster_api_path(namespace, "clusters", cluster_name)
-        )
-        if cluster is None:
-            return
-        if time.monotonic() >= deadline:
-            raise TimeoutError(
-                f"timed out waiting for Cluster {namespace}/{cluster_name} deletion"
-            )
-        time.sleep(_CAPI_TEARDOWN_POLL_SECONDS)
-
-
-def _delete_capi_cluster_ordered(
-    namespace: str, cluster_name: str, timeout_seconds: int
-) -> None:
-    deadline = time.monotonic() + timeout_seconds
-    if (
-        _mgmt_json_request(
-            "GET", _cluster_api_path(namespace, "clusters", cluster_name)
-        )
-        is None
-    ):
-        return
-
-    _scale_topology_to_zero(namespace, cluster_name)
-    _wait_for_no_cluster_machines(namespace, cluster_name, deadline)
-    _mgmt_json_request("DELETE", _cluster_api_path(namespace, "clusters", cluster_name))
-    _wait_for_cluster_deleted(namespace, cluster_name, deadline)
-
-
 def _wait_for_secret_value(
     *,
     namespace: str,
@@ -676,53 +552,6 @@ class KubernetesServicesReady(dynamic.Resource):
             {
                 "id": name,
                 "services": services,
-                "timeout_seconds": timeout_seconds,
-            },
-            opts,
-        )
-
-
-class _CapiClusterTeardownProvider(dynamic.ResourceProvider):
-    def create(self, props: dict[str, Any]) -> dynamic.CreateResult:
-        return dynamic.CreateResult(id_=props["cluster_name"], outs=props)
-
-    def diff(
-        self,
-        id_: str,
-        olds: dict[str, Any],
-        news: dict[str, Any],
-    ) -> dynamic.DiffResult:
-        replaces = [
-            key
-            for key in ("namespace", "cluster_name", "timeout_seconds")
-            if olds.get(key) != news.get(key)
-        ]
-        return dynamic.DiffResult(changes=bool(replaces), replaces=replaces)
-
-    def delete(self, id_: str, props: dict[str, Any]) -> None:
-        _delete_capi_cluster_ordered(
-            props["namespace"],
-            props["cluster_name"],
-            int(props["timeout_seconds"]),
-        )
-
-
-class CapiClusterTeardown(dynamic.Resource):
-    def __init__(
-        self,
-        name: str,
-        *,
-        namespace: pulumi.Input[str],
-        cluster_name: pulumi.Input[str],
-        timeout_seconds: pulumi.Input[int] = _CAPI_TEARDOWN_TIMEOUT_SECONDS,
-        opts: pulumi.ResourceOptions | None = None,
-    ) -> None:
-        super().__init__(
-            _CapiClusterTeardownProvider(),
-            name,
-            {
-                "namespace": namespace,
-                "cluster_name": cluster_name,
                 "timeout_seconds": timeout_seconds,
             },
             opts,
@@ -1004,25 +833,13 @@ def run() -> None:
         },
         opts=pulumi.ResourceOptions(
             depends_on=[cluster_class],
-            # Local CAPD teardown needs ordered cleanup: scale Machines down
-            # while DockerCluster/load balancer still exists, then delete the
-            # Cluster. ``cluster-teardown`` performs that delete; this resource
-            # is retained so the provider does not race it with a direct delete.
-            retain_on_delete=True,
         ),
     )
-    cluster_teardown = CapiClusterTeardown(
-        "cluster-teardown",
-        namespace=_NAMESPACE,
-        cluster_name=cluster_name,
-        opts=pulumi.ResourceOptions(depends_on=[cluster]),
-    )
-
     workload_kubeconfig = KubeconfigSecret(
         "workload-kubeconfig",
         namespace=_NAMESPACE,
         secret_name=f"{cluster_name}-kubeconfig",
-        opts=pulumi.ResourceOptions(depends_on=[cluster_teardown]),
+        opts=pulumi.ResourceOptions(depends_on=[cluster]),
     )
     workload_provider = k8s.Provider(
         "workload-k8s",
