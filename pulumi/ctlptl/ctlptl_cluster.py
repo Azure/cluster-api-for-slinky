@@ -160,10 +160,6 @@ kindV1Alpha4Cluster:
   kind: Cluster
   networking:
     ipFamily: dual
-  containerdConfigPatches:
-  - |-
-    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
-      endpoint = ["https://mirror.gcr.io"]
   nodes:
   - role: control-plane
     image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
