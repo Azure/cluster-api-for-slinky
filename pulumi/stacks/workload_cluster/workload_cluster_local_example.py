@@ -836,7 +836,13 @@ def run() -> None:
             "name": _CALICO_OPERATOR_NAMESPACE,
             "labels": {"pod-security.kubernetes.io/enforce": "privileged"},
         },
-        opts=pulumi.ResourceOptions(provider=workload_provider),
+        opts=pulumi.ResourceOptions(
+            provider=workload_provider,
+            # Keep CNI alive while CAPI deletes the workload cluster. The whole
+            # workload cluster is disposable, so retained Calico resources are
+            # removed when CAPD deletes the cluster containers.
+            retain_on_delete=True,
+        ),
     )
     calico_operator = k8s.helm.v3.Release(
         "calico-operator",
@@ -852,6 +858,7 @@ def run() -> None:
         opts=pulumi.ResourceOptions(
             provider=workload_provider,
             depends_on=[calico_namespace],
+            retain_on_delete=True,
         ),
     )
 
