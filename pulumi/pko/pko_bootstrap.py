@@ -205,6 +205,7 @@ class PKOBootstrap(pulumi.ComponentResource):
                 "namespace": PKO_NAMESPACE,
             },
             type="Opaque",
+            immutable=True,
             data={
                 _SSH_PRIVATE_KEY_KEY: ssh_private_key_data,
             },

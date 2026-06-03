@@ -102,6 +102,7 @@ class StateBackend(pulumi.ComponentResource):
             metadata={"name": PASSPHRASE_SECRET_NAME, "namespace": namespace},
             string_data={PASSPHRASE_SECRET_KEY: passphrase.result},
             type="Opaque",
+            immutable=True,
             opts=ResourceOptions(parent=self, provider=provider),
         )
 
