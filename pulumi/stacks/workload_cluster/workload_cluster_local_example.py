@@ -34,7 +34,6 @@ import subprocess
 import tempfile
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
@@ -42,6 +41,7 @@ from typing import Any
 import pulumi
 import pulumi.dynamic as dynamic
 import pulumi_kubernetes as k8s
+import pulumi_local as local
 import yaml
 
 
@@ -93,6 +93,9 @@ _AUTOSCALER_MAX_ANNOTATION = (
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 _SKIP_AWAIT_ANNOTATION = "pulumi.com/skipAwait"
+_MANAGEMENT_KUBECONFIG_ENV = "CA4S_MANAGEMENT_KUBECONFIG"
+_SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+_SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
 _CONTAINERD_DOCKER_IO_MIRROR_COMMANDS = [
     "mkdir -p /etc/containerd/certs.d/docker.io",
@@ -257,111 +260,105 @@ def _calico_values() -> dict[str, object]:
     }
 
 
-def _read_mgmt_secret(namespace: str, name: str) -> dict[str, Any] | None:
+def _management_kubeconfig() -> pulumi.Output[str]:
     if "KUBERNETES_SERVICE_HOST" in os.environ:
-        return _read_mgmt_secret_in_cluster(namespace, name)
-    return _read_mgmt_secret_with_kubectl(namespace, name)
+        return _management_kubeconfig_from_service_account()
 
-
-def _mgmt_json_request(
-    method: str,
-    path: str,
-    *,
-    body: object | None = None,
-    content_type: str = "application/json",
-) -> dict[str, Any] | None:
-    if "KUBERNETES_SERVICE_HOST" not in os.environ:
-        raise RuntimeError("KUBERNETES_SERVICE_HOST is not set")
-
-    host = os.environ["KUBERNETES_SERVICE_HOST"]
-    port = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
-    token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-    ca_path = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-    with open(token_path, encoding="ascii") as token_file:
-        token = token_file.read().strip()
-
-    data = json.dumps(body).encode("utf-8") if body is not None else None
-    request = urllib.request.Request(
-        f"https://{host}:{port}{path}",
-        data=data,
-        method=method,
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    if data is not None:
-        request.add_header("Content-Type", content_type)
-    context = ssl.create_default_context(cafile=ca_path)
-    try:
-        with urllib.request.urlopen(request, timeout=10, context=context) as response:
-            payload = response.read().decode("utf-8")
-            return json.loads(payload) if payload else {}
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            return None
-        raise
-
-
-def _read_mgmt_json_path(path: str) -> dict[str, Any] | None:
-    return _mgmt_json_request("GET", path)
-
-
-def _read_mgmt_secret_in_cluster(namespace: str, name: str) -> dict[str, Any] | None:
-    host = os.environ["KUBERNETES_SERVICE_HOST"]
-    port = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
-    token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-    ca_path = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-    with open(token_path, encoding="ascii") as token_file:
-        token = token_file.read().strip()
-
-    quoted_namespace = urllib.parse.quote(namespace, safe="")
-    quoted_name = urllib.parse.quote(name, safe="")
-    url = (
-        f"https://{host}:{port}/api/v1/namespaces/"
-        f"{quoted_namespace}/secrets/{quoted_name}"
-    )
-    request = urllib.request.Request(
-        url,
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    context = ssl.create_default_context(cafile=ca_path)
-    try:
-        with urllib.request.urlopen(request, timeout=10, context=context) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            return None
-        raise
-
-
-def _read_mgmt_secret_with_kubectl(namespace: str, name: str) -> dict[str, Any] | None:
-    result = subprocess.run(
-        ["kubectl", "-n", namespace, "get", "secret", name, "-o", "json"],
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    if result.returncode == 0:
-        return json.loads(result.stdout)
-    if "NotFound" in result.stderr:
-        return None
-    raise RuntimeError(result.stderr.strip() or result.stdout.strip())
-
-
-def _read_mgmt_endpoints(namespace: str, name: str) -> dict[str, Any] | None:
-    if "KUBERNETES_SERVICE_HOST" in os.environ:
-        quoted_namespace = urllib.parse.quote(namespace, safe="")
-        quoted_name = urllib.parse.quote(name, safe="")
-        return _read_mgmt_json_path(
-            f"/api/v1/namespaces/{quoted_namespace}/endpoints/{quoted_name}"
+    kubeconfig_path = os.environ.get(_MANAGEMENT_KUBECONFIG_ENV)
+    if not kubeconfig_path:
+        raise RuntimeError(
+            f"{_MANAGEMENT_KUBECONFIG_ENV} must point at the management "
+            "cluster kubeconfig when the workload stack is run outside a pod"
         )
 
-    result = subprocess.run(
-        ["kubectl", "-n", namespace, "get", "endpoints", name, "-o", "json"],
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+    kubeconfig_file = local.SensitiveFile.get(
+        "management-kubeconfig",
+        kubeconfig_path,
+        filename=kubeconfig_path,
     )
+    return pulumi.Output.secret(kubeconfig_file.content)
+
+
+def _management_kubeconfig_from_service_account() -> pulumi.Output[str]:
+    host = os.environ["KUBERNETES_SERVICE_HOST"]
+    port = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
+    server = f"https://{host}:{port}"
+    token_file = local.SensitiveFile.get(
+        "management-service-account-token",
+        _SERVICE_ACCOUNT_TOKEN_PATH,
+        filename=_SERVICE_ACCOUNT_TOKEN_PATH,
+    )
+    ca_file = local.File.get(
+        "management-service-account-ca",
+        _SERVICE_ACCOUNT_CA_PATH,
+        filename=_SERVICE_ACCOUNT_CA_PATH,
+    )
+
+    def build(args: list[str]) -> str:
+        token, ca = args
+        ca_data = base64.b64encode(ca.encode("utf-8")).decode("ascii")
+        return yaml.safe_dump(
+            {
+                "apiVersion": "v1",
+                "kind": "Config",
+                "clusters": [
+                    {
+                        "name": "management",
+                        "cluster": {
+                            "server": server,
+                            "certificate-authority-data": ca_data,
+                        },
+                    }
+                ],
+                "contexts": [
+                    {
+                        "name": "management",
+                        "context": {
+                            "cluster": "management",
+                            "user": "pulumi-runner",
+                        },
+                    }
+                ],
+                "current-context": "management",
+                "users": [
+                    {
+                        "name": "pulumi-runner",
+                        "user": {"token": token.strip()},
+                    }
+                ],
+            },
+            sort_keys=False,
+        )
+
+    return pulumi.Output.secret(
+        pulumi.Output.all(token_file.content, ca_file.content).apply(build)
+    )
+
+
+def _kubectl_get_json(
+    kubeconfig: str, resource: str, namespace: str, name: str
+) -> dict[str, Any] | None:
+    with tempfile.NamedTemporaryFile("w", delete=True) as kubeconfig_file:
+        kubeconfig_file.write(kubeconfig)
+        kubeconfig_file.flush()
+        result = subprocess.run(
+            [
+                "kubectl",
+                "--kubeconfig",
+                kubeconfig_file.name,
+                "-n",
+                namespace,
+                "get",
+                resource,
+                name,
+                "-o",
+                "json",
+            ],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
     if result.returncode == 0:
         return json.loads(result.stdout)
     if "NotFound" in result.stderr:
@@ -379,7 +376,7 @@ def _endpoints_ready(endpoints: dict[str, Any] | None) -> bool:
 
 
 def _wait_for_capi_webhooks(
-    services: list[dict[str, str]], timeout_seconds: int
+    kubeconfig: str, services: list[dict[str, str]], timeout_seconds: int
 ) -> None:
     deadline = time.monotonic() + timeout_seconds
     pending = services
@@ -388,7 +385,12 @@ def _wait_for_capi_webhooks(
             service
             for service in services
             if not _endpoints_ready(
-                _read_mgmt_endpoints(service["namespace"], service["name"])
+                _kubectl_get_json(
+                    kubeconfig,
+                    "endpoints",
+                    service["namespace"],
+                    service["name"],
+                )
             )
         ]
         if not pending:
@@ -401,28 +403,11 @@ def _wait_for_capi_webhooks(
         time.sleep(_CAPI_WEBHOOK_POLL_SECONDS)
 
 
-def _wait_for_secret_value(
-    *,
-    namespace: str,
-    name: str,
-    key: str,
-    timeout_seconds: int,
-) -> str:
-    deadline = time.monotonic() + timeout_seconds
-    while True:
-        secret = _read_mgmt_secret(namespace, name)
-        if secret is not None:
-            encoded_value = secret.get("data", {}).get(key)
-            if encoded_value:
-                kubeconfig = base64.b64decode(encoded_value).decode("utf-8")
-                _wait_for_workload_api(kubeconfig, deadline)
-                return kubeconfig
-
-        if time.monotonic() >= deadline:
-            raise TimeoutError(
-                f"timed out waiting for Secret {namespace}/{name} data[{key!r}]"
-            )
-        time.sleep(5)
+def _decode_secret_data_value(data: dict[str, str], key: str) -> str:
+    encoded_value = data.get(key)
+    if not encoded_value:
+        raise KeyError(f"Secret data[{key!r}] is missing")
+    return base64.b64decode(encoded_value).decode("utf-8")
 
 
 def _current_kubeconfig_cluster_and_user(
@@ -491,18 +476,11 @@ def _workload_api_endpoint_ready(
         return False
 
 
-class _KubeconfigSecretProvider(dynamic.ResourceProvider):
+class _WorkloadApiReadyProvider(dynamic.ResourceProvider):
     def create(self, props: dict[str, Any]) -> dynamic.CreateResult:
-        kubeconfig = _wait_for_secret_value(
-            namespace=props["namespace"],
-            name=props["secret_name"],
-            key=props["key"],
-            timeout_seconds=int(props["timeout_seconds"]),
-        )
-        return dynamic.CreateResult(
-            id_=f"{props['namespace']}/{props['secret_name']}",
-            outs={**props, "kubeconfig": kubeconfig},
-        )
+        deadline = time.monotonic() + int(props["timeout_seconds"])
+        _wait_for_workload_api(props["kubeconfig"], deadline)
+        return dynamic.CreateResult(id_=props["id"], outs=props)
 
     def diff(
         self,
@@ -511,61 +489,44 @@ class _KubeconfigSecretProvider(dynamic.ResourceProvider):
         news: dict[str, Any],
     ) -> dynamic.DiffResult:
         replaces = [
-            key
-            for key in ("namespace", "secret_name", "key")
-            if olds.get(key) != news.get(key)
+            key for key in ("id", "kubeconfig") if olds.get(key) != news.get(key)
         ]
         return dynamic.DiffResult(
             changes=bool(replaces),
             replaces=replaces,
-            delete_before_replace=True,
         )
 
     def read(self, id_: str, props: dict[str, Any]) -> dynamic.ReadResult:
-        kubeconfig = _wait_for_secret_value(
-            namespace=props["namespace"],
-            name=props["secret_name"],
-            key=props["key"],
-            timeout_seconds=int(props["timeout_seconds"]),
-        )
-        return dynamic.ReadResult(id_=id_, outs={**props, "kubeconfig": kubeconfig})
+        deadline = time.monotonic() + int(props["timeout_seconds"])
+        _wait_for_workload_api(props["kubeconfig"], deadline)
+        return dynamic.ReadResult(id_=id_, outs=props)
 
 
-class KubeconfigSecret(dynamic.Resource):
-    kubeconfig: pulumi.Output[str]
-
+class WorkloadApiReady(dynamic.Resource):
     def __init__(
         self,
         name: str,
         *,
-        namespace: pulumi.Input[str],
-        secret_name: pulumi.Input[str],
-        key: pulumi.Input[str] = _WORKLOAD_KUBECONFIG_SECRET_KEY,
+        kubeconfig: pulumi.Input[str],
         timeout_seconds: pulumi.Input[int] = _WORKLOAD_KUBECONFIG_TIMEOUT_SECONDS,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        opts = pulumi.ResourceOptions.merge(
-            opts,
-            pulumi.ResourceOptions(additional_secret_outputs=["kubeconfig"]),
-        )
         super().__init__(
-            _KubeconfigSecretProvider(),
+            _WorkloadApiReadyProvider(),
             name,
             {
-                "namespace": namespace,
-                "secret_name": secret_name,
-                "key": key,
+                "id": name,
                 "timeout_seconds": timeout_seconds,
-                "kubeconfig": None,
+                "kubeconfig": kubeconfig,
             },
             opts,
         )
-        self.kubeconfig = pulumi.Output.secret(self.kubeconfig)
 
 
 class _KubernetesServicesReadyProvider(dynamic.ResourceProvider):
     def create(self, props: dict[str, Any]) -> dynamic.CreateResult:
         _wait_for_capi_webhooks(
+            props["kubeconfig"],
             props["services"],
             int(props["timeout_seconds"]),
         )
@@ -579,7 +540,7 @@ class _KubernetesServicesReadyProvider(dynamic.ResourceProvider):
     ) -> dynamic.DiffResult:
         replaces = [
             key
-            for key in ("id", "services", "timeout_seconds")
+            for key in ("id", "kubeconfig", "services", "timeout_seconds")
             if olds.get(key) != news.get(key)
         ]
         return dynamic.DiffResult(changes=bool(replaces), replaces=replaces)
@@ -593,6 +554,7 @@ class KubernetesServicesReady(dynamic.Resource):
         self,
         name: str,
         *,
+        kubeconfig: pulumi.Input[str],
         services: pulumi.Input[list[dict[str, str]]],
         timeout_seconds: pulumi.Input[int] = _CAPI_WEBHOOK_TIMEOUT_SECONDS,
         opts: pulumi.ResourceOptions | None = None,
@@ -602,6 +564,7 @@ class KubernetesServicesReady(dynamic.Resource):
             name,
             {
                 "id": name,
+                "kubeconfig": kubeconfig,
                 "services": services,
                 "timeout_seconds": timeout_seconds,
             },
@@ -625,9 +588,15 @@ def run() -> None:
     """
     cluster_name = _resource_name(_TENANT, "workload")
     node_image = f"kindest/node:{_KUBERNETES_VERSION}"
+    management_kubeconfig = _management_kubeconfig()
+    management_provider = k8s.Provider(
+        "management-k8s",
+        kubeconfig=management_kubeconfig,
+    )
 
     capi_webhooks_ready = KubernetesServicesReady(
         "capi-webhooks-ready",
+        kubeconfig=management_kubeconfig,
         services=_CAPI_WEBHOOK_SERVICES,
     )
 
@@ -839,16 +808,31 @@ def run() -> None:
         )
         worker_health_checks.append(worker_health_check)
 
-    workload_kubeconfig = KubeconfigSecret(
-        "workload-kubeconfig",
-        namespace=_NAMESPACE,
-        secret_name=f"{cluster_name}-kubeconfig",
-        opts=pulumi.ResourceOptions(depends_on=[kubeadm_control_plane]),
+    workload_kubeconfig_secret = k8s.core.v1.Secret.get(
+        "workload-kubeconfig-secret",
+        id=f"{_NAMESPACE}/{cluster_name}-kubeconfig",
+        opts=pulumi.ResourceOptions(
+            provider=management_provider,
+            depends_on=[kubeadm_control_plane],
+        ),
+    )
+    workload_kubeconfig = pulumi.Output.secret(
+        workload_kubeconfig_secret.data.apply(
+            lambda data: _decode_secret_data_value(
+                data,
+                _WORKLOAD_KUBECONFIG_SECRET_KEY,
+            )
+        )
+    )
+    workload_api_ready = WorkloadApiReady(
+        "workload-api-ready",
+        kubeconfig=workload_kubeconfig,
+        opts=pulumi.ResourceOptions(depends_on=[workload_kubeconfig_secret]),
     )
     workload_provider = k8s.Provider(
         "workload-k8s",
-        kubeconfig=workload_kubeconfig.kubeconfig,
-        opts=pulumi.ResourceOptions(depends_on=[workload_kubeconfig]),
+        kubeconfig=workload_kubeconfig,
+        opts=pulumi.ResourceOptions(depends_on=[workload_api_ready]),
     )
 
     calico_namespace = k8s.core.v1.Namespace(
