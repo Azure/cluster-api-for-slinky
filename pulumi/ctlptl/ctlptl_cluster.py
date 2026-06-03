@@ -65,8 +65,8 @@ substitutes at apply/diff time:
   expands to a host-local filesystem path (used for ``hostPath`` mounts);
   the provider runs in the user's environment, so reading ``$HOME`` there
   is correct.
-* ``${DOCKER_IO_CERTS_DIR}`` → repository-local ``docker.io`` certs directory
-    mounted into kind nodes for containerd's Docker Hub mirror config.
+* ``${DOCKER_IO_HOSTS_TOML}`` → repository-local ``hosts.toml`` file mounted
+    into kind nodes for containerd's Docker Hub mirror config.
 
 * Inputs:
     - ``cluster_name``  : optional explicit ctlptl ``Cluster.name`` value.
@@ -139,9 +139,7 @@ from pulumi.dynamic import (
 )
 
 _RESOURCE_TYPE = "ca4s:local:CtlptlCluster"
-_DOCKER_IO_CERTS_DIR = (
-    Path(__file__).resolve().parent / "containerd-certs.d" / "docker.io"
-)
+_DOCKER_IO_HOSTS_TOML = Path(__file__).resolve().parent / "hosts.toml"
 
 # ---------------------------------------------------------------------------
 # Vendored ctlptl manifest.
@@ -169,8 +167,8 @@ kindV1Alpha4Cluster:
     extraMounts:
     # Docker Hub mirror for in-cluster pod pulls. Host Docker still handles the
     # node image pull before these containers exist.
-    - hostPath: ${DOCKER_IO_CERTS_DIR}
-      containerPath: /etc/containerd/certs.d/docker.io
+    - hostPath: ${DOCKER_IO_HOSTS_TOML}
+      containerPath: /etc/containerd/certs.d/docker.io/hosts.toml
       readOnly: true
     # required by CAPD
     - hostPath: /var/run/docker.sock
@@ -180,8 +178,8 @@ kindV1Alpha4Cluster:
     extraMounts:
     # Docker Hub mirror for in-cluster pod pulls. Host Docker still handles the
     # node image pull before these containers exist.
-    - hostPath: ${DOCKER_IO_CERTS_DIR}
-      containerPath: /etc/containerd/certs.d/docker.io
+    - hostPath: ${DOCKER_IO_HOSTS_TOML}
+      containerPath: /etc/containerd/certs.d/docker.io/hosts.toml
       readOnly: true
     # Exposes the host kubeconfig to in-cluster consumers via hostPath /root/.kube:
     #   - AWX / ansible-runner (mounted at /runner/.kube, see awx.yaml, pod-spec-override.yaml)
@@ -271,18 +269,19 @@ def _render(cluster_name: str, registry_name: Optional[str] = None) -> str:
             "HOME environment variable is not set; required for ctlptl manifest "
             "${HOME} substitution (hostPath mount of ~/.kube into the worker)"
         )
-    docker_io_hosts_toml = _DOCKER_IO_CERTS_DIR / "hosts.toml"
-    if not docker_io_hosts_toml.is_file():
+    if not _DOCKER_IO_HOSTS_TOML.is_file():
         raise RuntimeError(
             "missing Docker Hub containerd mirror config at "
-            f"{docker_io_hosts_toml}"
+            f"{_DOCKER_IO_HOSTS_TOML}"
         )
     rendered = _MANIFEST_TEMPLATE
     rendered = rendered.replace("${CLUSTER_NAME}", cluster_name)
     if registry_name:
         rendered = rendered.replace("${REGISTRY_NAME}", registry_name)
     rendered = rendered.replace("${HOME}", home)
-    rendered = rendered.replace("${DOCKER_IO_CERTS_DIR}", str(_DOCKER_IO_CERTS_DIR))
+    rendered = rendered.replace(
+        "${DOCKER_IO_HOSTS_TOML}", str(_DOCKER_IO_HOSTS_TOML)
+    )
     return rendered
 
 
