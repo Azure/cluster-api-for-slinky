@@ -8,11 +8,9 @@ is ``local-example``. Produces, for that env/tenant pair:
     ``MachineDeployment`` resources. CAPI then provisions the tenant's
     workload k8s cluster on the docker infrastructure provider.
 2. On the resulting workload cluster (via a second k8s provider built
-   from the ``${cluster}-kubeconfig`` Secret CAPI publishes on mgmt):
-   ``slurm-operator-crds`` + ``slurm-operator`` + the Slurm chart +
-   per-tenant ``NodeSet``s (mirroring ``slurm-cluster.yaml`` /
-   ``slurm-operator-values.yaml``). This is where the Slinky CRDs
-   actually live — NOT on the management cluster.
+   from the ``${cluster}-kubeconfig`` Secret CAPI publishes on the management
+   cluster): Calico. Slinky CRDs, ``slurm-operator``, the Slurm chart, and
+   per-tenant ``NodeSet``s belong here too, but are still TODO.
 
 State backend
 -------------
@@ -441,16 +439,15 @@ class WorkloadApiReady(dynamic.Resource):
 def run() -> None:
     """Build the local/example workload-cluster resource graph.
 
-    This first CAPI pass creates only the management-cluster side: a local
-    CAPD ``Cluster`` plus explicit control-plane and worker resources: one
-    Slurm head node and one compute node group.
-    It intentionally does not add the old SSH ``preKubeadmCommands`` from
-    ``capi-quickstart.yaml``.
+    The management-cluster side declares a local CAPD ``Cluster`` plus
+    explicit control-plane and worker resources: one Slurm head node and one
+    compute node group. Once CAPI publishes the workload kubeconfig Secret,
+    the workload-cluster side installs Calico.
 
     Still TODO for this tenant:
-        * Workload-cluster side: install ``slurm-operator-crds`` +
-          ``slurm-operator`` (mirroring ``slurm-operator-values.yaml``)
-          + the Slurm chart + NodeSets (mirroring ``slurm-cluster.yaml``).
+        * Install ``slurm-operator-crds`` + ``slurm-operator`` (mirroring
+          ``slurm-operator-values.yaml``) + the Slurm chart + NodeSets
+          (mirroring ``slurm-cluster.yaml``) on the workload cluster.
     """
     cluster_name = _resource_name(_TENANT, "workload")
     node_image = f"kindest/node:{_KUBERNETES_VERSION}"

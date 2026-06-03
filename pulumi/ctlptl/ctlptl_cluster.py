@@ -8,9 +8,9 @@ Design notes
   which is why ctlptl's ``Cluster.name`` for product=kind must start with
   ``kind-`` too).
 * The cluster is wired to a separately-managed ``CtlptlRegistry`` via the
-  ``registry: <name>`` field in the Cluster spec. The caller is responsible
-  for declaring a ``depends_on`` edge so the registry exists before the
-  cluster is applied (and survives until after the cluster is deleted).
+  ``registry: <name>`` field in the Cluster spec. Passing the registry's
+  ``registry_name`` output into this resource gives Pulumi the dependency
+  edge, so the registry is created first and deleted last.
 
 Auto-naming
 -----------
@@ -51,7 +51,7 @@ The ctlptl manifest is vendored into this module as ``_MANIFEST_TEMPLATE``
 you need to tweak the kind config, edit the template constant below.
 
 The template contains four shell-style placeholders that the provider
-substitutes at apply/diff time:
+substitutes when rendering the manifest:
 
 * ``${CLUSTER_NAME}`` → the autonamed or pinned ``cluster_name``. Must be
   expanded inside the provider because the autonamed value only exists
