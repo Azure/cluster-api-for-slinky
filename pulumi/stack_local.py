@@ -195,10 +195,10 @@ def run() -> None:
     #                                       per-env ``Tenants`` component.
     #
     # ``PKOBootstrap`` creates the control-plane Stack CR plus the
-    # per-tenant workload-cluster Stack CRs (one per entry in the
-    # per-env concrete tenants class, e.g. ``TenantsLocal``). Tenant
-    # churn is a single-line edit to ``pko/_tenants_<env>.py`` + a
-    # ``pulumi up`` on this outer stack.
+    # per-tenant workload-cluster Stack CRs (one per discovered tenant
+    # module, e.g. ``workload_cluster_local_example.py``). Tenant churn
+    # is adding/removing one workload-cluster tenant module + a ``pulumi up``
+    # on this outer stack.
     #
     # Per-env dispatch in every inner program follows the same
     # ``__main__.py`` -> ``<project>_<env>.py`` trick this outer file
