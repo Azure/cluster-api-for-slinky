@@ -252,11 +252,7 @@ def _management_kubeconfig() -> pulumi.Output[str]:
             "cluster kubeconfig when the workload stack is run outside a pod"
         )
 
-    kubeconfig_file = local.SensitiveFile.get(
-        "management-kubeconfig",
-        kubeconfig_path,
-        filename=kubeconfig_path,
-    )
+    kubeconfig_file = local.get_sensitive_file_output(filename=kubeconfig_path)
     return pulumi.Output.secret(kubeconfig_file.content)
 
 
@@ -264,16 +260,8 @@ def _management_kubeconfig_from_service_account() -> pulumi.Output[str]:
     host = os.environ["KUBERNETES_SERVICE_HOST"]
     port = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
     server = f"https://{host}:{port}"
-    token_file = local.SensitiveFile.get(
-        "management-service-account-token",
-        _SERVICE_ACCOUNT_TOKEN_PATH,
-        filename=_SERVICE_ACCOUNT_TOKEN_PATH,
-    )
-    ca_file = local.File.get(
-        "management-service-account-ca",
-        _SERVICE_ACCOUNT_CA_PATH,
-        filename=_SERVICE_ACCOUNT_CA_PATH,
-    )
+    token_file = local.get_sensitive_file_output(filename=_SERVICE_ACCOUNT_TOKEN_PATH)
+    ca_file = local.get_file_output(filename=_SERVICE_ACCOUNT_CA_PATH)
 
     def build(args: list[str]) -> str:
         token, ca = args
