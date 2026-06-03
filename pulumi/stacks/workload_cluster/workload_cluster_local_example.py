@@ -59,6 +59,23 @@ _CALICO_CHART_VERSION = "v3.30.3"
 _CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
 _WORKLOAD_KUBECONFIG_TIMEOUT_SECONDS = 30 * 60
+_CAPI_WEBHOOK_TIMEOUT_SECONDS = 10 * 60
+_CAPI_WEBHOOK_POLL_SECONDS = 5
+_CAPI_WEBHOOK_SERVICES = [
+    {"namespace": "capi-system", "name": "capi-webhook-service"},
+    {
+        "namespace": "kubeadm-bootstrap-system",
+        "name": "capi-kubeadm-bootstrap-webhook-service",
+    },
+    {
+        "namespace": "kubeadm-control-plane-system",
+        "name": "capi-kubeadm-control-plane-webhook-service",
+    },
+    {
+        "namespace": "docker-infrastructure-system",
+        "name": "capd-webhook-service",
+    },
+]
 
 _NODE_TYPE_LABEL = "slinky.slurm.net/node-type"
 _CONTROLLER_NODE_TYPE = "controller"
@@ -107,6 +124,8 @@ def _kubelet_extra_args() -> list[dict[str, str]]:
 def _docker_machine_template(
     name: str,
     resource_name: str,
+    *,
+    opts: pulumi.ResourceOptions | None = None,
 ) -> k8s.apiextensions.CustomResource:
     return k8s.apiextensions.CustomResource(
         resource_name,
@@ -125,6 +144,7 @@ def _docker_machine_template(
                 },
             },
         },
+        opts=opts,
     )
 
 
@@ -133,6 +153,7 @@ def _kubeadm_config_template(
     resource_name: str,
     *,
     controller: bool = False,
+    opts: pulumi.ResourceOptions | None = None,
 ) -> k8s.apiextensions.CustomResource:
     node_registration: dict[str, object] = {
         "kubeletExtraArgs": _kubelet_extra_args(),
@@ -156,6 +177,7 @@ def _kubeadm_config_template(
                 },
             },
         },
+        opts=opts,
     )
 
 
@@ -186,6 +208,31 @@ def _read_mgmt_secret(namespace: str, name: str) -> dict[str, Any] | None:
     if "KUBERNETES_SERVICE_HOST" in os.environ:
         return _read_mgmt_secret_in_cluster(namespace, name)
     return _read_mgmt_secret_with_kubectl(namespace, name)
+
+
+def _read_mgmt_json_path(path: str) -> dict[str, Any] | None:
+    if "KUBERNETES_SERVICE_HOST" not in os.environ:
+        raise RuntimeError("KUBERNETES_SERVICE_HOST is not set")
+
+    host = os.environ["KUBERNETES_SERVICE_HOST"]
+    port = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
+    token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    ca_path = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    with open(token_path, encoding="ascii") as token_file:
+        token = token_file.read().strip()
+
+    request = urllib.request.Request(
+        f"https://{host}:{port}{path}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    context = ssl.create_default_context(cafile=ca_path)
+    try:
+        with urllib.request.urlopen(request, timeout=10, context=context) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return None
+        raise
 
 
 def _read_mgmt_secret_in_cluster(namespace: str, name: str) -> dict[str, Any] | None:
@@ -229,6 +276,60 @@ def _read_mgmt_secret_with_kubectl(namespace: str, name: str) -> dict[str, Any] 
     if "NotFound" in result.stderr:
         return None
     raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+
+
+def _read_mgmt_endpoints(namespace: str, name: str) -> dict[str, Any] | None:
+    if "KUBERNETES_SERVICE_HOST" in os.environ:
+        quoted_namespace = urllib.parse.quote(namespace, safe="")
+        quoted_name = urllib.parse.quote(name, safe="")
+        return _read_mgmt_json_path(
+            f"/api/v1/namespaces/{quoted_namespace}/endpoints/{quoted_name}"
+        )
+
+    result = subprocess.run(
+        ["kubectl", "-n", namespace, "get", "endpoints", name, "-o", "json"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode == 0:
+        return json.loads(result.stdout)
+    if "NotFound" in result.stderr:
+        return None
+    raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+
+
+def _endpoints_ready(endpoints: dict[str, Any] | None) -> bool:
+    if endpoints is None:
+        return False
+    for subset in endpoints.get("subsets", []):
+        if subset.get("addresses") and subset.get("ports"):
+            return True
+    return False
+
+
+def _wait_for_capi_webhooks(
+    services: list[dict[str, str]], timeout_seconds: int
+) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    pending = services
+    while True:
+        pending = [
+            service
+            for service in services
+            if not _endpoints_ready(
+                _read_mgmt_endpoints(service["namespace"], service["name"])
+            )
+        ]
+        if not pending:
+            return
+        if time.monotonic() >= deadline:
+            names = ", ".join(
+                f"{service['namespace']}/{service['name']}" for service in pending
+            )
+            raise TimeoutError(f"timed out waiting for CAPI webhooks: {names}")
+        time.sleep(_CAPI_WEBHOOK_POLL_SECONDS)
 
 
 def _wait_for_secret_value(
@@ -325,6 +426,52 @@ class KubeconfigSecret(dynamic.Resource):
         self.kubeconfig = pulumi.Output.secret(self.kubeconfig)
 
 
+class _KubernetesServicesReadyProvider(dynamic.ResourceProvider):
+    def create(self, props: dict[str, Any]) -> dynamic.CreateResult:
+        _wait_for_capi_webhooks(
+            props["services"],
+            int(props["timeout_seconds"]),
+        )
+        return dynamic.CreateResult(id_=props["id"], outs=props)
+
+    def diff(
+        self,
+        id_: str,
+        olds: dict[str, Any],
+        news: dict[str, Any],
+    ) -> dynamic.DiffResult:
+        replaces = [
+            key
+            for key in ("id", "services", "timeout_seconds")
+            if olds.get(key) != news.get(key)
+        ]
+        return dynamic.DiffResult(changes=bool(replaces), replaces=replaces)
+
+    def read(self, id_: str, props: dict[str, Any]) -> dynamic.ReadResult:
+        return dynamic.ReadResult(id_=id_, outs=props)
+
+
+class KubernetesServicesReady(dynamic.Resource):
+    def __init__(
+        self,
+        name: str,
+        *,
+        services: pulumi.Input[list[dict[str, str]]],
+        timeout_seconds: pulumi.Input[int] = _CAPI_WEBHOOK_TIMEOUT_SECONDS,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            _KubernetesServicesReadyProvider(),
+            name,
+            {
+                "id": name,
+                "services": services,
+                "timeout_seconds": timeout_seconds,
+            },
+            opts,
+        )
+
+
 def run() -> None:
     """Build the local/example workload-cluster resource graph.
 
@@ -342,6 +489,11 @@ def run() -> None:
     cluster_name = _resource_name(_TENANT, "workload")
     cluster_class_name = _resource_name(_TENANT, "capd")
 
+    capi_webhooks_ready = KubernetesServicesReady(
+        "capi-webhooks-ready",
+        services=_CAPI_WEBHOOK_SERVICES,
+    )
+
     docker_cluster_template_name = _resource_name(_TENANT, "docker-cluster")
     control_plane_template_name = _resource_name(_TENANT, "control-plane")
     head_machine_template_name = _resource_name(_TENANT, "head-machine")
@@ -355,6 +507,7 @@ def run() -> None:
         kind="DockerClusterTemplate",
         metadata={"name": docker_cluster_template_name, "namespace": _NAMESPACE},
         spec={"template": {"spec": {}}},
+        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
     )
 
     control_plane_template = k8s.apiextensions.CustomResource(
@@ -390,28 +543,34 @@ def run() -> None:
                 },
             },
         },
+        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
     )
 
     control_plane_machine_template = _docker_machine_template(
         control_plane_template_name,
         "cluster-control-plane-machine-template",
+        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
     )
     head_machine_template = _docker_machine_template(
         head_machine_template_name,
         "cluster-head-machine-template",
+        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
     )
     compute_machine_template = _docker_machine_template(
         compute_machine_template_name,
         "cluster-compute-machine-template",
+        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
     )
     head_bootstrap_template = _kubeadm_config_template(
         head_bootstrap_template_name,
         "cluster-head-bootstrap-template",
         controller=True,
+        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
     )
     compute_bootstrap_template = _kubeadm_config_template(
         compute_bootstrap_template_name,
         "cluster-compute-bootstrap-template",
+        opts=pulumi.ResourceOptions(depends_on=[capi_webhooks_ready]),
     )
 
     cluster_class = k8s.apiextensions.CustomResource(
