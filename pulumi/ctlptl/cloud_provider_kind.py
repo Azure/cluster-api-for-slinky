@@ -86,6 +86,7 @@ cloudpickled provider in stack state round-trips cleanly.
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import shutil
@@ -113,6 +114,7 @@ from pulumi.dynamic import (
 # Linux truncates /proc/<pid>/comm to TASK_COMM_LEN-1 = 15 chars.
 _COMM_MAX = 15
 _EXPECTED_COMM = "cloud-provider-kind"[:_COMM_MAX]
+_DOCKER_HUB_MIRROR = "https://mirror.gcr.io"
 
 
 def _require_binary(name: str) -> str:
@@ -124,6 +126,34 @@ def _require_binary(name: str) -> str:
             "(needs Go) and ensure $GOPATH/bin is on PATH."
         )
     return path
+
+
+def _docker_registry_mirrors() -> Optional[list[str]]:
+    docker = shutil.which("docker")
+    if docker is None:
+        return None
+    try:
+        result = subprocess.run(  # noqa: S603 — docker path resolved above
+            [
+                docker,
+                "info",
+                "--format",
+                "{{json .RegistryConfig.Mirrors}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        mirrors = json.loads(result.stdout or "[]")
+    except json.JSONDecodeError:
+        return None
+    return mirrors if isinstance(mirrors, list) else None
 
 
 def _is_pid_alive(pid: int, check_comm: bool = True) -> bool:
@@ -290,6 +320,16 @@ class _CloudProviderKindProvider(ResourceProvider):
                 "and the LB EXTERNAL-IP is reachable without any caps. "
                 "If you ever need to enable bridge-IP mode on a split-"
                 f"namespace setup, grant them with: {_setcap_command(binary)}"
+            )
+
+        mirrors = _docker_registry_mirrors()
+        if mirrors is not None and _DOCKER_HUB_MIRROR not in mirrors:
+            log.warn(
+                "cloud-provider-kind pulls its LoadBalancer proxy image "
+                "(docker.io/envoyproxy/envoy:v1.33.2) from the host Docker "
+                "daemon. Configure the host Docker daemon with a Docker Hub "
+                f"registry mirror such as {_DOCKER_HUB_MIRROR} to avoid Docker "
+                "Hub rate limits for those opaque pulls."
             )
 
         # Log file lives next to Pulumi state. The cwd at create-time is the

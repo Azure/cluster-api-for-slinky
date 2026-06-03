@@ -50,11 +50,6 @@ _ORG_PLACEHOLDER = "organization"
 # this constant is the single place to update.
 _WORKSPACE_CONTAINER = "pulumi"
 
-# Avoid Docker Hub's anonymous pull limits for every PKO workspace pod. Pulumi
-# publishes this image to ECR Public as well as Docker Hub.
-_WORKSPACE_IMAGE = "public.ecr.aws/pulumi/pulumi:latest-nonroot"
-_WORKSPACE_IMAGE_PULL_POLICY = "IfNotPresent"
-
 # Default init container name PKO injects to do the ``git clone`` of
 # the inner project repo. The strategic merge by ``name`` targets it
 # so we can mount known_hosts + set ``SSH_KNOWN_HOSTS`` there too;
@@ -240,8 +235,6 @@ def build_stack_spec(
     }
     workspace_template = {
         "spec": {
-            "image": _WORKSPACE_IMAGE,
-            "imagePullPolicy": _WORKSPACE_IMAGE_PULL_POLICY,
             "podTemplate": {
                 "spec": {
                     "initContainers": [

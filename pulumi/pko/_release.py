@@ -36,13 +36,6 @@ from pulumi import ResourceOptions
 PKO_CHART_OCI = "oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator"
 PKO_CHART_VERSION = "2.3.0"
 
-# Pulumi publishes the v2.x operator image on Docker Hub as of v2.3.0. Keep the
-# registry/repository explicit so local stacks can point this at an ECR/private
-# mirror without changing the chart wiring. The workspace image is independent
-# and is overridden in :mod:`pko._stack_cr` to ECR Public.
-PKO_OPERATOR_IMAGE_REGISTRY = "docker.io"
-PKO_OPERATOR_IMAGE_REPOSITORY = "pulumi/pulumi-kubernetes-operator"
-
 # The conventional namespace for PKO. We don't make this configurable —
 # downstream Stack CRs are pinned to land in the same namespace by the
 # component and there is no real use case for renaming it.
@@ -105,12 +98,6 @@ class PKORelease(pulumi.ComponentResource):
             wait_for_jobs=True,
             timeout=600,
             values={
-                "image": {
-                    "registry": PKO_OPERATOR_IMAGE_REGISTRY,
-                    "repository": PKO_OPERATOR_IMAGE_REPOSITORY,
-                    "tag": PKO_CHART_VERSION,
-                    "pullPolicy": "IfNotPresent",
-                },
                 "extraVolumes": [
                     {
                         "name": _KNOWN_HOSTS_VOLUME_NAME,

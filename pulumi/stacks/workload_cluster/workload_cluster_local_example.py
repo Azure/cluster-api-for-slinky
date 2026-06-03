@@ -93,6 +93,12 @@ _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 _SKIP_AWAIT_ANNOTATION = "pulumi.com/skipAwait"
 
+_CONTAINERD_DOCKER_IO_MIRROR_COMMANDS = [
+    "mkdir -p /etc/containerd/certs.d/docker.io",
+    "cat >/etc/containerd/certs.d/docker.io/hosts.toml <<'EOF'\nserver = \"https://registry-1.docker.io\"\n\n[host.\"https://mirror.gcr.io\"]\n  capabilities = [\"pull\", \"resolve\"]\nEOF",
+    "systemctl restart containerd",
+]
+
 
 def _resource_name(tenant: str, suffix: str) -> str:
     normalized = _DNS_LABEL_INVALID_CHARS.sub("-", tenant.lower()).strip("-")
@@ -121,6 +127,17 @@ def _kubelet_extra_args() -> list[dict[str, str]]:
             "value": "nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%",
         }
     ]
+
+
+def _node_registration(controller: bool = False) -> dict[str, object]:
+    node_registration: dict[str, object] = {
+        "kubeletExtraArgs": _kubelet_extra_args(),
+    }
+    if controller:
+        node_registration["taints"] = [
+            {"key": "slinky.slurm.net/controller", "effect": "NoSchedule"}
+        ]
+    return node_registration
 
 
 def _docker_machine_template(
@@ -157,14 +174,6 @@ def _kubeadm_config_template(
     controller: bool = False,
     opts: pulumi.ResourceOptions | None = None,
 ) -> k8s.apiextensions.CustomResource:
-    node_registration: dict[str, object] = {
-        "kubeletExtraArgs": _kubelet_extra_args(),
-    }
-    if controller:
-        node_registration["taints"] = [
-            {"key": "slinky.slurm.net/controller", "effect": "NoSchedule"}
-        ]
-
     return k8s.apiextensions.CustomResource(
         resource_name,
         api_version=_BOOTSTRAP_API_VERSION,
@@ -173,8 +182,9 @@ def _kubeadm_config_template(
         spec={
             "template": {
                 "spec": {
+                    "preKubeadmCommands": _CONTAINERD_DOCKER_IO_MIRROR_COMMANDS,
                     "joinConfiguration": {
-                        "nodeRegistration": node_registration,
+                        "nodeRegistration": _node_registration(controller),
                     },
                 },
             },
@@ -616,15 +626,12 @@ def run() -> None:
                             },
                         },
                         "initConfiguration": {
-                            "nodeRegistration": {
-                                "kubeletExtraArgs": _kubelet_extra_args(),
-                            },
+                            "nodeRegistration": _node_registration(),
                         },
                         "joinConfiguration": {
-                            "nodeRegistration": {
-                                "kubeletExtraArgs": _kubelet_extra_args(),
-                            },
+                            "nodeRegistration": _node_registration(),
                         },
+                        "preKubeadmCommands": _CONTAINERD_DOCKER_IO_MIRROR_COMMANDS,
                     },
                 },
             },
