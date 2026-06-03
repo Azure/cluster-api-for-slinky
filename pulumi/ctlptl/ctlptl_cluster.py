@@ -172,7 +172,7 @@ kindV1Alpha4Cluster:
     - hostPath: /var/run/docker.sock
       containerPath: /var/run/docker.sock
   - role: worker
-    image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309614e8ec94d976dc5a
+    image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
     extraMounts:
     # Exposes the host kubeconfig to in-cluster consumers via hostPath /root/.kube:
     #   - AWX / ansible-runner (mounted at /runner/.kube, see awx.yaml, pod-spec-override.yaml)
