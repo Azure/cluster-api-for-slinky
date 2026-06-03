@@ -47,12 +47,10 @@ Diff semantics for ``cluster_name``
 Manifest
 --------
 The ctlptl manifest is vendored into this module as ``_MANIFEST_TEMPLATE``
-— callers no longer pass it in. This keeps the Pulumi program self-contained
-(no repo-relative file reads from inside Pulumi). Customizability is
-explicitly deferred; if you need to tweak the kind config, edit the
-template constant below.
+— callers no longer pass it in. Customizability is explicitly deferred; if
+you need to tweak the kind config, edit the template constant below.
 
-The template contains three shell-style placeholders that the provider
+The template contains four shell-style placeholders that the provider
 substitutes at apply/diff time:
 
 * ``${CLUSTER_NAME}`` → the autonamed or pinned ``cluster_name``. Must be
@@ -67,8 +65,8 @@ substitutes at apply/diff time:
   expands to a host-local filesystem path (used for ``hostPath`` mounts);
   the provider runs in the user's environment, so reading ``$HOME`` there
   is correct.
-* ``${DOCKER_IO_CERTS_DIR}`` → host-side ``docker.io`` certs directory generated
-    by the provider for containerd's Docker Hub mirror config.
+* ``${DOCKER_IO_CERTS_DIR}`` → repository-local ``docker.io`` certs directory
+    mounted into kind nodes for containerd's Docker Hub mirror config.
 
 * Inputs:
     - ``cluster_name``  : optional explicit ctlptl ``Cluster.name`` value.
@@ -141,20 +139,16 @@ from pulumi.dynamic import (
 )
 
 _RESOURCE_TYPE = "ca4s:local:CtlptlCluster"
-_DOCKER_IO_HOSTS_TOML = """\
-server = "https://registry-1.docker.io"
-
-[host."https://mirror.gcr.io"]
-  capabilities = ["pull", "resolve"]
-"""
+_DOCKER_IO_CERTS_DIR = (
+    Path(__file__).resolve().parent / "containerd-certs.d" / "docker.io"
+)
 
 # ---------------------------------------------------------------------------
 # Vendored ctlptl manifest.
 #
-# Kept in source so the Pulumi stack has no repo-relative file dependencies.
+# Kept in source so the Pulumi stack does not need a separate manifest file.
 # Customizability is deferred; edit this constant directly to change the kind
-# topology. Placeholders ``${HOME}`` / ``${CLUSTER_NAME}`` / ``${REGISTRY_NAME}``
-# are substituted by ``_render()``.
+# topology. Placeholders are substituted by ``_render()``.
 # ---------------------------------------------------------------------------
 
 _MANIFEST_TEMPLATE = """\
@@ -277,16 +271,18 @@ def _render(cluster_name: str, registry_name: Optional[str] = None) -> str:
             "HOME environment variable is not set; required for ctlptl manifest "
             "${HOME} substitution (hostPath mount of ~/.kube into the worker)"
         )
-    docker_io_certs_dir = Path(".state/containerd-certs.d/docker.io").resolve()
-    docker_io_certs_dir.mkdir(parents=True, exist_ok=True)
-    docker_io_hosts_toml = docker_io_certs_dir / "hosts.toml"
-    docker_io_hosts_toml.write_text(_DOCKER_IO_HOSTS_TOML, encoding="utf-8")
+    docker_io_hosts_toml = _DOCKER_IO_CERTS_DIR / "hosts.toml"
+    if not docker_io_hosts_toml.is_file():
+        raise RuntimeError(
+            "missing Docker Hub containerd mirror config at "
+            f"{docker_io_hosts_toml}"
+        )
     rendered = _MANIFEST_TEMPLATE
     rendered = rendered.replace("${CLUSTER_NAME}", cluster_name)
     if registry_name:
         rendered = rendered.replace("${REGISTRY_NAME}", registry_name)
     rendered = rendered.replace("${HOME}", home)
-    rendered = rendered.replace("${DOCKER_IO_CERTS_DIR}", str(docker_io_certs_dir))
+    rendered = rendered.replace("${DOCKER_IO_CERTS_DIR}", str(_DOCKER_IO_CERTS_DIR))
     return rendered
 
 
