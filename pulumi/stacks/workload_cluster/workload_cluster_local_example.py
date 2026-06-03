@@ -74,7 +74,6 @@ _AUTOSCALER_MAX_ANNOTATION = (
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
-_MANAGEMENT_KUBECONFIG_ENV = "CA4S_MANAGEMENT_KUBECONFIG"
 _SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
@@ -241,67 +240,82 @@ def _calico_values() -> dict[str, object]:
     }
 
 
-def _management_kubeconfig() -> pulumi.Output[str]:
-    if "KUBERNETES_SERVICE_HOST" in os.environ:
-        return _management_kubeconfig_from_service_account()
+class ManagementKubeconfig(pulumi.ComponentResource):
+    kubeconfig: pulumi.Output[str]
 
-    kubeconfig_path = os.environ.get(_MANAGEMENT_KUBECONFIG_ENV)
-    if not kubeconfig_path:
-        raise RuntimeError(
-            f"{_MANAGEMENT_KUBECONFIG_ENV} must point at the management "
-            "cluster kubeconfig when the workload stack is run outside a pod"
+    def __init__(
+        self,
+        name: str,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            "ca4s:workload:ManagementKubeconfig",
+            name,
+            props={},
+            opts=opts,
         )
 
-    kubeconfig_file = local.get_sensitive_file_output(filename=kubeconfig_path)
-    return pulumi.Output.secret(kubeconfig_file.content)
+        self.kubeconfig = self._from_service_account()
 
+        self.register_outputs({"kubeconfig": self.kubeconfig})
 
-def _management_kubeconfig_from_service_account() -> pulumi.Output[str]:
-    host = os.environ["KUBERNETES_SERVICE_HOST"]
-    port = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
-    server = f"https://{host}:{port}"
-    token_file = local.get_sensitive_file_output(filename=_SERVICE_ACCOUNT_TOKEN_PATH)
-    ca_file = local.get_file_output(filename=_SERVICE_ACCOUNT_CA_PATH)
+    def _from_service_account(self) -> pulumi.Output[str]:
+        if "KUBERNETES_SERVICE_HOST" not in os.environ:
+            raise RuntimeError(
+                "workload-cluster stacks must run inside the PKO workspace pod"
+            )
 
-    def build(args: list[str]) -> str:
-        token, ca = args
-        ca_data = base64.b64encode(ca.encode("utf-8")).decode("ascii")
-        return yaml.safe_dump(
-            {
-                "apiVersion": "v1",
-                "kind": "Config",
-                "clusters": [
-                    {
-                        "name": "management",
-                        "cluster": {
-                            "server": server,
-                            "certificate-authority-data": ca_data,
-                        },
-                    }
-                ],
-                "contexts": [
-                    {
-                        "name": "management",
-                        "context": {
-                            "cluster": "management",
-                            "user": "pulumi-runner",
-                        },
-                    }
-                ],
-                "current-context": "management",
-                "users": [
-                    {
-                        "name": "pulumi-runner",
-                        "user": {"token": token.strip()},
-                    }
-                ],
-            },
-            sort_keys=False,
+        host = os.environ["KUBERNETES_SERVICE_HOST"]
+        port = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
+        server = f"https://{host}:{port}"
+        token_file = local.get_sensitive_file_output(
+            filename=_SERVICE_ACCOUNT_TOKEN_PATH,
+            opts=pulumi.InvokeOutputOptions(parent=self),
+        )
+        ca_file = local.get_file_output(
+            filename=_SERVICE_ACCOUNT_CA_PATH,
+            opts=pulumi.InvokeOutputOptions(parent=self),
         )
 
-    return pulumi.Output.secret(
-        pulumi.Output.all(token_file.content, ca_file.content).apply(build)
-    )
+        def build(args: list[str]) -> str:
+            token, ca = args
+            ca_data = base64.b64encode(ca.encode("utf-8")).decode("ascii")
+            return yaml.safe_dump(
+                {
+                    "apiVersion": "v1",
+                    "kind": "Config",
+                    "clusters": [
+                        {
+                            "name": "management",
+                            "cluster": {
+                                "server": server,
+                                "certificate-authority-data": ca_data,
+                            },
+                        }
+                    ],
+                    "contexts": [
+                        {
+                            "name": "management",
+                            "context": {
+                                "cluster": "management",
+                                "user": "pulumi-runner",
+                            },
+                        }
+                    ],
+                    "current-context": "management",
+                    "users": [
+                        {
+                            "name": "pulumi-runner",
+                            "user": {"token": token.strip()},
+                        }
+                    ],
+                },
+                sort_keys=False,
+            )
+
+        return pulumi.Output.secret(
+            pulumi.Output.all(token_file.content, ca_file.content).apply(build)
+        )
 
 
 def _decode_secret_data_value(data: dict[str, str], key: str) -> str:
@@ -440,10 +454,11 @@ def run() -> None:
     """
     cluster_name = _resource_name(_TENANT, "workload")
     node_image = f"kindest/node:{_KUBERNETES_VERSION}"
-    management_kubeconfig = _management_kubeconfig()
+    management_kubeconfig = ManagementKubeconfig("management-kubeconfig")
     management_provider = k8s.Provider(
         "management-k8s",
-        kubeconfig=management_kubeconfig,
+        kubeconfig=management_kubeconfig.kubeconfig,
+        opts=pulumi.ResourceOptions(depends_on=[management_kubeconfig]),
     )
 
     control_plane_template_name = _resource_name(_TENANT, "control-plane")
