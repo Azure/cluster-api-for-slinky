@@ -10,6 +10,10 @@ pulumi>=3.0,<4.0
 pulumi-kubernetes>=4.0,<5.0
 pulumi-random>=4.0,<5.0
 
+# Generated Pulumi local-provider SDK used by the workload-cluster inner stack
+# to build an explicit management-cluster provider from projected kubeconfig files.
+-e ./pulumi/sdks/local
+
 # ed25519 keypair derivation for the in-cluster Gitea SSH host key
 # and the PKO admin SSH key (see pulumi/gitrepo/gitea_builtin.py).
 # Required at language-host time (during ``pulumi up``) and inside the

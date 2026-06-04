@@ -53,6 +53,35 @@ wsl --shutdown
 # Verify:  wslinfo --networking-mode   # should print: mirrored
 ```
 
+**Docker Hub mirror:**
+
+Local runs pull several images whose canonical names live on Docker Hub
+(`kindest/node`, `pulumi/pulumi-kubernetes-operator`, `pulumi/pulumi`, and the
+`envoyproxy/envoy` image launched internally by `cloud-provider-kind`). To avoid
+Docker Hub anonymous pull limits, configure the host Docker daemon with Google's
+Docker Hub mirror:
+
+```bash
+sudo mkdir -p /etc/docker
+if [ -f /etc/docker/daemon.json ]; then
+  sudo cp /etc/docker/daemon.json /etc/docker/daemon.json.bak.$(date +%Y%m%d%H%M%S)
+else
+  echo '{}' | sudo tee /etc/docker/daemon.json >/dev/null
+fi
+
+jq '. + {"registry-mirrors": (((."registry-mirrors" // []) + ["https://mirror.gcr.io"]) | unique)}' \
+  /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp >/dev/null
+sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
+sudo systemctl restart docker
+docker info --format '{{json .RegistryConfig.Mirrors}}'
+```
+
+The Pulumi-managed management kind cluster also configures `mirror.gcr.io` as a
+containerd mirror for in-cluster `docker.io` pulls, and CAPD workload nodes are
+bootstrapped with the same mirror. The host Docker daemon setting is still
+needed for host-side pulls: initial kind node images, CAPD DockerMachine node
+images, and `cloud-provider-kind` load-balancer proxy containers.
+
 ### Prerequisites
 
 Install the following:

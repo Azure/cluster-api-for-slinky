@@ -507,6 +507,7 @@ class GiteaBuiltinRepository(GitOpsRepository):
                 "namespace": _GITEA_NAMESPACE,
             },
             type="Opaque",
+            immutable=True,
             string_data={
                 "username": admin_username,
                 "password": admin_password.result,
@@ -567,6 +568,7 @@ class GiteaBuiltinRepository(GitOpsRepository):
                 "namespace": _GITEA_NAMESPACE,
             },
             type="Opaque",
+            immutable=True,
             data={
                 "ssh_host_ed25519_key": host_private_pem.apply(_k8s_secret_data),
                 "ssh_host_ed25519_key.pub": host_public_openssh.apply(
@@ -600,6 +602,7 @@ class GiteaBuiltinRepository(GitOpsRepository):
                 "namespace": _GITEA_NAMESPACE,
             },
             type="Opaque",
+            immutable=True,
             data={
                 _USER_PRIVATE_KEY_SECRET_KEY: user_private_pem.apply(
                     _k8s_secret_data

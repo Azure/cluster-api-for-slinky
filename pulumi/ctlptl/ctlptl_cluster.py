@@ -8,9 +8,9 @@ Design notes
   which is why ctlptl's ``Cluster.name`` for product=kind must start with
   ``kind-`` too).
 * The cluster is wired to a separately-managed ``CtlptlRegistry`` via the
-  ``registry: <name>`` field in the Cluster spec. The caller is responsible
-  for declaring a ``depends_on`` edge so the registry exists before the
-  cluster is applied (and survives until after the cluster is deleted).
+  ``registry: <name>`` field in the Cluster spec. Passing the registry's
+  ``registry_name`` output into this resource gives Pulumi the dependency
+  edge, so the registry is created first and deleted last.
 
 Auto-naming
 -----------
@@ -47,13 +47,11 @@ Diff semantics for ``cluster_name``
 Manifest
 --------
 The ctlptl manifest is vendored into this module as ``_MANIFEST_TEMPLATE``
-— callers no longer pass it in. This keeps the Pulumi program self-contained
-(no repo-relative file reads from inside Pulumi). Customizability is
-explicitly deferred; if you need to tweak the kind config, edit the
-template constant below.
+— callers no longer pass it in. Customizability is explicitly deferred; if
+you need to tweak the kind config, edit the template constant below.
 
-The template contains three shell-style placeholders that the provider
-substitutes at apply/diff time:
+The template contains four shell-style placeholders that the provider
+substitutes when rendering the manifest:
 
 * ``${CLUSTER_NAME}`` → the autonamed or pinned ``cluster_name``. Must be
   expanded inside the provider because the autonamed value only exists
@@ -67,6 +65,8 @@ substitutes at apply/diff time:
   expands to a host-local filesystem path (used for ``hostPath`` mounts);
   the provider runs in the user's environment, so reading ``$HOME`` there
   is correct.
+* ``${DOCKER_IO_HOSTS_TOML}`` → repository-local ``hosts.toml`` file mounted
+    into kind nodes for containerd's Docker Hub mirror config.
 
 * Inputs:
     - ``cluster_name``  : optional explicit ctlptl ``Cluster.name`` value.
@@ -83,7 +83,8 @@ substitutes at apply/diff time:
     - ``kubeconfig``   : standalone kubeconfig YAML for the new cluster.
     - ``context``      : kube context name (== ``cluster_name``).
 * Lifecycle:
-    - ``check``  : pure pass-through (the SDK default).
+    - ``check``  : validates explicit ``cluster_name`` values. Autonaming still
+                   happens in ``create()`` so previews stay deterministic.
     - ``create`` : resolves the cluster name (pinned value or freshly
                    minted ``kind-<seed>-<hex>``), renders the vendored
                    manifest, runs ``ctlptl apply -f -`` on stdin, then
@@ -126,10 +127,13 @@ import os
 import secrets
 import shutil
 import subprocess
+from pathlib import Path
 from typing import List, Optional
 
 from pulumi import Input, Output, ResourceOptions
 from pulumi.dynamic import (
+    CheckFailure,
+    CheckResult,
     CreateResult,
     DiffResult,
     ReadResult,
@@ -138,14 +142,14 @@ from pulumi.dynamic import (
 )
 
 _RESOURCE_TYPE = "ca4s:local:CtlptlCluster"
+_DOCKER_IO_HOSTS_TOML = Path(__file__).resolve().parent / "hosts.toml"
 
 # ---------------------------------------------------------------------------
 # Vendored ctlptl manifest.
 #
-# Kept in source so the Pulumi stack has no repo-relative file dependencies.
+# Kept in source so the Pulumi stack does not need a separate manifest file.
 # Customizability is deferred; edit this constant directly to change the kind
-# topology. Placeholders ``${HOME}`` / ``${CLUSTER_NAME}`` / ``${REGISTRY_NAME}``
-# are substituted by ``_render()``.
+# topology. Placeholders are substituted by ``_render()``.
 # ---------------------------------------------------------------------------
 
 _MANIFEST_TEMPLATE = """\
@@ -164,12 +168,22 @@ kindV1Alpha4Cluster:
   - role: control-plane
     image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
     extraMounts:
+    # Docker Hub mirror for in-cluster pod pulls. Host Docker still handles the
+    # node image pull before these containers exist.
+    - hostPath: ${DOCKER_IO_HOSTS_TOML}
+      containerPath: /etc/containerd/certs.d/docker.io/hosts.toml
+      readOnly: true
     # required by CAPD
     - hostPath: /var/run/docker.sock
       containerPath: /var/run/docker.sock
   - role: worker
     image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
     extraMounts:
+    # Docker Hub mirror for in-cluster pod pulls. Host Docker still handles the
+    # node image pull before these containers exist.
+    - hostPath: ${DOCKER_IO_HOSTS_TOML}
+      containerPath: /etc/containerd/certs.d/docker.io/hosts.toml
+      readOnly: true
     # Exposes the host kubeconfig to in-cluster consumers via hostPath /root/.kube:
     #   - AWX / ansible-runner (mounted at /runner/.kube, see awx.yaml, pod-spec-override.yaml)
     #   - cluster-autoscaler   (mounted at /mnt/kubeconfig, see cluster-autoscaler.yaml)
@@ -258,20 +272,36 @@ def _render(cluster_name: str, registry_name: Optional[str] = None) -> str:
             "HOME environment variable is not set; required for ctlptl manifest "
             "${HOME} substitution (hostPath mount of ~/.kube into the worker)"
         )
+    if not _DOCKER_IO_HOSTS_TOML.is_file():
+        raise RuntimeError(
+            "missing Docker Hub containerd mirror config at "
+            f"{_DOCKER_IO_HOSTS_TOML}"
+        )
     rendered = _MANIFEST_TEMPLATE
     rendered = rendered.replace("${CLUSTER_NAME}", cluster_name)
     if registry_name:
         rendered = rendered.replace("${REGISTRY_NAME}", registry_name)
     rendered = rendered.replace("${HOME}", home)
+    rendered = rendered.replace(
+        "${DOCKER_IO_HOSTS_TOML}", str(_DOCKER_IO_HOSTS_TOML)
+    )
     return rendered
 
 
 class _CtlptlClusterProvider(ResourceProvider):
     """Lifecycle hooks for the CtlptlCluster dynamic resource."""
 
-    # ``check`` is intentionally the SDK default (pass-through). Random
-    # ``cluster_name`` generation lives in ``create()`` so it runs exactly
-    # once per resource lifetime; see the module docstring for why.
+    def check(self, olds: dict, news: dict) -> CheckResult:
+        failures: list[CheckFailure] = []
+        cluster_name = news.get("cluster_name")
+        if cluster_name and not cluster_name.startswith("kind-"):
+            failures.append(
+                CheckFailure(
+                    "cluster_name",
+                    "ctlptl kind cluster names must start with 'kind-'",
+                )
+            )
+        return CheckResult(inputs=news, failures=failures)
 
     def create(self, props: dict) -> CreateResult:
         _require_binary("ctlptl")

@@ -42,6 +42,33 @@ _PROVIDER_API_VERSION = "operator.cluster.x-k8s.io/v1alpha2"
 _PROVIDER_FEATURE_GATES = {
     "ClusterTopology": True,
 }
+_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
+_WAIT_FOR_READY = "condition=Ready"
+_WAIT_FOR_WEBHOOK_CA_BUNDLE = "jsonpath={.webhooks[*].clientConfig.caBundle}"
+
+_CAPI_OPERATOR_WEBHOOK_CONFIGURATIONS = {
+    "mutating": "capi-operator-mutating-webhook-configuration",
+    "validating": "capi-operator-validating-webhook-configuration",
+}
+
+_PROVIDER_WEBHOOK_CONFIGURATIONS = {
+    "core": {
+        "mutating": "capi-mutating-webhook-configuration",
+        "validating": "capi-validating-webhook-configuration",
+    },
+    "bootstrap": {
+        "mutating": "capi-kubeadm-bootstrap-mutating-webhook-configuration",
+        "validating": "capi-kubeadm-bootstrap-validating-webhook-configuration",
+    },
+    "control_plane": {
+        "mutating": "capi-kubeadm-control-plane-mutating-webhook-configuration",
+        "validating": "capi-kubeadm-control-plane-validating-webhook-configuration",
+    },
+    "infrastructure": {
+        "mutating": "capd-mutating-webhook-configuration",
+        "validating": "capd-validating-webhook-configuration",
+    },
+}
 
 
 class ClusterAPIOperator(pulumi.ComponentResource):
@@ -97,6 +124,13 @@ class ClusterAPIOperator(pulumi.ComponentResource):
                 + ([cert_manager] if cert_manager is not None else []),
             ),
         )
+        operator_webhooks = self._webhook_configuration_patches(
+            name,
+            resource_name="operator",
+            names=_CAPI_OPERATOR_WEBHOOK_CONFIGURATIONS,
+            dependency=release,
+            provider=provider,
+        )
 
         core_ns = self._provider_namespace(name, "core", CAPI_CORE_NAMESPACE, provider)
         bootstrap_ns = self._provider_namespace(
@@ -116,7 +150,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             provider_name="cluster-api",
             namespace=CAPI_CORE_NAMESPACE,
             namespace_resource=core_ns,
-            operator_release=release,
+            dependencies=[release, *operator_webhooks],
             provider=provider,
         )
         bootstrap_provider = self._provider_cr(
@@ -126,7 +160,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             provider_name="kubeadm",
             namespace=CAPI_BOOTSTRAP_NAMESPACE,
             namespace_resource=bootstrap_ns,
-            operator_release=release,
+            dependencies=[release, *operator_webhooks],
             provider=provider,
         )
         control_plane_provider = self._provider_cr(
@@ -136,7 +170,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             provider_name="kubeadm",
             namespace=CAPI_CONTROL_PLANE_NAMESPACE,
             namespace_resource=control_plane_ns,
-            operator_release=release,
+            dependencies=[release, *operator_webhooks],
             provider=provider,
         )
         infrastructure_provider = self._provider_cr(
@@ -146,9 +180,44 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             provider_name="docker",
             namespace=CAPI_DOCKER_INFRASTRUCTURE_NAMESPACE,
             namespace_resource=infrastructure_ns,
-            operator_release=release,
+            dependencies=[release, *operator_webhooks],
             provider=provider,
         )
+        core_webhooks = self._webhook_configuration_patches(
+            name,
+            resource_name="core",
+            names=_PROVIDER_WEBHOOK_CONFIGURATIONS["core"],
+            dependency=core_provider,
+            provider=provider,
+        )
+        bootstrap_webhooks = self._webhook_configuration_patches(
+            name,
+            resource_name="bootstrap",
+            names=_PROVIDER_WEBHOOK_CONFIGURATIONS["bootstrap"],
+            dependency=bootstrap_provider,
+            provider=provider,
+        )
+        control_plane_webhooks = self._webhook_configuration_patches(
+            name,
+            resource_name="control-plane",
+            names=_PROVIDER_WEBHOOK_CONFIGURATIONS["control_plane"],
+            dependency=control_plane_provider,
+            provider=provider,
+        )
+        infrastructure_webhooks = self._webhook_configuration_patches(
+            name,
+            resource_name="infrastructure",
+            names=_PROVIDER_WEBHOOK_CONFIGURATIONS["infrastructure"],
+            dependency=infrastructure_provider,
+            provider=provider,
+        )
+        webhook_patches = {
+            "operator": operator_webhooks,
+            "core": core_webhooks,
+            "bootstrap": bootstrap_webhooks,
+            "control_plane": control_plane_webhooks,
+            "infrastructure": infrastructure_webhooks,
+        }
 
         self.namespace = Output.from_input(CAPI_OPERATOR_NAMESPACE)
         self.release_status = release.status
@@ -171,6 +240,10 @@ class ClusterAPIOperator(pulumi.ComponentResource):
                     "bootstrap": bootstrap_provider.metadata["name"],
                     "control_plane": control_plane_provider.metadata["name"],
                     "infrastructure": infrastructure_provider.metadata["name"],
+                },
+                "webhook_patches": {
+                    group: [patch.metadata["name"] for patch in patches]
+                    for group, patches in webhook_patches.items()
                 },
             }
         )
@@ -197,7 +270,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
         provider_name: str,
         namespace: str,
         namespace_resource: pulumi.Resource,
-        operator_release: pulumi.Resource,
+        dependencies: list[pulumi.Resource],
         provider: k8s.Provider | None,
     ) -> k8s.apiextensions.CustomResource:
         return k8s.apiextensions.CustomResource(
@@ -207,6 +280,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             metadata={
                 "name": provider_name,
                 "namespace": namespace,
+                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_READY},
             },
             spec={
                 "version": CAPI_PROVIDER_VERSION,
@@ -217,6 +291,36 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,
-                depends_on=[operator_release, namespace_resource],
+                depends_on=[*dependencies, namespace_resource],
             ),
         )
+
+    def _webhook_configuration_patches(
+        self,
+        parent_name: str,
+        *,
+        resource_name: str,
+        names: dict[str, str],
+        dependency: pulumi.Resource,
+        provider: k8s.Provider | None,
+    ) -> list[pulumi.Resource]:
+        annotations = {_WAIT_FOR_ANNOTATION: _WAIT_FOR_WEBHOOK_CA_BUNDLE}
+        mutating = k8s.admissionregistration.v1.MutatingWebhookConfigurationPatch(
+            f"{parent_name}-{resource_name}-mutating-webhook-ready",
+            metadata={"name": names["mutating"], "annotations": annotations},
+            opts=ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=[dependency],
+            ),
+        )
+        validating = k8s.admissionregistration.v1.ValidatingWebhookConfigurationPatch(
+            f"{parent_name}-{resource_name}-validating-webhook-ready",
+            metadata={"name": names["validating"], "annotations": annotations},
+            opts=ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=[dependency],
+            ),
+        )
+        return [mutating, validating]
