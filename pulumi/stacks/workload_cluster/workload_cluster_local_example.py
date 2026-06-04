@@ -48,7 +48,7 @@ _SERVICE_DOMAIN = "cluster.local"
 
 _CALICO_CHART_REPO = "https://docs.tigera.io/calico/charts"
 _CALICO_CHART_NAME = "tigera-operator"
-_CALICO_CHART_VERSION = "v3.30.3"
+_CALICO_CHART_VERSION = "v3.32.0"
 _CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
 

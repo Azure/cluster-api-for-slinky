@@ -47,7 +47,7 @@ from pulumi import ResourceOptions
 # for the release matrix.
 CERT_MANAGER_CHART_REPO = "https://charts.jetstack.io"
 CERT_MANAGER_CHART_NAME = "cert-manager"
-CERT_MANAGER_CHART_VERSION = "v1.16.2"
+CERT_MANAGER_CHART_VERSION = "v1.20.2"
 
 # Conventional namespace. Not configurable: downstream consumers that
 # care about cert-manager's presence (CAPI operator, future Issuers)
