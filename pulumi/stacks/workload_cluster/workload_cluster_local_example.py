@@ -41,7 +41,7 @@ _CONTROL_PLANE_API_VERSION = "controlplane.cluster.x-k8s.io/v1beta2"
 _INFRASTRUCTURE_API_VERSION = "infrastructure.cluster.x-k8s.io/v1beta2"
 
 _NAMESPACE = "default"
-_KUBERNETES_VERSION = "v1.34.0"
+_KUBERNETES_VERSION = "v1.36.1"
 _POD_CIDR = "192.168.0.0/16"
 _SERVICE_CIDR = "10.128.0.0/12"
 _SERVICE_DOMAIN = "cluster.local"

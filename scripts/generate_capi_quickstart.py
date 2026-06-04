@@ -55,7 +55,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT = REPO_ROOT / "capi-quickstart.yaml"
 # Default Kubernetes version for the workload (CAPD) cluster. Keep in sync with
 # the kindest/node image pinned in pulumi/ctlptl/ctlptl_cluster.py.
-DEFAULT_K8S_VERSION = "v1.34.0"
+DEFAULT_K8S_VERSION = "v1.36.1"
 DEFAULT_SSH_KEY_PATH = Path.home() / ".ssh" / "id_rsa.pub"
 
 SSH_COMMANDS_TEMPLATE = [
