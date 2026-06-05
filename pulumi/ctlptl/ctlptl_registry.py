@@ -59,8 +59,35 @@ Port semantics
   (or to ``None``) doesn't trigger a spurious replace — this mirrors
   ctlptl's own ``Apply`` behavior where ``desired.Port == 0`` preserves
   the existing port.
+* The host-published registry port is always bound to ``0.0.0.0`` instead
+    of ctlptl's default ``127.0.0.1`` so containers on other Docker bridge
+    networks can reach it through a host-routable address.
 
-* The resource is identified by the autonamed (or pinned) ``registry_name``.
+Registry environment semantics
+------------------------------
+Set ``env`` to configure environment variables on the registry container via
+ctlptl's ``Registry.env`` field. By default, the registry runs as a Docker Hub
+pull-through cache using
+``REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io``. Pass an explicit
+``env`` list to override the registry container environment.
+
+Adoption and destroy semantics
+------------------------------
+Two lifecycle knobs model the cases where a registry is shared across local
+stack lifetimes:
+
+* ``adopt_existing`` defaults to true and asks ``create()`` to scan existing
+    ctlptl registries and
+    adopt the first whose name starts with ``registry_name``. If
+    ``registry_name`` is empty or omitted, the first existing registry is
+    adopted and the ``adopted`` output is true. If nothing matches, creation
+    falls back to the normal apply path and ``adopted`` is false.
+* ``delete_on_destroy`` defaults to false and controls whether ``delete()``
+    tears down the underlying registry. If ``adopted`` is true, deletion is
+    always skipped for robustness.
+
+* The resource is identified by the autonamed, pinned, or adopted
+    ``registry_name``.
 * Inputs:
     - ``registry_name`` : optional explicit ctlptl ``Registry.name`` value.
                           When omitted, autoname kicks in.
@@ -68,10 +95,23 @@ Port semantics
                           both mean "unpinned" — ctlptl picks a free port
                           and ``check()`` carries the observed value
                           forward on subsequent runs.
+    - ``env``           : optional list of environment variables to pass to
+                          the registry container. Defaults to Docker Hub
+                          pull-through cache mode.
+    - ``adopt_existing``: optional bool, default ``True``. When true, adopt
+                          the first existing registry whose name starts with
+                          ``registry_name``; an empty name matches the first
+                          registry.
+    - ``delete_on_destroy``: optional bool, default ``False``. When false,
+                             ``delete()`` leaves the registry running. Ignored
+                             when the ``adopted`` output is true.
 * Outputs:
     - ``registry_name`` : the ctlptl ``Registry.name`` ultimately used
-                          (autonamed or explicit).
+                          (autonamed, explicit, or adopted).
     - ``port``          : host port the registry is bound to (int).
+    - ``env``           : registry container environment variables.
+    - ``adopted``       : whether ``create()`` adopted an existing ctlptl
+                          registry instead of creating one.
 * Lifecycle:
     - ``check``  : pass-through validation only (deterministic, no random
                    generation). The default SDK behavior plus a port
@@ -104,6 +144,7 @@ import json
 import secrets
 import shutil
 import subprocess
+import sys
 from typing import List, Optional
 
 from pulumi import Input, Output, ResourceOptions
@@ -114,7 +155,13 @@ from pulumi.dynamic import (
     ReadResult,
     Resource,
     ResourceProvider,
+    UpdateResult,
 )
+
+_REGISTRY_LISTEN_ADDRESS = "0.0.0.0"
+_DEFAULT_REGISTRY_ENV = ["REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io"]
+_DEFAULT_ADOPT_EXISTING = True
+_DEFAULT_DELETE_ON_DESTROY = False
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +194,11 @@ def _run(
     )
 
 
-def _registry_manifest(name: str, port: Optional[int] = None) -> str:
+def _registry_manifest(
+    name: str,
+    port: Optional[int] = None,
+    env: Optional[List[str]] = None,
+) -> str:
     """Build a Registry manifest, optionally pinning the host port.
 
     Omitting ``port`` (or passing 0) is equivalent to ``port: 0`` in the
@@ -164,9 +215,14 @@ def _registry_manifest(name: str, port: Optional[int] = None) -> str:
         "apiVersion: ctlptl.dev/v1alpha1\n"
         "kind: Registry\n"
         f"name: {name}\n"
+        f"listenAddress: {json.dumps(_REGISTRY_LISTEN_ADDRESS)}\n"
     )
     if port:
         body += f"port: {port}\n"
+    if env:
+        body += "env:\n"
+        for value in env:
+            body += f"- {json.dumps(value)}\n"
     return body
 
 
@@ -184,6 +240,67 @@ def _observe_port(name: str) -> int:
             f"ctlptl get registry {name!r} returned no port; raw JSON: {result.stdout!r}"
         )
     return int(port)
+
+
+def _registry_name(data: dict) -> Optional[str]:
+    """Return a registry object's name from ctlptl JSON."""
+    name = data.get("name") or data.get("metadata", {}).get("name")
+    return str(name) if name else None
+
+
+def _registry_port(data: dict) -> Optional[int]:
+    """Return a registry object's host port from ctlptl JSON."""
+    port = data.get("port") or data.get("status", {}).get("hostPort")
+    return int(port) if port else None
+
+
+def _first_registry_with_prefix(prefix: str) -> Optional[tuple[str, int]]:
+    """Return the first existing registry whose name starts with *prefix*.
+
+    An empty prefix intentionally matches the first registry in ctlptl's list.
+    """
+    result = _run(["ctlptl", "get", "registry", "-o", "json"], check=False)
+    if result.returncode != 0:
+        return None
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+
+    for item in data.get("items", []):
+        name = _registry_name(item)
+        if name is None or not name.startswith(prefix):
+            continue
+        port = _registry_port(item)
+        if port is None:
+            raise RuntimeError(
+                f"ctlptl registry {name!r} has no observed port; "
+                f"raw JSON: {json.dumps(item, sort_keys=True)!r}"
+            )
+        return name, port
+    return None
+
+
+def _bool_prop(props: dict, name: str, default: bool) -> bool:
+    value = props.get(name)
+    return default if value is None else bool(value)
+
+
+def _env_prop(props: dict) -> Optional[List[str]]:
+    value = props.get("env")
+    if value is None:
+        return list(_DEFAULT_REGISTRY_ENV)
+    if not value:
+        return None
+    return [str(item) for item in value]
+
+
+def _adopt_existing_prop(props: dict) -> bool:
+    return _bool_prop(props, "adopt_existing", _DEFAULT_ADOPT_EXISTING)
+
+
+def _delete_on_destroy_prop(props: dict) -> bool:
+    return _bool_prop(props, "delete_on_destroy", _DEFAULT_DELETE_ON_DESTROY)
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +328,25 @@ class _CtlptlRegistryProvider(ResourceProvider):
 
     def create(self, props: dict) -> CreateResult:
         _require_binary("ctlptl")
+        adopt_existing = _adopt_existing_prop(props)
+        env = _env_prop(props)
+        if adopt_existing:
+            prefix = props.get("registry_name") or ""
+            adopted = _first_registry_with_prefix(prefix)
+            if adopted is not None:
+                registry_name, port = adopted
+                return CreateResult(
+                    id_=registry_name,
+                    outs={
+                        "registry_name": registry_name,
+                        "port": port,
+                        "env": env,
+                        "adopt_existing": adopt_existing,
+                        "adopted": True,
+                        "delete_on_destroy": _delete_on_destroy_prop(props),
+                    },
+                )
+
         # Resolve the registry name: caller's pin, or autoname.
         registry_name: str = props.get("registry_name") or (
             f"{props.get('_autoname_seed') or 'ctlptl-registry'}-{secrets.token_hex(4)}"
@@ -218,25 +354,52 @@ class _CtlptlRegistryProvider(ResourceProvider):
         desired_port: Optional[int] = props.get("port")
         _run(
             ["ctlptl", "apply", "-f", "-"],
-            stdin=_registry_manifest(registry_name, desired_port),
+            stdin=_registry_manifest(
+                registry_name,
+                desired_port,
+                env,
+            ),
         )
         port = _observe_port(registry_name)
         return CreateResult(
             id_=registry_name,
-            outs={"registry_name": registry_name, "port": port},
+            outs={
+                "registry_name": registry_name,
+                "port": port,
+                "env": env,
+                "adopt_existing": adopt_existing,
+                "adopted": False,
+                "delete_on_destroy": _delete_on_destroy_prop(props),
+            },
         )
 
     def delete(self, id_: str, props: dict) -> None:
         _require_binary("ctlptl")
+        adopted = _bool_prop(props, "adopted", False)
+        delete_on_destroy = _delete_on_destroy_prop(props)
+        if adopted or not delete_on_destroy:
+            reason = "adopted=True" if adopted else "delete_on_destroy=False"
+            print(
+                f"Leaving ctlptl registry {id_!r} in place because {reason}. "
+                f"Delete it manually with: ctlptl delete registry {id_}",
+                file=sys.stderr,
+            )
+            return
         _run(["ctlptl", "delete", "registry", id_], check=False)
 
     def diff(self, id_: str, olds: dict, news: dict) -> DiffResult:
         replaces: List[str] = []
+        mutable_changes = False
+        adopt_existing = _adopt_existing_prop(news)
         # ``registry_name``: only compare when the caller actually pinned
         # one. An unpinned ``news`` (``None``/empty) means "don't care,
         # keep what was minted by ``create()`` last time" — not a diff.
         pinned_name = news.get("registry_name")
-        if pinned_name and pinned_name != olds.get("registry_name"):
+        old_name = olds.get("registry_name") or id_
+        if adopt_existing:
+            if pinned_name and not str(old_name).startswith(str(pinned_name)):
+                replaces.append("registry_name")
+        elif pinned_name and pinned_name != old_name:
             replaces.append("registry_name")
         # Same semantic for ``port``: an unpinned ``news`` is "don't care".
         # Both ``None`` and ``0`` count as unpinned (matching ctlptl's
@@ -246,16 +409,38 @@ class _CtlptlRegistryProvider(ResourceProvider):
         # and the comparison is a no-op.
         new_port = int(news.get("port") or 0)
         old_port = int(olds.get("port") or 0)
-        if new_port and new_port != old_port:
+        if not adopt_existing and new_port and new_port != old_port:
             replaces.append("port")
+        if _env_prop(news) != _env_prop(olds):
+            replaces.append("env")
+        if _adopt_existing_prop(news) != _adopt_existing_prop(olds):
+            mutable_changes = True
+        if _delete_on_destroy_prop(news) != _delete_on_destroy_prop(olds):
+            mutable_changes = True
         # ``_autoname_seed`` only changes when the Pulumi logical name
         # changes, which alters the URN and is handled by the engine as a
         # separate resource (or via aliases), so we don't react to it.
         return DiffResult(
-            changes=bool(replaces),
+            changes=bool(replaces) or mutable_changes,
             replaces=replaces,
             delete_before_replace=True,
         )
+
+    def update(self, id_: str, olds: dict, news: dict) -> UpdateResult:
+        port = olds.get("port")
+        try:
+            port = _observe_port(id_)
+        except Exception:
+            pass
+        outs = dict(news)
+        outs["registry_name"] = id_
+        if port:
+            outs["port"] = int(port)
+        outs["env"] = _env_prop(news)
+        outs["adopt_existing"] = _adopt_existing_prop(news)
+        outs["adopted"] = _bool_prop(olds, "adopted", False)
+        outs["delete_on_destroy"] = _delete_on_destroy_prop(news)
+        return UpdateResult(outs=outs)
 
     def read(self, id_: str, props: dict) -> ReadResult:
         _require_binary("ctlptl")
@@ -271,11 +456,15 @@ class _CtlptlRegistryProvider(ResourceProvider):
         except json.JSONDecodeError:
             return ReadResult(id_=None, outs={})
 
-        port = data.get("port") or data.get("status", {}).get("hostPort")
+        port = _registry_port(data)
         outs = dict(props)
         outs["registry_name"] = id_
         if port:
-            outs["port"] = int(port)
+            outs["port"] = port
+        outs["env"] = _env_prop(props)
+        outs["adopt_existing"] = _adopt_existing_prop(props)
+        outs["adopted"] = _bool_prop(props, "adopted", False)
+        outs["delete_on_destroy"] = _delete_on_destroy_prop(props)
         return ReadResult(id_=id_, outs=outs)
 
 
@@ -293,16 +482,36 @@ class CtlptlRegistry(Resource):
     (changing the pinned value forces replacement). ``port=None`` and
     ``port=0`` are both treated as "unpinned", matching ctlptl's own
     manifest convention.
+
+    The host-published registry port is always bound to ``0.0.0.0`` so Docker
+    containers on other bridge networks can reach it via a host-routable
+    address.
+
+    By default, create uses get-or-create behavior: it adopts the first
+    existing ctlptl registry whose name starts with ``registry_name`` if one
+    exists, otherwise creates a new registry normally. If ``registry_name`` is
+    empty or omitted, the first existing registry is adopted. The ``adopted``
+    output records whether adoption actually happened. Default destroy behavior
+    retains the registry. Set ``delete_on_destroy=True`` to delete registries
+    Pulumi created; actually adopted registries are always retained.
+
+    By default, the registry runs as a Docker Hub pull-through mirror/cache.
+    Set ``env`` to override the registry container environment.
     """
 
     registry_name: Output[str]
     port: Output[int]
+    env: Output[List[str]]
+    adopted: Output[bool]
 
     def __init__(
         self,
         name: str,
         registry_name: Optional[Input[str]] = None,
         port: Optional[Input[int]] = None,
+        env: Optional[Input[List[Input[str]]]] = None,
+        adopt_existing: Optional[Input[bool]] = None,
+        delete_on_destroy: Optional[Input[bool]] = None,
         opts: Optional[ResourceOptions] = None,
     ):
         super().__init__(
@@ -321,6 +530,21 @@ class CtlptlRegistry(Resource):
                 # caller has unpinned, so the bound port stays stable
                 # across ``pulumi up`` cycles.
                 "port": port,
+                # Optional registry container environment. When omitted,
+                # create() defaults to Docker Hub pull-through cache mode
+                # with REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io.
+                "env": env,
+                # If true, create() first attaches to the first existing
+                # ctlptl registry whose name starts with registry_name, then
+                # falls back to normal creation when no match exists. An empty
+                # registry_name intentionally adopts the first registry.
+                # The adopted output records whether create() actually found
+                # an existing registry or had to make a new one.
+                "adopt_existing": adopt_existing,
+                # If false, delete() removes only the Pulumi state handle and
+                # prints manual cleanup instructions instead of deleting the
+                # ctlptl registry. Ignored when adopt_existing is true.
+                "delete_on_destroy": delete_on_destroy,
                 # Hidden seed used by ``create()`` for autoname derivation.
                 # Sourced from the Pulumi logical name so the autonamed value
                 # is greppable (e.g. "registry-a1b2c3d4").
