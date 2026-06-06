@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
+from typing import Any
 
 import pulumi
 import pulumi_kubernetes as k8s
@@ -118,6 +119,10 @@ class PKOBootstrap(pulumi.ComponentResource):
             endpoint (``GitOpsRepository.ssh_known_hosts``). Projected
             into a hash-named ConfigMap under key
             ``known_hosts``.
+        config:
+            Optional inline Pulumi config map written into every inner Stack CR.
+            PKOBootstrap treats this as opaque pass-through; project-scoped
+            config keys determine which inner stack actually consumes a value.
         env:
             Outer-stack environment moniker (``pulumi.get_stack()``).
             Propagated to the control-plane Stack CR's ``spec.stack``
@@ -156,6 +161,7 @@ class PKOBootstrap(pulumi.ComponentResource):
         ssh_private_key_secret: k8s.core.v1.Secret,
         ssh_known_hosts: pulumi.Input[str],
         env: str,
+        config: dict[str, Any] | None = None,
         opts: ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:pko:PKOBootstrap", name, props={}, opts=opts)
@@ -285,6 +291,7 @@ class PKOBootstrap(pulumi.ComponentResource):
             project_name=CONTROL_PLANE_PROJECT,
             env=env,
             repo_dir=CONTROL_PLANE_REPO_DIR,
+            config=config,
         )
         control_plane = k8s.apiextensions.CustomResource(
             f"{name}-control-plane",
@@ -310,6 +317,7 @@ class PKOBootstrap(pulumi.ComponentResource):
             env=env,
             stack_spec=stack_spec,
             control_plane_stack=control_plane_stack_name,
+            config=config,
             provider=k8s_provider,
             opts=ResourceOptions(
                 parent=self, depends_on=cr_deps + [control_plane]

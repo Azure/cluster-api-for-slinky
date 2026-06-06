@@ -21,6 +21,7 @@ when PKOBootstrap runs.
 from __future__ import annotations
 
 import importlib
+from typing import Any
 
 import pulumi
 import pulumi_kubernetes as k8s
@@ -54,6 +55,8 @@ class Tenants(pulumi.ComponentResource):
         control_plane_stack: ``metadata.name`` of the control-plane
             Stack CR. Concrete impls thread it into each emitted
             Stack CR's ``spec.prerequisites``.
+        config: Optional inline Pulumi config map written into emitted Stack
+            CRs. Opaque pass-through; inner projects own key semantics.
         provider: Kubernetes provider for the management cluster.
         opts: Standard ``ResourceOptions``.
 
@@ -71,6 +74,7 @@ class Tenants(pulumi.ComponentResource):
         env: str,
         stack_spec: StackCRSpec,
         control_plane_stack: pulumi.Input[str],
+        config: dict[str, Any] | None,
         provider: k8s.Provider,
         opts: ResourceOptions | None = None,
     ) -> None:
@@ -106,6 +110,7 @@ class Tenants(pulumi.ComponentResource):
             f"{name}-impl",
             stack_spec=stack_spec,
             control_plane_stack=control_plane_stack,
+            config=config,
             provider=provider,
             opts=ResourceOptions(parent=self),
         )

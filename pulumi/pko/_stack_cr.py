@@ -74,7 +74,6 @@ _STATE_MOUNT_PATH = "/state"
 _KNOWN_HOSTS_VOLUME_NAME = "gitea-known-hosts"
 _SSH_MOUNT_PATH = "/etc/gitea-ssh"
 
-
 @dataclass(frozen=True)
 class StackCRSpec:
     """Bundle of inputs every Stack CR we emit needs.

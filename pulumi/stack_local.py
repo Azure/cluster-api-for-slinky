@@ -45,6 +45,10 @@ from ctlptl import CloudProviderKind, CtlptlCluster, CtlptlRegistry
 from gitrepo import GitOpsRepository
 from gitrepo.gitea_builtin import GiteaBuiltinRepository
 from pko import PKOBootstrap
+from stacks.workload_cluster.registry_setting import (
+    REGISTRY_CONFIG_KEY,
+    local_port_registry_setting,
+)
 
 
 def run() -> None:
@@ -225,6 +229,7 @@ def run() -> None:
         ssh_private_key_secret=repo.ssh_private_key_secret,
         ssh_known_hosts=repo.ssh_known_hosts,
         env=pulumi.get_stack(),
+        config={REGISTRY_CONFIG_KEY: local_port_registry_setting(registry.port)},
         opts=pulumi.ResourceOptions(depends_on=[repo]),
     )
 

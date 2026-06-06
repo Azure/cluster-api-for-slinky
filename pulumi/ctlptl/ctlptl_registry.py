@@ -66,10 +66,10 @@ Port semantics
 Registry environment semantics
 ------------------------------
 Set ``env`` to configure environment variables on the registry container via
-ctlptl's ``Registry.env`` field. By default, the registry runs as a Docker Hub
-pull-through cache using
-``REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io``. Pass an explicit
-``env`` list to override the registry container environment.
+ctlptl's ``Registry.env`` field. By default, the registry runs as a
+pull-through cache backed by Google's Docker Hub mirror using
+``REGISTRY_PROXY_REMOTEURL=https://mirror.gcr.io``. Pass an explicit ``env``
+list to override the registry container environment.
 
 Adoption and destroy semantics
 ------------------------------
@@ -96,8 +96,8 @@ stack lifetimes:
                           and ``check()`` carries the observed value
                           forward on subsequent runs.
     - ``env``           : optional list of environment variables to pass to
-                          the registry container. Defaults to Docker Hub
-                          pull-through cache mode.
+                          the registry container. Defaults to pull-through
+                          cache mode backed by ``mirror.gcr.io``.
     - ``adopt_existing``: optional bool, default ``True``. When true, adopt
                           the first existing registry whose name starts with
                           ``registry_name``; an empty name matches the first
@@ -159,7 +159,7 @@ from pulumi.dynamic import (
 )
 
 _REGISTRY_LISTEN_ADDRESS = "0.0.0.0"
-_DEFAULT_REGISTRY_ENV = ["REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io"]
+_DEFAULT_REGISTRY_ENV = ["REGISTRY_PROXY_REMOTEURL=https://mirror.gcr.io"]
 _DEFAULT_ADOPT_EXISTING = True
 _DEFAULT_DELETE_ON_DESTROY = False
 
@@ -495,7 +495,8 @@ class CtlptlRegistry(Resource):
     retains the registry. Set ``delete_on_destroy=True`` to delete registries
     Pulumi created; actually adopted registries are always retained.
 
-    By default, the registry runs as a Docker Hub pull-through mirror/cache.
+    By default, the registry runs as a pull-through cache backed by
+    ``mirror.gcr.io``.
     Set ``env`` to override the registry container environment.
     """
 
@@ -531,8 +532,8 @@ class CtlptlRegistry(Resource):
                 # across ``pulumi up`` cycles.
                 "port": port,
                 # Optional registry container environment. When omitted,
-                # create() defaults to Docker Hub pull-through cache mode
-                # with REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io.
+                # create() defaults to pull-through cache mode backed by
+                # mirror.gcr.io.
                 "env": env,
                 # If true, create() first attaches to the first existing
                 # ctlptl registry whose name starts with registry_name, then

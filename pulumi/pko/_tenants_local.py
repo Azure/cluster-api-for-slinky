@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 import pulumi
 import pulumi_kubernetes as k8s
@@ -80,6 +81,8 @@ class TenantsLocal(pulumi.ComponentResource):
             Stack CR. The workload-cluster Stack CR sets it as a
             PKO-level ``spec.prerequisites`` entry so workload reconcile
             blocks until the control plane is reconciled.
+        config: Optional inline Pulumi config map written into emitted Stack
+            CRs. Opaque pass-through; the inner project owns key semantics.
         provider: Kubernetes provider scoped to the management cluster.
         opts: Standard ``ResourceOptions``.
 
@@ -98,6 +101,7 @@ class TenantsLocal(pulumi.ComponentResource):
         *,
         stack_spec: StackCRSpec,
         control_plane_stack: pulumi.Input[str],
+        config: dict[str, Any] | None,
         provider: k8s.Provider,
         opts: ResourceOptions | None = None,
     ) -> None:
@@ -116,6 +120,7 @@ class TenantsLocal(pulumi.ComponentResource):
                 project_name=_WORKLOAD_CLUSTER_PROJECT,
                 env=f"{_OUTER_ENV}-{tenant}",
                 repo_dir=_WORKLOAD_CLUSTER_REPO_DIR,
+                config=config,
                 prerequisites=[control_plane_stack],
             )
             # Per-env customization hook: any local-only Stack-CR spec

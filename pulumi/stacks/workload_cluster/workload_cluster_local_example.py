@@ -34,6 +34,12 @@ import pulumi_kubernetes as k8s
 import pulumi_local as local
 import yaml
 
+from registry_setting import (
+    REGISTRY_CONFIG_NAME,
+    RegistrySetting,
+    parse_registry_setting,
+)
+
 
 _CAPI_API_VERSION = "cluster.x-k8s.io/v1beta2"
 _BOOTSTRAP_API_VERSION = "bootstrap.cluster.x-k8s.io/v1beta2"
@@ -69,11 +75,10 @@ _WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneAvailable"
 _SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
-_CONTAINERD_DOCKER_IO_MIRROR_COMMANDS = [
-    "mkdir -p /etc/containerd/certs.d/docker.io",
-    'cat >/etc/containerd/certs.d/docker.io/hosts.toml <<\'EOF\'\nserver = "https://registry-1.docker.io"\n\n[host."https://mirror.gcr.io"]\n  capabilities = ["pull", "resolve"]\nEOF',
-    "systemctl restart containerd",
-]
+_DOCKER_IO_HOSTS_DIR = "/etc/containerd/certs.d/docker.io"
+_DOCKER_IO_SERVER = "https://registry-1.docker.io"
+_DOCKER_HUB_PUBLIC_MIRROR = "https://mirror.gcr.io"
+_DOCKER_DESKTOP_HOST = "host.docker.internal"
 
 
 @dataclass(frozen=True)
@@ -101,6 +106,50 @@ _WORKER_NODE_CLASSES = (
         },
     ),
 )
+
+
+def _read_registry_setting() -> RegistrySetting | None:
+    return parse_registry_setting(
+        pulumi.Config().get_object(REGISTRY_CONFIG_NAME)
+    )
+
+
+def _containerd_docker_io_mirror_commands(
+    registry_setting: RegistrySetting | None,
+) -> list[str]:
+    if registry_setting is None:
+        hosts_toml = (
+            f'server = "{_DOCKER_IO_SERVER}"\n\n'
+            f'[host."{_DOCKER_HUB_PUBLIC_MIRROR}"]\n'
+            '  capabilities = ["pull", "resolve"]\n'
+        )
+        return [
+            f"mkdir -p {_DOCKER_IO_HOSTS_DIR}",
+            f"cat >{_DOCKER_IO_HOSTS_DIR}/hosts.toml <<'EOF'\n{hosts_toml}EOF",
+            "systemctl restart containerd",
+        ]
+
+    port = registry_setting["port"]
+    return [
+        f"mkdir -p {_DOCKER_IO_HOSTS_DIR}",
+        (
+            f"_CA4S_REGISTRY_HOST={_DOCKER_DESKTOP_HOST}\n"
+            'if ! getent hosts "${_CA4S_REGISTRY_HOST}" >/dev/null 2>&1; then\n'
+            "  _CA4S_REGISTRY_HOST=$(ip route show default "
+            "| awk '{print $3; exit}')\n"
+            "fi\n"
+            'if [ -z "${_CA4S_REGISTRY_HOST}" ]; then\n'
+            '  echo "could not determine local registry host" >&2\n'
+            "  exit 1\n"
+            "fi\n"
+            f"cat >{_DOCKER_IO_HOSTS_DIR}/hosts.toml <<EOF\n"
+            f'server = "{_DOCKER_IO_SERVER}"\n\n'
+            f'[host."http://${{_CA4S_REGISTRY_HOST}}:{port}"]\n'
+            '  capabilities = ["pull", "resolve"]\n'
+            "EOF"
+        ),
+        "systemctl restart containerd",
+    ]
 
 
 def _resource_name(tenant: str, suffix: str) -> str:
@@ -176,6 +225,7 @@ def _kubeadm_config_template(
     name: str,
     resource_name: str,
     *,
+    pre_kubeadm_commands: list[str],
     controller: bool = False,
     opts: pulumi.ResourceOptions | None = None,
 ) -> k8s.apiextensions.CustomResource:
@@ -187,7 +237,7 @@ def _kubeadm_config_template(
         spec={
             "template": {
                 "spec": {
-                    "preKubeadmCommands": _CONTAINERD_DOCKER_IO_MIRROR_COMMANDS,
+                    "preKubeadmCommands": pre_kubeadm_commands,
                     "joinConfiguration": {
                         "nodeRegistration": _node_registration(controller),
                     },
@@ -242,6 +292,7 @@ class WorkerClass(pulumi.ComponentResource):
         tenant: str,
         cluster_name: str,
         node_image: str,
+        pre_kubeadm_commands: list[str],
         worker: WorkerClassSpec,
         provider: k8s.Provider,
         cluster: pulumi.Resource,
@@ -274,6 +325,7 @@ class WorkerClass(pulumi.ComponentResource):
         bootstrap_template = _kubeadm_config_template(
             bootstrap_template_name,
             f"cluster-{worker.name}-bootstrap-template",
+            pre_kubeadm_commands=pre_kubeadm_commands,
             controller=worker.controller,
             opts=child_options(),
         )
@@ -456,6 +508,9 @@ def run() -> None:
     """
     cluster_name = _resource_name(_TENANT, "workload")
     node_image = f"kindest/node:{_KUBERNETES_VERSION}"
+    pre_kubeadm_commands = _containerd_docker_io_mirror_commands(
+        _read_registry_setting()
+    )
     management_kubeconfig = ManagementKubeconfig("management-kubeconfig")
     management_provider = k8s.Provider(
         "management-k8s",
@@ -559,7 +614,7 @@ def run() -> None:
                 "joinConfiguration": {
                     "nodeRegistration": _node_registration(),
                 },
-                "preKubeadmCommands": _CONTAINERD_DOCKER_IO_MIRROR_COMMANDS,
+                "preKubeadmCommands": pre_kubeadm_commands,
             },
         },
         opts=pulumi.ResourceOptions(
@@ -613,6 +668,7 @@ def run() -> None:
             tenant=_TENANT,
             cluster_name=cluster_name,
             node_image=node_image,
+            pre_kubeadm_commands=pre_kubeadm_commands,
             worker=worker,
             provider=management_provider,
             cluster=cluster,

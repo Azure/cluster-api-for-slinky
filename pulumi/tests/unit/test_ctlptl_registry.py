@@ -18,7 +18,7 @@ from ctlptl.ctlptl_registry import CtlptlRegistry  # noqa: F401
 from ctlptl import ctlptl_registry
 
 
-_DEFAULT_ENV = ["REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io"]
+_DEFAULT_ENV = ["REGISTRY_PROXY_REMOTEURL=https://mirror.gcr.io"]
 
 
 def _completed(cmd: list[str], stdout: str = "") -> subprocess.CompletedProcess:
@@ -107,7 +107,7 @@ def test_create_falls_back_to_apply_when_no_adopt_match(
             assert "name: wanted" in input
             assert 'listenAddress: "0.0.0.0"' in input
             assert "port: 5050" in input
-            assert '- "REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io"' in input
+            assert '- "REGISTRY_PROXY_REMOTEURL=https://mirror.gcr.io"' in input
             return _completed(cmd)
         if cmd == ["ctlptl", "get", "registry", "wanted", "-o", "json"]:
             return _completed(cmd, json.dumps({"name": "wanted", "port": 5050}))
