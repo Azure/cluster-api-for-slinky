@@ -55,6 +55,10 @@ _SERVICE_DOMAIN = "cluster.local"
 _CALICO_CHART_REPO = "https://docs.tigera.io/calico/charts"
 _CALICO_CHART_NAME = "tigera-operator"
 _CALICO_CHART_VERSION = "v3.32.0"
+_CALICO_OPERATOR_CRDS_URL = (
+    "https://raw.githubusercontent.com/projectcalico/calico/"
+    f"{_CALICO_CHART_VERSION}/manifests/operator-crds.yaml"
+)
 _CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
 
@@ -712,6 +716,15 @@ def run() -> None:
             retain_on_delete=True,
         ),
     )
+    calico_operator_crds = k8s.yaml.ConfigFile(
+        "calico-operator-crds",
+        file=_CALICO_OPERATOR_CRDS_URL,
+        opts=pulumi.ResourceOptions(
+            provider=workload_provider,
+            depends_on=[calico_namespace],
+            retain_on_delete=True,
+        ),
+    )
     calico_operator = k8s.helm.v3.Release(
         "calico-operator",
         chart=_CALICO_CHART_NAME,
@@ -721,11 +734,12 @@ def run() -> None:
         cleanup_on_fail=True,
         atomic=True,
         wait_for_jobs=True,
+        skip_crds=True,
         timeout=600,
         values=_calico_values(),
         opts=pulumi.ResourceOptions(
             provider=workload_provider,
-            depends_on=[calico_namespace],
+            depends_on=[calico_namespace, calico_operator_crds],
             retain_on_delete=True,
         ),
     )
