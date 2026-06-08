@@ -26,6 +26,7 @@ from __future__ import annotations
 import base64
 import os
 import re
+import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
@@ -284,6 +285,28 @@ def _calico_values() -> dict[str, object]:
             },
         },
     }
+
+
+def _read_url(url: str) -> str:
+    with urllib.request.urlopen(url, timeout=60) as response:
+        return response.read().decode("utf-8")
+
+
+def _calico_operator_crd_dependencies(
+    calico_operator_crds: k8s.yaml.ConfigGroup,
+) -> list[pulumi.Input[pulumi.Resource]]:
+    return [
+        calico_operator_crds.get_resource(
+            "apiextensions.k8s.io/v1/CustomResourceDefinition",
+            name,
+        )
+        for name in (
+            "apiservers.operator.tigera.io",
+            "goldmanes.operator.tigera.io",
+            "installations.operator.tigera.io",
+            "whiskers.operator.tigera.io",
+        )
+    ]
 
 
 class WorkerClass(pulumi.ComponentResource):
@@ -716,9 +739,9 @@ def run() -> None:
             retain_on_delete=True,
         ),
     )
-    calico_operator_crds = k8s.yaml.ConfigFile(
+    calico_operator_crds = k8s.yaml.ConfigGroup(
         "calico-operator-crds",
-        file=_CALICO_OPERATOR_CRDS_URL,
+        yaml=[_read_url(_CALICO_OPERATOR_CRDS_URL)],
         opts=pulumi.ResourceOptions(
             provider=workload_provider,
             depends_on=[calico_namespace],
@@ -739,7 +762,10 @@ def run() -> None:
         values=_calico_values(),
         opts=pulumi.ResourceOptions(
             provider=workload_provider,
-            depends_on=[calico_namespace, calico_operator_crds],
+            depends_on=[
+                calico_namespace,
+                *_calico_operator_crd_dependencies(calico_operator_crds),
+            ],
             retain_on_delete=True,
         ),
     )
