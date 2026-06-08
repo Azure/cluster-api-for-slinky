@@ -53,6 +53,25 @@ wsl --shutdown
 # Verify:  wslinfo --networking-mode   # should print: mirrored
 ```
 
+**Linux/WSL2 inotify limits:**
+
+CAPD workload clusters can create enough watches that the default Linux inotify
+limits are too low. Persist higher host limits before running the local stack:
+
+```bash
+sudo tee /etc/sysctl.d/99-ca4s-inotify.conf >/dev/null <<'EOF'
+fs.inotify.max_user_watches=1048576
+fs.inotify.max_user_instances=8192
+EOF
+
+sudo sysctl --system
+sysctl fs.inotify.max_user_watches fs.inotify.max_user_instances
+```
+
+On WSL2 with `systemd=true`, `systemd-sysctl` reapplies this file when the
+distro starts. If systemd is not enabled, add an equivalent `sysctl -w` command
+under `[boot]` in `/etc/wsl.conf`.
+
 **Docker Hub mirror:**
 
 Local runs pull several images whose canonical names live on Docker Hub
