@@ -19,6 +19,12 @@ Layout
 
 from __future__ import annotations
 
-from pko.pko_bootstrap import PKOBootstrap
-
 __all__ = ["PKOBootstrap"]
+
+
+def __getattr__(name: str) -> object:
+	if name == "PKOBootstrap":
+		from pko.pko_bootstrap import PKOBootstrap
+
+		return PKOBootstrap
+	raise AttributeError(name)
