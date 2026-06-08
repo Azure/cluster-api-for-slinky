@@ -10,21 +10,12 @@ ComponentResource the outer stack calls once:
     ├── PKORelease                   # Helm OCI install w/ known_hosts mount
     ├── StateBackend                 # PVC + passphrase Secret
     ├── WorkspaceServiceAccount      # pulumi-runner + ClusterRoleBindings
-    ├── Stack/ca4s-control-plane
-    └── Tenants                      # per-env fan-out → N workload-cluster Stack CRs
+    └── Stack/ca4s-init              # reflexively emits child PKO Stack CRs
 
-The control-plane Stack CR reconciles from the same repo as this
-stack itself — it's how subsequent waves of management-cluster
-resources (CAPI providers, AWX) get applied via PKO instead of via
-further ``pulumi up`` invocations on the outer stack. Slinky CRDs +
-slurm-operator + Slurm chart are NOT in this set: they live on each
-tenant's workload cluster (that's where Slurm runs), and are
-installed by the per-tenant workload-cluster Stack CRs. Those CRs
-are emitted directly by the :class:`pko._tenants.Tenants` component
-as a sibling building block; there is no intermediate
-``ca4s-tenants`` mini-stack. Tenant churn happens via outer-stack
-``pulumi up`` against the appropriate per-env concrete impl in
-:mod:`pko._tenants_<env>`.
+The init Stack CR reconciles from the same repo as this stack itself.
+It is the only PKO Stack CR the outer host-side Pulumi program owns. Once PKO
+runs it, the init stack reflexively creates the control-plane Stack CR and the
+per-tenant workload-cluster Stack CRs from inside the management cluster.
 
 The SSH path replaced the previous Flux + ESO indirection. PKO's
 ``projectRepo`` only accepts ``https`` and ``ssh`` schemes; our
@@ -53,17 +44,9 @@ from pulumi import Output, ResourceOptions
 from pko._backend import StateBackend
 from pko._release import PKO_NAMESPACE, PKORelease
 from pko._service_account import WorkspaceServiceAccount
+from pko._init_stack import INIT_PROJECT, INIT_REPO_DIR, init_stack_config
 from pko._stack_cr import StackCRSpec, build_stack_spec
-from pko._tenants import Tenants
 
-
-# Pulumi project name + repo dir for the control-plane inner stack.
-# Kebab-case per Pulumi idiom; must match the ``name:`` field in
-# ``pulumi/stacks/control_plane/Pulumi.yaml``. The workload-cluster
-# project identity lives in :mod:`pko._tenants_local` (and siblings)
-# because that's where workload Stack CRs are emitted.
-CONTROL_PLANE_PROJECT = "ca4s-control-plane"
-CONTROL_PLANE_REPO_DIR = "pulumi/stacks/control_plane/"
 
 # Names PKOBootstrap projects into PKO's namespace. The Secret name is supplied
 # by the GitOpsRepository because it is derived from the matching public key;
@@ -120,15 +103,15 @@ class PKOBootstrap(pulumi.ComponentResource):
             into a hash-named ConfigMap under key
             ``known_hosts``.
         config:
-            Optional inline Pulumi config map written into every inner Stack CR.
-            PKOBootstrap treats this as opaque pass-through; project-scoped
-            config keys determine which inner stack actually consumes a value.
+            Optional inline Pulumi config map to forward to child Stack CRs.
+            PKOBootstrap passes this through the init Stack CR unchanged;
+            project-scoped config keys determine which child stack consumes a
+            value.
         env:
             Outer-stack environment moniker (``pulumi.get_stack()``).
-            Propagated to the control-plane Stack CR's ``spec.stack``
-            and used by :class:`Tenants` to dispatch to the per-env
-            concrete tenants impl. Plain ``str`` (not ``Input``) because
-            ``Tenants`` dispatches synchronously at construction time.
+            Propagated to the init Stack CR's ``spec.stack``; the init stack
+            then uses the same value for the control-plane Stack CR and tenant
+            dispatcher.
         opts:
             Standard Pulumi ``ResourceOptions``.
 
@@ -137,19 +120,15 @@ class PKOBootstrap(pulumi.ComponentResource):
             PKO namespace name (constant ``pulumi-kubernetes-operator``).
         service_account:
             Workspace SA name (constant ``pulumi-runner``).
-        control_plane_stack:
-            ``metadata.name`` of the control-plane Stack CR (auto-named).
-        workload_cluster_stacks:
-            List of ``metadata.name`` of each workload-cluster Stack CR
-            emitted by :class:`Tenants` (one per tenant).
+        init_stack:
+            ``metadata.name`` of the single outer-owned init Stack CR.
     """
 
     namespace: Output[str]
     service_account: Output[str]
     ssh_secret_name: Output[str]
     known_hosts_config_map_name: Output[str]
-    control_plane_stack: Output[str]
-    workload_cluster_stacks: list[Output[str]]
+    init_stack: Output[str]
 
     def __init__(
         self,
@@ -259,9 +238,9 @@ class PKOBootstrap(pulumi.ComponentResource):
             opts=ResourceOptions(parent=self),
         )
 
-        # Bundle the shared shape once and pass it to every Stack CR
-        # build path: the control-plane CR directly here, and the
-        # per-tenant workload-cluster CRs through :class:`Tenants`.
+        # Bundle the shared shape once. PKOBootstrap passes it as init-stack
+        # config; the PKO-owned init stack reconstructs it and uses it for all
+        # child Stack CRs.
         stack_spec = StackCRSpec(
             pko_namespace=release.namespace,
             service_account_name=sa.service_account_name,
@@ -286,50 +265,33 @@ class PKOBootstrap(pulumi.ComponentResource):
             backend,
         ]
 
-        control_plane_spec = build_stack_spec(
+        init_spec = build_stack_spec(
             spec=stack_spec,
-            project_name=CONTROL_PLANE_PROJECT,
+            project_name=INIT_PROJECT,
             env=env,
-            repo_dir=CONTROL_PLANE_REPO_DIR,
-            config=config,
+            repo_dir=INIT_REPO_DIR,
+            config=init_stack_config(
+                stack_spec=stack_spec,
+                child_config=config,
+            ),
         )
-        control_plane = k8s.apiextensions.CustomResource(
-            f"{name}-control-plane",
+        init_stack = k8s.apiextensions.CustomResource(
+            f"{name}-init",
             api_version="pulumi.com/v1",
             kind="Stack",
             metadata={"namespace": PKO_NAMESPACE},
-            spec=control_plane_spec,
+            spec=init_spec,
             opts=ResourceOptions(
                 parent=self, provider=k8s_provider, depends_on=cr_deps
             ),
         )
-        control_plane_stack_name = control_plane.metadata["name"]  # type: ignore[attr-defined]
-
-        # Per-env tenant fan-out. ``Tenants`` is a sibling building
-        # block (like ``StateBackend``) that dispatches on ``env`` to
-        # the registered concrete impl in :mod:`pko._tenants` and
-        # emits one workload-cluster Stack CR per tenant. Each emitted
-        # CR sets the control-plane CR as a PKO ``spec.prerequisites``
-        # entry so workload reconcile blocks until the control plane
-        # is reconciled.
-        tenants = Tenants(
-            f"{name}-tenants",
-            env=env,
-            stack_spec=stack_spec,
-            control_plane_stack=control_plane_stack_name,
-            config=config,
-            provider=k8s_provider,
-            opts=ResourceOptions(
-                parent=self, depends_on=cr_deps + [control_plane]
-            ),
-        )
+        init_stack_name = init_stack.metadata["name"]  # type: ignore[attr-defined]
 
         self.namespace = release.namespace
         self.service_account = sa.service_account_name
         self.ssh_secret_name = ssh_secret_name
         self.known_hosts_config_map_name = known_hosts_config_map_name
-        self.control_plane_stack = control_plane_stack_name
-        self.workload_cluster_stacks = tenants.workload_cluster_stacks
+        self.init_stack = init_stack_name
 
         self.register_outputs(
             {
@@ -337,7 +299,6 @@ class PKOBootstrap(pulumi.ComponentResource):
                 "service_account": self.service_account,
                 "ssh_secret_name": self.ssh_secret_name,
                 "known_hosts_config_map_name": self.known_hosts_config_map_name,
-                "control_plane_stack": self.control_plane_stack,
-                "workload_cluster_stacks": self.workload_cluster_stacks,
+                "init_stack": self.init_stack,
             }
         )

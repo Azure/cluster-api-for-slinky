@@ -1,4 +1,4 @@
-"""Per-env tenant fan-out, sibling building block of PKOBootstrap.
+"""Per-env tenant fan-out used by the PKO-owned init stack.
 
 ``Tenants`` is a thin dispatcher: it picks the right per-env concrete
 implementation (``TenantsLocal`` etc.) based on the outer-stack env
@@ -13,9 +13,9 @@ a new ``_tenants_<env>.py`` next to this file exposing a class named
 ``Tenants<Env>`` (``Env`` = ``env.capitalize()``); the dispatcher
 resolves it by convention, no registry edit needed.
 
-No mini-stack, no workspace pod, no extra reconcile loop — the
-workload-cluster Stack CRs land directly in the management cluster
-when PKOBootstrap runs.
+The outer host-side Pulumi stack does not instantiate this directly. The
+PKO-owned init stack does, so workload-cluster Stack CR ownership sits behind
+the single outer-owned ``ca4s-init`` Stack CR.
 """
 
 from __future__ import annotations
@@ -40,9 +40,9 @@ _TENANTS_MODULE_PREFIX = "pko._tenants_"
 class Tenants(pulumi.ComponentResource):
     """Dispatch to the per-env concrete tenants impl.
 
-    Instantiated by :class:`pko.pko_bootstrap.PKOBootstrap` as a
-    sibling of ``StateBackend``, ``WorkspaceServiceAccount`` etc. —
-    the outer stack itself never references this class directly.
+    Instantiated by the PKO-owned init stack after it creates the
+    control-plane Stack CR. The outer stack itself never references this class
+    directly.
 
     Args:
         name: Pulumi resource name; prefix for the concrete impl
@@ -50,14 +50,17 @@ class Tenants(pulumi.ComponentResource):
         env: Outer-stack env moniker (``pulumi.get_stack()`` value).
             Must be a literal ``str`` because dispatch happens at
             construction time; no ``Output``/``Awaitable`` form.
-        stack_spec: Shared :class:`StackCRSpec` from PKOBootstrap.
-            Forwarded unchanged to the concrete impl.
+        stack_spec: Shared :class:`StackCRSpec` reconstructed by the init
+            stack. Forwarded unchanged to the concrete impl.
         control_plane_stack: ``metadata.name`` of the control-plane
             Stack CR. Concrete impls thread it into each emitted
             Stack CR's ``spec.prerequisites``.
         config: Optional inline Pulumi config map written into emitted Stack
             CRs. Opaque pass-through; inner projects own key semantics.
-        provider: Kubernetes provider for the management cluster.
+        provider: Optional Kubernetes provider for the management cluster. The
+            host-side bootstrap passed an explicit provider; the PKO-owned init
+            stack passes ``None`` to use the workspace pod's ambient in-cluster
+            credentials.
         opts: Standard ``ResourceOptions``.
 
     Outputs:
@@ -75,7 +78,7 @@ class Tenants(pulumi.ComponentResource):
         stack_spec: StackCRSpec,
         control_plane_stack: pulumi.Input[str],
         config: dict[str, Any] | None,
-        provider: k8s.Provider,
+        provider: k8s.Provider | None,
         opts: ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:pko:Tenants", name, props={}, opts=opts)

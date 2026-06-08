@@ -1,0 +1,7 @@
+# Python dependencies for the ca4s-init inner stack.
+#
+# Mirrors the host-side pins in the repo-root requirements.txt. The project
+# imports the sibling pko package from the checked-out repo source rather than
+# installing it as a wheel.
+pulumi>=3.0,<4.0
+pulumi-kubernetes>=4.0,<5.0

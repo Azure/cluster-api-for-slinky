@@ -9,8 +9,8 @@ description: |
   ``../workload_cluster/``). No ingress controller for now either:
   LoadBalancer Services on mgmt get a routable IP from the cloud
   provider (cloud-provider-kind locally) directly. The per-tenant
-  workload-cluster Stack CRs (emitted by the outer ``PKOBootstrap``
-  via the ``Tenants`` component) take a hard dependency on this
+  workload-cluster Stack CRs (emitted by the PKO-owned init stack via
+  the ``Tenants`` component) take a hard dependency on this
   stack via PKO's ``spec.prerequisites``, so CAPI + AWX land before
   any per-tenant workload cluster is attempted.
 

@@ -19,10 +19,9 @@ description: |
       ``slurm-operator-values.yaml``). Slinky CRDs live HERE, not on
       the management cluster.
 
-  Stack CRs that drive this project are emitted directly by the outer
-  ``PKOBootstrap`` via the per-env ``Tenants`` component (one CR per
-  entry in the per-env concrete ``TenantsLocal`` / etc. class) — there
-  is no intermediate ``ca4s-tenants`` mini-stack.
+  Stack CRs that drive this project are emitted by the PKO-owned
+  ``ca4s-init`` stack via the per-env ``Tenants`` component (one CR per
+  entry in the per-env concrete ``TenantsLocal`` / etc. class).
 runtime:
   name: python
   options:

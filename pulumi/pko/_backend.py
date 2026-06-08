@@ -1,7 +1,7 @@
 """``file://`` state backend for inner Pulumi stacks run by PKO.
 
 PKO's workspace pods need a Pulumi state backend to store the state of
-each inner stack (control-plane, tenants, workload-cluster). Options
+each inner stack (init, control-plane, workload-cluster). Options
 include Pulumi Cloud, S3 / GCS / Azure Blob, or a self-managed
 ``file://`` URL.
 

@@ -11,12 +11,12 @@ the developer loop needs, in dependency order:
    in-cluster Gitea seeded with this repo's current ``HEAD``. Swappable
    behind a single config key for external git providers later.
 3. **PKO bootstrap** via the ``pko`` package — installs the Pulumi
-   Kubernetes Operator (Helm OCI), wires up its file:// state backend
-   on a cluster-side PVC, projects the GitOps credentials Secret into
-   PKO's namespace, emits the top-level ``pulumi.com/v1`` Stack CR for
-   the control plane, and fans out one workload-cluster Stack CR per
-   tenant (via the per-env ``Tenants`` component). From there on PKO
-   owns reconcile.
+    Kubernetes Operator (Helm OCI), wires up its file:// state backend
+    on a cluster-side PVC, projects the GitOps credentials Secret into
+    PKO's namespace, and emits exactly one ``pulumi.com/v1`` Stack CR:
+    ``ca4s-init``. From there on PKO owns reconcile, including the
+    control-plane and per-tenant workload-cluster Stack CRs that the
+    init stack creates reflexively.
 
 Why one stack
 -------------
@@ -175,15 +175,18 @@ def run() -> None:
     # ----------------------------------------------------------------------
     #
     # Install the Pulumi Kubernetes Operator (PKO) into the management
-    # cluster and hand off everything else to it. From this point on,
-    # every further wave of resources (CAPI providers, AWX on mgmt;
-    # slinky operator + CRDs + Slurm cluster on each tenant's workload
-    # cluster) is applied by PKO out of the same seeded repo — NOT by
-    # further ``pulumi up`` invocations on this outer stack.
+    # cluster and hand off everything else to it. The outer stack owns
+    # exactly one Stack CR under PKO: ``ca4s-init``. That init stack runs
+    # inside PKO and creates the control-plane Stack CR plus the per-tenant
+    # workload-cluster Stack CRs. Tenant churn is therefore reconciled by
+    # PKO from Git after the init stack notices the repo change, rather than
+    # by adding/removing Stack CRs directly from this outer host-side graph.
     #
-    # Two inner Pulumi projects live as sibling directories under
-    # ``pulumi/stacks/``, both sharing the outer ``../../../.venv``:
+    # Three inner Pulumi projects live as sibling directories under
+    # ``pulumi/stacks/``, all sharing the outer ``../../../.venv``:
     #
+    #     pulumi/stacks/init/             - the single outer-owned PKO Stack;
+    #                                       reflexively emits child Stack CRs.
     #     pulumi/stacks/control_plane/    - CAPI providers + AWX
     #                                       (mgmt-cluster operators
     #                                       only; tenant-agnostic).
@@ -193,16 +196,7 @@ def run() -> None:
     #                                       slurm-operator-crds +
     #                                       slurm-operator + Slurm chart
     #                                       + NodeSets on the workload
-    #                                       cluster. One Stack CR per
-    #                                       tenant emitted directly by
-    #                                       ``PKOBootstrap`` via the
-    #                                       per-env ``Tenants`` component.
-    #
-    # ``PKOBootstrap`` creates the control-plane Stack CR plus the
-    # per-tenant workload-cluster Stack CRs (one per discovered tenant
-    # module, e.g. ``workload_cluster_local_example.py``). Tenant churn
-    # is adding/removing one workload-cluster tenant module + a ``pulumi up``
-    # on this outer stack.
+    #                                       cluster.
     #
     # Per-env dispatch in every inner program follows the same
     # ``__main__.py`` -> ``<project>_<env>.py`` trick this outer file
@@ -210,6 +204,8 @@ def run() -> None:
     # PKO's ``spec.stack`` field; inside the workspace pod
     # ``pulumi.get_stack()`` returns the third segment unchanged:
     #
+    #     ca4s-init             -> spec.stack=organization/ca4s-init/local
+    #                              -> creates the child Stack CRs below
     #     ca4s-control-plane    -> spec.stack=organization/ca4s-control-plane/local
     #                              -> dispatcher picks ``control_plane_local.py``
     #     ca4s-workload-cluster -> spec.stack=organization/ca4s-workload-cluster/<outer_env>-<tenant>
@@ -279,12 +275,11 @@ def run() -> None:
         repo.ssh_private_key_secret.metadata["namespace"],
     )
 
-    # Phase 3: PKO bootstrap handles + the control-plane Stack CR name
-    # + per-tenant workload-cluster Stack CR names. These variables are exported
-    # for transparency.
+    # Phase 3: PKO bootstrap handles + the one outer-owned init Stack CR name.
+    # The control-plane and workload-cluster Stack CR names are outputs of the
+    # PKO-owned init stack, not this host-side outer stack.
     pulumi.export("pko_namespace", pko.namespace)
     pulumi.export("pko_service_account", pko.service_account)
     pulumi.export("pko_ssh_secret_name", pko.ssh_secret_name)
     pulumi.export("pko_known_hosts_config_map_name", pko.known_hosts_config_map_name)
-    pulumi.export("pko_control_plane_stack", pko.control_plane_stack)
-    pulumi.export("pko_workload_cluster_stacks", pko.workload_cluster_stacks)
+    pulumi.export("pko_init_stack", pko.init_stack)

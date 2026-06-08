@@ -2,14 +2,15 @@
 
 Re-exports the single public entrypoint :class:`PKOBootstrap`. Inner
 building blocks (PKO Helm release with SSH mount, state backend,
-workspace SA, Stack CR spec builder, per-env tenants fan-out) are
-package-internal and wired together by :class:`PKOBootstrap` itself.
+workspace SA, Stack CR spec builder, init-stack runtime, per-env tenants
+fan-out) are package-internal.
 
 Layout
 ------
 * :mod:`pko._release`            — Helm OCI install + namespace + SSH mount
 * :mod:`pko._backend`            — file:// state backend (PVC + passphrase)
 * :mod:`pko._service_account`    — workspace SA + ClusterRoleBindings
+* :mod:`pko._init_stack`         — single init Stack CR contract + runtime
 * :mod:`pko._stack_cr`           — ``build_stack_spec`` + ``StackCRSpec``
 * :mod:`pko._tenants`            — per-env tenants dispatcher
 * :mod:`pko._tenants_<env>`      — per-env concrete tenants impls

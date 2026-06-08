@@ -1,0 +1,11 @@
+name: ca4s-init
+description: |
+  First PKO-owned stack. The outer host-side Pulumi stack creates exactly this
+  one Stack CR after installing PKO; this stack then reflexively creates the
+  control-plane Stack CR and per-tenant workload-cluster Stack CRs from inside
+  the management cluster.
+runtime:
+  name: python
+  options:
+    virtualenv: ../../../.venv
+main: __main__.py

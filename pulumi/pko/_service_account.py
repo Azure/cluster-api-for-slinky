@@ -12,10 +12,10 @@ we create our own:
 * ``ClusterRoleBinding`` -> ``cluster-admin`` (so the inner stacks can
   create namespaces, CRDs, Helm releases, etc.; trim later, see TODO).
 
-Single SA for all three inner stack projects (control-plane, tenants,
+Single SA for all inner stack projects (init, control-plane,
 workload-cluster). Splitting later — when we have a clear inventory of
-what each inner stack actually does — would let us write three trimmed
-ClusterRoles instead of cluster-admin.
+what each inner stack actually does — would let us write trimmed ClusterRoles
+instead of cluster-admin.
 """
 
 from __future__ import annotations

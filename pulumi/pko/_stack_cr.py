@@ -1,7 +1,7 @@
 """Reusable builder for ``pulumi.com/v1`` Stack Custom Resources.
 
-Both :class:`pko.pko_bootstrap.PKOBootstrap` (control-plane CR) and
-:class:`pko._tenants_local.TenantsLocal` (per-tenant workload-cluster
+Both :class:`pko.pko_bootstrap.PKOBootstrap` (the init Stack CR) and
+the PKO-owned init stack (control-plane plus per-tenant workload-cluster
 CRs) emit Stack CRs with the same boilerplate: ``serviceAccountName``,
 ``projectRepo`` + ``branch`` + ``gitAuth.sshAuth``, ``envRefs``,
 ``backend``, ``workspaceTemplate`` volume mounts, ``refresh: true``.
@@ -78,17 +78,12 @@ _SSH_MOUNT_PATH = "/etc/gitea-ssh"
 class StackCRSpec:
     """Bundle of inputs every Stack CR we emit needs.
 
-    Pure Python-side data carrier — ``PKOBootstrap`` builds one
-    instance, holds it as a Python attribute, and passes it through to
-    every Stack-CR build path: the control-plane CR directly in
-    :class:`pko.pko_bootstrap.PKOBootstrap`; the per-tenant
-    workload-cluster CRs via :class:`pko._tenants.Tenants` -> the
-    per-env concrete impl. Both call sites feed the same
-    :func:`build_stack_spec` to produce the ``spec`` dict and then
-    instantiate the ``CustomResource`` themselves. Never crosses the
-    Pulumi RPC boundary itself — callers always read its fields out
-    into the plain dicts that pulumi-kubernetes consumes. Do NOT pass
-    an instance directly as a resource property bag; this is not a
+    Pure Python-side data carrier. ``PKOBootstrap`` builds one instance and
+    serializes its fields into the init Stack CR config; the PKO-owned init
+    stack reconstructs it and passes it through to every child Stack-CR build
+    path. Callers feed the same :func:`build_stack_spec` to produce the
+    ``spec`` dict and then instantiate the ``CustomResource`` themselves. Do
+    NOT pass an instance directly as a resource property bag; this is not a
     ``@pulumi.input_type``.
 
     All Output-typed fields accept either ``Output[str]`` or plain

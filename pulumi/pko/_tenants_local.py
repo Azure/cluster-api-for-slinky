@@ -74,16 +74,16 @@ class TenantsLocal(pulumi.ComponentResource):
 
     Args:
         name: Pulumi resource name; prefix for the child Stack CR.
-        stack_spec: Shared :class:`StackCRSpec` built once by
-            :class:`pko.pko_bootstrap.PKOBootstrap` and threaded into
-            the Stack CR this component emits.
+        stack_spec: Shared :class:`StackCRSpec` reconstructed by the init stack
+            and threaded into the Stack CR this component emits.
         control_plane_stack: ``metadata.name`` of the control-plane
             Stack CR. The workload-cluster Stack CR sets it as a
             PKO-level ``spec.prerequisites`` entry so workload reconcile
             blocks until the control plane is reconciled.
         config: Optional inline Pulumi config map written into emitted Stack
             CRs. Opaque pass-through; the inner project owns key semantics.
-        provider: Kubernetes provider scoped to the management cluster.
+        provider: Optional Kubernetes provider scoped to the management cluster.
+            ``None`` uses the PKO workspace pod's ambient in-cluster credentials.
         opts: Standard ``ResourceOptions``.
 
     Outputs:
@@ -102,7 +102,7 @@ class TenantsLocal(pulumi.ComponentResource):
         stack_spec: StackCRSpec,
         control_plane_stack: pulumi.Input[str],
         config: dict[str, Any] | None,
-        provider: k8s.Provider,
+        provider: k8s.Provider | None,
         opts: ResourceOptions | None = None,
     ) -> None:
         super().__init__(
