@@ -542,6 +542,7 @@ def run() -> None:
     management_provider = k8s.Provider(
         "management-k8s",
         kubeconfig=management_kubeconfig.kubeconfig,
+        upsert_existing_objects=True,
         opts=pulumi.ResourceOptions(depends_on=[management_kubeconfig]),
     )
 
