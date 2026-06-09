@@ -494,7 +494,7 @@ def _local_path_storage(
     provider: k8s.Provider,
     opts: pulumi.ResourceOptions,
 ) -> pulumi.Resource:
-    namespace = k8s.core.v1.NamespacePatch(
+    namespace = k8s.core.v1.Namespace(
         "local-path-storage-namespace-privileged",
         metadata={
             "name": _LOCAL_PATH_NAMESPACE,
@@ -608,7 +608,7 @@ def _local_path_storage(
         },
         provisioner="rancher.io/local-path",
         reclaim_policy="Delete",
-        volume_binding_mode="WaitForFirstConsumer",
+        volume_binding_mode="Immediate",
         opts=pulumi.ResourceOptions(parent=opts.parent, provider=provider),
     )
     k8s.apps.v1.DeploymentPatch(
