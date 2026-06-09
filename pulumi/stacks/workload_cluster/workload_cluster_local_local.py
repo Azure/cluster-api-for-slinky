@@ -607,15 +607,12 @@ class LocalPathStorage(pulumi.ComponentResource):
         super().__init__("ca4s:workload:LocalPathStorage", name, props={}, opts=opts)
 
         def child_options(
-            *,
-            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
-            delete_before_replace: bool | None = None,
+            *, depends_on: list[pulumi.Input[pulumi.Resource]] | None = None
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
-                delete_before_replace=delete_before_replace,
             )
 
         namespace = k8s.core.v1.Namespace(
@@ -892,12 +889,15 @@ class ClusterAPIAutoscaler(pulumi.ComponentResource):
         capd_rbac_name = _resource_name(instance, "autoscaler-capd")
 
         def child_options(
-            *, depends_on: list[pulumi.Input[pulumi.Resource]] | None = None
+            *,
+            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+            delete_before_replace: bool | None = None,
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
+                delete_before_replace=delete_before_replace,
             )
 
         namespace = k8s.core.v1.Namespace(
