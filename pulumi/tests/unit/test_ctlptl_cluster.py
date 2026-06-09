@@ -29,6 +29,7 @@ def test_render_generates_docker_hub_hosts_for_registry_cache(
     hosts_path = state_dir / "kind-mgmt-test" / "docker.io" / "hosts.toml"
     hosts_toml = hosts_path.read_text(encoding="utf-8")
 
+    assert "registry: registry-test" not in rendered
     assert f"hostPath: {hosts_path}" in rendered
     assert "containerPath: /etc/containerd/certs.d/docker.io/hosts.toml" in rendered
     assert 'server = "https://registry-1.docker.io"' in hosts_toml

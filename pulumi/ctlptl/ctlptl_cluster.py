@@ -7,10 +7,11 @@ Design notes
   kubeconfig context name (kind always prefixes its contexts with ``kind-``,
   which is why ctlptl's ``Cluster.name`` for product=kind must start with
   ``kind-`` too).
-* The cluster is wired to a separately-managed ``CtlptlRegistry`` via the
-  ``registry: <name>`` field in the Cluster spec. Passing the registry's
-  ``registry_name`` output into this resource gives Pulumi the dependency
-  edge, so the registry is created first and deleted last.
+* The cluster is wired to a separately-managed ``CtlptlRegistry`` by mounting
+    a generated containerd ``hosts.toml`` into the kind nodes and attaching the
+    registry container to Docker's ``kind`` network after cluster creation.
+    Passing the registry's ``registry_name`` output into this resource gives
+    Pulumi the dependency edge, so the registry is created first and deleted last.
 
 Auto-naming
 -----------
@@ -56,11 +57,10 @@ substitutes when rendering the manifest:
 * ``${CLUSTER_NAME}`` → the autonamed or pinned ``cluster_name``. Must be
   expanded inside the provider because the autonamed value only exists
   inside ``create()``.
-* ``${REGISTRY_NAME}`` → the value of the ``registry_name`` input
-  (typically ``CtlptlRegistry().registry_name``). Substituting inside the
-  provider lets the caller pass an ``Output[str]`` directly, giving us the
-  canonical Pulumi Output→Input dependency edge without an explicit
-  ``depends_on``.
+* ``${REGISTRY_NAME}`` → the value of the ``registry_name`` input in the
+    generated Docker Hub ``hosts.toml``. The ctlptl ``Cluster`` manifest does not
+    set its own ``registry`` field because that path lets ctlptl recreate the
+    sibling registry without the proxy env, destroying the retained cache.
 * ``${HOME}`` → read from the program's environment at apply time. It
   expands to a host-local filesystem path (used for ``hostPath`` mounts);
   the provider runs in the user's environment, so reading ``$HOME`` there
@@ -157,7 +157,6 @@ apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
 product: kind
 name: ${CLUSTER_NAME}
-registry: ${REGISTRY_NAME}
 kindV1Alpha4Cluster:
   apiVersion: kind.x-k8s.io/v1alpha4
   kind: Cluster
@@ -257,6 +256,24 @@ def _docker_io_hosts_toml(cluster_name: str, registry_name: str) -> Path:
     return path
 
 
+def _connect_registry_to_kind_network(registry_name: str) -> None:
+    """Attach the managed registry container to Docker's kind network."""
+    _require_binary("docker")
+    result = _run(
+        ["docker", "network", "connect", "kind", registry_name],
+        check=False,
+    )
+    if result.returncode == 0:
+        return
+    stderr = result.stderr or ""
+    if "already exists" in stderr or "is already attached" in stderr:
+        return
+    raise RuntimeError(
+        "failed to attach registry container "
+        f"{registry_name!r} to Docker network 'kind': {stderr.strip()}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Provider.
 # ---------------------------------------------------------------------------
@@ -271,7 +288,8 @@ def _render(cluster_name: str, registry_name: Optional[str] = None) -> str:
     * ``${REGISTRY_NAME}`` → ``registry_name`` when truthy. Doing it here
       lets the caller pass ``CtlptlRegistry().registry_name`` directly as
       an ``Input[str]``, giving Pulumi the cross-resource dependency edge
-      for free (no ``depends_on`` needed).
+      for free (no ``depends_on`` needed). The value is only rendered into the
+      generated Docker Hub hosts file, not the ctlptl ``Cluster`` spec.
     * ``${HOME}`` → the program's ``$HOME`` env var, raised if missing.
         * ``${DOCKER_IO_HOSTS_TOML}`` → generated hostPath file pointing Docker Hub
             pulls at the sibling ctlptl registry's in-cluster address.
@@ -327,6 +345,8 @@ class _CtlptlClusterProvider(ResourceProvider):
         rendered = _render(cluster_name, registry_name)
 
         _run(["ctlptl", "apply", "-f", "-"], stdin=rendered)
+        if registry_name:
+            _connect_registry_to_kind_network(registry_name)
         kubeconfig = _fetch_kubeconfig(cluster_name)
 
         return CreateResult(
