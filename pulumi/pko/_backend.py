@@ -44,6 +44,8 @@ STATE_BACKEND_URL = f"file://{STATE_MOUNT_PATH}"
 # Single Secret name shared across all inner Stack CRs.
 PASSPHRASE_SECRET_NAME = "pko-state-passphrase"
 PASSPHRASE_SECRET_KEY = "PULUMI_CONFIG_PASSPHRASE"
+DELETE_UNREACHABLE_SECRET_NAME = "pko-delete-unreachable"
+DELETE_UNREACHABLE_SECRET_KEY = "PULUMI_K8S_DELETE_UNREACHABLE"
 
 
 class StateBackend(pulumi.ComponentResource):
@@ -103,6 +105,17 @@ class StateBackend(pulumi.ComponentResource):
             string_data={PASSPHRASE_SECRET_KEY: passphrase.result},
             type="Opaque",
             immutable=True,
+            opts=ResourceOptions(parent=self, provider=provider),
+        )
+
+        k8s.core.v1.SecretPatch(
+            f"{name}-delete-unreachable-secret",
+            metadata={
+                "name": DELETE_UNREACHABLE_SECRET_NAME,
+                "namespace": namespace,
+            },
+            string_data={DELETE_UNREACHABLE_SECRET_KEY: "true"},
+            type="Opaque",
             opts=ResourceOptions(parent=self, provider=provider),
         )
 

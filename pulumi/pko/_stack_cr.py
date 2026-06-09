@@ -30,6 +30,8 @@ from typing import Any
 
 import pulumi
 
+from pko._backend import DELETE_UNREACHABLE_SECRET_KEY, DELETE_UNREACHABLE_SECRET_NAME
+
 
 # Hard-coded org placeholder Pulumi uses for self-managed (file://)
 # backends. The full ``spec.stack`` string we emit is
@@ -147,6 +149,13 @@ def build_stack_spec(
             "secret": {
                 "name": spec.passphrase_secret_name,
                 "key": "PULUMI_CONFIG_PASSPHRASE",
+            },
+        },
+        DELETE_UNREACHABLE_SECRET_KEY: {
+            "type": "Secret",
+            "secret": {
+                "name": DELETE_UNREACHABLE_SECRET_NAME,
+                "key": DELETE_UNREACHABLE_SECRET_KEY,
             },
         },
     }
