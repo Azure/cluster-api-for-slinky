@@ -364,6 +364,7 @@ def _cluster_autoscaler_kubeconfig_secret_name(instance: str) -> str:
 
 def _cluster_autoscaler_values(
     *,
+    cluster_name: str,
     fullname: str,
     kubeconfig_secret_name: str,
 ) -> dict[str, object]:
@@ -377,13 +378,7 @@ def _cluster_autoscaler_values(
         ),
         "autoDiscovery": {
             "namespace": _NAMESPACE,
-            "labels": [
-                {
-                    _CLUSTER_AUTOSCALER_DISCOVERY_LABEL: (
-                        _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE
-                    )
-                }
-            ],
+            "clusterName": cluster_name,
         },
         "extraArgs": {
             "logtostderr": True,
@@ -958,6 +953,7 @@ class ClusterAPIAutoscaler(pulumi.ComponentResource):
             wait_for_jobs=True,
             timeout=600,
             values=_cluster_autoscaler_values(
+                cluster_name=_resource_name(instance, "workload"),
                 fullname=fullname,
                 kubeconfig_secret_name=kubeconfig_secret_name,
             ),

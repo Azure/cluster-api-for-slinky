@@ -77,16 +77,17 @@ clusterAPIKubeconfigSecret: local-autoscaler-kubeconfig
 clusterAPIWorkloadKubeconfigPath: /etc/kubernetes/value
 autoDiscovery:
   namespace: default
-  labels:
-  - ca4s.azure.com/autoscaler-enabled: "true"
+  clusterName: local-workload
 extraArgs:
   scale-down-unneeded-time: 2m
 ```
 
 Key details:
 
-- **Auto-discovery** finds autoscaled MachineDeployments by the label
-  `ca4s.azure.com/autoscaler-enabled: "true"`.
+- **Auto-discovery** is scoped to the CAPI cluster name. This keeps the
+  MachineDeployment, MachineSet, and Machine lookup path under the same filter,
+  which Cluster Autoscaler needs when mapping workload Nodes back to CAPI
+  Machines.
 - **Min/max bounds** are controlled by annotations on the MachineDeployment
   itself (see label/annotation passthrough below).
 - **Replica ownership** belongs to Cluster Autoscaler. Pulumi creates the
@@ -144,8 +145,9 @@ workers:
   REST API).
 - **`slinky.slurm.net/node-type: compute`** on the compute MachineDeployment
   identifies nodes that run slurmd worker pods.
-- **`ca4s.azure.com/autoscaler-enabled: "true"`** identifies
-  MachineDeployments that Cluster Autoscaler is allowed to manage.
+- **`ca4s.azure.com/autoscaler-enabled: "true"`** is a metadata marker on the
+  MachineDeployment. Cluster Autoscaler discovery is scoped by cluster name so
+  the related MachineSets and Machines remain discoverable during Node mapping.
 - The **autoscaler annotations** tell Cluster Autoscaler the allowed scaling
   range (1–10 nodes).
 

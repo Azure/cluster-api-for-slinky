@@ -66,6 +66,7 @@ def test_cluster_autoscaler_names_are_instance_scoped() -> None:
 
 def test_cluster_autoscaler_values_use_secret_backed_workload_kubeconfig() -> None:
     values = _cluster_autoscaler_values(
+        cluster_name="local-workload",
         fullname="local-cluster-autoscaler",
         kubeconfig_secret_name="local-autoscaler-kubeconfig",
     )
@@ -77,11 +78,7 @@ def test_cluster_autoscaler_values_use_secret_backed_workload_kubeconfig() -> No
     assert values["clusterAPIWorkloadKubeconfigPath"] == "/etc/kubernetes/value"
     assert values["autoDiscovery"] == {
         "namespace": "default",
-        "labels": [
-            {
-                _CLUSTER_AUTOSCALER_DISCOVERY_LABEL: _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE
-            }
-        ],
+        "clusterName": "local-workload",
     }
     assert values["extraArgs"] == {
         "logtostderr": True,
