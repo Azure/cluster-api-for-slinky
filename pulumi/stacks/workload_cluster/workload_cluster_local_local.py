@@ -968,10 +968,8 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 depends_on=[local_path_storage],
             ),
         )
-        local_path_storage_class = k8s.apiextensions.CustomResourcePatch(
+        local_path_storage_class = k8s.storage.v1.StorageClassPatch(
             "local-path-storage-class-default",
-            api_version="storage.k8s.io/v1",
-            kind="StorageClass",
             metadata={
                 "name": _LOCAL_PATH_STORAGE_CLASS,
                 "annotations": {
@@ -979,6 +977,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                     "defaultVolumeType": "local",
                 },
             },
+            provisioner="rancher.io/local-path",
             opts=child_options(
                 provider=workload_provider,
                 depends_on=[local_path_storage],
