@@ -3,12 +3,6 @@
 __pycache__/
 *.pyc
 
-# Per-stack config Pulumi auto-generates (currently just an encryptionsalt
-# that is never used because nothing in this stack is wrapped in
-# Output.secret). Pulumi recreates this file on every invocation, so it
-# can't be deleted; it just doesn't belong in Git for a local-backend PoC.
-Pulumi.*.yaml
-
 # pytest / mypy caches generated when running the test scaffold under
 # tests/. Safe to delete at any time.
 .pytest_cache/
