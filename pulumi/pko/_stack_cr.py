@@ -30,8 +30,6 @@ from typing import Any
 
 import pulumi
 
-from pko._backend import DELETE_UNREACHABLE_SECRET_KEY, DELETE_UNREACHABLE_SECRET_NAME
-
 
 # Hard-coded org placeholder Pulumi uses for self-managed (file://)
 # backends. The full ``spec.stack`` string we emit is
@@ -53,6 +51,8 @@ _STATE_VOLUME_NAME = "state"
 # Mount path inside the workspace pod. Must agree with the ``file://``
 # URL in :mod:`pko._backend`.
 _STATE_MOUNT_PATH = "/state"
+_DELETE_UNREACHABLE_SECRET_NAME = "pko-delete-unreachable"
+_DELETE_UNREACHABLE_SECRET_KEY = "PULUMI_K8S_DELETE_UNREACHABLE"
 
 
 @dataclass(frozen=True)
@@ -151,11 +151,11 @@ def build_stack_spec(
                 "key": "PULUMI_CONFIG_PASSPHRASE",
             },
         },
-        DELETE_UNREACHABLE_SECRET_KEY: {
+        _DELETE_UNREACHABLE_SECRET_KEY: {
             "type": "Secret",
             "secret": {
-                "name": DELETE_UNREACHABLE_SECRET_NAME,
-                "key": DELETE_UNREACHABLE_SECRET_KEY,
+                "name": _DELETE_UNREACHABLE_SECRET_NAME,
+                "key": _DELETE_UNREACHABLE_SECRET_KEY,
             },
         },
     }
