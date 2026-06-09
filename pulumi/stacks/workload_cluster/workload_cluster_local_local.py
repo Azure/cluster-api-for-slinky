@@ -515,240 +515,266 @@ auth_provider = none
     }
 
 
-def _local_path_storage(
-    *,
-    provider: k8s.Provider,
-    opts: pulumi.ResourceOptions,
-) -> pulumi.Resource:
-    def resource_options(
-        *, depends_on: list[pulumi.Input[pulumi.Resource]] | None = None
-    ) -> pulumi.ResourceOptions:
-        return pulumi.ResourceOptions(
-            parent=opts.parent,
-            provider=provider,
-            depends_on=depends_on,
-        )
+class LocalPathStorage(pulumi.ComponentResource):
+    """local-path provisioner and default StorageClass for workload clusters."""
 
-    namespace = k8s.core.v1.Namespace(
-        "local-path-storage-namespace-privileged",
-        metadata={
-            "name": _LOCAL_PATH_NAMESPACE,
-            "labels": _POD_SECURITY_PRIVILEGED_LABELS,
-        },
-        opts=opts,
-    )
-    service_account = k8s.core.v1.ServiceAccountPatch(
-        "local-path-service-account",
-        metadata={
-            "name": _LOCAL_PATH_SERVICE_ACCOUNT,
-            "namespace": _LOCAL_PATH_NAMESPACE,
-        },
-        opts=resource_options(depends_on=[namespace]),
-    )
-    role = k8s.rbac.v1.RolePatch(
-        "local-path-role",
-        metadata={"name": _LOCAL_PATH_RBAC_NAME, "namespace": _LOCAL_PATH_NAMESPACE},
-        rules=[
-            {
-                "apiGroups": [""],
-                "resources": ["pods"],
-                "verbs": [
-                    "get",
-                    "list",
-                    "watch",
-                    "create",
-                    "patch",
-                    "update",
-                    "delete",
-                ],
-            }
-        ],
-        opts=resource_options(depends_on=[namespace]),
-    )
-    cluster_role = k8s.rbac.v1.ClusterRolePatch(
-        "local-path-cluster-role",
-        metadata={"name": _LOCAL_PATH_RBAC_NAME},
-        rules=[
-            {
-                "apiGroups": [""],
-                "resources": [
-                    "nodes",
-                    "persistentvolumeclaims",
-                    "configmaps",
-                    "pods",
-                    "pods/log",
-                ],
-                "verbs": ["get", "list", "watch"],
+    namespace: pulumi.Output[str]
+    storage_class_name: pulumi.Output[str]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        provider: k8s.Provider,
+        depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__("ca4s:workload:LocalPathStorage", name, props={}, opts=opts)
+
+        def child_options(
+            *, depends_on: list[pulumi.Input[pulumi.Resource]] | None = None
+        ) -> pulumi.ResourceOptions:
+            return pulumi.ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=depends_on,
+            )
+
+        namespace = k8s.core.v1.Namespace(
+            "local-path-storage-namespace",
+            metadata={
+                "name": _LOCAL_PATH_NAMESPACE,
+                "labels": _POD_SECURITY_PRIVILEGED_LABELS,
             },
-            {
-                "apiGroups": [""],
-                "resources": ["persistentvolumes"],
-                "verbs": [
-                    "get",
-                    "list",
-                    "watch",
-                    "create",
-                    "patch",
-                    "update",
-                    "delete",
-                ],
-            },
-            {
-                "apiGroups": [""],
-                "resources": ["events"],
-                "verbs": ["create", "patch"],
-            },
-            {
-                "apiGroups": ["storage.k8s.io"],
-                "resources": ["storageclasses"],
-                "verbs": ["get", "list", "watch"],
-            },
-        ],
-        opts=resource_options(),
-    )
-    k8s.rbac.v1.RoleBindingPatch(
-        "local-path-role-binding",
-        metadata={
-            "name": _LOCAL_PATH_RBAC_BINDING_NAME,
-            "namespace": _LOCAL_PATH_NAMESPACE,
-        },
-        role_ref={
-            "apiGroup": "rbac.authorization.k8s.io",
-            "kind": "Role",
-            "name": _LOCAL_PATH_RBAC_NAME,
-        },
-        subjects=[
-            {
-                "kind": "ServiceAccount",
+            opts=child_options(depends_on=depends_on),
+        )
+        service_account = k8s.core.v1.ServiceAccount(
+            "local-path-service-account",
+            metadata={
                 "name": _LOCAL_PATH_SERVICE_ACCOUNT,
                 "namespace": _LOCAL_PATH_NAMESPACE,
-            }
-        ],
-        opts=resource_options(depends_on=[role, service_account]),
-    )
-    k8s.rbac.v1.ClusterRoleBindingPatch(
-        "local-path-cluster-role-binding",
-        metadata={"name": _LOCAL_PATH_RBAC_BINDING_NAME},
-        role_ref={
-            "apiGroup": "rbac.authorization.k8s.io",
-            "kind": "ClusterRole",
-            "name": _LOCAL_PATH_RBAC_NAME,
-        },
-        subjects=[
-            {
-                "kind": "ServiceAccount",
-                "name": _LOCAL_PATH_SERVICE_ACCOUNT,
-                "namespace": _LOCAL_PATH_NAMESPACE,
-            }
-        ],
-        opts=resource_options(depends_on=[cluster_role, service_account]),
-    )
-    config = k8s.core.v1.ConfigMapPatch(
-        "local-path-config",
-        metadata={
-            "name": _LOCAL_PATH_CONFIG_NAME,
-            "namespace": _LOCAL_PATH_NAMESPACE,
-        },
-        data={
-            "config.json": (
-                '{\n  "nodePathMap":[{\n'
-                '    "node":"DEFAULT_PATH_FOR_NON_LISTED_NODES",\n'
-                '    "paths":["/opt/local-path-provisioner"]\n  }]\n}'
-            ),
-            "setup": '#!/bin/sh\nset -eu\nmkdir -m 0777 -p "$VOL_DIR"\n',
-            "teardown": '#!/bin/sh\nset -eu\nrm -rf "$VOL_DIR"\n',
-            "helperPod.yaml": (
-                "apiVersion: v1\n"
-                "kind: Pod\n"
-                "metadata:\n"
-                "  name: helper-pod\n"
-                "spec:\n"
-                "  priorityClassName: system-node-critical\n"
-                "  tolerations:\n"
-                "    - key: node.kubernetes.io/disk-pressure\n"
-                "      operator: Exists\n"
-                "      effect: NoSchedule\n"
-                "  containers:\n"
-                "  - name: helper-pod\n"
-                "    image: busybox\n"
-                "    imagePullPolicy: IfNotPresent\n"
-            ),
-        },
-        opts=resource_options(depends_on=[namespace]),
-    )
-    storage_class = k8s.storage.v1.StorageClassPatch(
-        "local-path-storage-class-default",
-        metadata={
-            "name": _LOCAL_PATH_STORAGE_CLASS,
-            "annotations": {
-                "storageclass.kubernetes.io/is-default-class": "true",
-                "defaultVolumeType": "local",
             },
-        },
-        provisioner="rancher.io/local-path",
-        reclaim_policy="Delete",
-        volume_binding_mode="WaitForFirstConsumer",
-        opts=resource_options(),
-    )
-    k8s.apps.v1.DeploymentPatch(
-        "local-path-deployment",
-        metadata={
-            "name": _LOCAL_PATH_DEPLOYMENT_NAME,
-            "namespace": _LOCAL_PATH_NAMESPACE,
-        },
-        spec={
-            "replicas": 1,
-            "selector": {"matchLabels": {"app": _LOCAL_PATH_DEPLOYMENT_NAME}},
-            "template": {
-                "metadata": {"labels": {"app": _LOCAL_PATH_DEPLOYMENT_NAME}},
-                "spec": {
-                    "serviceAccountName": _LOCAL_PATH_SERVICE_ACCOUNT,
-                    "containers": [
-                        {
-                            "name": _LOCAL_PATH_DEPLOYMENT_NAME,
-                            "image": (
-                                "rancher/local-path-provisioner:"
-                                f"{_LOCAL_PATH_PROVISIONER_VERSION}"
-                            ),
-                            "imagePullPolicy": "IfNotPresent",
-                            "command": [
-                                "local-path-provisioner",
-                                "--debug",
-                                "start",
-                                "--config",
-                                "/etc/config/config.json",
-                            ],
-                            "volumeMounts": [
-                                {
-                                    "name": "config-volume",
-                                    "mountPath": "/etc/config/",
-                                }
-                            ],
-                            "env": [
-                                {
-                                    "name": "POD_NAMESPACE",
-                                    "valueFrom": {
-                                        "fieldRef": {
-                                            "fieldPath": "metadata.namespace"
-                                        }
-                                    },
-                                },
-                                {"name": "CONFIG_MOUNT_PATH", "value": "/etc/config/"},
-                            ],
-                        }
+            opts=child_options(depends_on=[namespace]),
+        )
+        role = k8s.rbac.v1.Role(
+            "local-path-role",
+            metadata={
+                "name": _LOCAL_PATH_RBAC_NAME,
+                "namespace": _LOCAL_PATH_NAMESPACE,
+            },
+            rules=[
+                {
+                    "apiGroups": [""],
+                    "resources": ["pods"],
+                    "verbs": [
+                        "get",
+                        "list",
+                        "watch",
+                        "create",
+                        "patch",
+                        "update",
+                        "delete",
                     ],
-                    "volumes": [
-                        {
-                            "name": "config-volume",
-                            "configMap": {"name": _LOCAL_PATH_CONFIG_NAME},
-                        }
+                }
+            ],
+            opts=child_options(depends_on=[namespace]),
+        )
+        cluster_role = k8s.rbac.v1.ClusterRole(
+            "local-path-cluster-role",
+            metadata={"name": _LOCAL_PATH_RBAC_NAME},
+            rules=[
+                {
+                    "apiGroups": [""],
+                    "resources": [
+                        "nodes",
+                        "persistentvolumeclaims",
+                        "configmaps",
+                        "pods",
+                        "pods/log",
+                    ],
+                    "verbs": ["get", "list", "watch"],
+                },
+                {
+                    "apiGroups": [""],
+                    "resources": ["persistentvolumes"],
+                    "verbs": [
+                        "get",
+                        "list",
+                        "watch",
+                        "create",
+                        "patch",
+                        "update",
+                        "delete",
                     ],
                 },
+                {
+                    "apiGroups": [""],
+                    "resources": ["events"],
+                    "verbs": ["create", "patch"],
+                },
+                {
+                    "apiGroups": ["storage.k8s.io"],
+                    "resources": ["storageclasses"],
+                    "verbs": ["get", "list", "watch"],
+                },
+            ],
+            opts=child_options(depends_on=depends_on),
+        )
+        k8s.rbac.v1.RoleBinding(
+            "local-path-role-binding",
+            metadata={
+                "name": _LOCAL_PATH_RBAC_BINDING_NAME,
+                "namespace": _LOCAL_PATH_NAMESPACE,
             },
-        },
-        opts=resource_options(depends_on=[config, service_account, storage_class]),
-    )
-    return storage_class
+            role_ref={
+                "apiGroup": "rbac.authorization.k8s.io",
+                "kind": "Role",
+                "name": _LOCAL_PATH_RBAC_NAME,
+            },
+            subjects=[
+                {
+                    "kind": "ServiceAccount",
+                    "name": _LOCAL_PATH_SERVICE_ACCOUNT,
+                    "namespace": _LOCAL_PATH_NAMESPACE,
+                }
+            ],
+            opts=child_options(depends_on=[role, service_account]),
+        )
+        k8s.rbac.v1.ClusterRoleBinding(
+            "local-path-cluster-role-binding",
+            metadata={"name": _LOCAL_PATH_RBAC_BINDING_NAME},
+            role_ref={
+                "apiGroup": "rbac.authorization.k8s.io",
+                "kind": "ClusterRole",
+                "name": _LOCAL_PATH_RBAC_NAME,
+            },
+            subjects=[
+                {
+                    "kind": "ServiceAccount",
+                    "name": _LOCAL_PATH_SERVICE_ACCOUNT,
+                    "namespace": _LOCAL_PATH_NAMESPACE,
+                }
+            ],
+            opts=child_options(depends_on=[cluster_role, service_account]),
+        )
+        config = k8s.core.v1.ConfigMap(
+            "local-path-config",
+            metadata={
+                "name": _LOCAL_PATH_CONFIG_NAME,
+                "namespace": _LOCAL_PATH_NAMESPACE,
+            },
+            data={
+                "config.json": (
+                    '{\n  "nodePathMap":[{\n'
+                    '    "node":"DEFAULT_PATH_FOR_NON_LISTED_NODES",\n'
+                    '    "paths":["/opt/local-path-provisioner"]\n  }]\n}'
+                ),
+                "setup": '#!/bin/sh\nset -eu\nmkdir -m 0777 -p "$VOL_DIR"\n',
+                "teardown": '#!/bin/sh\nset -eu\nrm -rf "$VOL_DIR"\n',
+                "helperPod.yaml": (
+                    "apiVersion: v1\n"
+                    "kind: Pod\n"
+                    "metadata:\n"
+                    "  name: helper-pod\n"
+                    "spec:\n"
+                    "  priorityClassName: system-node-critical\n"
+                    "  tolerations:\n"
+                    "    - key: node.kubernetes.io/disk-pressure\n"
+                    "      operator: Exists\n"
+                    "      effect: NoSchedule\n"
+                    "  containers:\n"
+                    "  - name: helper-pod\n"
+                    "    image: busybox\n"
+                    "    imagePullPolicy: IfNotPresent\n"
+                ),
+            },
+            opts=child_options(depends_on=[namespace]),
+        )
+        storage_class = k8s.storage.v1.StorageClass(
+            "local-path-storage-class",
+            metadata={
+                "name": _LOCAL_PATH_STORAGE_CLASS,
+                "annotations": {
+                    "storageclass.kubernetes.io/is-default-class": "true",
+                    "defaultVolumeType": "local",
+                },
+            },
+            provisioner="rancher.io/local-path",
+            reclaim_policy="Delete",
+            volume_binding_mode="WaitForFirstConsumer",
+            opts=child_options(depends_on=depends_on),
+        )
+        k8s.apps.v1.Deployment(
+            "local-path-deployment",
+            metadata={
+                "name": _LOCAL_PATH_DEPLOYMENT_NAME,
+                "namespace": _LOCAL_PATH_NAMESPACE,
+            },
+            spec={
+                "replicas": 1,
+                "selector": {"matchLabels": {"app": _LOCAL_PATH_DEPLOYMENT_NAME}},
+                "template": {
+                    "metadata": {"labels": {"app": _LOCAL_PATH_DEPLOYMENT_NAME}},
+                    "spec": {
+                        "serviceAccountName": _LOCAL_PATH_SERVICE_ACCOUNT,
+                        "containers": [
+                            {
+                                "name": _LOCAL_PATH_DEPLOYMENT_NAME,
+                                "image": (
+                                    "rancher/local-path-provisioner:"
+                                    f"{_LOCAL_PATH_PROVISIONER_VERSION}"
+                                ),
+                                "imagePullPolicy": "IfNotPresent",
+                                "command": [
+                                    "local-path-provisioner",
+                                    "--debug",
+                                    "start",
+                                    "--config",
+                                    "/etc/config/config.json",
+                                ],
+                                "volumeMounts": [
+                                    {
+                                        "name": "config-volume",
+                                        "mountPath": "/etc/config/",
+                                    }
+                                ],
+                                "env": [
+                                    {
+                                        "name": "POD_NAMESPACE",
+                                        "valueFrom": {
+                                            "fieldRef": {
+                                                "fieldPath": "metadata.namespace"
+                                            }
+                                        },
+                                    },
+                                    {
+                                        "name": "CONFIG_MOUNT_PATH",
+                                        "value": "/etc/config/",
+                                    },
+                                ],
+                            }
+                        ],
+                        "volumes": [
+                            {
+                                "name": "config-volume",
+                                "configMap": {"name": _LOCAL_PATH_CONFIG_NAME},
+                            }
+                        ],
+                    },
+                },
+            },
+            opts=child_options(depends_on=[config, service_account, storage_class]),
+        )
+
+        self.namespace = pulumi.Output.from_input(_LOCAL_PATH_NAMESPACE)
+        self.storage_class_name = pulumi.Output.from_input(_LOCAL_PATH_STORAGE_CLASS)
+
+        self.register_outputs(
+            {
+                "namespace": self.namespace,
+                "storage_class_name": self.storage_class_name,
+            }
+        )
 
 
 class WorkerClass(pulumi.ComponentResource):
@@ -1213,12 +1239,11 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             opts=child_options(depends_on=[workload_kubeconfig_secret]),
         )
 
-        local_path_storage_class = _local_path_storage(
+        local_path_storage = LocalPathStorage(
+            "local-path-storage",
             provider=workload_provider,
-            opts=child_options(
-                provider=workload_provider,
-                depends_on=[workload_kubeconfig_secret],
-            ),
+            depends_on=[workload_kubeconfig_secret],
+            opts=child_options(provider=workload_provider),
         )
 
         calico_namespace = k8s.core.v1.Namespace(
@@ -1362,7 +1387,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 provider=workload_provider,
                 depends_on=[
                     slurm_namespace,
-                    local_path_storage_class,
+                    local_path_storage,
                     slurm_operator,
                 ],
                 retain_on_delete=True,
