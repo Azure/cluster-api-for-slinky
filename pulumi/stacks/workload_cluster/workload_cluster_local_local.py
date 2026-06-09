@@ -1113,7 +1113,10 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
 
         local_path_storage_class = _local_path_storage(
             provider=workload_provider,
-            opts=child_options(depends_on=[workload_kubeconfig_secret]),
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[workload_kubeconfig_secret],
+            ),
         )
 
         calico_namespace = k8s.core.v1.Namespace(
