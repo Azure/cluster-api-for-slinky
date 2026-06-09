@@ -314,15 +314,30 @@ def _object_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
 
 
 def _worker_labels(cluster_name: str, worker: WorkerClassSpec) -> dict[str, str]:
-    labels = {
+    return {
         "cluster.x-k8s.io/cluster-name": cluster_name,
         _NODE_TYPE_LABEL: worker.node_type,
     }
+
+
+def _autoscaler_discovery_labels(worker: WorkerClassSpec) -> dict[str, str]:
     if worker.replicas is None:
-        labels[_CLUSTER_AUTOSCALER_DISCOVERY_LABEL] = (
-            _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE
-        )
-    return labels
+        return {
+            _CLUSTER_AUTOSCALER_DISCOVERY_LABEL: (
+                _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE
+            )
+        }
+    return {}
+
+
+def _machine_deployment_labels(
+    cluster_name: str,
+    worker: WorkerClassSpec,
+) -> dict[str, str]:
+    return {
+        **_worker_labels(cluster_name, worker),
+        **_autoscaler_discovery_labels(worker),
+    }
 
 
 def _autoscaled_worker_classes(
@@ -984,6 +999,7 @@ class WorkerClass(pulumi.ComponentResource):
         bootstrap_template_name = _resource_name(instance, f"{worker.name}-bootstrap")
         machine_deployment_name = _resource_name(instance, worker.name)
         labels = _worker_labels(cluster_name, worker)
+        machine_deployment_labels = _machine_deployment_labels(cluster_name, worker)
 
         def child_options(
             *,
@@ -1053,6 +1069,7 @@ class WorkerClass(pulumi.ComponentResource):
             metadata={
                 "name": machine_deployment_name,
                 "namespace": _NAMESPACE,
+                "labels": machine_deployment_labels,
                 **({"annotations": worker.annotations} if worker.annotations else {}),
             },
             spec=machine_deployment_spec,

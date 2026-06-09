@@ -12,6 +12,7 @@ from stacks.workload_cluster.workload_cluster_local_local import (
     _cluster_autoscaler_namespace,
     _cluster_autoscaler_release_name,
     _cluster_autoscaler_values,
+    _machine_deployment_labels,
     _worker_labels,
 )
 
@@ -31,6 +32,10 @@ def test_autoscaled_worker_class_is_discoverable_without_fixed_replicas() -> Non
     assert _worker_labels("local-workload", worker) == {
         "cluster.x-k8s.io/cluster-name": "local-workload",
         "slinky.slurm.net/node-type": "compute",
+    }
+    assert _machine_deployment_labels("local-workload", worker) == {
+        "cluster.x-k8s.io/cluster-name": "local-workload",
+        "slinky.slurm.net/node-type": "compute",
         _CLUSTER_AUTOSCALER_DISCOVERY_LABEL: _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE,
     }
 
@@ -40,6 +45,10 @@ def test_fixed_worker_class_is_not_autoscaler_discovered() -> None:
 
     assert _autoscaled_worker_classes((worker,)) == ()
     assert _worker_labels("local-workload", worker) == {
+        "cluster.x-k8s.io/cluster-name": "local-workload",
+        "slinky.slurm.net/node-type": "controller",
+    }
+    assert _machine_deployment_labels("local-workload", worker) == {
         "cluster.x-k8s.io/cluster-name": "local-workload",
         "slinky.slurm.net/node-type": "controller",
     }
