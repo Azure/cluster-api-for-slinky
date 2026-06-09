@@ -406,8 +406,12 @@ def _slurm_operator_values() -> dict[str, object]:
 
 
 def _slurm_nodeset_values(worker: WorkerClassSpec) -> dict[str, object]:
+    replicas = worker.replicas
+    if replicas is None:
+        replicas = int(worker.annotations.get(_AUTOSCALER_MIN_ANNOTATION, "1"))
     return {
         "enabled": True,
+        "replicas": replicas,
         "slurmd": {
             "image": {
                 "repository": "ghcr.io/slinkyproject/slurmd",
