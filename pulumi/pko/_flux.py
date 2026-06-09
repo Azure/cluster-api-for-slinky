@@ -101,6 +101,37 @@ class FluxInfrastructure(pulumi.ComponentResource):
             ),
         )
 
+        artifact_ingress = k8s.networking.v1.NetworkPolicy(
+            f"{name}-source-artifact-ingress",
+            metadata={
+                "name": "allow-source-controller-artifacts-from-pko",
+                "namespace": FLUX_NAMESPACE,
+            },
+            spec={
+                "pod_selector": {"match_labels": {"app": "source-controller"}},
+                "policy_types": ["Ingress"],
+                "ingress": [
+                    {
+                        "from_": [
+                            {
+                                "namespace_selector": {
+                                    "match_labels": {
+                                        "kubernetes.io/metadata.name": PKO_NAMESPACE
+                                    }
+                                }
+                            }
+                        ],
+                        "ports": [{"protocol": "TCP", "port": 9090}],
+                    }
+                ],
+            },
+            opts=ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=[release],
+            ),
+        )
+
         self.namespace = Output.from_input(FLUX_NAMESPACE)
         self.release_status = release.status
 
@@ -108,6 +139,7 @@ class FluxInfrastructure(pulumi.ComponentResource):
             {
                 "namespace": self.namespace,
                 "release_status": self.release_status,
+                "artifact_ingress_policy": artifact_ingress.metadata["name"],  # type: ignore[attr-defined]
             }
         )
 
