@@ -70,6 +70,21 @@ _CALICO_OPERATOR_CRDS_URL = (
 _CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
 
+_LOCAL_PATH_STORAGE_URL = (
+    "https://raw.githubusercontent.com/rancher/local-path-provisioner/"
+    "v0.0.32/deploy/local-path-storage.yaml"
+)
+_LOCAL_PATH_NAMESPACE = "local-path-storage"
+_LOCAL_PATH_STORAGE_CLASS = "local-path"
+
+_SLINKY_CHART_OCI_PREFIX = "oci://ghcr.io/slinkyproject/charts"
+_SLINKY_CHART_VERSION = "1.0.2"
+_SLINKY_OPERATOR_CRDS_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator-crds"
+_SLINKY_OPERATOR_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator"
+_SLURM_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm"
+_SLINKY_OPERATOR_NAMESPACE = "slinky"
+_SLURM_NAMESPACE = "slurm"
+
 _NODE_TYPE_LABEL = "slinky.slurm.net/node-type"
 _CONTROLLER_NODE_TYPE = "controller"
 _COMPUTE_NODE_TYPE = "compute"
@@ -91,6 +106,10 @@ _DOCKER_IO_HOSTS_DIR = "/etc/containerd/certs.d/docker.io"
 _DOCKER_IO_SERVER = "https://registry-1.docker.io"
 _DOCKER_HUB_PUBLIC_MIRROR = "https://mirror.gcr.io"
 _DOCKER_DESKTOP_HOST = "host.docker.internal"
+_POD_SECURITY_PRIVILEGED_LABELS = {
+    "pod-security.kubernetes.io/enforce": "privileged",
+    "pod-security.kubernetes.io/enforce-version": "latest",
+}
 
 
 @dataclass(frozen=True)
@@ -314,6 +333,158 @@ def _calico_operator_crd_dependencies(
             "whiskers.operator.tigera.io",
         )
     ]
+
+
+def _node_type_affinity(node_type: str) -> dict[str, object]:
+    return {
+        "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": _NODE_TYPE_LABEL,
+                                "operator": "In",
+                                "values": [node_type],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+
+
+def _controller_tolerations() -> list[dict[str, str]]:
+    return [
+        {
+            "key": "slinky.slurm.net/controller",
+            "operator": "Exists",
+            "effect": "NoSchedule",
+        }
+    ]
+
+
+def _controller_pod_spec() -> dict[str, object]:
+    return {
+        "tolerations": _controller_tolerations(),
+        "affinity": _node_type_affinity(_CONTROLLER_NODE_TYPE),
+    }
+
+
+def _slurm_operator_values() -> dict[str, object]:
+    return {
+        "operator": {
+            "tolerations": _controller_tolerations(),
+            "affinity": _node_type_affinity(_CONTROLLER_NODE_TYPE),
+        },
+        "webhook": {
+            "tolerations": _controller_tolerations(),
+            "affinity": _node_type_affinity(_CONTROLLER_NODE_TYPE),
+        },
+    }
+
+
+def _slurm_nodeset_values(worker: WorkerClassSpec) -> dict[str, object]:
+    return {
+        "enabled": True,
+        "slurmd": {
+            "image": {
+                "repository": "ghcr.io/slinkyproject/slurmd",
+                "tag": "25.11-ubuntu24.04",
+            },
+            "args": [],
+            "resources": {},
+            "volumeMounts": [],
+        },
+        "logfile": {
+            "image": {
+                "repository": "public.ecr.aws/docker/library/alpine",
+                "tag": "3.21",
+            },
+        },
+        "partition": {"enabled": True, "configMap": {}},
+        "useResourceLimits": True,
+        "taintKubeNodes": False,
+        "podSpec": {
+            "affinity": {
+                **_node_type_affinity(worker.node_type),
+                "podAntiAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": [
+                        {
+                            "labelSelector": {
+                                "matchExpressions": [
+                                    {
+                                        "key": "app.kubernetes.io/name",
+                                        "operator": "In",
+                                        "values": ["slurmd"],
+                                    }
+                                ]
+                            },
+                            "topologyKey": "kubernetes.io/hostname",
+                        }
+                    ]
+                },
+            },
+        },
+    }
+
+
+def _slurm_values(workers: tuple[WorkerClassSpec, ...]) -> dict[str, object]:
+    compute_workers = tuple(worker for worker in workers if not worker.controller)
+    return {
+        "configFiles": {
+            "cgroup.conf": "CgroupPlugin=disabled\n",
+        },
+        "controller": {
+            "logfile": {
+                "image": {
+                    "repository": "public.ecr.aws/docker/library/alpine",
+                    "tag": "3.21",
+                },
+            },
+            "metrics": {
+                "enabled": True,
+                "serviceMonitor": {"enabled": True},
+            },
+            "podSpec": _controller_pod_spec(),
+        },
+        "loginsets": {
+            "slinky": {
+                "enabled": True,
+                "initconf": {
+                    "image": {
+                        "repository": "public.ecr.aws/docker/library/alpine",
+                        "tag": "3.21",
+                    },
+                },
+                "sssdConf": """[sssd]
+config_file_version = 2
+services = nss,pam
+domains = LOCAL
+
+[nss]
+filter_groups = root,slurm
+filter_users = root,slurm
+
+[pam]
+
+[domain/LOCAL]
+id_provider = files
+auth_provider = none
+""",
+                "podSpec": _controller_pod_spec(),
+            },
+        },
+        "nodesets": {
+            "slinky": {"enabled": False},
+            **{
+                worker.name: _slurm_nodeset_values(worker)
+                for worker in compute_workers
+            },
+        },
+        "restapi": {"podSpec": _controller_pod_spec()},
+    }
 
 
 class WorkerClass(pulumi.ComponentResource):
@@ -776,6 +947,44 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             opts=child_options(depends_on=[workload_kubeconfig_secret]),
         )
 
+        local_path_storage = k8s.yaml.ConfigGroup(
+            "local-path-storage",
+            yaml=[_read_url(_LOCAL_PATH_STORAGE_URL)],
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[workload_kubeconfig_secret],
+            ),
+        )
+        k8s.apiextensions.CustomResourcePatch(
+            "local-path-storage-namespace-privileged",
+            api_version="v1",
+            kind="Namespace",
+            metadata={
+                "name": _LOCAL_PATH_NAMESPACE,
+                "labels": _POD_SECURITY_PRIVILEGED_LABELS,
+            },
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[local_path_storage],
+            ),
+        )
+        local_path_storage_class = k8s.apiextensions.CustomResourcePatch(
+            "local-path-storage-class-default",
+            api_version="storage.k8s.io/v1",
+            kind="StorageClass",
+            metadata={
+                "name": _LOCAL_PATH_STORAGE_CLASS,
+                "annotations": {
+                    "storageclass.kubernetes.io/is-default-class": "true",
+                    "defaultVolumeType": "local",
+                },
+            },
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[local_path_storage],
+            ),
+        )
+
         calico_namespace = k8s.core.v1.Namespace(
             "calico-operator-namespace",
             metadata={
@@ -821,6 +1030,82 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             ),
         )
 
+        slinky_namespace = k8s.core.v1.Namespace(
+            "slinky-operator-namespace",
+            metadata={
+                "name": _SLINKY_OPERATOR_NAMESPACE,
+                "labels": _POD_SECURITY_PRIVILEGED_LABELS,
+            },
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[calico_operator],
+                retain_on_delete=True,
+            ),
+        )
+        slurm_namespace = k8s.core.v1.Namespace(
+            "slurm-namespace",
+            metadata={
+                "name": _SLURM_NAMESPACE,
+                "labels": _POD_SECURITY_PRIVILEGED_LABELS,
+            },
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[calico_operator],
+                retain_on_delete=True,
+            ),
+        )
+        slurm_operator_crds = k8s.helm.v3.Release(
+            "slurm-operator-crds",
+            chart=_SLINKY_OPERATOR_CRDS_CHART,
+            version=_SLINKY_CHART_VERSION,
+            namespace=_SLINKY_OPERATOR_NAMESPACE,
+            cleanup_on_fail=True,
+            atomic=True,
+            wait_for_jobs=True,
+            timeout=600,
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[slinky_namespace, calico_operator],
+                retain_on_delete=True,
+            ),
+        )
+        slurm_operator = k8s.helm.v3.Release(
+            "slurm-operator",
+            chart=_SLINKY_OPERATOR_CHART,
+            version=_SLINKY_CHART_VERSION,
+            namespace=_SLINKY_OPERATOR_NAMESPACE,
+            cleanup_on_fail=True,
+            atomic=True,
+            wait_for_jobs=True,
+            timeout=600,
+            values=_slurm_operator_values(),
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[slinky_namespace, slurm_operator_crds],
+                retain_on_delete=True,
+            ),
+        )
+        slurm_release = k8s.helm.v3.Release(
+            "slurm",
+            chart=_SLURM_CHART,
+            version=_SLINKY_CHART_VERSION,
+            namespace=_SLURM_NAMESPACE,
+            cleanup_on_fail=True,
+            atomic=True,
+            wait_for_jobs=True,
+            timeout=900,
+            values=_slurm_values(worker_node_classes),
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[
+                    slurm_namespace,
+                    local_path_storage_class,
+                    slurm_operator,
+                ],
+                retain_on_delete=True,
+            ),
+        )
+
         self.cluster_class = pulumi.Output.from_input(_CLUSTER_CLASS)
         self.cluster_instance = pulumi.Output.from_input(instance)
         self.cluster_name = pulumi.Output.from_input(cluster_name)
@@ -831,9 +1116,15 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             _CALICO_CHART_VERSION
         )
         self.calico_operator_status = calico_operator.status
-        self.workload_cluster_ready = pulumi.Output.from_input(False)
+        self.workload_cluster_ready = pulumi.Output.all(
+            cluster_control_plane_available.metadata["name"],  # type: ignore[index]
+            workload_kubeconfig_secret.metadata["name"],  # type: ignore[index]
+            calico_operator.status,
+            slurm_operator.status,
+            slurm_release.status,
+        ).apply(lambda _: True)
         self.todo = pulumi.Output.from_input(
-            "Install slurm-operator and NodeSets on the Calico-enabled workload cluster."
+            "Wire workload-driven autoscaling and tenant-facing Slurm operations."
         )
 
         self.register_outputs(
@@ -847,6 +1138,10 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 "calico_operator_chart_version": self.calico_operator_chart_version,
                 "calico_operator_status": self.calico_operator_status,
                 "workload_cluster_ready": self.workload_cluster_ready,
+                "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+                "slurm_operator_status": slurm_operator.status,
+                "slurm_chart_version": _SLINKY_CHART_VERSION,
+                "slurm_status": slurm_release.status,
                 "todo": self.todo,
             }
         )
