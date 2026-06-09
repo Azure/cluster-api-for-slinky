@@ -210,18 +210,27 @@ def _health_check() -> dict[str, object]:
     }
 
 
-def _kubelet_extra_args() -> list[dict[str, str]]:
-    return [
+def _kubelet_extra_args(node_type: str | None = None) -> list[dict[str, str]]:
+    args = [
         {
             "name": "eviction-hard",
             "value": "nodefs.available<0%,nodefs.inodesFree<0%,imagefs.available<0%",
         }
     ]
+    if node_type is not None:
+        args.append(
+            {"name": "node-labels", "value": f"{_NODE_TYPE_LABEL}={node_type}"}
+        )
+    return args
 
 
-def _node_registration(controller: bool = False) -> dict[str, object]:
+def _node_registration(
+    controller: bool = False,
+    *,
+    node_type: str | None = None,
+) -> dict[str, object]:
     node_registration: dict[str, object] = {
-        "kubeletExtraArgs": _kubelet_extra_args(),
+        "kubeletExtraArgs": _kubelet_extra_args(node_type),
     }
     if controller:
         node_registration["taints"] = [
@@ -265,6 +274,7 @@ def _kubeadm_config_template(
     *,
     pre_kubeadm_commands: list[str],
     controller: bool = False,
+    node_type: str | None = None,
     opts: pulumi.ResourceOptions | None = None,
 ) -> k8s.apiextensions.CustomResource:
     return k8s.apiextensions.CustomResource(
@@ -277,7 +287,10 @@ def _kubeadm_config_template(
                 "spec": {
                     "preKubeadmCommands": pre_kubeadm_commands,
                     "joinConfiguration": {
-                        "nodeRegistration": _node_registration(controller),
+                        "nodeRegistration": _node_registration(
+                            controller,
+                            node_type=node_type,
+                        ),
                     },
                 },
             },
@@ -699,6 +712,7 @@ class WorkerClass(pulumi.ComponentResource):
             f"cluster-{worker.name}-bootstrap-template",
             pre_kubeadm_commands=pre_kubeadm_commands,
             controller=worker.controller,
+            node_type=worker.node_type,
             opts=child_options(),
         )
 
