@@ -31,8 +31,35 @@ def _registry_list(*registries: tuple[str, int]) -> str:
             "kind": "RegistryList",
             "apiVersion": "ctlptl.dev/v1alpha1",
             "items": [
-                {"name": name, "port": port, "status": {"hostPort": port}}
+                {
+                    "name": name,
+                    "port": port,
+                    "status": {
+                        "hostPort": port,
+                        "env": [
+                            "REGISTRY_STORAGE_DELETE_ENABLED=true",
+                            *_DEFAULT_ENV,
+                        ],
+                    },
+                }
                 for name, port in registries
+            ],
+        }
+    )
+
+
+def _registry_list_with_env(*registries: tuple[str, int, list[str]]) -> str:
+    return json.dumps(
+        {
+            "kind": "RegistryList",
+            "apiVersion": "ctlptl.dev/v1alpha1",
+            "items": [
+                {
+                    "name": name,
+                    "port": port,
+                    "status": {"hostPort": port, "env": env},
+                }
+                for name, port, env in registries
             ],
         }
     )
@@ -83,6 +110,51 @@ def test_create_adopts_first_registry_with_matching_prefix(
     assert outs["adopted"] is True
     assert outs["delete_on_destroy"] is False
     assert calls == [["ctlptl", "get", "registry", "-o", "json"]]
+
+
+def test_create_skips_incompatible_adopted_registry(
+    provider: ctlptl_registry._CtlptlRegistryProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], str | None]] = []
+
+    def fake_run(
+        cmd: list[str],
+        *,
+        input: str | None = None,
+        check: bool = True,
+        capture_output: bool = True,
+        text: bool = True,
+    ) -> subprocess.CompletedProcess:
+        calls.append((cmd, input))
+        if cmd == ["ctlptl", "get", "registry", "-o", "json"]:
+            return _completed(
+                cmd,
+                _registry_list_with_env(
+                    ("ca4s-registry-old", 5001, ["REGISTRY_STORAGE_DELETE_ENABLED=true"]),
+                ),
+            )
+        if cmd == ["ctlptl", "apply", "-f", "-"]:
+            assert input is not None
+            assert "name: ca4s-registry" in input
+            assert '- "REGISTRY_PROXY_REMOTEURL=https://mirror.gcr.io"' in input
+            return _completed(cmd)
+        if cmd == ["ctlptl", "get", "registry", "ca4s-registry", "-o", "json"]:
+            return _completed(cmd, json.dumps({"name": "ca4s-registry", "port": 5002}))
+        raise AssertionError(f"unexpected command: {cmd!r}")
+
+    monkeypatch.setattr(ctlptl_registry.subprocess, "run", fake_run)
+
+    result = provider.create({"registry_name": "ca4s-registry", "port": 5002})
+
+    assert result.id == "ca4s-registry"
+    assert result.outs is not None
+    assert result.outs["adopted"] is False
+    assert [cmd for cmd, _ in calls] == [
+        ["ctlptl", "get", "registry", "-o", "json"],
+        ["ctlptl", "apply", "-f", "-"],
+        ["ctlptl", "get", "registry", "ca4s-registry", "-o", "json"],
+    ]
 
 
 def test_create_falls_back_to_apply_when_no_adopt_match(

@@ -65,8 +65,8 @@ substitutes when rendering the manifest:
   expands to a host-local filesystem path (used for ``hostPath`` mounts);
   the provider runs in the user's environment, so reading ``$HOME`` there
   is correct.
-* ``${DOCKER_IO_HOSTS_TOML}`` → repository-local ``hosts.toml`` file mounted
-    into kind nodes for containerd's Docker Hub mirror config.
+* ``${DOCKER_IO_HOSTS_TOML}`` → generated ``hosts.toml`` file mounted into
+    kind nodes for containerd's Docker Hub pull-through registry cache config.
 
 * Inputs:
     - ``cluster_name``  : optional explicit ctlptl ``Cluster.name`` value.
@@ -74,9 +74,8 @@ substitutes when rendering the manifest:
     - ``registry_name`` : optional sibling registry name to substitute for
                           ``${REGISTRY_NAME}``. Pass
                           ``CtlptlRegistry().registry_name`` to wire the
-                          dependency implicitly. When omitted, the
-                          placeholder flows through verbatim and ctlptl
-                          will reject the manifest.
+                          dependency implicitly. Required because Docker Hub
+                          pulls are routed through the sibling registry cache.
 * Outputs:
     - ``cluster_name`` : the ctlptl ``Cluster.name`` ultimately used
                          (autonamed or explicit).
@@ -142,7 +141,7 @@ from pulumi.dynamic import (
 )
 
 _RESOURCE_TYPE = "ca4s:local:CtlptlCluster"
-_DOCKER_IO_HOSTS_TOML = Path(__file__).resolve().parent / "hosts.toml"
+_GENERATED_CONFIG_DIR = Path(__file__).resolve().parents[1] / ".state" / "ctlptl"
 
 # ---------------------------------------------------------------------------
 # Vendored ctlptl manifest.
@@ -245,6 +244,19 @@ def _fetch_kubeconfig(context: str) -> str:
     return result.stdout
 
 
+def _docker_io_hosts_toml(cluster_name: str, registry_name: str) -> Path:
+    """Write the containerd Docker Hub hosts config for this kind cluster."""
+    path = _GENERATED_CONFIG_DIR / cluster_name / "docker.io" / "hosts.toml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "server = \"https://registry-1.docker.io\"\n\n"
+        f"[host.\"http://{registry_name}:5000\"]\n"
+        "  capabilities = [\"pull\", \"resolve\"]\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 # ---------------------------------------------------------------------------
 # Provider.
 # ---------------------------------------------------------------------------
@@ -261,10 +273,11 @@ def _render(cluster_name: str, registry_name: Optional[str] = None) -> str:
       an ``Input[str]``, giving Pulumi the cross-resource dependency edge
       for free (no ``depends_on`` needed).
     * ``${HOME}`` → the program's ``$HOME`` env var, raised if missing.
+        * ``${DOCKER_IO_HOSTS_TOML}`` → generated hostPath file pointing Docker Hub
+            pulls at the sibling ctlptl registry's in-cluster address.
 
-    A missing ``registry_name`` leaves the placeholder verbatim; ctlptl
-    will then reject the manifest. That's intentional — it surfaces the
-    missing wiring loudly rather than silently substituting an empty string.
+        A missing ``registry_name`` is rejected here because Docker Hub pull-through
+        cache config depends on the sibling registry's in-cluster name.
     """
     home = os.environ.get("HOME")
     if not home:
@@ -272,18 +285,17 @@ def _render(cluster_name: str, registry_name: Optional[str] = None) -> str:
             "HOME environment variable is not set; required for ctlptl manifest "
             "${HOME} substitution (hostPath mount of ~/.kube into the worker)"
         )
-    if not _DOCKER_IO_HOSTS_TOML.is_file():
+    if not registry_name:
         raise RuntimeError(
-            "missing Docker Hub containerd mirror config at "
-            f"{_DOCKER_IO_HOSTS_TOML}"
+            "registry_name is required to render kind registry cache config"
         )
+    docker_io_hosts_toml = _docker_io_hosts_toml(cluster_name, registry_name)
     rendered = _MANIFEST_TEMPLATE
     rendered = rendered.replace("${CLUSTER_NAME}", cluster_name)
-    if registry_name:
-        rendered = rendered.replace("${REGISTRY_NAME}", registry_name)
+    rendered = rendered.replace("${REGISTRY_NAME}", registry_name)
     rendered = rendered.replace("${HOME}", home)
     rendered = rendered.replace(
-        "${DOCKER_IO_HOSTS_TOML}", str(_DOCKER_IO_HOSTS_TOML)
+        "${DOCKER_IO_HOSTS_TOML}", str(docker_io_hosts_toml)
     )
     return rendered
 

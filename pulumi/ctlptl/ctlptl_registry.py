@@ -254,10 +254,29 @@ def _registry_port(data: dict) -> Optional[int]:
     return int(port) if port else None
 
 
-def _first_registry_with_prefix(prefix: str) -> Optional[tuple[str, int]]:
+def _registry_env(data: dict) -> list[str]:
+    """Return a registry object's live container environment."""
+    env = data.get("env") or data.get("status", {}).get("env") or []
+    return [str(item) for item in env]
+
+
+def _env_is_compatible(data: dict, desired_env: Optional[list[str]]) -> bool:
+    """Return whether an existing registry has the env we require."""
+    if not desired_env:
+        return True
+    live_env = set(_registry_env(data))
+    return all(item in live_env for item in desired_env)
+
+
+def _first_registry_with_prefix(
+    prefix: str,
+    desired_env: Optional[list[str]],
+) -> Optional[tuple[str, int]]:
     """Return the first existing registry whose name starts with *prefix*.
 
     An empty prefix intentionally matches the first registry in ctlptl's list.
+    Registries with incompatible env are ignored so old retained registries do
+    not silently disable pull-through cache mode.
     """
     result = _run(["ctlptl", "get", "registry", "-o", "json"], check=False)
     if result.returncode != 0:
@@ -270,6 +289,8 @@ def _first_registry_with_prefix(prefix: str) -> Optional[tuple[str, int]]:
     for item in data.get("items", []):
         name = _registry_name(item)
         if name is None or not name.startswith(prefix):
+            continue
+        if not _env_is_compatible(item, desired_env):
             continue
         port = _registry_port(item)
         if port is None:
@@ -332,7 +353,7 @@ class _CtlptlRegistryProvider(ResourceProvider):
         env = _env_prop(props)
         if adopt_existing:
             prefix = props.get("registry_name") or ""
-            adopted = _first_registry_with_prefix(prefix)
+            adopted = _first_registry_with_prefix(prefix, env)
             if adopted is not None:
                 registry_name, port = adopted
                 return CreateResult(

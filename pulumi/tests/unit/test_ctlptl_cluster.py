@@ -8,9 +8,39 @@ to surface the cluster's kubeconfig as a Pulumi Output.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from ctlptl.ctlptl_cluster import CtlptlCluster  # noqa: F401
+from ctlptl import ctlptl_cluster
+
+
+def test_render_generates_docker_hub_hosts_for_registry_cache(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "ctlptl"
+    monkeypatch.setattr(ctlptl_cluster, "_GENERATED_CONFIG_DIR", state_dir)
+    monkeypatch.setenv("HOME", "/home/tester")
+
+    rendered = ctlptl_cluster._render("kind-mgmt-test", "registry-test")
+
+    hosts_path = state_dir / "kind-mgmt-test" / "docker.io" / "hosts.toml"
+    hosts_toml = hosts_path.read_text(encoding="utf-8")
+
+    assert f"hostPath: {hosts_path}" in rendered
+    assert "containerPath: /etc/containerd/certs.d/docker.io/hosts.toml" in rendered
+    assert 'server = "https://registry-1.docker.io"' in hosts_toml
+    assert '[host."http://registry-test:5000"]' in hosts_toml
+    assert 'capabilities = ["pull", "resolve"]' in hosts_toml
+
+
+def test_render_requires_registry_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HOME", "/home/tester")
+
+    with pytest.raises(RuntimeError, match="registry_name is required"):
+        ctlptl_cluster._render("kind-mgmt-test", None)
 
 
 @pytest.mark.skip(reason="TODO: stub subprocess.run for `ctlptl apply`; assert ``${CLUSTER_NAME}`` and ``${REGISTRY_NAME}`` placeholders are substituted with the autonamed cluster name and the registry_name input, respectively")
