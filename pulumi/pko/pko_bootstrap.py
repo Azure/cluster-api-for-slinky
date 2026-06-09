@@ -7,12 +7,12 @@ ComponentResource the outer stack calls once:
     ├── PKORelease                   # Helm OCI install
     ├── StateBackend                 # PVC + passphrase Secret
     ├── WorkspaceServiceAccount      # pulumi-runner + ClusterRoleBindings
-    └── Stack/ca4s-init              # reflexively emits child resources
+    └── Stack/ca4s-init              # runs env-specific init component
 
 The init Stack CR reconciles from the same repo as this stack itself.
 It is the only PKO Stack CR the outer host-side Pulumi program owns. Once PKO
-runs it, the init stack reflexively creates the control-plane Stack CR and then
-instantiates tenant/workload resources from inside the management cluster.
+runs it, the init stack reflexively instantiates control-plane and
+tenants/workload resources from inside the management cluster.
 
 The caller owns the PKO namespace and the Flux ``GitRepository`` source.
 PKOBootstrap installs PKO and creates the init Stack CR that consumes that
@@ -58,7 +58,7 @@ class PKOBootstrap(pulumi.ComponentResource):
         env:
             Outer-stack environment moniker (``pulumi.get_stack()``).
             Propagated to the init Stack CR's ``spec.stack``; the init stack
-            then uses the same value for the control-plane Stack CR and tenant
+            then uses the same value for the env-specific init and tenants
             component.
         opts:
             Standard Pulumi ``ResourceOptions``.

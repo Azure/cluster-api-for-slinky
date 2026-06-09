@@ -112,8 +112,7 @@ def build_stack_spec(
     Args:
         spec:           Shared shape; see :class:`StackCRSpec`.
         project_name:   Kebab-case Pulumi project name (e.g.
-                        ``ca4s-control-plane`` or
-                        ``ca4s-workload-cluster``). Becomes the second
+                ``ca4s-init``). Becomes the second
                         segment of ``spec.stack``.
         env:            Third segment of ``spec.stack``. For the
                         control-plane CR this is the outer

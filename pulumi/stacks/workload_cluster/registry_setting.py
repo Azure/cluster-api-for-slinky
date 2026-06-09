@@ -1,7 +1,7 @@
-"""Registry config contract for tenant/workload components.
+"""Registry config contract for tenants/workload components.
 
 The outer stack forwards this shape through the init Stack CR's child config.
-Tenant/workload components read it back through ``pulumi.Config`` and validate
+Tenants/workload components read it back through ``pulumi.Config`` and validate
 it before rendering node bootstrap config.
 
 The explicit ``kind`` tag is intentionally a little more structure than the

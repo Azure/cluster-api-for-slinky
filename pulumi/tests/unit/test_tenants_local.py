@@ -2,22 +2,22 @@ from __future__ import annotations
 
 import pytest
 
-from stacks.workload_cluster.tenant_local import (
+from stacks.workload_cluster.tenants_local import (
     WorkloadClusterSpec,
-    parse_tenant_local_spec,
+    parse_tenants_local_spec,
 )
 
 
-def test_parse_tenant_local_spec_defaults_to_local_cluster() -> None:
-    spec = parse_tenant_local_spec(None)
+def test_parse_tenants_local_spec_defaults_to_local_cluster() -> None:
+    spec = parse_tenants_local_spec(None)
 
     assert spec.workload_clusters == (
         WorkloadClusterSpec(name="local", cluster_class="local"),
     )
 
 
-def test_parse_tenant_local_spec_accepts_workload_clusters_shape() -> None:
-    spec = parse_tenant_local_spec(
+def test_parse_tenants_local_spec_accepts_workload_clusters_shape() -> None:
+    spec = parse_tenants_local_spec(
         {
             "workloadClusters": [
                 {"name": "local", "class": "local"},
@@ -32,9 +32,9 @@ def test_parse_tenant_local_spec_accepts_workload_clusters_shape() -> None:
     )
 
 
-def test_parse_tenant_local_spec_rejects_duplicate_cluster_names() -> None:
+def test_parse_tenants_local_spec_rejects_duplicate_cluster_names() -> None:
     with pytest.raises(ValueError, match="duplicate names: local"):
-        parse_tenant_local_spec(
+        parse_tenants_local_spec(
             {
                 "workloadClusters": [
                     {"name": "local", "class": "local"},
@@ -54,6 +54,6 @@ def test_parse_tenant_local_spec_rejects_duplicate_cluster_names() -> None:
         {"workloadClusters": [{"name": "local", "class": "not_valid"}]},
     ],
 )
-def test_parse_tenant_local_spec_rejects_invalid_shape(value: object) -> None:
+def test_parse_tenants_local_spec_rejects_invalid_shape(value: object) -> None:
     with pytest.raises(ValueError):
-        parse_tenant_local_spec(value)
+        parse_tenants_local_spec(value)

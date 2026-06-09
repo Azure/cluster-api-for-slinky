@@ -1,8 +1,8 @@
-"""Tenant aggregate for the ``local`` outer env.
+"""Tenants aggregate for the ``local`` outer env.
 
 The workload-cluster project stack name is the outer env, ``local``. The
 top-level ``__main__.py`` imports this module and instantiates
-``TenantLocal``. This component reads ``spec.workloadClusters`` config, fans
+``TenantsLocal``. This component reads ``spec.workloadClusters`` config, fans
 out one child per entry, handles cross-workload-cluster concerns, and
 instantiates the selected ``workload_cluster_local_<class>.py`` component for
 each instance.
@@ -33,11 +33,11 @@ class WorkloadClusterSpec:
 
 
 @dataclass(frozen=True)
-class TenantLocalSpec:
+class TenantsLocalSpec:
     workload_clusters: tuple[WorkloadClusterSpec, ...]
 
 
-_DEFAULT_TENANT_LOCAL_SPEC = TenantLocalSpec(
+_DEFAULT_TENANTS_LOCAL_SPEC = TenantsLocalSpec(
     workload_clusters=(
         WorkloadClusterSpec(name="local", cluster_class="local"),
     ),
@@ -67,9 +67,9 @@ def _parse_workload_cluster_spec(value: object) -> WorkloadClusterSpec:
     return WorkloadClusterSpec(name=name, cluster_class=cluster_class)
 
 
-def parse_tenant_local_spec(
+def parse_tenants_local_spec(
     value: object | None,
-) -> TenantLocalSpec:
+) -> TenantsLocalSpec:
     """Parse the local workload-cluster inventory shape.
 
     Expected input shape:
@@ -77,8 +77,8 @@ def parse_tenant_local_spec(
         {"workloadClusters": [{"name": "local", "class": "local"}]}
     """
     if value is None:
-        return _DEFAULT_TENANT_LOCAL_SPEC
-    if isinstance(value, TenantLocalSpec):
+        return _DEFAULT_TENANTS_LOCAL_SPEC
+    if isinstance(value, TenantsLocalSpec):
         return value
     if not isinstance(value, Mapping):
         raise ValueError("local workload clusters spec must be an object")
@@ -101,7 +101,7 @@ def parse_tenant_local_spec(
             + ", ".join(duplicates)
         )
 
-    return TenantLocalSpec(
+    return TenantsLocalSpec(
         workload_clusters=tuple(sorted(workload_clusters, key=lambda item: item.name))
     )
 
@@ -115,7 +115,7 @@ def _module_suffix(value: str, *, field_name: str) -> str:
     return suffix
 
 
-class TenantLocal(pulumi.ComponentResource):
+class TenantsLocal(pulumi.ComponentResource):
     """Instantiate local workload-cluster instances from ``workloadClusters``."""
 
     workload_clusters: list[dict[str, Any]]
@@ -134,17 +134,17 @@ class TenantLocal(pulumi.ComponentResource):
         self,
         name: str,
         *,
-        spec: TenantLocalSpec | Mapping[str, object] | None = None,
+        spec: TenantsLocalSpec | Mapping[str, object] | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
-            "ca4s:workload:TenantLocal",
+            "ca4s:workload:TenantsLocal",
             name,
             props={},
             opts=opts,
         )
 
-        workload_clusters_spec = parse_tenant_local_spec(
+        workload_clusters_spec = parse_tenants_local_spec(
             spec
             if spec is not None
             else pulumi.Config(_PROJECT_NAME).get_object(_SPEC_CONFIG_KEY)

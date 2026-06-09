@@ -14,8 +14,8 @@ the developer loop needs, in dependency order:
     Flux source/notification controllers, declares a Flux ``GitRepository`` for
     the hydrated GitOps repo, installs the Pulumi Kubernetes Operator (Helm OCI),
     and emits exactly one ``pulumi.com/v1`` Stack CR: ``ca4s-init``. From there
-    on PKO owns reconcile, including the control-plane Stack CR and
-    tenant/workload resources that the init stack creates reflexively.
+    on PKO owns reconcile, including control-plane and tenants/workload
+    resources that the init stack creates reflexively.
 
 Why one stack
 -------------
@@ -191,24 +191,22 @@ def run() -> None:
     #
     # Install PKO and hand it the Flux GitRepository source created by the
     # GitOps provider. The outer stack owns exactly one Stack CR under PKO:
-    # ``ca4s-init``. That init stack runs inside PKO, creates the control-plane
-    # Stack CR, waits for it to become ready, then instantiates tenant/workload
-    # resources directly. Workload-cluster instance churn is therefore
+    # ``ca4s-init``. That init stack runs inside PKO and instantiates
+    # ``ControlPlaneLocal`` plus ``TenantsLocal`` directly. Workload-cluster
+    # instance churn is therefore
     # reconciled by PKO from Git after the init stack notices the repo change,
     # rather than by adding/removing Stack CRs directly from this outer
     # host-side graph.
     #
-    # Two inner Pulumi projects live as sibling directories under
-    # ``pulumi/stacks/``, sharing the outer ``../../../.venv``; tenant/workload
-    # code is imported as a component module by the init stack:
+    # The single inner Pulumi project is ``pulumi/stacks/init/``. Control-plane
+    # and tenants/workload code is imported as component modules by that init
+    # stack:
     #
-    #     pulumi/stacks/init/             - the single outer-owned PKO Stack;
-    #                                       reflexively emits child Stack CRs.
-    #     pulumi/stacks/control_plane/    - CAPI providers + AWX
-    #                                       (mgmt-cluster operators
-    #                                       only; tenant-agnostic).
-    #     pulumi/stacks/workload_cluster/ - tenant/workload component modules;
-    #                                       ``TenantLocal`` creates per-instance
+    #     pulumi/stacks/init/             - the single outer-owned PKO Stack.
+    #     pulumi/stacks/control_plane/    - component modules for CAPI providers
+    #                                       + AWX (tenant-agnostic).
+    #     pulumi/stacks/workload_cluster/ - tenants/workload component modules;
+    #                                       ``TenantsLocal`` creates per-instance
     #                                       CAPI Clusters on mgmt, then installs
     #                                       workload-cluster-side resources via
     #                                       each cluster's own kubeconfig.
@@ -220,13 +218,9 @@ def run() -> None:
     # ``pulumi.get_stack()`` returns the third segment unchanged:
     #
     #     ca4s-init             -> spec.stack=organization/ca4s-init/local
-    #                              -> creates the child Stack CRs below
-    #     ca4s-control-plane    -> spec.stack=organization/ca4s-control-plane/local
-    #                              -> dispatcher picks ``control_plane_local.py``
-    #     TenantLocal            -> component instantiated by ca4s-init after
-    #                              the control-plane Stack CR is ready. It owns
-    #                              ``spec.workloadClusters`` inventory, instance
-    #                              fan-out, and cross-workload-cluster concerns.
+    #                              -> dispatcher picks ``InitStackLocal``;
+    #                                 that component instantiates
+    #                                 ``ControlPlaneLocal`` and ``TenantsLocal``.
 
     pko = PKOBootstrap(
         "pko",

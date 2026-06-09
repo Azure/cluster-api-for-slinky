@@ -1,29 +1,27 @@
-"""PKO init-stack contract and runtime.
+"""PKO init-stack contract and env dispatcher.
 
 The outer stack should own exactly one ``pulumi.com/v1`` Stack CR after PKO is
-installed: ``ca4s-init``. That init stack then runs inside PKO, creates the
-control-plane Stack CR, and instantiates the tenant/workload component after the
-control-plane stack is ready.
+installed: ``ca4s-init``. That init stack then runs inside PKO and dispatches to
+an env-specific init component such as :class:`pko._init_stack_local.InitStackLocal`.
 
 This module is intentionally shared by both sides of that handoff:
 
 * :class:`pko.pko_bootstrap.PKOBootstrap` calls :func:`init_stack_config` when it
   creates the single init Stack CR.
 * ``pulumi/stacks/init/__main__.py`` calls :func:`run` from inside the PKO
-    workspace to reconstruct :class:`pko._stack_cr.StackCRSpec`, emit the
-    control-plane Stack CR, and instantiate tenant/workload resources.
+    workspace to reconstruct :class:`pko._stack_cr.StackCRSpec` and instantiate
+    the env-specific init component.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib
 from typing import Any, Mapping
 
 import pulumi
-import pulumi_kubernetes as k8s
 
-from pko._stack_cr import StackCRSpec, build_stack_spec
-from stacks.workload_cluster.tenant_local import TenantLocal
+from pko._stack_cr import StackCRSpec
 
 
 INIT_PROJECT = "ca4s-init"
@@ -33,9 +31,8 @@ INIT_CHILD_CONFIG_NAME = "childConfig"
 INIT_STACK_SPEC_CONFIG_KEY = f"{INIT_PROJECT}:{INIT_STACK_SPEC_CONFIG_NAME}"
 INIT_CHILD_CONFIG_KEY = f"{INIT_PROJECT}:{INIT_CHILD_CONFIG_NAME}"
 
-CONTROL_PLANE_PROJECT = "ca4s-control-plane"
-CONTROL_PLANE_REPO_DIR = "pulumi/stacks/control_plane/"
-_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
+_INIT_STACK_MODULE_PREFIX = "pko._init_stack_"
+_INIT_STACK_CLASS_PREFIX = "InitStack"
 
 _STACK_SPEC_CONFIG_KEYS = {
     "pkoNamespace": "pko_namespace",
@@ -101,34 +98,37 @@ def load_init_stack_inputs() -> InitStackInputs:
     return InitStackInputs(stack_spec=stack_spec, child_config=child_config)
 
 
+def _pascal_case(value: str) -> str:
+    words = value.replace("-", "_").split("_")
+    return "".join(word.capitalize() for word in words if word)
+
+
 def run() -> None:
-    """Create control-plane and tenant/workload resources from init."""
+    """Instantiate the env-specific init-stack component."""
     inputs = load_init_stack_inputs()
     env = pulumi.get_stack()
 
-    control_plane_spec = build_stack_spec(
-        spec=inputs.stack_spec,
-        project_name=CONTROL_PLANE_PROJECT,
-        env=env,
-        repo_dir=CONTROL_PLANE_REPO_DIR,
-        config=inputs.child_config,
-    )
-    control_plane = k8s.apiextensions.CustomResource(
-        "control-plane",
-        api_version="pulumi.com/v1",
-        kind="Stack",
-        metadata={
-            "namespace": inputs.stack_spec.pko_namespace,
-            "annotations": {_WAIT_FOR_ANNOTATION: "condition=Ready"},
-        },
-        spec=control_plane_spec,
-    )
-    control_plane_stack_name = control_plane.metadata["name"]  # type: ignore[attr-defined]
+    module_name = f"{_INIT_STACK_MODULE_PREFIX}{env}"
+    class_name = f"{_INIT_STACK_CLASS_PREFIX}{_pascal_case(env)}"
+    try:
+        module = importlib.import_module(module_name)
+    except ModuleNotFoundError as exc:
+        if exc.name != module_name:
+            raise
+        raise ValueError(
+            f"unsupported init stack env {env!r}: expected module {module_name!r} "
+            f"exposing class {class_name!r}."
+        ) from None
 
-    tenant = TenantLocal(
-        "tenant-local",
-        opts=pulumi.ResourceOptions(depends_on=[control_plane]),
-    )
+    try:
+        concrete = getattr(module, class_name)
+    except AttributeError:
+        raise ValueError(
+            f"module {module_name!r} does not expose class {class_name!r}; "
+            "env-specific init-stack modules must follow InitStack<Env>."
+        ) from None
 
-    pulumi.export("control_plane_stack", control_plane_stack_name)
-    pulumi.export("workload_clusters", tenant.workload_clusters)
+    init_stack = concrete("init-stack", inputs=inputs)
+
+    pulumi.export("control_plane_ready", init_stack.control_plane_ready)
+    pulumi.export("workload_clusters", init_stack.workload_clusters)

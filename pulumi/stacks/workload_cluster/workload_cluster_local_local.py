@@ -1,6 +1,6 @@
 """Local workload-cluster class for ``local`` instances.
 
-Selected by ``tenant_local.py`` for ``workloadClusters`` entries with
+Selected by ``tenants_local.py`` for ``workloadClusters`` entries with
 ``class: local``. Produces a local CAPD-backed workload-cluster resource graph
 for the requested instance:
 
@@ -16,8 +16,8 @@ for the requested instance:
 State backend
 -------------
 This component currently runs inside the PKO-owned ``ca4s-init`` stack, so its
-resources live in the init stack's shared ``file:///state`` state. A separate
-tenant/workload stack boundary can be reintroduced later if isolated state is
+resources live in the init stack's shared ``file:///state`` state. Separate
+tenants/workload stack boundaries can be reintroduced later if isolated state is
 needed.
 """
 
@@ -463,7 +463,7 @@ class ManagementKubeconfig(pulumi.ComponentResource):
     def _from_service_account(self) -> pulumi.Output[str]:
         if "KUBERNETES_SERVICE_HOST" not in os.environ:
             raise RuntimeError(
-                "tenant/workload components must run inside the PKO workspace pod"
+                "tenants/workload components must run inside the PKO workspace pod"
             )
 
         host = os.environ["KUBERNETES_SERVICE_HOST"]
