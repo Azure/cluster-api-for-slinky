@@ -84,6 +84,12 @@ _LOCAL_PATH_RBAC_BINDING_NAME = "local-path-provisioner-bind"
 _LOCAL_PATH_CONFIG_NAME = "local-path-config"
 _LOCAL_PATH_DEPLOYMENT_NAME = "local-path-provisioner"
 
+_CLUSTER_AUTOSCALER_CHART_REPO = "https://kubernetes.github.io/autoscaler"
+_CLUSTER_AUTOSCALER_CHART_NAME = "cluster-autoscaler"
+_CLUSTER_AUTOSCALER_CHART_VERSION = "9.57.0"
+_CLUSTER_AUTOSCALER_DISCOVERY_LABEL = "ca4s.azure.com/autoscaler-enabled"
+_CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE = "true"
+
 _SLINKY_CHART_OCI_PREFIX = "oci://ghcr.io/slinkyproject/charts"
 _SLINKY_CHART_VERSION = "1.0.2"
 _SLINKY_OPERATOR_CRDS_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator-crds"
@@ -308,9 +314,68 @@ def _object_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
 
 
 def _worker_labels(cluster_name: str, worker: WorkerClassSpec) -> dict[str, str]:
-    return {
+    labels = {
         "cluster.x-k8s.io/cluster-name": cluster_name,
         _NODE_TYPE_LABEL: worker.node_type,
+    }
+    if worker.replicas is None:
+        labels[_CLUSTER_AUTOSCALER_DISCOVERY_LABEL] = (
+            _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE
+        )
+    return labels
+
+
+def _autoscaled_worker_classes(
+    workers: tuple[WorkerClassSpec, ...],
+) -> tuple[WorkerClassSpec, ...]:
+    return tuple(worker for worker in workers if worker.replicas is None)
+
+
+def _cluster_autoscaler_namespace(instance: str) -> str:
+    return _resource_name(instance, "autoscaler")
+
+
+def _cluster_autoscaler_release_name(instance: str) -> str:
+    return _resource_name(instance, "autoscaler")
+
+
+def _cluster_autoscaler_fullname(instance: str) -> str:
+    return _resource_name(instance, "cluster-autoscaler")
+
+
+def _cluster_autoscaler_kubeconfig_secret_name(instance: str) -> str:
+    return _resource_name(instance, "autoscaler-kubeconfig")
+
+
+def _cluster_autoscaler_values(
+    *,
+    fullname: str,
+    kubeconfig_secret_name: str,
+) -> dict[str, object]:
+    return {
+        "fullnameOverride": fullname,
+        "cloudProvider": "clusterapi",
+        "clusterAPIMode": "kubeconfig-incluster",
+        "clusterAPIKubeconfigSecret": kubeconfig_secret_name,
+        "clusterAPIWorkloadKubeconfigPath": (
+            f"/etc/kubernetes/{_WORKLOAD_KUBECONFIG_SECRET_KEY}"
+        ),
+        "autoDiscovery": {
+            "namespace": _NAMESPACE,
+            "labels": [
+                {
+                    _CLUSTER_AUTOSCALER_DISCOVERY_LABEL: (
+                        _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE
+                    )
+                }
+            ],
+        },
+        "extraArgs": {
+            "logtostderr": True,
+            "stderrthreshold": "info",
+            "v": 4,
+            "scale-down-unneeded-time": "2m",
+        },
     }
 
 
@@ -777,6 +842,125 @@ class LocalPathStorage(pulumi.ComponentResource):
         )
 
 
+class ClusterAPIAutoscaler(pulumi.ComponentResource):
+    """Cluster Autoscaler for a CAPI-managed workload cluster."""
+
+    namespace: pulumi.Output[str]
+    release_name: pulumi.Output[str]
+    status: pulumi.Output[Any]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        instance: str,
+        workload_kubeconfig: pulumi.Input[str],
+        autoscaled_workers: tuple[WorkerClassSpec, ...],
+        provider: k8s.Provider,
+        depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            "ca4s:workload:ClusterAPIAutoscaler",
+            name,
+            props={},
+            opts=opts,
+        )
+
+        if not autoscaled_workers:
+            raise ValueError(
+                "ClusterAPIAutoscaler requires at least one autoscaled worker"
+            )
+
+        namespace_name = _cluster_autoscaler_namespace(instance)
+        release_name = _cluster_autoscaler_release_name(instance)
+        fullname = _cluster_autoscaler_fullname(instance)
+        kubeconfig_secret_name = _cluster_autoscaler_kubeconfig_secret_name(instance)
+        capd_rbac_name = _resource_name(instance, "autoscaler-capd")
+
+        def child_options(
+            *, depends_on: list[pulumi.Input[pulumi.Resource]] | None = None
+        ) -> pulumi.ResourceOptions:
+            return pulumi.ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=depends_on,
+            )
+
+        namespace = k8s.core.v1.Namespace(
+            "namespace",
+            metadata={"name": namespace_name},
+            opts=child_options(depends_on=depends_on),
+        )
+        kubeconfig_secret = k8s.core.v1.Secret(
+            "workload-kubeconfig",
+            metadata={
+                "name": kubeconfig_secret_name,
+                "namespace": namespace_name,
+            },
+            type="Opaque",
+            string_data={_WORKLOAD_KUBECONFIG_SECRET_KEY: workload_kubeconfig},
+            opts=child_options(depends_on=[namespace]),
+        )
+        capd_cluster_role = k8s.rbac.v1.ClusterRole(
+            "capd-cluster-role",
+            metadata={"name": capd_rbac_name},
+            rules=[
+                {
+                    "apiGroups": [_api_group(_INFRASTRUCTURE_API_VERSION)],
+                    "resources": ["*"],
+                    "verbs": ["get", "list", "watch", "update", "patch"],
+                }
+            ],
+            opts=child_options(depends_on=depends_on),
+        )
+        k8s.rbac.v1.ClusterRoleBinding(
+            "capd-cluster-role-binding",
+            metadata={"name": capd_rbac_name},
+            role_ref={
+                "apiGroup": "rbac.authorization.k8s.io",
+                "kind": "ClusterRole",
+                "name": capd_rbac_name,
+            },
+            subjects=[
+                {
+                    "kind": "ServiceAccount",
+                    "name": fullname,
+                    "namespace": namespace_name,
+                }
+            ],
+            opts=child_options(depends_on=[capd_cluster_role, namespace]),
+        )
+        release = k8s.helm.v3.Release(
+            "release",
+            chart=_CLUSTER_AUTOSCALER_CHART_NAME,
+            name=release_name,
+            version=_CLUSTER_AUTOSCALER_CHART_VERSION,
+            repository_opts={"repo": _CLUSTER_AUTOSCALER_CHART_REPO},
+            namespace=namespace_name,
+            cleanup_on_fail=True,
+            atomic=True,
+            wait_for_jobs=True,
+            timeout=600,
+            values=_cluster_autoscaler_values(
+                fullname=fullname,
+                kubeconfig_secret_name=kubeconfig_secret_name,
+            ),
+            opts=child_options(depends_on=[namespace, kubeconfig_secret]),
+        )
+
+        self.namespace = pulumi.Output.from_input(namespace_name)
+        self.release_name = pulumi.Output.from_input(release_name)
+        self.status = release.status
+        self.register_outputs(
+            {
+                "namespace": self.namespace,
+                "release_name": self.release_name,
+                "status": self.status,
+            }
+        )
+
+
 class WorkerClass(pulumi.ComponentResource):
     machine_deployment_name: pulumi.Output[str]
 
@@ -802,12 +986,15 @@ class WorkerClass(pulumi.ComponentResource):
         labels = _worker_labels(cluster_name, worker)
 
         def child_options(
-            *, depends_on: list[pulumi.Resource] | None = None
+            *,
+            depends_on: list[pulumi.Resource] | None = None,
+            ignore_changes: list[str] | None = None,
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
+                ignore_changes=ignore_changes,
             )
 
         machine_template = _docker_machine_template(
@@ -875,7 +1062,10 @@ class WorkerClass(pulumi.ComponentResource):
                     control_plane,
                     machine_template,
                     bootstrap_template,
-                ]
+                ],
+                ignore_changes=(
+                    ["spec.replicas"] if worker.replicas is None else None
+                ),
             ),
         )
 
@@ -1002,6 +1192,8 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
     docker_cluster_name: pulumi.Output[str]
     control_plane_name: pulumi.Output[str]
     worker_machine_deployments: list[pulumi.Output[str]]
+    cluster_autoscaler_namespace: pulumi.Output[str | None]
+    cluster_autoscaler_status: pulumi.Output[Any]
     calico_operator_chart_version: pulumi.Output[str]
     calico_operator_status: pulumi.Output[Any]
     workload_cluster_ready: pulumi.Output[bool]
@@ -1201,6 +1393,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
         )
 
         worker_machine_deployment_names: list[pulumi.Output[str]] = []
+        worker_classes: list[WorkerClass] = []
         for worker in worker_node_classes:
             worker_class = WorkerClass(
                 f"cluster-{worker.name}",
@@ -1214,6 +1407,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 control_plane=kubeadm_control_plane,
                 opts=child_options(),
             )
+            worker_classes.append(worker_class)
             worker_machine_deployment_names.append(worker_class.machine_deployment_name)
 
         workload_kubeconfig_secret = k8s.core.v1.Secret.get(
@@ -1238,6 +1432,19 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             upsert_existing_objects=True,
             opts=child_options(depends_on=[workload_kubeconfig_secret]),
         )
+
+        autoscaled_workers = _autoscaled_worker_classes(worker_node_classes)
+        cluster_autoscaler: ClusterAPIAutoscaler | None = None
+        if autoscaled_workers:
+            cluster_autoscaler = ClusterAPIAutoscaler(
+                "cluster-autoscaler",
+                instance=instance,
+                workload_kubeconfig=workload_kubeconfig,
+                autoscaled_workers=autoscaled_workers,
+                provider=management_provider,
+                depends_on=[workload_kubeconfig_secret, *worker_classes],
+                opts=child_options(provider=management_provider),
+            )
 
         local_path_storage = LocalPathStorage(
             "local-path-storage",
@@ -1400,6 +1607,12 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
         self.docker_cluster_name = pulumi.Output.from_input(cluster_name)
         self.control_plane_name = pulumi.Output.from_input(control_plane_template_name)
         self.worker_machine_deployments = worker_machine_deployment_names
+        self.cluster_autoscaler_namespace = pulumi.Output.from_input(
+            cluster_autoscaler.namespace if cluster_autoscaler is not None else None
+        )
+        self.cluster_autoscaler_status = pulumi.Output.from_input(
+            cluster_autoscaler.status if cluster_autoscaler is not None else None
+        )
         self.calico_operator_chart_version = pulumi.Output.from_input(
             _CALICO_CHART_VERSION
         )
@@ -1408,6 +1621,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             cluster_control_plane_available.metadata["name"],  # type: ignore[index]
             workload_kubeconfig_secret.metadata["name"],  # type: ignore[index]
             calico_operator.status,
+            self.cluster_autoscaler_status,
             slurm_operator.status,
             slurm_release.status,
         ).apply(lambda _: True)
@@ -1423,6 +1637,8 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 "docker_cluster_name": self.docker_cluster_name,
                 "control_plane_name": self.control_plane_name,
                 "worker_machine_deployments": self.worker_machine_deployments,
+                "cluster_autoscaler_namespace": self.cluster_autoscaler_namespace,
+                "cluster_autoscaler_status": self.cluster_autoscaler_status,
                 "calico_operator_chart_version": self.calico_operator_chart_version,
                 "calico_operator_status": self.calico_operator_status,
                 "workload_cluster_ready": self.workload_cluster_ready,

@@ -221,7 +221,7 @@ Install [CAPD](https://github.com/kubernetes-sigs/cluster-api/blob/main/test/inf
 ```bash
 export CLUSTER_TOPOLOGY=true
 clusterctl init --infrastructure docker
-# enhance metadata propagation so that Slinky labels will land on the node (for MachineSet and Machine only; CAPD MachinePool label seems to propagate just fine without this trick)
+# enhance metadata propagation so that Slinky labels from CAPI Machines land on workload Nodes
 kubectl -n capi-system patch deployment/capi-controller-manager --type=json -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--additional-sync-machine-labels=.*slinky\\.slurm\\.net.*"}]'
 ```
 
@@ -308,7 +308,7 @@ sacct
 
 ## Platform pod placement
 
-Compute nodes are tainted with `slinky.slurm.net/controller:NoSchedule` on the controller MachineDeployment only; the MachinePool used for compute is untainted so general Kubernetes workloads can land freely. Slurm NodeSet pods reach compute nodes via `nodeAffinity` (no toleration needed).
+The controller worker `MachineDeployment` is tainted with `slinky.slurm.net/controller:NoSchedule`; the compute `MachineDeployment` is untainted so Cluster Autoscaler can remove idle compute nodes without fighting tenant/platform pods. Slurm NodeSet pods reach compute nodes via `nodeAffinity` and pod anti-affinity.
 
 Every other platform component (`cert-manager`, `slurm-operator`, `kube-prometheus-stack`, `keda`, `local-path-provisioner`, `coredns`, `calico-kube-controllers`) is pinned to the controller node so that **no non-DaemonSet pod ever lands on a compute node and blocks cluster-autoscaler scale-in**. DaemonSets (`calico-node`, `kube-proxy`, `prometheus-node-exporter`) intentionally run everywhere — they don't block scale-in.
 
@@ -357,23 +357,12 @@ The autoscaling logical workflow behaves as follows:
 - slurmctld built-in metrics endpoint exports Slurm job queue data into Prometheus
 - Keda (or some other more sophisticated custom logic) scales Slinky NodeSet replicas based on Prometheus data
 - more NodeSet replicas lead to unschedulable NodeSet pods
-- Cluster Autoscaler sees unschedulable pods, and Cluster API cloud provider of Cluster Autoscaler scales up the MachinePool
-- MachinePool increases its number of replicas, which brings more nodes into the workload cluster
+- Cluster Autoscaler sees unschedulable pods, and Cluster API cloud provider of Cluster Autoscaler scales up the compute MachineDeployment
+- The compute MachineDeployment increases its number of replicas, which brings more nodes into the workload cluster
 - NodeSet pods is now schedulable onto the newly-introduced nodes
 - new nodes join the Slurm cluster and pick up the jobs
 
-To set up the autoscaling configuration, we first connect the Cluster Autoscaler to Cluster API. For our CAPD setup,
-```bash
-# Switch your kubectl context/kubeconfig to the management cluster first
-unset KUBECONFIG # go back to Kind's kubeconfig
-clusterctl get kubeconfig capi-quickstart > ${HOME}/.kube/capi-quickstart.kubeconfig # this time we actually want the in-management-cluster load-balancer IP!
-helm repo add autoscaler https://kubernetes.github.io/autoscaler
-helm install cluster-autoscaler autoscaler/cluster-autoscaler -f cluster-autoscaler.yaml --namespace=cluster-autoscaler --create-namespace
-kubectl label ns cluster-autoscaler pod-security.kubernetes.io/enforce=privileged --overwrite
-kubectl label ns cluster-autoscaler pod-security.kubernetes.io/enforce-version=latest --overwrite
-# Extra RBAC so the autoscaler can access CAPD infrastructure resources
-kubectl apply -f cluster-autoscaler-capd-rbac.yaml
-```
+The Pulumi workload-cluster class installs Cluster Autoscaler into the management cluster. For autoscaled worker classes, Pulumi creates the CAPI MachineDeployment with min/max autoscaler annotations and omits `spec.replicas`; Cluster Autoscaler then owns the live replica count. Pulumi also ignores `spec.replicas` drift for those MachineDeployments so PKO does not fight autoscaler decisions.
 
 We then install KEDA to scale the Slurm NodeSet based on Prometheus metrics of pending jobs:
 ```bash

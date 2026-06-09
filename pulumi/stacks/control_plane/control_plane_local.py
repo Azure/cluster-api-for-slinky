@@ -98,7 +98,7 @@ class ControlPlaneLocal(pulumi.ComponentResource):
         self.awx_admin_password_secret = awx_instance.admin_password_secret
         self.control_plane_ready = pulumi.Output.from_input(False)
         self.todo = pulumi.Output.from_input(
-            "Wire AWX API config and cluster-autoscaler; ClusterClass lives in workload stack."
+            "Wire AWX API config and tenant-facing Slurm day-2 operations."
         )
 
         self.register_outputs(

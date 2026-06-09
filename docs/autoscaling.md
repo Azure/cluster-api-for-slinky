@@ -10,7 +10,7 @@ Slurm pending jobs
   → Prometheus scrapes slurmctld metrics
     → KEDA scales the NodeSet (slurmd pod count)
       → Unschedulable slurmd pods appear
-        → Cluster Autoscaler scales the MachinePool
+        → Cluster Autoscaler scales the compute MachineDeployment
           → CAPD creates new Docker "nodes"
             → Nodes join the workload cluster
               → slurmd pods are scheduled and register with Slurm
@@ -58,45 +58,51 @@ When at least one job is pending, KEDA increases the NodeSet replica count
 compute node. When pending jobs drop to zero, KEDA scales back down (minimum
 of 1 replica).
 
-### 3. Unschedulable Pods → Cluster Autoscaler → MachinePool
+### 3. Unschedulable Pods → Cluster Autoscaler → MachineDeployment
 
 Because of the **anti-affinity** rule (see below), each slurmd pod requires
 its own dedicated Kubernetes node. When KEDA requests more NodeSet replicas
 than there are available compute nodes, the new pods become *unschedulable*.
 
-The **Cluster Autoscaler** (running on the management cluster, configured in
-`cluster-autoscaler.yaml`) detects these unschedulable pods and responds by
-scaling up the CAPI **MachinePool**:
+The **Cluster Autoscaler** runs on the management cluster and watches the
+workload cluster through the CAPI-generated workload kubeconfig. The local
+Pulumi workload-cluster class installs it as a first-class component and it
+responds to unschedulable pods by scaling the compute CAPI
+**MachineDeployment**:
 
 ```yaml
 cloudProvider: clusterapi
 clusterAPIMode: kubeconfig-incluster
-clusterAPIWorkloadKubeconfigPath: /mnt/kubeconfig/capi-quickstart.kubeconfig
+clusterAPIKubeconfigSecret: local-autoscaler-kubeconfig
+clusterAPIWorkloadKubeconfigPath: /etc/kubernetes/value
 autoDiscovery:
   namespace: default
   labels:
-  - slinky.slurm.net/node-type: compute
+  - ca4s.azure.com/autoscaler-enabled: "true"
 extraArgs:
   scale-down-unneeded-time: 2m
 ```
 
 Key details:
 
-- **Auto-discovery** finds the MachinePool by the label
-  `slinky.slurm.net/node-type: compute`.
-- **Min/max bounds** are controlled by annotations on the MachinePool itself
-  (see label/annotation passthrough below).
+- **Auto-discovery** finds autoscaled MachineDeployments by the label
+  `ca4s.azure.com/autoscaler-enabled: "true"`.
+- **Min/max bounds** are controlled by annotations on the MachineDeployment
+  itself (see label/annotation passthrough below).
+- **Replica ownership** belongs to Cluster Autoscaler. Pulumi creates the
+  MachineDeployment without `spec.replicas` for autoscaled worker classes and
+  ignores drift on `spec.replicas` so PKO does not overwrite autoscaler changes.
 - **Scale-down** is set to 2 minutes of idle time for demo purposes.
-- **CAPD RBAC** (`cluster-autoscaler-capd-rbac.yaml`) grants the autoscaler
-  access to the `infrastructure.cluster.x-k8s.io` API group, which the
-  default Helm chart does not include.
+- **CAPD RBAC** is owned by Pulumi and grants access to the
+  `infrastructure.cluster.x-k8s.io` API group, which the default Helm chart
+  does not include.
 
 ### 4. CAPD Creates Docker Nodes
 
-The MachinePool's infrastructure reference points to a
-`DockerMachinePoolTemplate`. When the Cluster Autoscaler increases the
-MachinePool replica count, CAPD creates new Docker containers that act as
-Kubernetes nodes. These nodes are bootstrapped with kubeadm and join the
+The compute MachineDeployment's infrastructure reference points to a
+`DockerMachineTemplate`. When the Cluster Autoscaler increases the
+MachineDeployment replica count, CAPI/CAPD creates new Docker containers that
+act as Kubernetes nodes. These nodes are bootstrapped with kubeadm and join the
 workload cluster.
 
 ---
@@ -110,42 +116,44 @@ pod placement.
 
 ### Where Labels Originate
 
-In `capi-quickstart.yaml`, the Cluster topology declares:
+In the Pulumi local workload-cluster class, worker classes generate direct
+CAPI MachineDeployments:
 
 ```yaml
 workers:
   machineDeployments:
-  - class: default-worker
-    name: md-0
+  - name: local-head
     replicas: 1
     metadata:
       labels:
-        slinky.slurm.net/node-type: controller   # ← head-node label
+        slinky.slurm.net/node-type: controller
 
-  machinePools:
-  - class: default-worker
-    name: mp-0
+  - name: local-compute
+    # replicas omitted: Cluster Autoscaler owns the live value
     metadata:
       annotations:
         cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size: '1'
         cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size: '10'
       labels:
-        slinky.slurm.net/node-type: compute       # ← compute-node label
+        slinky.slurm.net/node-type: compute
+        ca4s.azure.com/autoscaler-enabled: "true"
 ```
 
 - **`slinky.slurm.net/node-type: controller`** on the MachineDeployment
   identifies nodes that run the Slurm head services (slurmctld, login,
   REST API).
-- **`slinky.slurm.net/node-type: compute`** on the MachinePool identifies
-  nodes that run slurmd worker pods.
+- **`slinky.slurm.net/node-type: compute`** on the compute MachineDeployment
+  identifies nodes that run slurmd worker pods.
+- **`ca4s.azure.com/autoscaler-enabled: "true"`** identifies
+  MachineDeployments that Cluster Autoscaler is allowed to manage.
 - The **autoscaler annotations** tell Cluster Autoscaler the allowed scaling
   range (1–10 nodes).
 
 ### How Labels Reach Kubernetes Nodes
 
 CAPI's controller manager propagates labels from `Machine` objects to
-`Node` objects, but only for labels that match a configured allowlist. Custom
-Slinky labels require an explicit patch:
+`Node` objects, but only for labels that match a configured allowlist. The
+local control-plane setup configures the CAPI controller to sync Slinky labels:
 
 ```bash
 kubectl -n capi-system patch deployment/capi-controller-manager \
@@ -155,19 +163,15 @@ kubectl -n capi-system patch deployment/capi-controller-manager \
 ```
 
 This tells the CAPI controller to sync any label matching
-`.*slinky\.slurm\.net.*` from Machine to Node. Without this patch,
+`.*slinky\.slurm\.net.*` from Machine to Node. Without this configuration,
 MachineDeployment-created nodes would not carry the `slinky.slurm.net/*`
 labels and pod affinity rules would fail.
-
-> **Note:** CAPD MachinePool labels propagate to nodes without this patch;
-> the patch is specifically needed for MachineSet/Machine-based topologies
-> (i.e., the MachineDeployment used for the controller node).
 
 ### Propagation Chain
 
 ```
-Cluster topology (capi-quickstart.yaml)
-  → MachineDeployment / MachinePool metadata.labels
+Pulumi worker class
+  → MachineDeployment metadata.labels
     → Machine metadata.labels
       → Kubernetes Node labels  (via CAPI controller --additional-sync-machine-labels)
         → Pod nodeAffinity selectors match  (slurm-cluster.yaml)
@@ -223,7 +227,7 @@ scaling:
 2. If only M < N compute nodes exist, the remaining N − M pods are
    **unschedulable** — the scheduler cannot place two slurmd pods on the
    same node.
-3. Cluster Autoscaler sees the unschedulable pods and grows the MachinePool
+3. Cluster Autoscaler sees the unschedulable pods and grows the compute MachineDeployment
    until N compute nodes exist.
 4. New nodes get the `compute` label via CAPI label passthrough, and the
    pending slurmd pods are immediately scheduled.
@@ -251,56 +255,54 @@ affinity:
           - "controller"
 ```
 
-This ensures all Slurm management components run on the MachineDeployment
-node (`md-0`) rather than on compute MachinePool nodes, keeping head-node
-traffic isolated from worker workloads.
+This ensures all Slurm management components run on the controller worker
+rather than on compute workers, keeping head-node traffic isolated from worker
+workloads.
 
 ---
 
-## Compute Node Taint Isolation
+## Controller Node Taint Isolation
 
-Node affinity alone does not prevent non-Slurm pods (e.g., Grafana,
-cert-manager, CoreDNS) from landing on compute nodes. To enforce strict
-"Slurm-only" compute nodes, a **taint** is applied at node registration
-time.
-
-### Taint on Compute Nodes
-
-The MachinePool uses a dedicated `KubeadmConfigTemplate`
-(`quick-start-compute-worker-bootstraptemplate`) that adds a taint during
-kubeadm join:
+The controller worker is tainted at node registration time so tenant compute
+pods do not land on the Slurm head node by accident:
 
 ```yaml
 joinConfiguration:
   nodeRegistration:
     taints:
-    - key: slinky.slurm.net/compute
+    - key: slinky.slurm.net/controller
       effect: NoSchedule
 ```
 
-This prevents any pod from scheduling onto compute nodes unless it
-explicitly tolerates the taint.
+Compute workers are intentionally untainted. Slurm `NodeSet` pods select them
+with `nodeAffinity`, and this keeps Cluster Autoscaler scale-in simpler: idle
+compute nodes are not held alive by platform pods that accidentally tolerated a
+compute taint.
 
 ### Who Tolerates the Taint
 
-| Component | Tolerates? | How |
-|-----------|-----------|-----|
-| slurmd (NodeSet worker) | Yes | `slurm-cluster.yaml` → `nodesets.slinky.podSpec.tolerations` |
-| kube-proxy | Yes | DaemonSet has `operator: Exists` (tolerates all) |
-| calico-node (CNI) | Yes | DaemonSet has `operator: Exists` (tolerates all NoSchedule) |
-| prometheus-node-exporter | Yes | DaemonSet has `operator: Exists` (tolerates all NoSchedule) |
-| Everything else | No | Pods like CoreDNS, Grafana, cert-manager stay on controller/CP nodes |
+| Component | Tolerates controller taint? | How |
+|-----------|-----------------------------|-----|
+| Slurm controller/login/restapi | Yes | Generated chart values add `slinky.slurm.net/controller` toleration and controller node affinity |
+| slurmd NodeSet workers | No | They select compute nodes by `slinky.slurm.net/node-type: compute` |
+| DaemonSets | Usually yes | Kubernetes DaemonSet defaults or chart tolerations allow node agents everywhere |
+| Tenant/platform Deployments | No | They stay off the controller worker unless explicitly configured |
 
-### NodeSet Toleration in `slurm-cluster.yaml`
+### NodeSet Placement
 
 ```yaml
 nodesets:
   slinky:
     podSpec:
-      tolerations:
-      - key: slinky.slurm.net/compute
-        operator: Exists
-        effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: slinky.slurm.net/node-type
+                operator: In
+                values:
+                - compute
 ```
 
 ---
@@ -310,8 +312,8 @@ nodesets:
 ```
 ┌──────────────────────── Management Cluster (Kind) ───────────────────────┐
 │                                                                          │
-│  Cluster Autoscaler ──discovers──▶ MachinePool (mp-0)                    │
-│         │                          label: compute                        │
+│  Cluster Autoscaler ──discovers──▶ MachineDeployment (compute)           │
+│         │                          label: autoscaler-enabled             │
 │         │                          annotations: min=1, max=10            │
 │         │                                  │                             │
 │         │ scales up/down                   │ CAPD creates Docker nodes   │
