@@ -34,6 +34,11 @@ import pulumi_kubernetes as k8s
 import pulumi_random as random
 from pulumi import ResourceOptions
 
+from pko._workspace_env import (
+    PULUMI_DELETE_UNREACHABLE_ENV,
+    PULUMI_DELETE_UNREACHABLE_SECRET_NAME,
+)
+
 # Convention: the PVC and Secret live in the PKO namespace alongside the
 # operator pod. The names are NOT configurable — every Stack CR's
 # ``workspaceTemplate`` patch references these exact names.
@@ -44,8 +49,6 @@ STATE_BACKEND_URL = f"file://{STATE_MOUNT_PATH}"
 # Single Secret name shared across all inner Stack CRs.
 PASSPHRASE_SECRET_NAME = "pko-state-passphrase"
 PASSPHRASE_SECRET_KEY = "PULUMI_CONFIG_PASSPHRASE"
-DELETE_UNREACHABLE_SECRET_NAME = "pko-delete-unreachable"
-DELETE_UNREACHABLE_SECRET_KEY = "PULUMI_K8S_DELETE_UNREACHABLE"
 
 
 class StateBackend(pulumi.ComponentResource):
@@ -111,10 +114,10 @@ class StateBackend(pulumi.ComponentResource):
         k8s.core.v1.SecretPatch(
             f"{name}-delete-unreachable-secret",
             metadata={
-                "name": DELETE_UNREACHABLE_SECRET_NAME,
+                "name": PULUMI_DELETE_UNREACHABLE_SECRET_NAME,
                 "namespace": namespace,
             },
-            string_data={DELETE_UNREACHABLE_SECRET_KEY: "true"},
+            string_data={PULUMI_DELETE_UNREACHABLE_ENV: "true"},
             type="Opaque",
             opts=ResourceOptions(parent=self, provider=provider),
         )
