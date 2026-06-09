@@ -8,11 +8,9 @@ description: |
   here — they belong workload-cluster-side (see
   ``../workload_cluster/``). No ingress controller for now either:
   LoadBalancer Services on mgmt get a routable IP from the cloud
-  provider (cloud-provider-kind locally) directly. The per-tenant
-  workload-cluster Stack CRs (emitted by the PKO-owned init stack via
-  the ``Tenants`` component) take a hard dependency on this
-  stack via PKO's ``spec.prerequisites``, so CAPI + AWX land before
-  any per-tenant workload cluster is attempted.
+  provider (cloud-provider-kind locally) directly. The PKO-owned init stack
+  waits for this Stack CR to become ready before instantiating tenant/workload
+  resources, so CAPI + AWX land before any workload cluster is attempted.
 
   Same dispatcher pattern as the outer ``pulumi/`` project:
   ``main: __main__.py`` switches on ``pulumi.get_stack()`` (which

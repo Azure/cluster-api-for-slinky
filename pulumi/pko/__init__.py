@@ -2,8 +2,8 @@
 
 Re-exports the single public entrypoint :class:`PKOBootstrap`. Inner building
 blocks (Flux infrastructure/source helpers, PKO Helm release, state backend,
-workspace SA, Stack CR spec builder, init-stack runtime, per-env tenants
-fan-out) are package-internal.
+workspace SA, Stack CR spec builder, and init-stack runtime) are
+package-internal.
 
 Layout
 ------
@@ -13,8 +13,6 @@ Layout
 * :mod:`pko._service_account`    — workspace SA + ClusterRoleBindings
 * :mod:`pko._init_stack`         — single init Stack CR contract + runtime
 * :mod:`pko._stack_cr`           — ``build_stack_spec`` + ``StackCRSpec``
-* :mod:`pko._tenants`            — per-env tenants dispatcher
-* :mod:`pko._tenants_<env>`      — per-env concrete tenants impls
 * :mod:`pko.pko_bootstrap`       — top-level :class:`PKOBootstrap` component
 """
 

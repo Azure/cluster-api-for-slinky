@@ -14,8 +14,8 @@ the developer loop needs, in dependency order:
     Flux source/notification controllers, declares a Flux ``GitRepository`` for
     the hydrated GitOps repo, installs the Pulumi Kubernetes Operator (Helm OCI),
     and emits exactly one ``pulumi.com/v1`` Stack CR: ``ca4s-init``. From there
-    on PKO owns reconcile, including the control-plane and per-tenant
-    workload-cluster Stack CRs that the init stack creates reflexively.
+    on PKO owns reconcile, including the control-plane Stack CR and
+    tenant/workload resources that the init stack creates reflexively.
 
 Why one stack
 -------------
@@ -191,27 +191,27 @@ def run() -> None:
     #
     # Install PKO and hand it the Flux GitRepository source created by the
     # GitOps provider. The outer stack owns exactly one Stack CR under PKO:
-    # ``ca4s-init``. That init stack runs inside PKO and creates the
-    # control-plane Stack CR plus the per-tenant workload-cluster Stack CRs.
-    # Tenant churn is therefore reconciled by PKO from Git after the init stack
-    # notices the repo change, rather than by adding/removing Stack CRs directly
-    # from this outer host-side graph.
+    # ``ca4s-init``. That init stack runs inside PKO, creates the control-plane
+    # Stack CR, waits for it to become ready, then instantiates tenant/workload
+    # resources directly. Workload-cluster instance churn is therefore
+    # reconciled by PKO from Git after the init stack notices the repo change,
+    # rather than by adding/removing Stack CRs directly from this outer
+    # host-side graph.
     #
-    # Three inner Pulumi projects live as sibling directories under
-    # ``pulumi/stacks/``, all sharing the outer ``../../../.venv``:
+    # Two inner Pulumi projects live as sibling directories under
+    # ``pulumi/stacks/``, sharing the outer ``../../../.venv``; tenant/workload
+    # code is imported as a component module by the init stack:
     #
     #     pulumi/stacks/init/             - the single outer-owned PKO Stack;
     #                                       reflexively emits child Stack CRs.
     #     pulumi/stacks/control_plane/    - CAPI providers + AWX
     #                                       (mgmt-cluster operators
     #                                       only; tenant-agnostic).
-    #     pulumi/stacks/workload_cluster/ - per-tenant CAPI Cluster on
-    #                                       mgmt, then (via the workload
-    #                                       cluster's own kubeconfig)
-    #                                       slurm-operator-crds +
-    #                                       slurm-operator + Slurm chart
-    #                                       + NodeSets on the workload
-    #                                       cluster.
+    #     pulumi/stacks/workload_cluster/ - tenant/workload component modules;
+    #                                       ``TenantLocal`` creates per-instance
+    #                                       CAPI Clusters on mgmt, then installs
+    #                                       workload-cluster-side resources via
+    #                                       each cluster's own kubeconfig.
     #
     # Per-env dispatch in every inner program follows the same
     # ``__main__.py`` -> ``<project>_<env>.py`` trick this outer file
@@ -223,14 +223,10 @@ def run() -> None:
     #                              -> creates the child Stack CRs below
     #     ca4s-control-plane    -> spec.stack=organization/ca4s-control-plane/local
     #                              -> dispatcher picks ``control_plane_local.py``
-    #     ca4s-workload-cluster -> spec.stack=organization/ca4s-workload-cluster/<outer_env>-<tenant>
-    #                              -> dispatcher splits on first '-':
-    #                                 outer_env picks the env dispatcher,
-    #                                 then tenant picks the concrete
-    #                                 env+tenant module.
-    #
-    # Constraint that falls out: outer env names (``local``, future
-    # ``prod``, ...) must not contain ``-``. Tenant names may.
+    #     TenantLocal            -> component instantiated by ca4s-init after
+    #                              the control-plane Stack CR is ready. It owns
+    #                              ``spec.workloadClusters`` inventory, instance
+    #                              fan-out, and cross-workload-cluster concerns.
 
     pko = PKOBootstrap(
         "pko",

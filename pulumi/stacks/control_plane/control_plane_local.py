@@ -13,11 +13,11 @@ tenant-AGNOSTIC management-cluster operators:
 Slinky CRDs / slurm-operator / Slurm chart are deliberately NOT in
 this list: they belong on each tenant's workload cluster (that's
 where ``slurm-operator`` reconciles ``NodeSet``s onto CAPI-managed
-worker nodes). The per-tenant ``ca4s-workload-cluster`` stack
-installs those after CAPI brings the workload cluster up.
+worker nodes). ``TenantLocal`` installs those after CAPI brings the
+workload cluster up.
 
-None of the resources here touch tenant state — the per-tenant
-workload-cluster stack is the one that produces per-tenant resources.
+None of the resources here touch tenant state — tenant/workload components
+produce per-tenant resources.
 
 State backend
 -------------

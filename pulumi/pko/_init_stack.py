@@ -1,16 +1,17 @@
 """PKO init-stack contract and runtime.
 
 The outer stack should own exactly one ``pulumi.com/v1`` Stack CR after PKO is
-installed: ``ca4s-init``. That init stack then runs inside PKO and creates the
-second wave of Stack CRs (control-plane plus per-tenant workload clusters).
+installed: ``ca4s-init``. That init stack then runs inside PKO, creates the
+control-plane Stack CR, and instantiates the tenant/workload component after the
+control-plane stack is ready.
 
 This module is intentionally shared by both sides of that handoff:
 
 * :class:`pko.pko_bootstrap.PKOBootstrap` calls :func:`init_stack_config` when it
   creates the single init Stack CR.
 * ``pulumi/stacks/init/__main__.py`` calls :func:`run` from inside the PKO
-  workspace to reconstruct :class:`pko._stack_cr.StackCRSpec` and emit child
-  Stack CRs.
+    workspace to reconstruct :class:`pko._stack_cr.StackCRSpec`, emit the
+    control-plane Stack CR, and instantiate tenant/workload resources.
 """
 
 from __future__ import annotations
@@ -20,10 +21,9 @@ from typing import Any, Mapping
 
 import pulumi
 import pulumi_kubernetes as k8s
-from pulumi import ResourceOptions
 
 from pko._stack_cr import StackCRSpec, build_stack_spec
-from pko._tenants import Tenants
+from stacks.workload_cluster.tenant_local import TenantLocal
 
 
 INIT_PROJECT = "ca4s-init"
@@ -35,6 +35,7 @@ INIT_CHILD_CONFIG_KEY = f"{INIT_PROJECT}:{INIT_CHILD_CONFIG_NAME}"
 
 CONTROL_PLANE_PROJECT = "ca4s-control-plane"
 CONTROL_PLANE_REPO_DIR = "pulumi/stacks/control_plane/"
+_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 
 _STACK_SPEC_CONFIG_KEYS = {
     "pkoNamespace": "pko_namespace",
@@ -101,7 +102,7 @@ def load_init_stack_inputs() -> InitStackInputs:
 
 
 def run() -> None:
-    """Create the child PKO Stack CRs from inside the init workspace."""
+    """Create control-plane and tenant/workload resources from init."""
     inputs = load_init_stack_inputs()
     env = pulumi.get_stack()
 
@@ -116,20 +117,18 @@ def run() -> None:
         "control-plane",
         api_version="pulumi.com/v1",
         kind="Stack",
-        metadata={"namespace": inputs.stack_spec.pko_namespace},
+        metadata={
+            "namespace": inputs.stack_spec.pko_namespace,
+            "annotations": {_WAIT_FOR_ANNOTATION: "condition=Ready"},
+        },
         spec=control_plane_spec,
     )
     control_plane_stack_name = control_plane.metadata["name"]  # type: ignore[attr-defined]
 
-    tenants = Tenants(
-        "tenants",
-        env=env,
-        stack_spec=inputs.stack_spec,
-        control_plane_stack=control_plane_stack_name,
-        config=inputs.child_config,
-        provider=None,
-        opts=ResourceOptions(depends_on=[control_plane]),
+    tenant = TenantLocal(
+        "tenant-local",
+        opts=pulumi.ResourceOptions(depends_on=[control_plane]),
     )
 
     pulumi.export("control_plane_stack", control_plane_stack_name)
-    pulumi.export("workload_cluster_stacks", tenants.workload_cluster_stacks)
+    pulumi.export("workload_clusters", tenant.workload_clusters)

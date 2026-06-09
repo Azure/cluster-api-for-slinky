@@ -12,8 +12,8 @@ Owns the tenant-agnostic CAPI management-plane layer:
 This is the Pulumi equivalent of the provider-install portion of
 ``clusterctl init --infrastructure docker``. It deliberately stops before
 declaring any workload ``Cluster`` / ``ClusterClass`` objects; those are
-tenant-scoped and belong in the workload-cluster stack once the providers
-are present.
+tenant-scoped and belong in tenant/workload components once the providers are
+present.
 """
 
 from __future__ import annotations

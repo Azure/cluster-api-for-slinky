@@ -1,8 +1,8 @@
-"""Registry config contract for workload-cluster stacks.
+"""Registry config contract for tenant/workload components.
 
-The outer stack writes this shape into the workload-cluster Stack CR's
-``spec.config``. The inner workload-cluster program reads it back through
-``pulumi.Config`` and validates it before rendering node bootstrap config.
+The outer stack forwards this shape through the init Stack CR's child config.
+Tenant/workload components read it back through ``pulumi.Config`` and validate
+it before rendering node bootstrap config.
 
 The explicit ``kind`` tag is intentionally a little more structure than the
 single variant needs today. It keeps the config wire format ready for future

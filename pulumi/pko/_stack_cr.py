@@ -1,7 +1,7 @@
 """Reusable builder for ``pulumi.com/v1`` Stack Custom Resources.
 
 Both :class:`pko.pko_bootstrap.PKOBootstrap` (the init Stack CR) and the
-PKO-owned init stack (control-plane plus per-tenant workload-cluster CRs) emit
+PKO-owned init stack (control-plane plus workload-cluster CRs) emit
 Stack CRs with the same boilerplate: ``serviceAccountName``, ``fluxSource``,
 ``envRefs``, ``backend``, ``workspaceTemplate`` volume mounts, ``refresh:
 true``. Factoring that boilerplate here keeps the two callers thin and makes
@@ -118,8 +118,8 @@ def build_stack_spec(
         env:            Third segment of ``spec.stack``. For the
                         control-plane CR this is the outer
                         ``pulumi.get_stack()`` value (e.g. ``local``).
-                        For per-tenant workload-cluster CRs this is
-                        ``<outer_env>-<tenant>``.
+                        For workload-cluster CRs this is the outer env; inner
+                        ``Tenant<Env>`` components own instance fan-out.
         repo_dir:       Repo-relative path of the inner Pulumi project
                         (e.g. ``pulumi/stacks/control_plane/``).
         config:         Optional inline ``spec.config`` map. Keys are

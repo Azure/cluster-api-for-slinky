@@ -1,8 +1,8 @@
 """Entrypoint for the ``ca4s-init`` PKO-owned stack.
 
 This is the only Stack CR the outer host-side Pulumi program creates. Once PKO
-reconciles it, this program creates the control-plane Stack CR and the per-tenant
-workload-cluster Stack CRs from inside the management cluster.
+reconciles it, this program creates the control-plane Stack CR and then
+instantiates tenant/workload resources from inside the management cluster.
 """
 
 from __future__ import annotations
