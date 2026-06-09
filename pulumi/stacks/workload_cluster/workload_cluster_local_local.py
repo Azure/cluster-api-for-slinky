@@ -70,6 +70,11 @@ _CALICO_OPERATOR_CRDS_URL = (
 _CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
 
+_CERT_MANAGER_CHART_REPO = "https://charts.jetstack.io"
+_CERT_MANAGER_CHART_NAME = "cert-manager"
+_CERT_MANAGER_CHART_VERSION = "v1.20.2"
+_CERT_MANAGER_NAMESPACE = "cert-manager"
+
 _LOCAL_PATH_NAMESPACE = "local-path-storage"
 _LOCAL_PATH_STORAGE_CLASS = "local-path"
 _LOCAL_PATH_PROVISIONER_VERSION = "v0.0.32"
@@ -1164,6 +1169,33 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             ),
         )
 
+        cert_manager_namespace = k8s.core.v1.Namespace(
+            "workload-cert-manager-namespace",
+            metadata={"name": _CERT_MANAGER_NAMESPACE},
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[calico_operator],
+                retain_on_delete=True,
+            ),
+        )
+        cert_manager = k8s.helm.v3.Release(
+            "workload-cert-manager",
+            chart=_CERT_MANAGER_CHART_NAME,
+            version=_CERT_MANAGER_CHART_VERSION,
+            repository_opts={"repo": _CERT_MANAGER_CHART_REPO},
+            namespace=_CERT_MANAGER_NAMESPACE,
+            cleanup_on_fail=True,
+            atomic=True,
+            wait_for_jobs=True,
+            timeout=600,
+            values={"crds": {"enabled": True}},
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[cert_manager_namespace],
+                retain_on_delete=True,
+            ),
+        )
+
         slinky_namespace = k8s.core.v1.Namespace(
             "slinky-operator-namespace",
             metadata={
@@ -1215,7 +1247,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             values=_slurm_operator_values(),
             opts=child_options(
                 provider=workload_provider,
-                depends_on=[slinky_namespace, slurm_operator_crds],
+                depends_on=[slinky_namespace, cert_manager, slurm_operator_crds],
                 retain_on_delete=True,
             ),
         )
