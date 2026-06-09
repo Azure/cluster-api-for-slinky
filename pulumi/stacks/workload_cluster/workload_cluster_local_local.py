@@ -425,6 +425,10 @@ def _slurm_nodeset_values(worker: WorkerClassSpec) -> dict[str, object]:
         },
         "partition": {"enabled": True, "configMap": {}},
         "useResourceLimits": True,
+        "updateStrategy": {
+            "type": "RollingUpdate",
+            "rollingUpdate": {"maxUnavailable": "25%"},
+        },
         "taintKubeNodes": False,
         "podSpec": {
             "affinity": {
@@ -626,7 +630,7 @@ def _local_path_storage(
         },
         provisioner="rancher.io/local-path",
         reclaim_policy="Delete",
-        volume_binding_mode="Immediate",
+        volume_binding_mode="WaitForFirstConsumer",
         opts=pulumi.ResourceOptions(parent=opts.parent, provider=provider),
     )
     k8s.apps.v1.DeploymentPatch(
