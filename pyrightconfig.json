@@ -1,5 +1,6 @@
 {
   "extraPaths": [
-    "pulumi/sdks/local"
+    "pulumi/sdks/local",
+    "pulumi/sdks/gitea"
   ]
 }

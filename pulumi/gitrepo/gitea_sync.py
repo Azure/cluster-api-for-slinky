@@ -1,6 +1,6 @@
 """Pulumi dynamic resource that syncs a local Git commit into Gitea.
 
-After :class:`~gitrepo.gitea_repo.GiteaRepo` lands an empty repo inside
+After the Gitea repository resource lands an empty repo inside
 Gitea, this resource makes sure the repo's default branch points at the
 current ``HEAD`` of a local Git working tree. It always attempts a normal
 non-force push during replacement; if the remote already matches, Git exits

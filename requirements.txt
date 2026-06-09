@@ -14,6 +14,10 @@ pulumi-random>=4.0,<5.0
 # to build an explicit management-cluster provider from projected kubeconfig files.
 -e ./pulumi/sdks/local
 
+# Generated Pulumi Gitea-provider SDK used by the local GitOps provider to
+# manage repository webhooks through terraform-provider-gitea.
+-e ./pulumi/sdks/gitea
+
 # ed25519 keypair derivation for the in-cluster Gitea SSH host key
 # and the PKO admin SSH key (see pulumi/gitrepo/gitea_builtin.py).
 # Required at language-host time (during ``pulumi up``) and inside the

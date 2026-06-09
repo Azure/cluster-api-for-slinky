@@ -39,10 +39,7 @@ CONTROL_PLANE_REPO_DIR = "pulumi/stacks/control_plane/"
 _STACK_SPEC_CONFIG_KEYS = {
     "pkoNamespace": "pko_namespace",
     "serviceAccountName": "service_account_name",
-    "repoUrl": "repo_url",
-    "repoBranch": "repo_branch",
-    "sshSecretName": "ssh_secret_name",
-    "knownHostsConfigMapName": "known_hosts_config_map_name",
+    "fluxSourceName": "flux_source_name",
     "statePvcName": "state_pvc_name",
     "stateBackendUrl": "state_backend_url",
     "passphraseSecretName": "passphrase_secret_name",
@@ -65,10 +62,7 @@ def init_stack_config(
         INIT_STACK_SPEC_CONFIG_KEY: {
             "pkoNamespace": stack_spec.pko_namespace,
             "serviceAccountName": stack_spec.service_account_name,
-            "repoUrl": stack_spec.repo_url,
-            "repoBranch": stack_spec.repo_branch,
-            "sshSecretName": stack_spec.ssh_secret_name,
-            "knownHostsConfigMapName": stack_spec.known_hosts_config_map_name,
+            "fluxSourceName": stack_spec.flux_source_name,
             "statePvcName": stack_spec.state_pvc_name,
             "stateBackendUrl": stack_spec.state_backend_url,
             "passphraseSecretName": stack_spec.passphrase_secret_name,

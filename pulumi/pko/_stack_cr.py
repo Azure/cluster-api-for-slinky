@@ -1,22 +1,15 @@
 """Reusable builder for ``pulumi.com/v1`` Stack Custom Resources.
 
-Both :class:`pko.pko_bootstrap.PKOBootstrap` (the init Stack CR) and
-the PKO-owned init stack (control-plane plus per-tenant workload-cluster
-CRs) emit Stack CRs with the same boilerplate: ``serviceAccountName``,
-``projectRepo`` + ``branch`` + ``gitAuth.sshAuth``, ``envRefs``,
-``backend``, ``workspaceTemplate`` volume mounts, ``refresh: true``.
-Factoring that boilerplate here keeps the two callers thin and makes
+Both :class:`pko.pko_bootstrap.PKOBootstrap` (the init Stack CR) and the
+PKO-owned init stack (control-plane plus per-tenant workload-cluster CRs) emit
+Stack CRs with the same boilerplate: ``serviceAccountName``, ``fluxSource``,
+``envRefs``, ``backend``, ``workspaceTemplate`` volume mounts, ``refresh:
+true``. Factoring that boilerplate here keeps the two callers thin and makes
 the CR shape self-documenting in one place.
 
-Source model: SSH against the in-cluster Gitea. PKO's ``projectRepo``
-path only accepts ``https`` and ``ssh`` schemes (the ``gitutil``
-allow-list rejects plain HTTP outright), and our in-cluster Gitea
-ships no TLS — SSH is the only viable scheme. The admin private key
-is projected into PKO's namespace as a Secret named in
-``StackCRSpec.ssh_secret_name``; this builder references it via
-``gitAuth.sshAuth.sshPrivateKey``. The public Gitea host key is
-projected separately as a known_hosts ConfigMap and mounted into
-workspace pods so go-git's SSH host-key verification passes.
+Source model: Flux owns cloning the in-cluster Gitea repo and producing a source
+artifact. PKO consumes that artifact via ``spec.fluxSource`` and no longer needs
+per-Stack git credentials or known_hosts mounts.
 
 This module exposes :func:`build_stack_spec` only; callers own the
 ``k8s.apiextensions.CustomResource`` instantiation itself. Splitting
@@ -50,14 +43,6 @@ _ORG_PLACEHOLDER = "organization"
 # this constant is the single place to update.
 _WORKSPACE_CONTAINER = "pulumi"
 
-# Default init container name PKO injects to do the ``git clone`` of
-# the inner project repo. The strategic merge by ``name`` targets it
-# so we can mount known_hosts + set ``SSH_KNOWN_HOSTS`` there too;
-# without it the clone runs without host-key trust and fails with
-# "unable to find any valid known_hosts file" before the main
-# ``pulumi`` container ever starts.
-_WORKSPACE_FETCH_CONTAINER = "fetch"
-
 # Volume name used inside the workspace pod for the file:// backend's
 # PVC mount. Arbitrary string, just has to match between volume and
 # volumeMount entries.
@@ -67,12 +52,6 @@ _STATE_VOLUME_NAME = "state"
 # URL in :mod:`pko._backend`.
 _STATE_MOUNT_PATH = "/state"
 
-# Volume name + mount path for the in-cluster Gitea known_hosts ConfigMap.
-# Mirrors the PKO operator pod's own mount (see :mod:`pko._release`) so the
-# workspace pod's ``git clone`` step trusts the same host key by the same env
-# var.
-_KNOWN_HOSTS_VOLUME_NAME = "gitea-known-hosts"
-_SSH_MOUNT_PATH = "/etc/gitea-ssh"
 
 @dataclass(frozen=True)
 class StackCRSpec:
@@ -91,27 +70,17 @@ class StackCRSpec:
     final CR to the API server.
     """
 
-    # Where the Stack CRs themselves live. The PKO operator watches
-    # this namespace for Stack CRs; same ns as the workspace SA and
-    # the shared Flux GitRepository CR.
+    # Where the Stack CRs themselves live. The PKO operator watches this
+    # namespace for Stack CRs; the shared Flux GitRepository lives here too.
     pko_namespace: pulumi.Input[str]
 
     # Workspace pod identity. References the SA created by
     # :class:`pko._service_account.WorkspaceServiceAccount`.
     service_account_name: pulumi.Input[str]
 
-    # Git source. SSH URL (``ssh://git@...``) + branch the inner stack
-    # tracks. The branch is conventionally ``main`` — see
-    # :mod:`gitrepo._base`.
-    repo_url: pulumi.Input[str]
-    repo_branch: pulumi.Input[str]
-
-    # SSH Secret in ``pko_namespace`` exposing the admin private key.
-    ssh_secret_name: pulumi.Input[str]
-
-    # ConfigMap in ``pko_namespace`` exposing the known_hosts entry for
-    # go-git's SSH host-key verification.
-    known_hosts_config_map_name: pulumi.Input[str]
+    # Flux Source reference PKO uses to fetch the Pulumi program artifact.
+    # The source lives in ``pko_namespace`` and points at the hydrated Gitea repo.
+    flux_source_name: pulumi.Input[str]
 
     # State backend. The PVC is mounted at ``/state`` and the backend
     # URL is ``file:///state``; the passphrase Secret feeds
@@ -120,11 +89,8 @@ class StackCRSpec:
     state_backend_url: pulumi.Input[str]
     passphrase_secret_name: pulumi.Input[str]
 
-    # Key names inside the Secret/ConfigMap. Defaulted because every caller
-    # uses the canonical names; kept as fields so a future cloud-hosted
-    # gitops provider can override without touching the Stack CR code.
-    ssh_private_key_key: str = "id_ed25519"
-    ssh_known_hosts_key: str = "known_hosts"
+    flux_source_api_version: str = "source.toolkit.fluxcd.io/v1"
+    flux_source_kind: str = "GitRepository"
 
 
 def build_stack_spec(
@@ -171,23 +137,6 @@ def build_stack_spec(
         f"{_ORG_PLACEHOLDER}/{project_name}/", env
     )
 
-    # ``gitAuth.sshAuth.sshPrivateKey`` points the PKO controller at
-    # the ``id_ed25519`` key inside our SSH Secret. PKO's go-git client
-    # signs the connection with this key. NB: previously we routed through
-    # Flux to dodge PKO's HTTP-scheme rejection; now that we speak SSH
-    # directly, ``projectRepo`` is back on the menu and Flux is gone.
-    git_auth = {
-        "sshAuth": {
-            "sshPrivateKey": {
-                "type": "Secret",
-                "secret": {
-                    "name": spec.ssh_secret_name,
-                    "key": spec.ssh_private_key_key,
-                },
-            },
-        },
-    }
-
     # PULUMI_CONFIG_PASSPHRASE comes out of the shared passphrase Secret
     # so every inner stack uses the same passphrase against the shared
     # file:// backend (otherwise per-stack passphrases would each need
@@ -203,51 +152,22 @@ def build_stack_spec(
         },
     }
 
-    # Strategic merge patch onto PKO's default workspace pod template.
-    # PKO matches containers by ``name``; the default main container is
-    # ``pulumi`` (constant above) and the default init container that
-    # runs the ``git clone`` is ``fetch``. Both need the known_hosts
-    # mount + ``SSH_KNOWN_HOSTS`` env: ``fetch`` so go-git inside
-    # PKO's clone init can verify the Gitea host key, and ``pulumi``
-    # so the auto-api inside the workspace can re-resolve the same
-    # remote if the inner program ever does its own git ops. The main
-    # container also gets the state PVC mount; the init container
-    # doesn't (it writes only into the shared ``/share`` emptyDir
-    # that PKO injects automatically).
-    ssh_env = [
-        {
-            "name": "SSH_KNOWN_HOSTS",
-            "value": (
-                f"{_SSH_MOUNT_PATH}/{spec.ssh_known_hosts_key}"
-            ),
-        },
-    ]
-    ssh_volume_mount = {
-        "name": _KNOWN_HOSTS_VOLUME_NAME,
-        "mountPath": _SSH_MOUNT_PATH,
-        "readOnly": True,
-    }
+    # Strategic merge patch onto PKO's default workspace pod template. PKO
+    # matches containers by ``name``; the default main container is ``pulumi``.
+    # The only workspace customization left here is the shared file:// backend
+    # PVC mount. Flux handles git authentication and source artifact fetching.
     workspace_template = {
         "spec": {
             "podTemplate": {
                 "spec": {
-                    "initContainers": [
-                        {
-                            "name": _WORKSPACE_FETCH_CONTAINER,
-                            "env": ssh_env,
-                            "volumeMounts": [ssh_volume_mount],
-                        },
-                    ],
                     "containers": [
                         {
                             "name": _WORKSPACE_CONTAINER,
-                            "env": ssh_env,
                             "volumeMounts": [
                                 {
                                     "name": _STATE_VOLUME_NAME,
                                     "mountPath": _STATE_MOUNT_PATH,
                                 },
-                                ssh_volume_mount,
                             ],
                         },
                     ],
@@ -258,19 +178,6 @@ def build_stack_spec(
                                 "claimName": spec.state_pvc_name,
                             },
                         },
-                        {
-                            "name": _KNOWN_HOSTS_VOLUME_NAME,
-                            "configMap": {
-                                "name": spec.known_hosts_config_map_name,
-                                "items": [
-                                    {
-                                        "key": spec.ssh_known_hosts_key,
-                                        "path": spec.ssh_known_hosts_key,
-                                    },
-                                ],
-                                "defaultMode": 0o444,
-                            },
-                        },
                     ],
                 },
             },
@@ -279,10 +186,14 @@ def build_stack_spec(
 
     cr_spec: dict[str, Any] = {
         "stack": stack_name,
-        "projectRepo": spec.repo_url,
-        "repoDir": repo_dir,
-        "branch": spec.repo_branch,
-        "gitAuth": git_auth,
+        "fluxSource": {
+            "sourceRef": {
+                "apiVersion": spec.flux_source_api_version,
+                "kind": spec.flux_source_kind,
+                "name": spec.flux_source_name,
+            },
+            "dir": repo_dir,
+        },
         "serviceAccountName": spec.service_account_name,
         "envRefs": env_refs,
         "backend": spec.state_backend_url,

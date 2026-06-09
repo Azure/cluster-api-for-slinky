@@ -340,7 +340,6 @@ class WorkerClass(pulumi.ComponentResource):
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
-                aliases=[pulumi.Alias(parent=pulumi.ROOT_STACK_RESOURCE)],
             )
 
         machine_template = _docker_machine_template(

@@ -2,9 +2,8 @@
 
 This module stands up a self-contained, ephemeral Gitea instance inside the
 management cluster and exposes it through the
-:class:`~gitrepo._base.GitOpsRepository` contract so downstream PKO
-``Stack`` resources can consume it without knowing how the git server
-was created.
+:class:`~gitrepo._base.GitOpsRepositoryProvider` contract so downstream Flux/PKO
+resources can consume it without knowing how the git server was created.
 
 What we deploy
 --------------
@@ -18,8 +17,8 @@ What we deploy
     bootstrap the admin user on first boot. (``email`` is sourced from
     chart values directly, not from the Secret, so it isn't a Secret key.)
 
-    PKO reads the repo through an uploaded admin SSH public key, not this
-    HTTP admin password.
+    Flux source-controller reads the repo through an uploaded admin SSH public
+    key, not this HTTP admin password.
 * A ``helm.v3.Release`` of ``gitea-charts/gitea`` (pinned version below)
   configured for the minimal footprint: no postgres, no redis, no
   external cache, sqlite3 DB, memory session/cache, level queue. A
@@ -28,11 +27,10 @@ What we deploy
   ``helm.sh/resource-policy: keep`` annotation is explicitly stripped
   so ``pulumi destroy`` / ``helm uninstall`` reclaims the PVC rather
   than leaking it. The HTTP Service is exposed as ``LoadBalancer`` so
-  cloud-provider-kind can publish a host-reachable address for
-    ``GiteaRepo`` / ``GiteaSync`` to use; SSH stays on ``ClusterIP``.
-* A ``GiteaRepo`` (``gitrepo.gitea_repo``) that ``POST``s to
-  ``/api/v1/user/repos`` and lands an empty ``<owner>/<repo_name>``
-  inside Gitea. Re-adopts on 409 so partial failures are recoverable.
+    cloud-provider-kind can publish a host-reachable address for the bridged
+    Gitea provider and ``GiteaSync`` to use; SSH stays on ``ClusterIP``.
+* A ``pulumi_gitea.Repository`` that lands an empty
+    ``<owner>/<repo_name>`` inside Gitea.
 * A ``GiteaSync`` (``gitrepo.gitea_sync``) that pushes the local working
     tree's current ``HEAD`` into the repo's default branch when the remote
     branch is missing or stale. It never force-pushes and resolves the
@@ -64,16 +62,16 @@ import os
 from typing import Any, Mapping, Optional
 
 import pulumi
+import pulumi_gitea as gitea_sdk
 import pulumi_kubernetes as k8s
 import pulumi_random as random
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from pulumi import Output, ResourceOptions
 
-from gitrepo._base import GitOpsRepository
-from gitrepo.gitea_repo import GiteaRepo
+from gitrepo._base import GitOpsRepositoryProvider, GitOpsWebhookProvider
 from gitrepo.gitea_sync import GiteaSync
-from gitrepo.gitea_sshkey import GiteaSSHKey
+from pko._flux import FluxGitSource
 
 
 # Pinned upstream chart. Bump this together with ``_GITEA_APP_VERSION``
@@ -92,8 +90,8 @@ _GITEA_NAMESPACE = "gitea"
 
 # The credentials Secret name. The Gitea Helm chart reads it via
 # ``gitea.admin.existingSecret`` (pulling ``username`` / ``password`` keys
-# out of it to bootstrap the admin user on first boot). PKO uses SSH auth
-# instead and never consumes this Secret directly.
+# out of it to bootstrap the admin user on first boot). Flux uses SSH auth for
+# Git reads and never consumes this Secret directly.
 _CREDENTIALS_SECRET = "gitea-credentials"
 
 # Gitea refuses the literal string ``admin`` as an administrator username
@@ -116,8 +114,8 @@ _GITEA_HTTP_PORT = 3000
 
 # SSH endpoint. The chart's default ``service.ssh`` is a *headless*
 # ClusterIP (``clusterIP: None``), which we explicitly override below
-# to a regular ClusterIP — a regular vIP gives the PKO operator
-# pod a stable target that resolves to the Gitea pod's current IP
+# to a regular ClusterIP — a regular vIP gives Flux source-controller
+# a stable target that resolves to the Gitea pod's current IP
 # without relying on the headless-Service DNS quirk that returns the
 # pod IP directly (and would change every restart, busting known_hosts
 # entries pinned by IP if we ever did that).
@@ -133,10 +131,9 @@ _GITEA_SSH_PORT = 22
 #   * ``ssh_host_ed25519_key.pub``  — OpenSSH-format public key.
 _HOST_KEY_SECRET_PREFIX = "gitea-ssh-host-keys-pkcs8"
 
-# Prefix for the PKO namespace Secret that will hold the admin user's SSH
-# private key. The Secret is created by :class:`pko.pko_bootstrap.PKOBootstrap`,
-# but the name is derived here from the matching public key so every consumer
-# follows the same key-version identity.
+# Prefix for the source Secret that holds the admin user's SSH private key. The
+# name is derived from the matching public key so every consumer follows the
+# same key-version identity.
 _USER_KEY_SECRET_PREFIX = "gitea-ssh"
 _USER_PRIVATE_KEY_SECRET_KEY = "id_ed25519"
 
@@ -247,7 +244,8 @@ def _chart_values(
         # HTTP exposed as ``LoadBalancer`` so cloud-provider-kind can
         # publish it on a host-reachable address. We need that address
         # at two points in this stack:
-        #   * GiteaRepo, to call the Gitea REST admin API from the host;
+        #   * pulumi_gitea.Repository, to call the Gitea REST admin API
+        #     from the host;
         #   * GiteaSync, to ``git push`` the local working tree.
         # SSH stays ``ClusterIP`` — host-side sync reaches it through a
         # short-lived kubectl port-forward, avoiding a LAN-visible SSH
@@ -267,7 +265,7 @@ def _chart_values(
             # SSH stays in-cluster (we never expose it to the host).
             # Override the chart's headless default (``clusterIP: None``)
             # with the empty string so k8s assigns a regular vIP — the
-            # PKO operator dials this Service by DNS, and a stable vIP is
+            # Flux source-controller dials this Service by DNS, and a stable vIP is
             # the friendlier failure mode for debugging.
             "ssh": {
                 "type": "ClusterIP",
@@ -338,10 +336,9 @@ def _chart_values(
 def _in_cluster_ssh_url(owner: str, repo: str) -> str:
     """Compute the in-cluster git SSH URL for ``owner/repo``.
 
-    PKO's ``gitutil.ParseGitRepoURL`` only accepts ``https`` and ``ssh``
-    schemes (HTTP is rejected outright). We have no in-cluster TLS, so
-    SSH is the only viable scheme. Service name + namespace + port are
-    pinned by the chart values above; this is a pure formatting helper.
+    Flux supports SSH URLs and expects this full URL shape rather than scp-like
+    shorthand. Service name + namespace + port are pinned by the chart values
+    above; this is a pure formatting helper.
     """
     return (
         f"ssh://git@{_GITEA_SSH_SERVICE}.{_GITEA_NAMESPACE}.svc.cluster.local"
@@ -401,7 +398,7 @@ def _derive_ed25519_keypair(seed_b64: str) -> dict[str, str]:
     return {"private": priv_pem, "public": pub_openssh}
 
 
-class GiteaBuiltinRepository(GitOpsRepository):
+class GiteaBuiltinRepository(GitOpsRepositoryProvider):
     """In-cluster, ephemeral Gitea backing the GitOps source.
 
     Parameters
@@ -413,11 +410,15 @@ class GiteaBuiltinRepository(GitOpsRepository):
         ``kubernetes.Provider`` so this stack doesn't accidentally use the
         ambient ``~/.kube/config`` context, which can drift if the user
         ``kubectl config use-context`` to something else mid-session.
+    flux_provider, flux_infrastructure, pko_namespace_resource :
+        Management-cluster handles for declaring the Flux ``GitRepository``
+        source that PKO Stack CRs consume. The Gitea implementation owns this
+        because it knows the provider-specific SSH Secret and known_hosts shape.
     admin_username, admin_email :
         Override the defaults for the Gitea admin user. ``admin_username``
         must not be the literal ``"admin"`` (Gitea reserves it).
     repo_owner, repo_name, default_branch :
-        Coordinates for the ``GiteaRepo`` / ``GiteaSync`` children:
+        Coordinates for the Gitea repository and ``GiteaSync`` children:
         which Gitea user/org owns the seeded repo, what it's called,
         and what branch the local working tree gets pushed to.
         ``repo_owner`` defaults to ``admin_username`` so the URL is
@@ -441,6 +442,9 @@ class GiteaBuiltinRepository(GitOpsRepository):
         name: str,
         kubeconfig: Output[str] | str,
         *,
+        flux_provider: k8s.Provider,
+        flux_infrastructure: pulumi.Resource,
+        pko_namespace_resource: pulumi.Resource,
         admin_username: str = _DEFAULT_ADMIN_USERNAME,
         admin_email: str = _DEFAULT_ADMIN_EMAIL,
         repo_owner: Optional[str] = None,
@@ -582,8 +586,8 @@ class GiteaBuiltinRepository(GitOpsRepository):
             ),
         )
 
-        # Single-line ``known_hosts`` entry the PKO operator + workspace
-        # pods will trust. Format: ``<hostname> <alg> <base64-pubkey>``.
+        # Single-line ``known_hosts`` entry Flux source-controller will trust.
+        # Format: ``<hostname> <alg> <base64-pubkey>``.
         # ``host_public_openssh`` is already in the ``ssh-ed25519 AAAA...``
         # shape — prepending the hostname turns it into a valid
         # ``known_hosts`` line. (The optional trailing comment doesn't
@@ -674,53 +678,48 @@ class GiteaBuiltinRepository(GitOpsRepository):
 
         external_base = gitea_http_svc.status.apply(_build_external_base)
 
+        gitea_provider = gitea_sdk.Provider(
+            f"{name}-provider",
+            base_url=external_base,
+            username=admin_username,
+            password=admin_password.result,
+            opts=ResourceOptions(parent=self, depends_on=[gitea]),
+        )
+
         # Create the actual repo through Gitea's REST API, then push the
         # local working tree into it. Both are children of this component
-        # so ``pulumi destroy`` cleans them up before the chart goes
-        # away (otherwise the API endpoint would be unreachable when
-        # GiteaRepo.delete tries to call it).
-        repo = GiteaRepo(
+        # so ``pulumi destroy`` cleans them up before the chart goes away.
+        repo = gitea_sdk.Repository(
             f"{name}-repo",
-            api_url=external_base,
-            admin_username=admin_username,
-            admin_password=admin_password.result,
-            owner=owner,
-            repo_name=repo_name,
+            username=owner,
+            name=repo_name,
             default_branch=default_branch,
+            auto_init=False,
+            private=True,
+            description="Bootstrap GitOps repo managed by ca4s-infra",
             opts=ResourceOptions(
                 parent=self,
+                provider=gitea_provider,
                 depends_on=[gitea],
-                # Server-side ID is ``<owner>/<repo_name>``, invariant
-                # across replacements. Pulumi's default create-before-
-                # delete would have the delete of the "old" resource
-                # ``DELETE`` the new one we just ``POST``'d (same path).
-                # Force delete-before-create so replacement is safe.
                 delete_before_replace=True,
             ),
         )
 
         # Upload the admin user's SSH public key to Gitea so PKO can
         # authenticate as the admin user over SSH (push + pull on every
-        # repo). We POST to ``/api/v1/user/keys`` (the per-user endpoint
-        # acting as the authenticated admin) so the key is attached to
-        # the admin user account, matching the user the SSH URL above
-        # (``ssh://git@...``) effectively logs in as via Gitea's SSH
-        # gateway.
-        ssh_key = GiteaSSHKey(
+        # repo). The key is attached to the admin user account, matching the
+        # user the SSH URL above (``ssh://git@...``) effectively logs in as
+        # via Gitea's SSH gateway.
+        ssh_key = gitea_sdk.PublicKey(
             f"{name}-ssh-key",
-            api_url=external_base,
-            admin_username=admin_username,
-            admin_password=admin_password.result,
+            username=admin_username,
             title=_ADMIN_SSH_KEY_TITLE,
-            public_key=user_public_openssh,
+            key=user_public_openssh,
+            read_only=False,
             opts=ResourceOptions(
                 parent=self,
-                # API call \u2014 needs Gitea up + the admin user
-                # bootstrapped. Repo existence is irrelevant for keys,
-                # but ordering after ``repo`` keeps the dependency
-                # graph linear (and matches the destroy order: keys
-                # come down before the repo, before the chart).
-                depends_on=[gitea],
+                provider=gitea_provider,
+                depends_on=[repo],
             ),
         )
 
@@ -757,11 +756,35 @@ class GiteaBuiltinRepository(GitOpsRepository):
         self.ssh_private_key_secret = user_key_secret
         self.ssh_known_hosts = ssh_known_hosts
 
+        flux_source = FluxGitSource(
+            f"{name}-flux-source",
+            provider=flux_provider,
+            flux_infrastructure=flux_infrastructure,
+            pko_namespace_resource=pko_namespace_resource,
+            repo_url=self.url,
+            repo_branch=self.default_branch,
+            ssh_private_key_secret=self.ssh_private_key_secret,
+            ssh_known_hosts=self.ssh_known_hosts,
+            opts=ResourceOptions(parent=self, depends_on=[sync]),
+        )
+        self.flux_source = flux_source
+        self.flux_source_name = flux_source.source_name
+        self.flux_receiver_token = flux_source.receiver_token
+        self.flux_receiver_url = flux_source.receiver_url
+
+        # Built-in-provider handles used by the local stack to register the
+        # Gitea -> Flux Receiver webhook. These are intentionally not part of
+        # the generic GitOpsRepository contract.
+        self.api_url = external_base
+        self.admin_password = admin_password.result
+        self.owner = Output.from_input(owner)
+        self.repo_name = Output.from_input(repo_name)
+
         # Useful for human eyeballing of the deployed state.
-        self.repo_full_name = repo.full_name
+        self.repo_full_name = Output.concat(owner, "/", repo_name)
         self.repo_html_url = repo.html_url
         self.sync_head_sha = sync.head_sha
-        self.ssh_key_id = ssh_key.key_id
+        self.ssh_key_id = ssh_key.public_key_id
         self.gitea_host_key_secret_name = host_key_secret_name
 
         # Surface a few helpful diagnostics in addition to the contract
@@ -770,6 +793,17 @@ class GiteaBuiltinRepository(GitOpsRepository):
         self.gitea_chart_version = Output.from_input(_GITEA_CHART_VERSION)
         self.gitea_app_version = Output.from_input(_GITEA_APP_VERSION)
         self.admin_username = Output.from_input(admin_username)
+
+        self.webhook_args = {
+            "api_url": self.api_url,
+            "admin_username": self.admin_username,
+            "admin_password": self.admin_password,
+            "owner": self.owner,
+            "repo_name": self.repo_name,
+            "webhook_url": self.flux_receiver_url,
+            "secret": self.flux_receiver_token,
+            "events": ["push"],
+        }
 
         # Anchor the Helm release in the component's output set so Pulumi
         # tracks readiness end-to-end and ``preview`` shows it as a child.
@@ -781,9 +815,17 @@ class GiteaBuiltinRepository(GitOpsRepository):
                 "url_external": self.url_external,
                 "default_branch": self.default_branch,
                 "ssh_known_hosts": self.ssh_known_hosts,
+                "flux_source_name": self.flux_source_name,
+                "flux_receiver_token": self.flux_receiver_token,
+                "flux_receiver_url": self.flux_receiver_url,
+                "api_url": self.api_url,
                 "gitea_chart_version": self.gitea_chart_version,
                 "gitea_app_version": self.gitea_app_version,
                 "admin_username": self.admin_username,
+                "admin_password": self.admin_password,
+                "owner": self.owner,
+                "repo_name": self.repo_name,
+                "webhook_args": self.webhook_args,
                 "repo_full_name": self.repo_full_name,
                 "repo_html_url": self.repo_html_url,
                 "sync_head_sha": self.sync_head_sha,
@@ -791,3 +833,55 @@ class GiteaBuiltinRepository(GitOpsRepository):
                 "gitea_host_key_secret_name": self.gitea_host_key_secret_name,
             }
         )
+
+
+class GiteaBuiltinWebhook(GitOpsWebhookProvider):
+    """Gitea implementation of the generic GitOps webhook contract."""
+
+    hook_id: Output[str]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        api_url: pulumi.Input[str],
+        admin_username: pulumi.Input[str],
+        admin_password: pulumi.Input[str],
+        owner: pulumi.Input[str],
+        repo_name: pulumi.Input[str],
+        webhook_url: pulumi.Input[str],
+        secret: pulumi.Input[str],
+        events: pulumi.Input[list[str]] | None = None,
+        active: pulumi.Input[bool] = True,
+        branch_filter: pulumi.Input[str] = "*",
+        opts: Optional[ResourceOptions] = None,
+    ) -> None:
+        super().__init__(
+            name,
+            t="ca4s:gitrepo:GiteaBuiltinWebhook",
+            opts=opts,
+        )
+
+        gitea_provider = gitea_sdk.Provider(
+            f"{name}-provider",
+            base_url=api_url,
+            username=admin_username,
+            password=admin_password,
+            opts=ResourceOptions(parent=self),
+        )
+        webhook = gitea_sdk.RepositoryWebhook(
+            f"{name}-hook",
+            username=owner,
+            name=repo_name,
+            url=webhook_url,
+            secret=secret,
+            events=events if events is not None else ["push"],
+            active=active,
+            branch_filter=branch_filter,
+            content_type="json",
+            type="gitea",
+            opts=ResourceOptions(parent=self, provider=gitea_provider),
+        )
+
+        self.hook_id = webhook.repository_webhook_id
+        self.register_outputs({"hook_id": self.hook_id})

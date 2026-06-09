@@ -1,13 +1,14 @@
 """PKO bootstrap package.
 
-Re-exports the single public entrypoint :class:`PKOBootstrap`. Inner
-building blocks (PKO Helm release with SSH mount, state backend,
+Re-exports the single public entrypoint :class:`PKOBootstrap`. Inner building
+blocks (Flux infrastructure/source helpers, PKO Helm release, state backend,
 workspace SA, Stack CR spec builder, init-stack runtime, per-env tenants
 fan-out) are package-internal.
 
 Layout
 ------
-* :mod:`pko._release`            — Helm OCI install + namespace + SSH mount
+* :mod:`pko._flux`               — Flux controllers + shared GitRepository
+* :mod:`pko._release`            — Helm OCI install
 * :mod:`pko._backend`            — file:// state backend (PVC + passphrase)
 * :mod:`pko._service_account`    — workspace SA + ClusterRoleBindings
 * :mod:`pko._init_stack`         — single init Stack CR contract + runtime
@@ -19,12 +20,17 @@ Layout
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pko.pko_bootstrap import PKOBootstrap
+
 __all__ = ["PKOBootstrap"]
 
 
-def __getattr__(name: str) -> object:
-	if name == "PKOBootstrap":
-		from pko.pko_bootstrap import PKOBootstrap
+def __getattr__(name: str) -> Any:
+    if name == "PKOBootstrap":
+        from pko.pko_bootstrap import PKOBootstrap
 
-		return PKOBootstrap
-	raise AttributeError(name)
+        return PKOBootstrap
+    raise AttributeError(name)

@@ -10,22 +10,20 @@ the developer loop needs, in dependency order:
 2. **GitOps source-of-truth** via the ``gitrepo`` package — by default an
    in-cluster Gitea seeded with this repo's current ``HEAD``. Swappable
    behind a single config key for external git providers later.
-3. **PKO bootstrap** via the ``pko`` package — installs the Pulumi
-    Kubernetes Operator (Helm OCI), wires up its file:// state backend
-    on a cluster-side PVC, projects the GitOps credentials Secret into
-    PKO's namespace, and emits exactly one ``pulumi.com/v1`` Stack CR:
-    ``ca4s-init``. From there on PKO owns reconcile, including the
-    control-plane and per-tenant workload-cluster Stack CRs that the
-    init stack creates reflexively.
+3. **Flux source handoff + PKO bootstrap** via the ``pko`` package — installs
+    Flux source/notification controllers, declares a Flux ``GitRepository`` for
+    the hydrated GitOps repo, installs the Pulumi Kubernetes Operator (Helm OCI),
+    and emits exactly one ``pulumi.com/v1`` Stack CR: ``ca4s-init``. From there
+    on PKO owns reconcile, including the control-plane and per-tenant
+    workload-cluster Stack CRs that the init stack creates reflexively.
 
 Why one stack
 -------------
-The ``CtlptlCluster`` Output for ``kubeconfig`` flows directly into
-``GiteaBuiltinRepository``'s ``kubeconfig`` parameter as a regular
+The ``CtlptlCluster`` Output for ``kubeconfig`` flows directly into the selected
+``GitOpsRepository`` provider's ``kubeconfig`` parameter as a regular
 Input-typed dependency. Pulumi's Output -> Input dependency tracking then
-enforces creation order (registry -> cluster -> gitea -> pko) and the
-reverse on teardown, with no explicit ``depends_on`` and no out-of-band
-kubeconfig surgery.
+enforces creation order (registry -> cluster -> gitea -> pko) and the reverse on
+teardown, with no explicit ``depends_on`` and no out-of-band kubeconfig surgery.
 
 Tradeoff: one shared state blast radius. A flaky Helm install can not be
 torn down independently of the cluster. Revisit (via
@@ -40,11 +38,13 @@ layout) see the "Project layout" section of ``__main__.py``.
 from __future__ import annotations
 
 import pulumi
+import pulumi_kubernetes as k8s
 
 from ctlptl import CloudProviderKind, CtlptlCluster, CtlptlRegistry
-from gitrepo import GitOpsRepository
-from gitrepo.gitea_builtin import GiteaBuiltinRepository
+from gitrepo import GitOpsRepository, GitOpsWebhook
 from pko import PKOBootstrap
+from pko._flux import FluxInfrastructure
+from pko._release import PKO_NAMESPACE
 from stacks.workload_cluster.registry_setting import (
     REGISTRY_CONFIG_KEY,
     local_port_registry_setting,
@@ -90,6 +90,7 @@ def run() -> None:
     #     pulumi config set --path 'gitea_sync_triggers.generation' rerun-1 -s local
     # Bump any key/value to force a normal non-force push without changing HEAD.
     gitea_sync_triggers = config.get_object("gitea_sync_triggers") or {}
+    configured_gitops_provider_args = config.get_object("gitops_provider_args") or {}
 
     # ----------------------------------------------------------------------
     # Phase 1 — cluster + registry + LB controller.
@@ -126,6 +127,19 @@ def run() -> None:
         registry_name=registry.registry_name,
     )
 
+    mgmt_provider = k8s.Provider(
+        "mgmt-k8s",
+        kubeconfig=cluster.kubeconfig,
+    )
+
+    pko_namespace = k8s.core.v1.Namespace(
+        "pko-ns",
+        metadata={"name": PKO_NAMESPACE},
+        opts=pulumi.ResourceOptions(
+            provider=mgmt_provider,
+        ),
+    )
+
     # Host-side daemon that turns ``type: LoadBalancer`` Services on kind
     # into real host-reachable IPs. The daemon is host-singleton (one
     # process services all kind clusters), so it's a sibling resource, not
@@ -133,6 +147,11 @@ def run() -> None:
     # daemon polls Docker continuously and picks up new kind clusters as
     # they appear.
     lb = CloudProviderKind("lb", enable_lb_port_mapping=enable_lb_port_mapping)
+
+    flux = FluxInfrastructure(
+        "flux",
+        provider=mgmt_provider,
+    )
 
     # ----------------------------------------------------------------------
     # Phase 2 — GitOps source (gitrepo).
@@ -142,45 +161,41 @@ def run() -> None:
     # DAG edge cluster -> gitea, so the Gitea Helm release waits for the
     # kind cluster to be ready and tears down before the cluster on
     # destroy. No ambient kubeconfig dependency: the Kubernetes provider
-    # inside ``GiteaBuiltinRepository`` reads only the bytes we hand it
-    # here.
+    # inside the selected GitOpsRepository provider reads only the bytes we hand
+    # it here.
     #
     # TODO(multi-target): add cloud-hosted GitOps impls (GitHub,
     # GitLab). Each impl populates the same GitOpsRepository contract
     # defined in ``gitrepo/_base.py`` (``url``, ``url_external``,
     # ``default_branch``, ``ssh_private_key_secret``, ``ssh_known_hosts``).
-    # Cloud impls won't need ``kubeconfig`` for the *source* of
-    # truth (the git server lives off-cluster) but DO need it to
-    # project the source SSH credentials Secret into the management
-    # cluster; PKOBootstrap then copies it into the operator namespace.
+    # Cloud impls won't need ``kubeconfig`` for the *source* of truth (the git
+    # server lives off-cluster) but DO need credentials projected into the
+    # management cluster so Flux source-controller can produce artifacts for PKO.
 
-    repo: GitOpsRepository
-    if gitops_provider == "gitea-builtin":
-        repo = GiteaBuiltinRepository(
-            "gitops",
-            kubeconfig=cluster.kubeconfig,
-            sync_triggers=gitea_sync_triggers,
-            # Other knobs (admin_username, repo_name, default_branch, ...)
-            # keep their defaults. Surface them as config later if/when a
-            # real use case for overriding shows up.
-        )
-    else:
-        raise ValueError(
-            f"unsupported ca4s-infra:gitops_provider {gitops_provider!r}; "
-            "supported values: 'gitea-builtin'"
-        )
+    repo = GitOpsRepository(
+        "gitops",
+        gitops_provider_name=gitops_provider,
+        gitops_provider_args={
+            **configured_gitops_provider_args,
+            "kubeconfig": cluster.kubeconfig,
+            "flux_provider": mgmt_provider,
+            "flux_infrastructure": flux,
+            "pko_namespace_resource": pko_namespace,
+            "sync_triggers": gitea_sync_triggers,
+        },
+    )
 
     # ----------------------------------------------------------------------
     # Phase 3 — PKO bootstrap.
     # ----------------------------------------------------------------------
     #
-    # Install the Pulumi Kubernetes Operator (PKO) into the management
-    # cluster and hand off everything else to it. The outer stack owns
-    # exactly one Stack CR under PKO: ``ca4s-init``. That init stack runs
-    # inside PKO and creates the control-plane Stack CR plus the per-tenant
-    # workload-cluster Stack CRs. Tenant churn is therefore reconciled by
-    # PKO from Git after the init stack notices the repo change, rather than
-    # by adding/removing Stack CRs directly from this outer host-side graph.
+    # Install PKO and hand it the Flux GitRepository source created by the
+    # GitOps provider. The outer stack owns exactly one Stack CR under PKO:
+    # ``ca4s-init``. That init stack runs inside PKO and creates the
+    # control-plane Stack CR plus the per-tenant workload-cluster Stack CRs.
+    # Tenant churn is therefore reconciled by PKO from Git after the init stack
+    # notices the repo change, rather than by adding/removing Stack CRs directly
+    # from this outer host-side graph.
     #
     # Three inner Pulumi projects live as sibling directories under
     # ``pulumi/stacks/``, all sharing the outer ``../../../.venv``:
@@ -219,14 +234,19 @@ def run() -> None:
 
     pko = PKOBootstrap(
         "pko",
-        kubeconfig=cluster.kubeconfig,
-        repo_url=repo.url,
-        repo_branch=repo.default_branch,
-        ssh_private_key_secret=repo.ssh_private_key_secret,
-        ssh_known_hosts=repo.ssh_known_hosts,
+        provider=mgmt_provider,
+        namespace_resource=pko_namespace,
+        flux_source_name=repo.flux_source_name,
+        flux_source_resource=repo.flux_source,
         env=pulumi.get_stack(),
         config={REGISTRY_CONFIG_KEY: local_port_registry_setting(registry.port)},
-        opts=pulumi.ResourceOptions(depends_on=[repo]),
+    )
+
+    gitops_webhook = GitOpsWebhook(
+        "gitops-flux-webhook",
+        gitops_provider_name=gitops_provider,
+        gitops_webhook_args=repo.webhook_args,
+        opts=pulumi.ResourceOptions(depends_on=[pko]),
     )
 
     # ----------------------------------------------------------------------
@@ -280,6 +300,7 @@ def run() -> None:
     # PKO-owned init stack, not this host-side outer stack.
     pulumi.export("pko_namespace", pko.namespace)
     pulumi.export("pko_service_account", pko.service_account)
-    pulumi.export("pko_ssh_secret_name", pko.ssh_secret_name)
-    pulumi.export("pko_known_hosts_config_map_name", pko.known_hosts_config_map_name)
+    pulumi.export("pko_flux_source_name", repo.flux_source_name)
+    pulumi.export("pko_flux_receiver_url", repo.flux_receiver_url)
+    pulumi.export("gitops_flux_webhook_id", gitops_webhook.hook_id)
     pulumi.export("pko_init_stack", pko.init_stack)

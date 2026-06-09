@@ -8,17 +8,14 @@ from pko._init_stack import (
     init_stack_config,
     parse_init_stack_spec,
 )
-from pko._stack_cr import StackCRSpec
+from pko._stack_cr import StackCRSpec, build_stack_spec
 
 
 def _stack_spec() -> StackCRSpec:
     return StackCRSpec(
         pko_namespace="pulumi-kubernetes-operator",
         service_account_name="pulumi-runner",
-        repo_url="ssh://git@gitea/repo.git",
-        repo_branch="main",
-        ssh_secret_name="gitea-ssh",
-        known_hosts_config_map_name="gitea-known-hosts",
+        flux_source_name="gitops-source",
         state_pvc_name="pko-state",
         state_backend_url="file:///state",
         passphrase_secret_name="pko-state-passphrase",
@@ -33,10 +30,7 @@ def test_init_stack_config_wraps_shared_spec_and_child_config() -> None:
     assert config[INIT_STACK_SPEC_CONFIG_KEY] == {
         "pkoNamespace": "pulumi-kubernetes-operator",
         "serviceAccountName": "pulumi-runner",
-        "repoUrl": "ssh://git@gitea/repo.git",
-        "repoBranch": "main",
-        "sshSecretName": "gitea-ssh",
-        "knownHostsConfigMapName": "gitea-known-hosts",
+        "fluxSourceName": "gitops-source",
         "statePvcName": "pko-state",
         "stateBackendUrl": "file:///state",
         "passphraseSecretName": "pko-state-passphrase",
@@ -54,7 +48,7 @@ def test_parse_init_stack_spec_round_trips_config_payload() -> None:
 
 def test_parse_init_stack_spec_rejects_missing_required_field() -> None:
     payload = dict(init_stack_config(stack_spec=_stack_spec())[INIT_STACK_SPEC_CONFIG_KEY])
-    del payload["repoUrl"]
+    del payload["fluxSourceName"]
 
-    with pytest.raises(ValueError, match=f"{INIT_STACK_SPEC_CONFIG_KEY}.repoUrl"):
+    with pytest.raises(ValueError, match=f"{INIT_STACK_SPEC_CONFIG_KEY}.fluxSourceName"):
         parse_init_stack_spec(payload)
