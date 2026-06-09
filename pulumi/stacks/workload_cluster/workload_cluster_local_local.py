@@ -537,7 +537,7 @@ def _local_path_storage(
         },
         opts=opts,
     )
-    service_account = k8s.core.v1.ServiceAccount(
+    service_account = k8s.core.v1.ServiceAccountPatch(
         "local-path-service-account",
         metadata={
             "name": _LOCAL_PATH_SERVICE_ACCOUNT,
@@ -545,7 +545,7 @@ def _local_path_storage(
         },
         opts=resource_options(depends_on=[namespace]),
     )
-    role = k8s.rbac.v1.Role(
+    role = k8s.rbac.v1.RolePatch(
         "local-path-role",
         metadata={"name": _LOCAL_PATH_RBAC_NAME, "namespace": _LOCAL_PATH_NAMESPACE},
         rules=[
@@ -565,7 +565,7 @@ def _local_path_storage(
         ],
         opts=resource_options(depends_on=[namespace]),
     )
-    cluster_role = k8s.rbac.v1.ClusterRole(
+    cluster_role = k8s.rbac.v1.ClusterRolePatch(
         "local-path-cluster-role",
         metadata={"name": _LOCAL_PATH_RBAC_NAME},
         rules=[
@@ -606,7 +606,7 @@ def _local_path_storage(
         ],
         opts=resource_options(),
     )
-    k8s.rbac.v1.RoleBinding(
+    k8s.rbac.v1.RoleBindingPatch(
         "local-path-role-binding",
         metadata={
             "name": _LOCAL_PATH_RBAC_BINDING_NAME,
@@ -626,7 +626,7 @@ def _local_path_storage(
         ],
         opts=resource_options(depends_on=[role, service_account]),
     )
-    k8s.rbac.v1.ClusterRoleBinding(
+    k8s.rbac.v1.ClusterRoleBindingPatch(
         "local-path-cluster-role-binding",
         metadata={"name": _LOCAL_PATH_RBAC_BINDING_NAME},
         role_ref={
@@ -643,7 +643,7 @@ def _local_path_storage(
         ],
         opts=resource_options(depends_on=[cluster_role, service_account]),
     )
-    config = k8s.core.v1.ConfigMap(
+    config = k8s.core.v1.ConfigMapPatch(
         "local-path-config",
         metadata={
             "name": _LOCAL_PATH_CONFIG_NAME,
@@ -676,7 +676,7 @@ def _local_path_storage(
         },
         opts=resource_options(depends_on=[namespace]),
     )
-    storage_class = k8s.storage.v1.StorageClass(
+    storage_class = k8s.storage.v1.StorageClassPatch(
         "local-path-storage-class-default",
         metadata={
             "name": _LOCAL_PATH_STORAGE_CLASS,
@@ -690,7 +690,7 @@ def _local_path_storage(
         volume_binding_mode="WaitForFirstConsumer",
         opts=resource_options(),
     )
-    k8s.apps.v1.Deployment(
+    k8s.apps.v1.DeploymentPatch(
         "local-path-deployment",
         metadata={
             "name": _LOCAL_PATH_DEPLOYMENT_NAME,
