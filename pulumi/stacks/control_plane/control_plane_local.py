@@ -31,11 +31,11 @@ from __future__ import annotations
 import pulumi
 
 try:
-    from .awx import AWXInstance, AWXOperator
+    from .awx import AWXInstance, AWXOperator, AWXProviderConfig
     from .capi import ClusterAPIOperator
     from .certmanager import CertManager
 except ImportError:
-    from awx import AWXInstance, AWXOperator
+    from awx import AWXInstance, AWXOperator, AWXProviderConfig
     from capi import ClusterAPIOperator
     from certmanager import CertManager
 
@@ -50,8 +50,11 @@ class ControlPlaneLocal(pulumi.ComponentResource):
     awx_operator_namespace: pulumi.Output[str]
     awx_instance_name: pulumi.Output[str]
     awx_service_name: pulumi.Output[str]
+    awx_api_url: pulumi.Output[str]
     awx_admin_user: pulumi.Output[str]
+    awx_admin_password: pulumi.Output[str]
     awx_admin_password_secret: pulumi.Output[str]
+    awx_provider: pulumi.ProviderResource
     control_plane_ready: pulumi.Output[bool]
     todo: pulumi.Output[str]
 
@@ -77,13 +80,14 @@ class ControlPlaneLocal(pulumi.ComponentResource):
             opts=child_options(),
         )
         awx_operator = AWXOperator("awx-operator", opts=child_options())
-        # TODO(awx-plumbing): keep AWX installed as a management-plane surface,
-        # but defer wiring it until the CAPI/CAPD path is solid. Useful
-        # follow-ups: scoped Kubernetes credential, AWX org/project/inventory,
-        # job templates for day-2 operations, and tenant credential boundaries.
         awx_instance = AWXInstance(
             "awx-instance",
             operator=awx_operator,
+            opts=child_options(),
+        )
+        awx_provider_config = AWXProviderConfig(
+            "awx-api",
+            instance=awx_instance,
             opts=child_options(),
         )
 
@@ -94,11 +98,17 @@ class ControlPlaneLocal(pulumi.ComponentResource):
         self.awx_operator_namespace = awx_operator.namespace
         self.awx_instance_name = awx_instance.name
         self.awx_service_name = awx_instance.service_name
+        self.awx_api_url = awx_provider_config.api_url
         self.awx_admin_user = awx_instance.admin_user
+        self.awx_admin_password = awx_provider_config.admin_password
         self.awx_admin_password_secret = awx_instance.admin_password_secret
-        self.control_plane_ready = pulumi.Output.from_input(False)
+        self.awx_provider = awx_provider_config.provider
+        self.control_plane_ready = pulumi.Output.all(
+            capi.provider_version,
+            awx_provider_config.provider.urn,
+        ).apply(lambda _: True)
         self.todo = pulumi.Output.from_input(
-            "Wire AWX API config and tenant-facing Slurm day-2 operations."
+            "Wire AWX tenant inventories, credentials, and Slurm day-2 job templates."
         )
 
         self.register_outputs(
@@ -110,7 +120,9 @@ class ControlPlaneLocal(pulumi.ComponentResource):
                 "awx_operator_namespace": self.awx_operator_namespace,
                 "awx_instance_name": self.awx_instance_name,
                 "awx_service_name": self.awx_service_name,
+                "awx_api_url": self.awx_api_url,
                 "awx_admin_user": self.awx_admin_user,
+                "awx_admin_password": self.awx_admin_password,
                 "awx_admin_password_secret": self.awx_admin_password_secret,
                 "control_plane_ready": self.control_plane_ready,
                 "todo": self.todo,
