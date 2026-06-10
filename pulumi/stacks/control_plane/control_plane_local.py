@@ -32,10 +32,12 @@ import pulumi
 
 try:
     from .awx import AWXInstance, AWXOperator, AWXProviderConfig
+    from .awx._configuration import AWXConfiguration
     from .capi import ClusterAPIOperator
     from .certmanager import CertManager
 except ImportError:
     from awx import AWXInstance, AWXOperator, AWXProviderConfig
+    from awx._configuration import AWXConfiguration
     from capi import ClusterAPIOperator
     from certmanager import CertManager
 
@@ -55,12 +57,19 @@ class ControlPlaneLocal(pulumi.ComponentResource):
     awx_admin_password: pulumi.Output[str]
     awx_admin_password_secret: pulumi.Output[str]
     awx_provider: pulumi.ProviderResource
+    awx_organization_id: pulumi.Output[float]
+    awx_project_id: pulumi.Output[float]
+    awx_project_name: pulumi.Output[str]
+    awx_scm_credential_id: pulumi.Output[float]
     control_plane_ready: pulumi.Output[bool]
     todo: pulumi.Output[str]
 
     def __init__(
         self,
         name: str,
+        *,
+        flux_source_namespace: pulumi.Input[str],
+        flux_source_name: pulumi.Input[str],
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -90,6 +99,13 @@ class ControlPlaneLocal(pulumi.ComponentResource):
             instance=awx_instance,
             opts=child_options(),
         )
+        awx_configuration = AWXConfiguration(
+            "awx-configuration",
+            provider_config=awx_provider_config,
+            flux_source_namespace=flux_source_namespace,
+            flux_source_name=flux_source_name,
+            opts=child_options(),
+        )
 
         self.cert_manager_namespace = cert_manager.namespace
         self.capi_operator_namespace = capi.namespace
@@ -103,9 +119,13 @@ class ControlPlaneLocal(pulumi.ComponentResource):
         self.awx_admin_password = awx_provider_config.admin_password
         self.awx_admin_password_secret = awx_instance.admin_password_secret
         self.awx_provider = awx_provider_config.provider
+        self.awx_organization_id = awx_configuration.organization_id
+        self.awx_project_id = awx_configuration.project_id
+        self.awx_project_name = awx_configuration.project_name
+        self.awx_scm_credential_id = awx_configuration.scm_credential_id
         self.control_plane_ready = pulumi.Output.all(
             capi.provider_version,
-            awx_provider_config.provider.urn,
+            awx_configuration.project_id,
         ).apply(lambda _: True)
         self.todo = pulumi.Output.from_input(
             "Wire AWX tenant inventories, credentials, and Slurm day-2 job templates."
@@ -124,6 +144,10 @@ class ControlPlaneLocal(pulumi.ComponentResource):
                 "awx_admin_user": self.awx_admin_user,
                 "awx_admin_password": self.awx_admin_password,
                 "awx_admin_password_secret": self.awx_admin_password_secret,
+                "awx_organization_id": self.awx_organization_id,
+                "awx_project_id": self.awx_project_id,
+                "awx_project_name": self.awx_project_name,
+                "awx_scm_credential_id": self.awx_scm_credential_id,
                 "control_plane_ready": self.control_plane_ready,
                 "todo": self.todo,
             }

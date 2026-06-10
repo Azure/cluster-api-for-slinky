@@ -229,7 +229,9 @@ def run() -> None:
         flux_source_name=repo.flux_source_name,
         flux_source_resource=repo.flux_source,
         env=pulumi.get_stack(),
-        config={REGISTRY_CONFIG_KEY: local_port_registry_setting(registry.port)},
+        config={
+            REGISTRY_CONFIG_KEY: local_port_registry_setting(registry.port),
+        },
     )
 
     gitops_webhook = GitOpsWebhook(
