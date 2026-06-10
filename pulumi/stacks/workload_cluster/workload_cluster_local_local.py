@@ -10,8 +10,9 @@ for the requested instance:
     workload k8s cluster on the docker infrastructure provider.
 2. On the resulting workload cluster (via a second k8s provider built
    from the ``${cluster}-kubeconfig`` Secret CAPI publishes on the management
-    cluster): local-path storage, Calico, workload cert-manager, Slinky CRDs,
-    ``slurm-operator``, the Slurm chart, and per-instance ``NodeSet``s.
+    cluster): local-path storage, Calico, workload cert-manager, Prometheus /
+    Grafana, Slinky CRDs, ``slurm-operator``, the Slurm chart, and
+    per-instance ``NodeSet``s.
 
 State backend
 -------------
@@ -90,8 +91,13 @@ _CLUSTER_AUTOSCALER_CHART_VERSION = "9.57.0"
 _CLUSTER_AUTOSCALER_DISCOVERY_LABEL = "ca4s.azure.com/autoscaler-enabled"
 _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE = "true"
 
+_PROMETHEUS_CHART_REPO = "https://prometheus-community.github.io/helm-charts"
+_PROMETHEUS_CHART_NAME = "kube-prometheus-stack"
+_PROMETHEUS_CHART_VERSION = "86.2.2"
+_PROMETHEUS_NAMESPACE = "prometheus"
+
 _SLINKY_CHART_OCI_PREFIX = "oci://ghcr.io/slinkyproject/charts"
-_SLINKY_CHART_VERSION = "1.0.2"
+_SLINKY_CHART_VERSION = "1.1.1"
 _SLINKY_OPERATOR_CRDS_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator-crds"
 _SLINKY_OPERATOR_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator"
 _SLURM_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm"
@@ -476,6 +482,45 @@ def _slurm_operator_values() -> dict[str, object]:
         "webhook": {
             "tolerations": _controller_tolerations(),
             "affinity": _node_type_affinity(_CONTROLLER_NODE_TYPE),
+        },
+    }
+
+
+def _prometheus_values() -> dict[str, object]:
+    controller_node_selector = {_NODE_TYPE_LABEL: _CONTROLLER_NODE_TYPE}
+    controller_tolerations = _controller_tolerations()
+    return {
+        "prometheus": {
+            "prometheusSpec": {
+                "serviceMonitorSelectorNilUsesHelmValues": False,
+                "podMonitorSelectorNilUsesHelmValues": False,
+                "nodeSelector": controller_node_selector,
+                "tolerations": controller_tolerations,
+            },
+        },
+        "alertmanager": {
+            "alertmanagerSpec": {
+                "nodeSelector": controller_node_selector,
+                "tolerations": controller_tolerations,
+            },
+        },
+        "prometheusOperator": {
+            "nodeSelector": controller_node_selector,
+            "tolerations": controller_tolerations,
+            "admissionWebhooks": {
+                "patch": {
+                    "nodeSelector": controller_node_selector,
+                    "tolerations": controller_tolerations,
+                },
+            },
+        },
+        "grafana": {
+            "nodeSelector": controller_node_selector,
+            "tolerations": controller_tolerations,
+        },
+        "kube-state-metrics": {
+            "nodeSelector": controller_node_selector,
+            "tolerations": controller_tolerations,
         },
     }
 
@@ -1213,6 +1258,8 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
     worker_machine_deployments: list[pulumi.Output[str]]
     cluster_autoscaler_namespace: pulumi.Output[str | None]
     cluster_autoscaler_status: pulumi.Output[Any]
+    prometheus_namespace: pulumi.Output[str]
+    prometheus_status: pulumi.Output[Any]
     calico_operator_chart_version: pulumi.Output[str]
     calico_operator_status: pulumi.Output[Any]
     workload_cluster_ready: pulumi.Output[bool]
@@ -1544,6 +1591,36 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             ),
         )
 
+        prometheus_namespace = k8s.core.v1.Namespace(
+            "prometheus-namespace",
+            metadata={
+                "name": _PROMETHEUS_NAMESPACE,
+                "labels": _POD_SECURITY_PRIVILEGED_LABELS,
+            },
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[calico_operator],
+                retain_on_delete=True,
+            ),
+        )
+        prometheus = k8s.helm.v3.Release(
+            "prometheus",
+            chart=_PROMETHEUS_CHART_NAME,
+            version=_PROMETHEUS_CHART_VERSION,
+            repository_opts={"repo": _PROMETHEUS_CHART_REPO},
+            namespace=_PROMETHEUS_NAMESPACE,
+            cleanup_on_fail=True,
+            atomic=True,
+            wait_for_jobs=True,
+            timeout=900,
+            values=_prometheus_values(),
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[prometheus_namespace],
+                retain_on_delete=True,
+            ),
+        )
+
         slinky_namespace = k8s.core.v1.Namespace(
             "slinky-operator-namespace",
             metadata={
@@ -1552,7 +1629,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             },
             opts=child_options(
                 provider=workload_provider,
-                depends_on=[calico_operator],
+                depends_on=[prometheus],
                 retain_on_delete=True,
             ),
         )
@@ -1564,7 +1641,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             },
             opts=child_options(
                 provider=workload_provider,
-                depends_on=[calico_operator],
+                depends_on=[prometheus],
                 retain_on_delete=True,
             ),
         )
@@ -1579,7 +1656,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             timeout=600,
             opts=child_options(
                 provider=workload_provider,
-                depends_on=[slinky_namespace, calico_operator],
+                depends_on=[slinky_namespace, prometheus],
                 retain_on_delete=True,
             ),
         )
@@ -1632,6 +1709,8 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
         self.cluster_autoscaler_status = pulumi.Output.from_input(
             cluster_autoscaler.status if cluster_autoscaler is not None else None
         )
+        self.prometheus_namespace = pulumi.Output.from_input(_PROMETHEUS_NAMESPACE)
+        self.prometheus_status = prometheus.status
         self.calico_operator_chart_version = pulumi.Output.from_input(
             _CALICO_CHART_VERSION
         )
@@ -1641,6 +1720,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             workload_kubeconfig_secret.metadata["name"],  # type: ignore[index]
             calico_operator.status,
             self.cluster_autoscaler_status,
+            prometheus.status,
             slurm_operator.status,
             slurm_release.status,
         ).apply(lambda _: True)
@@ -1658,6 +1738,9 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 "worker_machine_deployments": self.worker_machine_deployments,
                 "cluster_autoscaler_namespace": self.cluster_autoscaler_namespace,
                 "cluster_autoscaler_status": self.cluster_autoscaler_status,
+                "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
+                "prometheus_namespace": self.prometheus_namespace,
+                "prometheus_status": self.prometheus_status,
                 "calico_operator_chart_version": self.calico_operator_chart_version,
                 "calico_operator_status": self.calico_operator_status,
                 "workload_cluster_ready": self.workload_cluster_ready,

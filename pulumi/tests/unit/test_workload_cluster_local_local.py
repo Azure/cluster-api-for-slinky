@@ -13,6 +13,7 @@ from stacks.workload_cluster.workload_cluster_local_local import (
     _cluster_autoscaler_release_name,
     _cluster_autoscaler_values,
     _machine_deployment_labels,
+    _prometheus_values,
     _worker_labels,
 )
 
@@ -85,4 +86,37 @@ def test_cluster_autoscaler_values_use_secret_backed_workload_kubeconfig() -> No
         "stderrthreshold": "info",
         "v": 4,
         "scale-down-unneeded-time": "2m",
+    }
+
+
+def test_prometheus_values_pin_components_to_controller_node() -> None:
+    values = _prometheus_values()
+    expected_node_selector = {"slinky.slurm.net/node-type": "controller"}
+    expected_tolerations = [
+        {
+            "key": "slinky.slurm.net/controller",
+            "operator": "Exists",
+            "effect": "NoSchedule",
+        }
+    ]
+
+    assert values["prometheus"]["prometheusSpec"] == {
+        "serviceMonitorSelectorNilUsesHelmValues": False,
+        "podMonitorSelectorNilUsesHelmValues": False,
+        "nodeSelector": expected_node_selector,
+        "tolerations": expected_tolerations,
+    }
+    assert values["alertmanager"]["alertmanagerSpec"] == {
+        "nodeSelector": expected_node_selector,
+        "tolerations": expected_tolerations,
+    }
+    assert values["prometheusOperator"]["nodeSelector"] == expected_node_selector
+    assert values["prometheusOperator"]["tolerations"] == expected_tolerations
+    assert values["grafana"] == {
+        "nodeSelector": expected_node_selector,
+        "tolerations": expected_tolerations,
+    }
+    assert values["kube-state-metrics"] == {
+        "nodeSelector": expected_node_selector,
+        "tolerations": expected_tolerations,
     }

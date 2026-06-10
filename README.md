@@ -267,17 +267,11 @@ kubectl label ns slurm pod-security.kubernetes.io/enforce=privileged --overwrite
 kubectl label ns slurm pod-security.kubernetes.io/enforce-version=latest --overwrite
 ```
 
-Next, we set up Prometheus/Grafana on the workload cluster:
+The Pulumi workload-cluster class installs `kube-prometheus-stack` before Slinky
+so Slurm `ServiceMonitor` resources have their CRDs available. To access the
+Grafana instance created by the managed stack:
 ```bash
-# switch to CAPI workload cluster again
 export KUBECONFIG="$(pwd)/capi-quickstart.kubeconfig"
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-# All non-DaemonSet prometheus components are pinned to controller via prometheus-values.yaml;
-# prometheus-node-exporter (DaemonSet) is intentionally left to run on every node.
-helm install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml --namespace=prometheus --create-namespace
-kubectl label ns prometheus pod-security.kubernetes.io/enforce=privileged --overwrite
-kubectl label ns prometheus pod-security.kubernetes.io/enforce-version=latest --overwrite
 # check status
 kubectl --namespace prometheus get pods -l "release=prometheus"
 # get Grafana 'admin' user password
@@ -317,7 +311,7 @@ Every other platform component (`cert-manager`, `slurm-operator`, `kube-promethe
 | `cert-manager-values.yaml` | `helm install cert-manager -f cert-manager-values.yaml` |
 | `slurm-operator-values.yaml` | `helm install slurm-operator -f slurm-operator-values.yaml` |
 | `slurm-cluster.yaml` | `helm install slurm -f slurm-cluster.yaml` (head pods + NodeSet affinity) |
-| `prometheus-values.yaml` | `helm install prometheus -f prometheus-values.yaml` |
+| `prometheus-values.yaml` | Legacy manual Prometheus install values; Pulumi now renders equivalent placement values directly. |
 | `keda-values.yaml` | `helm install keda -f keda-values.yaml` |
 | `scripts/pin-platform-pods.sh` | Post-install patches for raw-manifest Deployments (coredns, calico-kube-controllers, local-path-provisioner) |
 
