@@ -28,7 +28,6 @@ from contextlib import ExitStack, contextmanager
 from typing import Any, Optional
 
 import pulumi
-from cryptography.hazmat.primitives import serialization
 from pulumi.dynamic import (
     CreateResult,
     DiffResult,
@@ -36,6 +35,8 @@ from pulumi.dynamic import (
     Resource,
     ResourceProvider,
 )
+
+from gitrepo.kubernetes_secret_runtime import read_secret_text
 
 
 def _git_head_sha(source_dir: str) -> str:
@@ -53,7 +54,7 @@ class _GiteaSyncProvider(ResourceProvider):
     """Synchronizes a local Git tree to a Gitea repo's default branch."""
 
     def _redact(self, text: str, props: dict) -> str:
-        for secret_key in ("ssh_private_key",):
+        for secret_key in ("kubeconfig",):
             secret = props.get(secret_key)
             if not secret:
                 continue
@@ -72,20 +73,6 @@ class _GiteaSyncProvider(ResourceProvider):
             temp_file.flush()
             os.chmod(temp_file.name, mode)
             yield temp_file.name
-
-    def _openssh_private_key(self, private_key_pem: str) -> str:
-        if private_key_pem.lstrip().startswith("-----BEGIN OPENSSH PRIVATE KEY-----"):
-            return private_key_pem
-
-        private_key = serialization.load_pem_private_key(
-            private_key_pem.encode("ascii"),
-            password=None,
-        )
-        return private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.OpenSSH,
-            encryption_algorithm=serialization.NoEncryption(),
-        ).decode("ascii")
 
     @contextmanager
     def _port_forward(
@@ -159,50 +146,64 @@ class _GiteaSyncProvider(ResourceProvider):
             f"{props['service_name']}.{props['service_namespace']}.svc.cluster.local"
         )
 
+    def _ssh_material(self, props: dict, kubeconfig_path: str) -> tuple[str, str]:
+        private_key = read_secret_text(
+            kubeconfig_path=kubeconfig_path,
+            namespace=str(props["ssh_key_secret_namespace"]),
+            name=str(props["ssh_key_secret_name"]),
+            key=str(props["ssh_private_key_secret_key"]),
+        )
+        host_public_key = read_secret_text(
+            kubeconfig_path=kubeconfig_path,
+            namespace=str(props["ssh_host_key_secret_namespace"]),
+            name=str(props["ssh_host_key_secret_name"]),
+            key=str(props["ssh_host_public_key_secret_key"]),
+        ).strip()
+        known_hosts = f"{self._ssh_host_alias(props)} {host_public_key}\n"
+        return private_key, known_hosts
+
     def _push(self, props: dict) -> None:
         kubeconfig = props.get("kubeconfig")
         if not kubeconfig:
             raise RuntimeError("kubeconfig is required for Gitea SSH sync")
-        with (
-            self._temp_file(str(kubeconfig), 0o600) as kubeconfig_path,
-            self._temp_file(
-                self._openssh_private_key(str(props["ssh_private_key"])),
-                0o600,
-            ) as key_path,
-            self._temp_file(str(props["ssh_known_hosts"]), 0o644) as known_hosts_path,
-        ):
-            with self._port_forward(props, kubeconfig_path) as local_port:
-                git_url = self._build_git_url(props, local_port)
-                ssh_command = " ".join(
-                    [
-                        "ssh",
-                        "-i",
-                        shlex.quote(key_path),
-                        "-o",
-                        "IdentitiesOnly=yes",
-                        "-o",
-                        "BatchMode=yes",
-                        "-o",
-                        "StrictHostKeyChecking=yes",
-                        "-o",
-                        f"UserKnownHostsFile={shlex.quote(known_hosts_path)}",
-                        "-o",
-                        f"HostKeyAlias={shlex.quote(self._ssh_host_alias(props))}",
-                    ]
-                )
-                subprocess.run(
-                    [
-                        "git",
-                        "push",
-                        git_url,
-                        f"HEAD:refs/heads/{props['default_branch']}",
-                    ],
-                    cwd=props["source_dir"],
-                    check=True,
-                    env={**self._git_env(), "GIT_SSH_COMMAND": ssh_command},
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
+        with self._temp_file(str(kubeconfig), 0o600) as kubeconfig_path:
+            private_key, known_hosts = self._ssh_material(props, kubeconfig_path)
+            with (
+                self._temp_file(private_key, 0o600) as key_path,
+                self._temp_file(known_hosts, 0o644) as known_hosts_path,
+            ):
+                with self._port_forward(props, kubeconfig_path) as local_port:
+                    git_url = self._build_git_url(props, local_port)
+                    ssh_command = " ".join(
+                        [
+                            "ssh",
+                            "-i",
+                            shlex.quote(key_path),
+                            "-o",
+                            "IdentitiesOnly=yes",
+                            "-o",
+                            "BatchMode=yes",
+                            "-o",
+                            "StrictHostKeyChecking=yes",
+                            "-o",
+                            f"UserKnownHostsFile={shlex.quote(known_hosts_path)}",
+                            "-o",
+                            f"HostKeyAlias={shlex.quote(self._ssh_host_alias(props))}",
+                        ]
+                    )
+                    subprocess.run(
+                        [
+                            "git",
+                            "push",
+                            git_url,
+                            f"HEAD:refs/heads/{props['default_branch']}",
+                        ],
+                        cwd=props["source_dir"],
+                        check=True,
+                        env={**self._git_env(), "GIT_SSH_COMMAND": ssh_command},
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
 
     def create(self, props: dict) -> CreateResult:
         head = _git_head_sha(props["source_dir"])
@@ -235,6 +236,13 @@ class _GiteaSyncProvider(ResourceProvider):
             "service_namespace",
             "service_name",
             "service_port",
+            "kubeconfig",
+            "ssh_key_secret_namespace",
+            "ssh_key_secret_name",
+            "ssh_private_key_secret_key",
+            "ssh_host_key_secret_namespace",
+            "ssh_host_key_secret_name",
+            "ssh_host_public_key_secret_key",
             "head_sha",
         ):
             if old.get(key) != new.get(key):
@@ -257,8 +265,6 @@ class GiteaSync(Resource):
 
     head_sha: pulumi.Output[str]
     pushed: pulumi.Output[bool]
-    ssh_private_key: pulumi.Output[str]
-    ssh_known_hosts: pulumi.Output[str]
     owner: pulumi.Output[str]
     repo_name: pulumi.Output[str]
     default_branch: pulumi.Output[str]
@@ -269,8 +275,12 @@ class GiteaSync(Resource):
         self,
         name: str,
         *,
-        ssh_private_key: pulumi.Input[str],
-        ssh_known_hosts: pulumi.Input[str],
+        ssh_key_secret_namespace: pulumi.Input[str],
+        ssh_key_secret_name: pulumi.Input[str],
+        ssh_private_key_secret_key: pulumi.Input[str],
+        ssh_host_key_secret_namespace: pulumi.Input[str],
+        ssh_host_key_secret_name: pulumi.Input[str],
+        ssh_host_public_key_secret_key: pulumi.Input[str],
         owner: pulumi.Input[str],
         repo_name: pulumi.Input[str],
         default_branch: pulumi.Input[str],
@@ -287,8 +297,12 @@ class GiteaSync(Resource):
             _GiteaSyncProvider(),
             name,
             {
-                "ssh_private_key": ssh_private_key,
-                "ssh_known_hosts": ssh_known_hosts,
+                "ssh_key_secret_namespace": ssh_key_secret_namespace,
+                "ssh_key_secret_name": ssh_key_secret_name,
+                "ssh_private_key_secret_key": ssh_private_key_secret_key,
+                "ssh_host_key_secret_namespace": ssh_host_key_secret_namespace,
+                "ssh_host_key_secret_name": ssh_host_key_secret_name,
+                "ssh_host_public_key_secret_key": ssh_host_public_key_secret_key,
                 "owner": owner,
                 "repo_name": repo_name,
                 "default_branch": default_branch,

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from collections.abc import Mapping
 
 import pulumi
 import pulumi_kubernetes as k8s
@@ -31,23 +30,10 @@ FLUX_RECEIVER_API_VERSION = "notification.toolkit.fluxcd.io/v1"
 FLUX_RECEIVER_KIND = "Receiver"
 FLUX_RECEIVER_NAME = "gitops-source"
 FLUX_RECEIVER_TOKEN_SECRET_NAME = "gitops-source-webhook-token"
-_SSH_PRIVATE_KEY_KEY = "id_ed25519"
 
 
 def _secret_data(value: str) -> str:
     return base64.b64encode(value.encode("utf-8")).decode("ascii")
-
-
-def _copy_secret_data_key(
-    data: Mapping[str, str] | None,
-    source_key: str,
-) -> str:
-    if not data or source_key not in data:
-        available = sorted(data.keys()) if data else []
-        raise ValueError(
-            f"source SSH Secret is missing key {source_key!r}; available keys: {available!r}"
-        )
-    return data[source_key]
 
 
 def _receiver_path(token: str, name: str, namespace: str) -> str:
@@ -162,34 +148,11 @@ class FluxGitSource(pulumi.ComponentResource):
         pko_namespace_resource: pulumi.Resource,
         repo_url: pulumi.Input[str],
         repo_branch: pulumi.Input[str],
-        ssh_private_key_secret: k8s.core.v1.Secret,
-        ssh_known_hosts: pulumi.Input[str],
+        git_auth_secret_name: pulumi.Input[str],
+        git_auth_secret_resource: pulumi.Resource,
         opts: ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:pko:FluxGitSource", name, props={}, opts=opts)
-
-        ssh_private_key_data = Output.secret(
-            ssh_private_key_secret.data.apply(
-                lambda data: _copy_secret_data_key(data, _SSH_PRIVATE_KEY_KEY)
-            )
-        )
-        git_auth = k8s.core.v1.Secret(
-            f"{name}-git-auth",
-            metadata={
-                "name": FLUX_GIT_AUTH_SECRET_NAME,
-                "namespace": PKO_NAMESPACE,
-            },
-            type="Opaque",
-            data={
-                "identity": ssh_private_key_data,
-                "known_hosts": Output.from_input(ssh_known_hosts).apply(_secret_data),
-            },
-            opts=ResourceOptions(
-                parent=self,
-                provider=provider,
-                depends_on=[pko_namespace_resource, ssh_private_key_secret],
-            ),
-        )
 
         git_repository = k8s.apiextensions.CustomResource(
             f"{name}-git-repository",
@@ -203,13 +166,13 @@ class FluxGitSource(pulumi.ComponentResource):
                 "interval": "30s",
                 "url": repo_url,
                 "ref": {"branch": repo_branch},
-                "secretRef": {"name": FLUX_GIT_AUTH_SECRET_NAME},
+                "secretRef": {"name": git_auth_secret_name},
                 "timeout": "2m0s",
             },
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,
-                depends_on=[flux_infrastructure, git_auth],
+                depends_on=[flux_infrastructure, pko_namespace_resource, git_auth_secret_resource],
             ),
         )
 

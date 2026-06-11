@@ -56,23 +56,22 @@ matching the rest of this stack's conservative defaults.
 
 from __future__ import annotations
 
-import base64
-import hashlib
 import os
-import struct
+import base64
 from typing import Any, Mapping, Optional
 
 import pulumi
 import pulumi_gitea as gitea_sdk
 import pulumi_kubernetes as k8s
 import pulumi_random as random
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
 from pulumi import Output, ResourceOptions
 
 from gitrepo._base import GitOpsRepositoryProvider, GitOpsWebhookProvider
+from gitrepo.external_secrets import ExternalSecretsOperator
+from gitrepo.flux_git_auth import FluxGitAuthSecret
 from gitrepo.gitea_sync import GiteaSync
 from pko._flux import FluxGitSource
+from pko._release import PKO_NAMESPACE
 
 
 # Pinned upstream chart. Bump this together with ``_GITEA_APP_VERSION``
@@ -123,25 +122,27 @@ _GITEA_HTTP_PORT = 3000
 _GITEA_SSH_SERVICE = "gitea-ssh"
 _GITEA_SSH_PORT = 22
 
-# Prefix for the Secret holding the pre-generated Gitea SSH host keypair. Mounted
-# into the Gitea pod via the chart's ``extraVolumes`` +
-# ``extraContainerVolumeMounts`` so Gitea boots with a deterministic
-# ed25519 host key. The suffix is a short hash of the public key so
-# rotation changes the Kubernetes object name (immutable Secret). Two keys:
-#   * ``ssh_host_ed25519_key``      — OpenSSH-format private key.
-#   * ``ssh_host_ed25519_key.pub``  — OpenSSH-format public key.
-_HOST_KEY_SECRET_PREFIX = "gitea-ssh-host-keys"
+# ESO-generated Secret holding the Gitea SSH host keypair. Mounted into the
+# Gitea pod via the chart's ``extraVolumes`` + ``extraContainerVolumeMounts``
+# so Gitea boots with a known ed25519 host key. Two source keys:
+#   * ``privateKey`` — OpenSSH-format private key.
+#   * ``publicKey``  — OpenSSH-format public key.
+_HOST_KEY_SECRET = "gitea-ssh-host-key"
+_HOST_PRIVATE_KEY_SECRET_KEY = "privateKey"
+_HOST_PUBLIC_KEY_SECRET_KEY = "publicKey"
 
-# Prefix for the source Secret that holds the admin user's SSH private key. The
-# name is derived from the matching public key so every consumer follows the
-# same key-version identity.
-_USER_KEY_SECRET_PREFIX = "gitea-ssh"
-_USER_PRIVATE_KEY_SECRET_KEY = "id_ed25519"
+# ESO-generated Secret that holds the admin user's SSH keypair.
+_USER_KEY_SECRET = "gitea-ssh-user-key"
+_USER_PUBLIC_KEY_SECRET = "gitea-ssh-user-public-key"
+_USER_PRIVATE_KEY_SECRET_KEY = "privateKey"
+_USER_PUBLIC_KEY_SECRET_KEY = "publicKey"
+
+_FLUX_GIT_AUTH_SECRET = "gitops-source-ssh-managed"
 
 # Title we give the admin user's SSH key inside Gitea. Surfaces in the
 # Gitea web UI under the admin user's SSH keys list — useful when
 # eyeballing what Pulumi actually wired up.
-_ADMIN_SSH_KEY_TITLE = "ca4s-pko"
+_ADMIN_SSH_KEY_TITLE = "ca4s-pko-eso"
 
 # Default location of the local working tree the sync pushes from is
 # resolved lazily by :func:`_default_source_dir` — see the docstring there
@@ -294,13 +295,13 @@ def _chart_values(
             {
                 "name": "gitea-ssh-host-keys",
                 "mountPath": "/data/ssh/ssh_host_ed25519_key",
-                "subPath": "ssh_host_ed25519_key",
+                "subPath": _HOST_PRIVATE_KEY_SECRET_KEY,
                 "readOnly": True,
             },
             {
                 "name": "gitea-ssh-host-keys",
                 "mountPath": "/data/ssh/ssh_host_ed25519_key.pub",
-                "subPath": "ssh_host_ed25519_key.pub",
+                "subPath": _HOST_PUBLIC_KEY_SECRET_KEY,
                 "readOnly": True,
             },
         ],
@@ -352,95 +353,11 @@ def _in_cluster_ssh_host() -> str:
     return f"{_GITEA_SSH_SERVICE}.{_GITEA_NAMESPACE}.svc.cluster.local"
 
 
-def _short_public_key_hash(public_key: str) -> str:
-    """Return a short stable hash for an OpenSSH public key string."""
-    parts = public_key.strip().split()
-    if len(parts) < 2:
-        raise ValueError(f"expected OpenSSH public key, got {public_key!r}")
-    normalized = " ".join(parts[:2])
-    return hashlib.sha256(normalized.encode("ascii")).hexdigest()[:12]
-
-
-def _name_with_public_key_hash(prefix: str, public_key: str) -> str:
-    """Build a Kubernetes-safe name that changes only when the public key does."""
-    return f"{prefix}-{_short_public_key_hash(public_key)}"
-
-
-def _k8s_secret_data(value: str) -> str:
-    return base64.b64encode(value.encode("ascii")).decode("ascii")
-
-
-def _ssh_string(value: bytes) -> bytes:
-    return struct.pack(">I", len(value)) + value
-
-
-def _openssh_ed25519_private_key(*, seed: bytes, public_key: bytes) -> str:
-    key_type = b"ssh-ed25519"
-    public_blob = _ssh_string(key_type) + _ssh_string(public_key)
-    checkint = b"\x00\x00\x00\x00"
-    private_blob = b"".join(
-        (
-            checkint,
-            checkint,
-            _ssh_string(key_type),
-            _ssh_string(public_key),
-            _ssh_string(seed + public_key),
-            _ssh_string(b""),
-        )
-    )
-    padding_length = 8 - (len(private_blob) % 8)
-    if padding_length == 0:
-        padding_length = 8
-    private_blob += bytes(range(1, padding_length + 1))
-    payload = b"".join(
-        (
-            b"openssh-key-v1\x00",
-            _ssh_string(b"none"),
-            _ssh_string(b"none"),
-            _ssh_string(b""),
-            struct.pack(">I", 1),
-            _ssh_string(public_blob),
-            _ssh_string(private_blob),
-        )
-    )
-    encoded = base64.b64encode(payload).decode("ascii")
-    wrapped = "\n".join(
-        encoded[index : index + 70] for index in range(0, len(encoded), 70)
-    )
-    return (
-        "-----BEGIN OPENSSH PRIVATE KEY-----\n"
-        f"{wrapped}\n"
-        "-----END OPENSSH PRIVATE KEY-----\n"
-    )
-
-
-def _derive_ed25519_keypair(seed_b64: str) -> dict[str, str]:
-    """Derive an ed25519 keypair from 32 bytes of randomness.
-
-    Pulumi state already persists the seed bytes (via
-    :class:`pulumi_random.RandomBytes`), so derivation is deterministic
-    across reapplies — changing the seed bytes is the only thing that
-    rotates the key. Returns OpenSSH private and OpenSSH public
-    (single-line ``ssh-ed25519 <base64> <comment>``-style without the
-    comment) strings.
-    """
-    seed = base64.b64decode(seed_b64)
-    if len(seed) != 32:
-        raise ValueError(
-            f"ed25519 seed must be 32 bytes, got {len(seed)} (b64='{seed_b64[:20]}...')"
-        )
-    priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
-    pub = priv.public_key()
-    public_raw = pub.public_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PublicFormat.Raw,
-    )
-    priv_pem = _openssh_ed25519_private_key(seed=seed, public_key=public_raw)
-    pub_openssh = pub.public_bytes(
-        encoding=serialization.Encoding.OpenSSH,
-        format=serialization.PublicFormat.OpenSSH,
-    ).decode("ascii")
-    return {"private": priv_pem, "public": pub_openssh}
+def _decode_secret_data_key(data: Mapping[str, str] | None, key: str) -> str:
+    if not data or key not in data:
+        available = sorted(data.keys()) if data else []
+        raise ValueError(f"Secret is missing key {key!r}; available keys: {available!r}")
+    return base64.b64decode(data[key]).decode("utf-8")
 
 
 class GiteaBuiltinRepository(GitOpsRepositoryProvider):
@@ -568,99 +485,231 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             ),
         )
 
-        # ----------------------------------------------------------------
-        # SSH keypair generation (host key for Gitea + admin user key).
-        # ----------------------------------------------------------------
-        #
-        # Two ed25519 keypairs, both derived deterministically from
-        # ``RandomBytes`` seeds. ``RandomBytes`` persists the bytes in
-        # Pulumi state (encrypted by the stack's passphrase), so reapplies
-        # produce the same keys until you explicitly rotate by tainting
-        # the RandomBytes resource. Deriving via cryptography in an
-        # ``Output.apply`` keeps the private key bytes inside the
-        # language host \u2014 they never leak to the wire as a separate
-        # Pulumi resource property.
-        host_seed = random.RandomBytes(
-            f"{name}-ssh-host-seed",
-            length=32,
-            opts=ResourceOptions(parent=self),
-        )
-        user_seed = random.RandomBytes(
-            f"{name}-ssh-user-seed",
-            length=32,
-            opts=ResourceOptions(parent=self),
-        )
-        host_keypair = host_seed.base64.apply(_derive_ed25519_keypair)
-        user_keypair = user_seed.base64.apply(_derive_ed25519_keypair)
-
-        host_private_pem: Output[str] = host_keypair["private"]
-        host_public_openssh: Output[str] = Output.unsecret(host_keypair["public"])
-        user_private_pem: Output[str] = user_keypair["private"]
-        user_public_openssh: Output[str] = Output.unsecret(user_keypair["public"])
-
-        host_key_secret_name = host_public_openssh.apply(
-            lambda pub: _name_with_public_key_hash(_HOST_KEY_SECRET_PREFIX, pub)
-        )
-        user_key_secret_name = user_public_openssh.apply(
-            lambda pub: _name_with_public_key_hash(_USER_KEY_SECRET_PREFIX, pub)
+        eso = ExternalSecretsOperator(
+            f"{name}-eso",
+            provider=k8s_provider,
+            opts=ResourceOptions(parent=self, depends_on=[gitea_ns]),
         )
 
-        # Secret holding the Gitea SSH host keypair. Mounted into the
-        # Gitea pod by ``_chart_values`` so the first-boot host-key
-        # auto-generation step is skipped \u2014 our pre-computed
-        # ``known_hosts`` line will match the key Gitea presents on
-        # the wire.
-        host_key_secret = k8s.core.v1.Secret(
-            f"{name}-ssh-host-keys",
+        host_key_generator = k8s.apiextensions.CustomResource(
+            f"{name}-ssh-host-key-generator",
+            api_version="generators.external-secrets.io/v1alpha1",
+            kind="SSHKey",
             metadata={
-                "name": host_key_secret_name,
+                "name": _HOST_KEY_SECRET,
                 "namespace": _GITEA_NAMESPACE,
             },
-            type="Opaque",
-            immutable=True,
-            data={
-                "ssh_host_ed25519_key": host_private_pem.apply(_k8s_secret_data),
-                "ssh_host_ed25519_key.pub": host_public_openssh.apply(
-                    _k8s_secret_data
-                ),
-            },
+            spec={"keyType": "ed25519", "comment": "gitea-host@ca4s.local"},
             opts=ResourceOptions(
                 parent=self,
                 provider=k8s_provider,
-                depends_on=[gitea_ns],
+                depends_on=[eso],
+            ),
+        )
+        user_key_generator = k8s.apiextensions.CustomResource(
+            f"{name}-ssh-user-key-generator",
+            api_version="generators.external-secrets.io/v1alpha1",
+            kind="SSHKey",
+            metadata={
+                "name": _USER_KEY_SECRET,
+                "namespace": _GITEA_NAMESPACE,
+            },
+            spec={"keyType": "ed25519", "comment": f"{admin_username}@ca4s.local"},
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[eso],
             ),
         )
 
-        # Single-line ``known_hosts`` entry Flux source-controller will trust.
-        # Format: ``<hostname> <alg> <base64-pubkey>``.
-        # ``host_public_openssh`` is already in the ``ssh-ed25519 AAAA...``
-        # shape — prepending the hostname turns it into a valid
-        # ``known_hosts`` line. (The optional trailing comment doesn't
-        # affect matching.)
-        ssh_known_hosts = host_public_openssh.apply(
-            lambda pub: f"{_in_cluster_ssh_host()} {pub.strip()}\n"
-        )
-
-        # Source Secret holding the admin user's private key. Downstream
-        # components copy from this Secret into their own namespaces rather
-        # than accepting raw private-key material as an input.
-        user_key_secret = k8s.core.v1.Secret(
-            f"{name}-ssh-user-key",
+        host_key_secret = k8s.apiextensions.CustomResource(
+            f"{name}-ssh-host-key-secret",
+            api_version="external-secrets.io/v1",
+            kind="ExternalSecret",
             metadata={
-                "name": user_key_secret_name,
+                "name": _HOST_KEY_SECRET,
                 "namespace": _GITEA_NAMESPACE,
+                "annotations": {"pulumi.com/waitFor": "condition=Ready"},
             },
-            type="Opaque",
-            immutable=True,
-            data={
-                _USER_PRIVATE_KEY_SECRET_KEY: user_private_pem.apply(
-                    _k8s_secret_data
-                ),
+            spec={
+                "refreshPolicy": "CreatedOnce",
+                "target": {"name": _HOST_KEY_SECRET, "creationPolicy": "Owner"},
+                "dataFrom": [
+                    {
+                        "sourceRef": {
+                            "generatorRef": {
+                                "apiVersion": "generators.external-secrets.io/v1alpha1",
+                                "kind": "SSHKey",
+                                "name": _HOST_KEY_SECRET,
+                            }
+                        }
+                    }
+                ],
             },
             opts=ResourceOptions(
                 parent=self,
                 provider=k8s_provider,
-                depends_on=[gitea_ns],
+                depends_on=[host_key_generator],
+                custom_timeouts=pulumi.CustomTimeouts(create="5m", update="5m"),
+            ),
+        )
+        user_key_secret = k8s.apiextensions.CustomResource(
+            f"{name}-ssh-user-key-secret",
+            api_version="external-secrets.io/v1",
+            kind="ExternalSecret",
+            metadata={
+                "name": _USER_KEY_SECRET,
+                "namespace": _GITEA_NAMESPACE,
+                "annotations": {"pulumi.com/waitFor": "condition=Ready"},
+            },
+            spec={
+                "refreshPolicy": "CreatedOnce",
+                "target": {"name": _USER_KEY_SECRET, "creationPolicy": "Owner"},
+                "dataFrom": [
+                    {
+                        "sourceRef": {
+                            "generatorRef": {
+                                "apiVersion": "generators.external-secrets.io/v1alpha1",
+                                "kind": "SSHKey",
+                                "name": _USER_KEY_SECRET,
+                            }
+                        }
+                    }
+                ],
+            },
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[user_key_generator],
+                custom_timeouts=pulumi.CustomTimeouts(create="5m", update="5m"),
+            ),
+        )
+
+        public_key_reader_sa = k8s.core.v1.ServiceAccount(
+            f"{name}-ssh-public-key-reader-sa",
+            metadata={
+                "name": "gitea-ssh-public-key-reader",
+                "namespace": _GITEA_NAMESPACE,
+            },
+            opts=ResourceOptions(parent=self, provider=k8s_provider),
+        )
+        public_key_reader_role = k8s.rbac.v1.Role(
+            f"{name}-ssh-public-key-reader-role",
+            metadata={
+                "name": "gitea-ssh-public-key-reader",
+                "namespace": _GITEA_NAMESPACE,
+            },
+            rules=[
+                {
+                    "api_groups": [""],
+                    "resources": ["secrets"],
+                    "verbs": ["get", "list", "watch"],
+                },
+                {
+                    "api_groups": ["authorization.k8s.io"],
+                    "resources": ["selfsubjectrulesreviews"],
+                    "verbs": ["create"],
+                },
+            ],
+            opts=ResourceOptions(parent=self, provider=k8s_provider),
+        )
+        public_key_reader_binding = k8s.rbac.v1.RoleBinding(
+            f"{name}-ssh-public-key-reader-rolebinding",
+            metadata={
+                "name": "gitea-ssh-public-key-reader",
+                "namespace": _GITEA_NAMESPACE,
+            },
+            role_ref={
+                "api_group": "rbac.authorization.k8s.io",
+                "kind": "Role",
+                "name": public_key_reader_role.metadata["name"],
+            },
+            subjects=[
+                {
+                    "kind": "ServiceAccount",
+                    "name": public_key_reader_sa.metadata["name"],
+                    "namespace": _GITEA_NAMESPACE,
+                }
+            ],
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[public_key_reader_role],
+            ),
+        )
+        public_key_store = k8s.apiextensions.CustomResource(
+            f"{name}-ssh-public-key-store",
+            api_version="external-secrets.io/v1",
+            kind="SecretStore",
+            metadata={
+                "name": "gitea-ssh-public-key-store",
+                "namespace": _GITEA_NAMESPACE,
+            },
+            spec={
+                "provider": {
+                    "kubernetes": {
+                        "remoteNamespace": _GITEA_NAMESPACE,
+                        "server": {
+                            "caProvider": {
+                                "type": "ConfigMap",
+                                "name": "kube-root-ca.crt",
+                                "key": "ca.crt",
+                            }
+                        },
+                        "auth": {
+                            "serviceAccount": {
+                                "name": public_key_reader_sa.metadata["name"],
+                                "namespace": _GITEA_NAMESPACE,
+                            }
+                        },
+                    }
+                }
+            },
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[public_key_reader_binding],
+            ),
+        )
+        user_public_key_secret = k8s.apiextensions.CustomResource(
+            f"{name}-ssh-user-public-key-secret",
+            api_version="external-secrets.io/v1",
+            kind="ExternalSecret",
+            metadata={
+                "name": _USER_PUBLIC_KEY_SECRET,
+                "namespace": _GITEA_NAMESPACE,
+                "annotations": {"pulumi.com/waitFor": "condition=Ready"},
+            },
+            spec={
+                "refreshPolicy": "CreatedOnce",
+                "secretStoreRef": {
+                    "kind": "SecretStore",
+                    "name": "gitea-ssh-public-key-store",
+                },
+                "target": {
+                    "name": _USER_PUBLIC_KEY_SECRET,
+                    "creationPolicy": "Owner",
+                    "template": {
+                        "engineVersion": "v2",
+                        "type": "Opaque",
+                        "data": {_USER_PUBLIC_KEY_SECRET_KEY: "{{ .publicKey }}"},
+                    },
+                },
+                "data": [
+                    {
+                        "secretKey": "publicKey",
+                        "remoteRef": {
+                            "key": _USER_KEY_SECRET,
+                            "property": _USER_PUBLIC_KEY_SECRET_KEY,
+                        },
+                    }
+                ],
+            },
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[public_key_store, user_key_secret],
+                custom_timeouts=pulumi.CustomTimeouts(create="5m", update="5m"),
             ),
         )
 
@@ -676,7 +725,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             wait_for_jobs=True,
             timeout=600,
             values=_chart_values(
-                _CREDENTIALS_SECRET, admin_email, host_key_secret_name
+                _CREDENTIALS_SECRET, admin_email, _HOST_KEY_SECRET
             ),
             opts=ResourceOptions(
                 parent=self,
@@ -750,28 +799,43 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             ),
         )
 
-        # Upload the admin user's SSH public key to Gitea so PKO can
-        # authenticate as the admin user over SSH (push + pull on every
-        # repo). The key is attached to the admin user account, matching the
-        # user the SSH URL above (``ssh://git@...``) effectively logs in as
-        # via Gitea's SSH gateway.
+        user_public_key_lookup = k8s.core.v1.Secret.get(
+            f"{name}-ssh-user-public-key-lookup",
+            id=f"{_GITEA_NAMESPACE}/{_USER_PUBLIC_KEY_SECRET}",
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[user_public_key_secret],
+            ),
+        )
+        user_public_key = user_public_key_lookup.data.apply(
+            lambda data: _decode_secret_data_key(data, _USER_PUBLIC_KEY_SECRET_KEY).strip()
+        )
+
+        # Upload the ESO-projected public key through the generated Gitea SDK.
+        # The projected Secret contains only public material, so reading it into
+        # Pulumi state does not route private key bytes through Pulumi.
         ssh_key = gitea_sdk.PublicKey(
             f"{name}-ssh-key",
             username=admin_username,
             title=_ADMIN_SSH_KEY_TITLE,
-            key=user_public_openssh,
+            key=user_public_key,
             read_only=False,
             opts=ResourceOptions(
                 parent=self,
                 provider=gitea_provider,
-                depends_on=[repo],
+                depends_on=[repo, user_key_secret],
             ),
         )
 
         sync = GiteaSync(
             f"{name}-sync",
-            ssh_private_key=user_private_pem,
-            ssh_known_hosts=ssh_known_hosts,
+            ssh_key_secret_namespace=_GITEA_NAMESPACE,
+            ssh_key_secret_name=_USER_KEY_SECRET,
+            ssh_private_key_secret_key=_USER_PRIVATE_KEY_SECRET_KEY,
+            ssh_host_key_secret_namespace=_GITEA_NAMESPACE,
+            ssh_host_key_secret_name=_HOST_KEY_SECRET,
+            ssh_host_public_key_secret_key=_HOST_PUBLIC_KEY_SECRET_KEY,
             owner=owner,
             repo_name=repo_name,
             default_branch=default_branch,
@@ -789,17 +853,33 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             ),
         )
 
+        flux_git_auth = FluxGitAuthSecret(
+            f"{name}-flux-git-auth",
+            provider=k8s_provider,
+            source_namespace=_GITEA_NAMESPACE,
+            user_secret_name=_USER_KEY_SECRET,
+            user_private_key_key=_USER_PRIVATE_KEY_SECRET_KEY,
+            host_secret_name=_HOST_KEY_SECRET,
+            host_public_key_key=_HOST_PUBLIC_KEY_SECRET_KEY,
+            target_namespace=PKO_NAMESPACE,
+            target_name=_FLUX_GIT_AUTH_SECRET,
+            known_hosts_hostname=_in_cluster_ssh_host(),
+            opts=ResourceOptions(
+                parent=self,
+                depends_on=[sync, pko_namespace_resource, host_key_secret, user_key_secret],
+            ),
+        )
+
         # Outputs. The required GitOpsRepository contract values are
         # ``url`` / ``url_external`` / ``default_branch`` /
-        # ``ssh_private_key_secret`` / ``ssh_known_hosts``. The credentials
-        # Secret stays an in-package detail (the Gitea chart needs it
-        # for first-boot admin bootstrap) and is no longer part of the
-        # contract.
+        # ``ssh_private_key_secret_name`` / ``ssh_private_key_secret_namespace``.
+        # Secret data stays in Kubernetes and is not surfaced through Pulumi
+        # outputs or component inputs.
         self.url = Output.from_input(_in_cluster_ssh_url(owner, repo_name))
         self.url_external = Output.concat(external_base, "/", owner, "/", repo_name, ".git")
         self.default_branch = Output.from_input(default_branch)
-        self.ssh_private_key_secret = user_key_secret
-        self.ssh_known_hosts = ssh_known_hosts
+        self.ssh_private_key_secret_name = Output.from_input(_USER_KEY_SECRET)
+        self.ssh_private_key_secret_namespace = Output.from_input(_GITEA_NAMESPACE)
 
         flux_source = FluxGitSource(
             f"{name}-flux-source",
@@ -808,8 +888,8 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             pko_namespace_resource=pko_namespace_resource,
             repo_url=self.url,
             repo_branch=self.default_branch,
-            ssh_private_key_secret=self.ssh_private_key_secret,
-            ssh_known_hosts=self.ssh_known_hosts,
+            git_auth_secret_name=_FLUX_GIT_AUTH_SECRET,
+            git_auth_secret_resource=flux_git_auth,
             opts=ResourceOptions(parent=self, depends_on=[sync]),
         )
         self.flux_source = flux_source
@@ -830,7 +910,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         self.repo_html_url = repo.html_url
         self.sync_head_sha = sync.head_sha
         self.ssh_key_id = ssh_key.public_key_id
-        self.gitea_host_key_secret_name = host_key_secret_name
+        self.gitea_host_key_secret_name = Output.from_input(_HOST_KEY_SECRET)
 
         # Surface a few helpful diagnostics in addition to the contract
         # outputs — these are not part of GitOpsRepository but exist so a
@@ -859,7 +939,8 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
                 "url": self.url,
                 "url_external": self.url_external,
                 "default_branch": self.default_branch,
-                "ssh_known_hosts": self.ssh_known_hosts,
+                "ssh_private_key_secret_name": self.ssh_private_key_secret_name,
+                "ssh_private_key_secret_namespace": self.ssh_private_key_secret_namespace,
                 "flux_source_name": self.flux_source_name,
                 "flux_receiver_token": self.flux_receiver_token,
                 "flux_receiver_url": self.flux_receiver_url,

@@ -167,7 +167,8 @@ def run() -> None:
     # TODO(multi-target): add cloud-hosted GitOps impls (GitHub,
     # GitLab). Each impl populates the same GitOpsRepository contract
     # defined in ``gitrepo/_base.py`` (``url``, ``url_external``,
-    # ``default_branch``, ``ssh_private_key_secret``, ``ssh_known_hosts``).
+    # ``default_branch``, ``ssh_private_key_secret_name`` /
+    # ``ssh_private_key_secret_namespace``).
     # Cloud impls won't need ``kubeconfig`` for the *source* of truth (the git
     # server lives off-cluster) but DO need credentials projected into the
     # management cluster so Flux source-controller can produce artifacts for PKO.
@@ -277,14 +278,13 @@ def run() -> None:
     pulumi.export("gitops_url", repo.url)
     pulumi.export("gitops_url_external", repo.url_external)
     pulumi.export("gitops_default_branch", repo.default_branch)
-    pulumi.export("gitops_ssh_known_hosts", repo.ssh_known_hosts)
     pulumi.export(
         "gitops_ssh_private_key_secret_name",
-        repo.ssh_private_key_secret.metadata["name"],
+        repo.ssh_private_key_secret_name,
     )
     pulumi.export(
         "gitops_ssh_private_key_secret_namespace",
-        repo.ssh_private_key_secret.metadata["namespace"],
+        repo.ssh_private_key_secret_namespace,
     )
 
     # Phase 3: PKO bootstrap handles + the one outer-owned init Stack CR name.

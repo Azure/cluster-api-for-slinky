@@ -26,13 +26,6 @@ pulumi-random>=4.0,<5.0
 # spec of the PKO GitRepository source.
 -e ./pulumi/sdks/flux
 
-# ed25519 keypair derivation for the in-cluster Gitea SSH host key
-# and the PKO admin SSH key (see pulumi/gitrepo/gitea_builtin.py).
-# Required at language-host time (during ``pulumi up``) and inside the
-# pulumi-language-python subprocess, NOT inside dynamic-resource
-# workers (which talk to Gitea over HTTP and never touch a key).
-cryptography>=42,<46
-
 # HTTP for Pulumi dynamic resources that wrap the Gitea REST API.
 # Imported lazily inside provider methods (gitrepo/gitea_repo.py,
 # gitrepo/gitea_sshkey.py, gitrepo/gitea_sync.py) so it must be in

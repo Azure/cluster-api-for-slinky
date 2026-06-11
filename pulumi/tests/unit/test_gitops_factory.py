@@ -22,22 +22,9 @@ so a fixture in tests/unit/conftest.py would activate it for this file.
 """
 
 import pytest
-from cryptography.hazmat.primitives.serialization import load_ssh_private_key
 
 from gitrepo import GitOpsRepository  # noqa: F401
-from gitrepo.gitea_builtin import GiteaBuiltinRepository, _derive_ed25519_keypair  # noqa: F401
-
-
-def test_ed25519_private_key_derivation_is_openssh_and_stable() -> None:
-    keypair = _derive_ed25519_keypair("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
-
-    assert keypair["private"].startswith("-----BEGIN OPENSSH PRIVATE KEY-----")
-    assert keypair["private"].endswith("-----END OPENSSH PRIVATE KEY-----\n")
-    assert keypair["public"].startswith("ssh-ed25519 ")
-    assert load_ssh_private_key(keypair["private"].encode("ascii"), password=None)
-    assert keypair == _derive_ed25519_keypair(
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-    )
+from gitrepo.gitea_builtin import GiteaBuiltinRepository  # noqa: F401
 
 
 @pytest.mark.skip(reason="TODO: instantiate GiteaBuiltinRepository(kubeconfig=DUMMY_KUBECONFIG); assert it creates exactly one Namespace named ``gitea``, one Secret named ``gitea-credentials`` with username/password keys, and one helm.sh/v3:Release with the pinned chart version")

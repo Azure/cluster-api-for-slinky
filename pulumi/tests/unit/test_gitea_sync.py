@@ -7,8 +7,12 @@ from gitrepo.gitea_sync import _GiteaSyncProvider
 
 def _props(**overrides: object) -> dict[str, object]:
     props: dict[str, object] = {
-        "ssh_private_key": "-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----\n",
-        "ssh_known_hosts": "gitea-ssh.gitea.svc.cluster.local ssh-ed25519 AAAAFake\n",
+        "ssh_key_secret_namespace": "gitea",
+        "ssh_key_secret_name": "gitea-ssh-user-key",
+        "ssh_private_key_secret_key": "privateKey",
+        "ssh_host_key_secret_namespace": "gitea",
+        "ssh_host_key_secret_name": "gitea-ssh-host-key",
+        "ssh_host_public_key_secret_key": "publicKey",
         "owner": "caps-admin",
         "repo_name": "cluster-api-provider-slinky",
         "default_branch": "main",
@@ -35,10 +39,3 @@ def test_diff_replaces_when_triggers_change() -> None:
 
     assert diff.changes is True
     assert diff.replaces == ["triggers"]
-
-
-def test_openssh_private_key_passthrough_for_native_openssh_key() -> None:
-    provider = _GiteaSyncProvider()
-    key = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n"
-
-    assert provider._openssh_private_key(key) == key

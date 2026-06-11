@@ -157,6 +157,12 @@ class AWXConfiguration(pulumi.ComponentResource):
             scm_branch=scm_branch,
             scm_clean=True,
             scm_update_on_launch=True,
+            # TODO: Re-enable once pulumi_awx/terraform-provider-awx reliably
+            # parses ProjectUpdate wait responses. With this set, AWX synced
+            # the project successfully but the provider failed the Pulumi
+            # create while parsing the sync response, leaving an orphaned
+            # Project outside Pulumi state.
+            # wait_for_sync=True,
             timeout=300,
             opts=ResourceOptions(
                 parent=self,
