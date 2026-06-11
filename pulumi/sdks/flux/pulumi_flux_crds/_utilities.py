@@ -104,16 +104,15 @@ _version = _get_semver_version()
 _version_str = str(_version)
 
 def get_resource_opts_defaults() -> pulumi.ResourceOptions:
-    return pulumi.ResourceOptions(
-        version=get_version(),
-        plugin_download_url=get_plugin_download_url(),
-    )
+    # crd2pulumi generated these classes as a package named ``flux-crds``, but
+    # the resource tokens are Kubernetes tokens, e.g.
+    # ``kubernetes:source.toolkit.fluxcd.io/v1:GitRepository``. Do not attach
+    # the shim package version/download URL here; doing so makes Pulumi try to
+    # install a nonexistent ``pulumi-resource-flux-crds`` provider plugin.
+    return pulumi.ResourceOptions()
 
 def get_invoke_opts_defaults() -> pulumi.InvokeOptions:
-    return pulumi.InvokeOptions(
-        version=get_version(),
-        plugin_download_url=get_plugin_download_url(),
-    )
+    return pulumi.InvokeOptions()
 
 def get_resource_args_opts(resource_args_type, resource_options_type, *args, **kwargs):
     """
