@@ -74,6 +74,9 @@ class _GiteaSyncProvider(ResourceProvider):
             yield temp_file.name
 
     def _openssh_private_key(self, private_key_pem: str) -> str:
+        if private_key_pem.lstrip().startswith("-----BEGIN OPENSSH PRIVATE KEY-----"):
+            return private_key_pem
+
         private_key = serialization.load_pem_private_key(
             private_key_pem.encode("ascii"),
             password=None,

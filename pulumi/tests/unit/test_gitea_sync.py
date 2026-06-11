@@ -35,3 +35,10 @@ def test_diff_replaces_when_triggers_change() -> None:
 
     assert diff.changes is True
     assert diff.replaces == ["triggers"]
+
+
+def test_openssh_private_key_passthrough_for_native_openssh_key() -> None:
+    provider = _GiteaSyncProvider()
+    key = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n"
+
+    assert provider._openssh_private_key(key) == key
