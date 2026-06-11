@@ -61,6 +61,7 @@ class ControlPlaneLocal(pulumi.ComponentResource):
     awx_project_id: pulumi.Output[float]
     awx_project_name: pulumi.Output[str]
     awx_scm_credential_id: pulumi.Output[float]
+    awx_management_kubernetes_credential_id: pulumi.Output[float]
     control_plane_ready: pulumi.Output[bool]
     todo: pulumi.Output[str]
 
@@ -123,9 +124,13 @@ class ControlPlaneLocal(pulumi.ComponentResource):
         self.awx_project_id = awx_configuration.project_id
         self.awx_project_name = awx_configuration.project_name
         self.awx_scm_credential_id = awx_configuration.scm_credential_id
+        self.awx_management_kubernetes_credential_id = (
+            awx_configuration.management_kubernetes_credential_id
+        )
         self.control_plane_ready = pulumi.Output.all(
             capi.provider_version,
             awx_configuration.project_id,
+            awx_configuration.management_kubernetes_credential_id,
         ).apply(lambda _: True)
         self.todo = pulumi.Output.from_input(
             "Wire AWX tenant inventories, credentials, and Slurm day-2 job templates."
@@ -148,6 +153,9 @@ class ControlPlaneLocal(pulumi.ComponentResource):
                 "awx_project_id": self.awx_project_id,
                 "awx_project_name": self.awx_project_name,
                 "awx_scm_credential_id": self.awx_scm_credential_id,
+                "awx_management_kubernetes_credential_id": (
+                    self.awx_management_kubernetes_credential_id
+                ),
                 "control_plane_ready": self.control_plane_ready,
                 "todo": self.todo,
             }

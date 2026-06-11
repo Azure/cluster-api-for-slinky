@@ -10,6 +10,7 @@ from stacks.control_plane.awx._configuration import (
     flux_source_secret_name,
     flux_source_url,
     project_name_from_scm_url,
+    management_kubernetes_credential_inputs,
     source_control_credential_inputs,
 )
 
@@ -76,4 +77,15 @@ def test_source_control_credential_inputs_are_stable_json() -> None:
     assert (
         source_control_credential_inputs(ssh_key_data="PRIVATE KEY")
         == '{"ssh_key_data": "PRIVATE KEY"}'
+    )
+
+
+def test_management_kubernetes_credential_inputs_are_stable_json() -> None:
+    assert management_kubernetes_credential_inputs(
+        host="https://kubernetes.default.svc",
+        bearer_token="TOKEN",
+        ssl_ca_cert="CA",
+    ) == (
+        '{"bearer_token": "TOKEN", "host": "https://kubernetes.default.svc", '
+        '"ssl_ca_cert": "CA", "verify_ssl": true}'
     )
