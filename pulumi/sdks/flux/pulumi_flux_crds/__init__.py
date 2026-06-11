@@ -5,8 +5,6 @@
 import builtins as _builtins
 from . import _utilities
 import typing
-# Export this package's modules as members:
-from .provider import *
 
 # Make subpackages available:
 if typing.TYPE_CHECKING:
@@ -18,29 +16,3 @@ else:
     meta = _utilities.lazy_import('pulumi_flux_crds.meta')
     source = _utilities.lazy_import('pulumi_flux_crds.source')
 
-_utilities.register(
-    resource_modules="""
-[
- {
-  "pkg": "flux_crds",
-  "mod": "source.toolkit.fluxcd.io/v1",
-  "fqn": "pulumi_flux_crds.source.v1",
-  "classes": {
-   "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository": "GitRepository",
-   "kubernetes:source.toolkit.fluxcd.io/v1:GitRepositoryList": "GitRepositoryList",
-   "kubernetes:source.toolkit.fluxcd.io/v1:GitRepositoryPatch": "GitRepositoryPatch"
-  }
- }
-]
-""",
-    resource_packages="""
-[
- {
-  "pkg": "flux_crds",
-  "token": "pulumi:providers:kubernetes",
-  "fqn": "pulumi_flux_crds",
-  "class": "Provider"
- }
-]
-"""
-)
