@@ -8,11 +8,11 @@ import typing
 
 # Make subpackages available:
 if typing.TYPE_CHECKING:
-    import pulumi_flux_crds.meta as __meta
+    import ca4s_flux_crds.meta as __meta
     meta = __meta
-    import pulumi_flux_crds.source as __source
+    import ca4s_flux_crds.source as __source
     source = __source
 else:
-    meta = _utilities.lazy_import('pulumi_flux_crds.meta')
-    source = _utilities.lazy_import('pulumi_flux_crds.source')
+    meta = _utilities.lazy_import('ca4s_flux_crds.meta')
+    source = _utilities.lazy_import('ca4s_flux_crds.source')
 

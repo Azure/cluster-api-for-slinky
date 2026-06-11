@@ -7,7 +7,7 @@ import json
 
 import pulumi
 import pulumi_awx as awx
-from pulumi_flux_crds.source.v1 import GitRepository
+from ca4s_flux_crds.source.v1 import GitRepository
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
