@@ -111,6 +111,7 @@ _DEFAULT_BRANCH = "main"
 # either, so these are the values to use in the in-cluster URL.
 _GITEA_HTTP_SERVICE = "gitea-http"
 _GITEA_HTTP_PORT = 3000
+_WAIT_FOR_LOAD_BALANCER_IP = "jsonpath={.status.loadBalancer.ingress[0].ip}"
 
 # SSH endpoint. The chart's default ``service.ssh`` is a *headless*
 # ClusterIP (``clusterIP: None``), which we explicitly override below
@@ -243,15 +244,12 @@ def _chart_values(
         "strategy": {
             "type": "Recreate",
         },
-        # HTTP exposed as ``LoadBalancer`` so cloud-provider-kind can
+        # HTTP and SSH are exposed as ``LoadBalancer`` so cloud-provider-kind can
         # publish it on a host-reachable address. We need that address
         # at two points in this stack:
         #   * pulumi_gitea.Repository, to call the Gitea REST admin API
         #     from the host;
-        #   * GiteaSync, to ``git push`` the local working tree.
-        # SSH stays ``ClusterIP`` — host-side sync reaches it through a
-        # short-lived kubectl port-forward, avoiding a LAN-visible SSH
-        # endpoint.
+        #   * GiteaSync, to ``git push`` the local working tree over SSH.
         #
         # ``clusterIP: ""`` is critical here: the chart defaults this to
         # ``None`` (i.e. a *headless* Service), which is incompatible
@@ -263,15 +261,16 @@ def _chart_values(
             "http": {
                 "type": "LoadBalancer",
                 "clusterIP": "",
+                "annotations": {
+                    "pulumi.com/waitFor": _WAIT_FOR_LOAD_BALANCER_IP,
+                },
             },
-            # SSH stays in-cluster (we never expose it to the host).
-            # Override the chart's headless default (``clusterIP: None``)
-            # with the empty string so k8s assigns a regular vIP — the
-            # Flux source-controller dials this Service by DNS, and a stable vIP is
-            # the friendlier failure mode for debugging.
             "ssh": {
-                "type": "ClusterIP",
+                "type": "LoadBalancer",
                 "clusterIP": "",
+                "annotations": {
+                    "pulumi.com/waitFor": _WAIT_FOR_LOAD_BALANCER_IP,
+                },
             },
         },
         # Mount the pre-generated host keypair Secret onto the Gitea
@@ -738,10 +737,10 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         # IP that cloud-provider-kind assigned to it. ``Service.get`` is
         # the canonical "import existing k8s resource into Pulumi state"
         # call; combined with ``depends_on=[gitea]`` it correctly defers
-        # the lookup until after the Helm release has finished, which in
-        # turn has already awaited the LB IP assignment (pulumi-kubernetes
-        # blocks on ``.status.loadBalancer.ingress`` populating for any
-        # type=LoadBalancer Service the chart creates).
+        # the lookup until after the Helm release has finished. The chart
+        # annotates both LoadBalancer Services with ``pulumi.com/waitFor``
+        # so the Helm release does not complete until the host-reachable IPs
+        # are assigned.
         gitea_http_svc = k8s.core.v1.Service.get(
             f"{name}-gitea-http-lookup",
             id=f"{_GITEA_NAMESPACE}/{_GITEA_HTTP_SERVICE}",
@@ -751,26 +750,28 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
                 depends_on=[gitea],
             ),
         )
+        gitea_ssh_svc = k8s.core.v1.Service.get(
+            f"{name}-gitea-ssh-lookup",
+            id=f"{_GITEA_NAMESPACE}/{_GITEA_SSH_SERVICE}",
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[gitea],
+            ),
+        )
 
-        # Resolve the LB ingress to a host-reachable ``http://IP:PORT``
-        # URL. cloud-provider-kind populates ``ip`` (not ``hostname``)
-        # so the conditional below is mostly defensive; the empty-string
-        # fallback turns a missing LB into a deterministic error from
-        # the dynamic resources downstream rather than a confusing
-        # ``NoneType`` AttributeError mid-apply.
+        # Resolve the LB ingress to host-reachable endpoints. The chart-level
+        # ``pulumi.com/waitFor`` annotations make missing ingress data a hard
+        # contract violation here rather than something to paper over.
         def _build_external_base(status: Any) -> str:
-            ingress = (
-                getattr(getattr(status, "load_balancer", None), "ingress", None)
-                if status is not None
-                else None
-            )
-            if not ingress:
-                return ""
-            entry = ingress[0]
-            host = getattr(entry, "ip", None) or getattr(entry, "hostname", None) or ""
-            return f"http://{host}:{_GITEA_HTTP_PORT}" if host else ""
+            return f"http://{_load_balancer_host(status)}:{_GITEA_HTTP_PORT}"
+
+        def _load_balancer_host(status: Any) -> str:
+            entry = status.load_balancer.ingress[0]
+            return entry.ip or entry.hostname
 
         external_base = gitea_http_svc.status.apply(_build_external_base)
+        external_ssh_host = gitea_ssh_svc.status.apply(_load_balancer_host)
 
         gitea_provider = gitea_sdk.Provider(
             f"{name}-provider",
@@ -828,22 +829,44 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             ),
         )
 
+        user_key_lookup = k8s.core.v1.Secret.get(
+            f"{name}-ssh-user-key-lookup",
+            id=f"{_GITEA_NAMESPACE}/{_USER_KEY_SECRET}",
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[user_key_secret],
+            ),
+        )
+        host_key_lookup = k8s.core.v1.Secret.get(
+            f"{name}-ssh-host-key-lookup",
+            id=f"{_GITEA_NAMESPACE}/{_HOST_KEY_SECRET}",
+            opts=ResourceOptions(
+                parent=self,
+                provider=k8s_provider,
+                depends_on=[host_key_secret],
+            ),
+        )
+        user_private_key = Output.secret(
+            user_key_lookup.data.apply(
+                lambda data: _decode_secret_data_key(data, _USER_PRIVATE_KEY_SECRET_KEY)
+            )
+        )
+        host_public_key = host_key_lookup.data.apply(
+            lambda data: _decode_secret_data_key(data, _HOST_PUBLIC_KEY_SECRET_KEY)
+        )
+
         sync = GiteaSync(
             f"{name}-sync",
-            ssh_key_secret_namespace=_GITEA_NAMESPACE,
-            ssh_key_secret_name=_USER_KEY_SECRET,
-            ssh_private_key_secret_key=_USER_PRIVATE_KEY_SECRET_KEY,
-            ssh_host_key_secret_namespace=_GITEA_NAMESPACE,
-            ssh_host_key_secret_name=_HOST_KEY_SECRET,
-            ssh_host_public_key_secret_key=_HOST_PUBLIC_KEY_SECRET_KEY,
+            ssh_private_key=user_private_key,
+            ssh_host_public_key=host_public_key,
+            ssh_host=external_ssh_host,
+            ssh_host_alias=_in_cluster_ssh_host(),
+            ssh_port=_GITEA_SSH_PORT,
             owner=owner,
             repo_name=repo_name,
             default_branch=default_branch,
             source_dir=source_dir,
-            kubeconfig=kubeconfig,
-            service_namespace=_GITEA_NAMESPACE,
-            service_name=_GITEA_SSH_SERVICE,
-            service_port=_GITEA_SSH_PORT,
             triggers=sync_triggers,
             opts=ResourceOptions(
                 parent=self,

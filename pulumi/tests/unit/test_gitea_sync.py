@@ -7,22 +7,17 @@ from gitrepo.gitea_sync import _GiteaSyncProvider
 
 def _props(**overrides: object) -> dict[str, object]:
     props: dict[str, object] = {
-        "ssh_key_secret_namespace": "gitea",
-        "ssh_key_secret_name": "gitea-ssh-user-key",
-        "ssh_private_key_secret_key": "privateKey",
-        "ssh_host_key_secret_namespace": "gitea",
-        "ssh_host_key_secret_name": "gitea-ssh-host-key",
-        "ssh_host_public_key_secret_key": "publicKey",
+        "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
+        "ssh_host_public_key": "ssh-ed25519 AAAAFake",
+        "ssh_host": "172.18.0.5",
+        "ssh_host_alias": "gitea-ssh.gitea.svc.cluster.local",
+        "ssh_port": 22,
         "owner": "caps-admin",
         "repo_name": "cluster-api-provider-slinky",
         "default_branch": "main",
         "source_dir": ".",
         "head_sha": "local-sha",
         "triggers": {},
-        "kubeconfig": "kubeconfig-bytes",
-        "service_namespace": "gitea",
-        "service_name": "gitea-ssh",
-        "service_port": 22.0,
     }
     props.update(overrides)
     return props
