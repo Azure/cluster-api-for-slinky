@@ -1,509 +1,390 @@
-# AWX Tenant Inventory and Job Template Plan
+# AWX Tenant Binding Integration Plan
 
 ## Goal
 
-Add per-tenant AWX inventory and job template plumbing using the Terraform AWX provider bridged into Pulumi. This phase deliberately does not try to solve all global AWX configuration. It assumes AWX is already installed by the control-plane stack and focuses on binding each workload cluster / tenant into AWX as an operable target.
+Wire workload-cluster inventory into AWX tenant inventories and job templates
+without mixing AWX concerns into workload-cluster class implementations.
 
-## Scope
+The integration should let the PKO-owned init stack create these AWX objects:
 
-Implement a per-tenant component that creates AWX objects for each workload cluster:
+- One tenant-level AWX inventory per logical tenant / Slurm deployment.
+- Workload-cluster groups and variables attached to that tenant inventory.
+- Job templates backed by the shared GitOps AWX project.
+- Credential associations that let AWX jobs talk to the management Kubernetes
+  API.
 
-- Inventory for the workload cluster.
-- Inventory source or generated inventory content for CAPI / Slurm nodes.
-- Credentials needed by tenant jobs.
-- Job templates bound to that inventory.
-- Outputs that expose AWX object names/IDs for later workflows.
-
-Out of scope for this phase:
-
-- Multi-tenant AWX RBAC/team model.
-- Self-service tenant access.
-- Schedules and workflow templates.
-- Custom execution environments.
-- Full AWX global bootstrap beyond whatever minimal provider/config objects are required to create per-tenant resources.
+The first implementation should be small and provider-backed. It should not use
+manual AWX API calls or hand-managed UI setup.
 
 ## Current State
 
-AWX is currently installed as management-plane infrastructure:
+The control-plane stack already owns tenant-agnostic AWX objects:
 
 - `AWXOperator` installs the AWX Operator chart.
-- `AWXInstance` creates the `AWX` custom resource.
-- `ControlPlaneLocal` wires those into the local control-plane graph.
+- `AWXInstance` creates the AWX custom resource.
+- `AWXProviderConfig` builds an in-cluster AWX provider from the operator-created
+  admin Secret.
+- `AWXConfiguration` creates:
+  - shared organization `ca4s`
+  - shared SCM credential `ca4s-gitops-scm`
+  - shared GitOps project derived from the Flux `GitRepository`
+  - management-cluster Kubernetes credential `ca4s-management-kubernetes`
 
-No AWX API resources are managed yet. The old manual README flow described creating SCM credentials, projects, inventories, inventory sources, machine credentials, and job templates through the AWX UI. This plan replaces that manual tenant-facing part with Pulumi-owned resources.
+The workload layer already owns workload-cluster realization:
 
-## Ownership Split
+- `TenantsLocal` parses local workload-cluster config and fans out workload
+  cluster instances.
+- `LocalWorkloadClusterClass` creates the local CAPI/CAPD workload cluster,
+  workload-cluster addons, Slurm, and readiness outputs.
 
-### Control Plane
+The missing layer is a binding layer that consumes both sides.
 
-The control-plane layer owns tenant-agnostic AWX readiness and shared inputs:
+## Design Rule
 
-- AWX operator and instance.
-- AWX API endpoint discovery.
-- AWX admin credential lookup.
-- Minimal AWX provider construction.
-- Shared organization, if required by the provider resource model.
-- Shared project, only if the provider can create reusable job templates that are later bound per tenant.
-
-### Tenant Binding
-
-The tenant binding layer owns per-workload-cluster AWX objects:
-
-- Inventory named for the workload cluster / tenant.
-- Inventory source or generated inventory script association.
-- Credentials scoped to the workload cluster.
-- Job templates bound to the inventory.
-- Tenant-specific variables and labels.
-
-## Proposed Components
-
-### `AWXProviderConfig`
-
-Location:
+Keep ownership split by concern:
 
 ```text
-pulumi/stacks/control_plane/awx/_provider.py
+ControlPlaneLocal
+  owns AWX instance, AWX provider, shared AWX org/project/credentials
+
+TenantsLocal
+  owns tenant/workload-cluster inventory as data, not AWX resources
+
+AWXTenants / AWXTenantBinding
+  owns AWX tenant inventories, groups, and job templates
 ```
 
-Responsibilities:
+Do not make workload-cluster classes import AWX provider modules. Workload
+classes should emit descriptors; AWX binding components should consume those
+descriptors.
 
-- Read the AWX admin password Secret created by the AWX Operator.
-- Build the AWX API URL for in-cluster access:
+## Proposed Code Structure
 
 ```text
-http://awx-service.awx.svc.cluster.local
+pulumi/stacks/control_plane/awx/
+  _configuration.py          # existing shared org/project/credentials
+  _context.py                # small AWXControlPlaneContext dataclass, or inline
+  _tenant_binding.py         # new AWXTenants, AWXTenantBinding,
+                             # AWXWorkloadClusterBinding
+
+pulumi/stacks/workload_cluster/
+  inventory.py               # new TenantInventory and WorkloadClusterInventory
+                             # dataclasses / renderer helpers
+  tenants_local.py           # expose tenant_inventories from workload outputs
+  workload_cluster_local_local.py
+                             # expose workload inventory descriptor outputs
+
+pulumi/pko/_init_stack_local.py
+  # compose ControlPlaneLocal + TenantsLocal + AWXTenants
 ```
 
-- Wait until AWX API readiness succeeds before constructing dependent AWX API resources.
-- Construct and expose the bridged AWX Pulumi provider.
+The AWX binding code lives under `control_plane/awx` because it creates AWX API
+resources. It depends only on neutral workload inventory descriptors, not on
+workload implementation classes.
 
-Readiness check options:
+## Data Contracts
 
-- Prefer a small dynamic resource or command-like component that polls `/api/v2/ping/` with basic auth.
-- Avoid using the external LoadBalancer URL for PKO-to-AWX traffic.
-- Keep all AWX provider traffic inside the management cluster.
+### AWX Control Plane Context
 
-Outputs:
-
-- `api_url`
-- `admin_user`
-- `admin_password`
-- `provider`
-
-### `AWXTenantBinding`
-
-Location:
-
-```text
-pulumi/stacks/workload_cluster/awx_tenant_binding.py
-```
-
-or, if we want AWX-specific code colocated under control-plane APIs:
-
-```text
-pulumi/stacks/control_plane/awx/_tenant_binding.py
-```
-
-Preferred initial location: `pulumi/stacks/workload_cluster/awx_tenant_binding.py`, because the component is instantiated from tenant/workload descriptors and should not make workload-cluster classes import control-plane AWX modules directly.
-
-Responsibilities:
-
-- Accept one logical tenant descriptor plus one or more workload-cluster descriptors.
-- Create the tenant-level AWX surface for the logical Slurm deployment.
-- Instantiate one `AWXWorkloadClusterBinding` child per workload cluster shard.
-- Expose tenant aggregate AWX IDs/names and child cluster binding outputs.
-
-For the single-cluster local case, `AWXTenantBinding` will have exactly one child `AWXWorkloadClusterBinding`. For a future >5k-node tenant, `AWXTenantBinding` is the durable object representing the tenant's Slurm environment, while each workload cluster is a capacity shard attached to it.
-
-Tenant-level ownership:
-
-- Shared organization reference or tenant organization, depending on the eventual RBAC model.
-- Shared project for playbooks and inventory scripts, usually pointing at the GitOps repository.
-- SCM credential for that project, if not owned globally by `AWXConfiguration`.
-- Tenant aggregate inventory, named for the logical Slurm tenant rather than one Kubernetes cluster.
-- Tenant inventory variables that describe the logical Slurm deployment and the list of workload-cluster shards.
-- Job templates that operate on the tenant as a whole, such as cluster-state collection, Slurm health checks, and future workflow entrypoints.
-- Optional aggregate / constructed inventory if a single inventory with multiple inventory sources becomes too coarse.
-
-Tenant-level resources should not own per-cluster kubeconfigs, per-cluster inventory source settings, or CAPI label selectors. Those belong to `AWXWorkloadClusterBinding`.
-
-Inputs:
+Expose a compact context from `AWXConfiguration` / `ControlPlaneLocal` so the
+binding layer does not pass unrelated scalar outputs everywhere.
 
 ```python
 @dataclass(frozen=True)
-class AWXTenantDescriptor:
-    tenant_name: str
-    slurm_name: str
-    slurm_namespace: str
-    slurm_release_name: str
-    project_name: str
-    inventory_name: str
-    workload_clusters: tuple[AWXWorkloadClusterDescriptor, ...]
+class AWXControlPlaneContext:
+    provider: awx.Provider
+    organization_id: pulumi.Output[float]
+    project_id: pulumi.Output[float]
+    project_name: pulumi.Output[str]
+    management_kubernetes_credential_id: pulumi.Output[float]
 ```
 
-Initial local values:
+`ControlPlaneLocal` can keep its current stack exports, but should also expose:
+
+```python
+self.awx_context = awx_configuration.context
+```
+
+### Workload Cluster Inventory
+
+Add a neutral descriptor for one workload cluster shard:
+
+```python
+@dataclass(frozen=True)
+class WorkloadClusterInventory:
+    tenant_name: str
+    instance: pulumi.Input[str]
+    cluster_class: pulumi.Input[str]
+    cluster_name: pulumi.Input[str]
+    management_namespace: pulumi.Input[str]
+    workload_kubeconfig_secret_name: pulumi.Input[str]
+    workload_kubeconfig_secret_key: pulumi.Input[str]
+    control_plane_name: pulumi.Input[str]
+    worker_machine_deployments: Sequence[pulumi.Input[str]]
+    ready: pulumi.Input[bool]
+```
+
+For the current local cluster, values are expected to look like:
 
 ```text
 tenant_name: local
-slurm_name: local
-slurm_namespace: slurm
-slurm_release_name: slurm
-project_name: cluster-api-provider-slinky
-inventory_name: local
-workload_clusters: (local-workload,)
+instance: local
+cluster_class: local
+cluster_name: local-workload
+management_namespace: default
+workload_kubeconfig_secret_name: local-workload-kubeconfig
+workload_kubeconfig_secret_key: value
+control_plane_name: local-control-plane
+worker_machine_deployments: [local-head, local-compute]
 ```
 
-Outputs:
+### Tenant Inventory
 
-- `inventory_id`
-- `inventory_name`
-- `project_id`
-- `tenant_job_template_ids`
-- `workload_cluster_bindings`
+Add a tenant aggregate descriptor:
 
-### `AWXWorkloadClusterBinding`
-
-Location:
-
-```text
-pulumi/stacks/workload_cluster/awx_tenant_binding.py
+```python
+@dataclass(frozen=True)
+class TenantInventory:
+    name: str
+    workload_clusters: Sequence[WorkloadClusterInventory]
 ```
 
-or, if the file grows too large:
-
-```text
-pulumi/stacks/workload_cluster/awx_workload_cluster_binding.py
-```
-
-Responsibilities:
-
-- Accept one workload-cluster descriptor and the tenant-level AWX inventory/project IDs.
-- Attach that workload cluster to the tenant inventory as one inventory source.
-- Create or reference credentials that are specific to that workload cluster.
-- Emit child outputs that the tenant binding can aggregate.
-
-Per-workload-cluster ownership:
-
-- Inventory source name and `source_vars` for one CAPI/workload-cluster shard.
-- Management-cluster CAPI selectors for that shard.
-- Workload kubeconfig Secret reference for that shard.
-- Kubernetes credential or credential input source for that shard, once the credential model is implemented.
-- Optional per-cluster diagnostic job template with `limit` scoped to that cluster's inventory group.
-- Cluster-specific inventory variables such as node label conventions, worker classes, capacity role, and Slurm participation role.
-
-The inventory script should emit both aggregate groups and shard-scoped groups. For example, for cluster `local-workload`:
+The current local config is flat, so `TenantsLocal` can initially synthesize one
+logical tenant named `local` that contains all configured workload clusters. A
+future config shape can make tenants explicit:
 
 ```json
 {
-  "all": {"children": ["slurm", "cluster_local_workload"]},
-  "slurm": {"children": ["controller", "compute"]},
-  "cluster_local_workload": {"children": ["controller_local_workload", "compute_local_workload"]},
-  "controller": {"children": ["controller_local_workload"]},
-  "compute": {"children": ["compute_local_workload"]}
+  "tenants": [
+    {
+      "name": "tenant-a",
+      "workloadClusters": [
+        {"name": "tenant-a-0", "class": "local"},
+        {"name": "tenant-a-1", "class": "local"}
+      ]
+    }
+  ]
 }
 ```
 
-This lets tenant-wide job templates target `compute` or `slurm`, while per-shard diagnostics can target `cluster_local_workload`.
+The AWX binding layer should not care whether the tenant descriptor came from
+the current flat config or a future explicit tenant config.
 
-Inputs:
+## AWX Binding Components
+
+### `AWXTenants`
+
+Aggregate component that creates one `AWXTenantBinding` per tenant.
 
 ```python
-@dataclass(frozen=True)
-class AWXWorkloadClusterDescriptor:
-    tenant_name: str
-    cluster_name: str
-    cluster_class: str
-    shard_name: str
-    kubeconfig_secret_namespace: str
-    kubeconfig_secret_name: str
-    kubeconfig_secret_key: str
-    slurm_namespace: str
-    slurm_release_name: str
-    slurm_role: str
-    node_type_label: str
-    controller_node_type: str
-    compute_node_type: str
-    worker_machine_deployments: tuple[str, ...]
+class AWXTenants(pulumi.ComponentResource):
+    bindings: list[AWXTenantBinding]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        awx_context: AWXControlPlaneContext,
+        tenants: Sequence[TenantInventory],
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None: ...
 ```
 
-Initial local values:
+Responsibilities:
+
+- Keep the init-stack composition tidy.
+- Fan out tenant bindings.
+- Export aggregate AWX IDs/names if useful.
+
+### `AWXTenantBinding`
+
+Creates tenant-level AWX resources.
+
+```python
+class AWXTenantBinding(pulumi.ComponentResource):
+    inventory_id: pulumi.Output[float]
+    inventory_name: pulumi.Output[str]
+    job_template_ids: list[pulumi.Output[float]]
+    workload_cluster_bindings: list[AWXWorkloadClusterBinding]
+```
+
+Initial resources:
+
+- `awx.Inventory` named `ca4s-<tenant>`.
+- Tenant variables describing the workload cluster shards.
+- A synthetic `localhost` host with `ansible_connection=local` so management
+  API jobs have an execution target before SSH/node inventory exists.
+- One or more job templates backed by the shared AWX project.
+- `JobTemplateAssociateCredential` to attach the management Kubernetes
+  credential to those templates.
+
+Initial inventory variables should be stable JSON:
+
+```json
+{
+  "tenant_name": "local",
+  "workload_clusters": [
+    {
+      "instance": "local",
+      "cluster_class": "local",
+      "cluster_name": "local-workload",
+      "management_namespace": "default",
+      "workload_kubeconfig_secret_name": "local-workload-kubeconfig",
+      "worker_machine_deployments": ["local-head", "local-compute"]
+    }
+  ]
+}
+```
+
+### `AWXWorkloadClusterBinding`
+
+Creates cluster-shard AWX structure inside the tenant inventory.
+
+```python
+class AWXWorkloadClusterBinding(pulumi.ComponentResource):
+    cluster_group_name: pulumi.Output[str]
+    controller_group_name: pulumi.Output[str]
+    compute_group_name: pulumi.Output[str]
+```
+
+Initial resources:
+
+- `awx.Group` for the workload cluster, e.g. `cluster_local_workload`.
+- `awx.Group` for controller nodes, e.g. `controller_local_workload`.
+- `awx.Group` for compute nodes, e.g. `compute_local_workload`.
+- Group variables containing CAPI cluster name, namespace, kubeconfig Secret
+  reference, worker MachineDeployment names, and label conventions.
+
+Use AWX groups before hosts because the first integration target is management
+API introspection. Real node hosts can be added later from a dynamic inventory
+source once the execution path is decided.
+
+## Project and Job Template Integration
+
+The global AWX project remains control-plane-owned in `AWXConfiguration`.
+Tenant bindings reference it by `project_id`.
+
+Initial job template:
+
+```python
+awx.JobTemplate(
+    f"{tenant.name}-cluster-state",
+    name=f"ca4s-{tenant.name}-cluster-state",
+    inventory=inventory.inventory_id,
+    project=awx_context.project_id,
+    playbook="projects/awx/playbooks/collect_cluster_state.yml",
+    job_type="run",
+    ask_variables_on_launch=True,
+    opts=pulumi.ResourceOptions(parent=self, provider=awx_context.provider),
+)
+```
+
+Then attach the management-cluster Kubernetes credential:
+
+```python
+awx.JobTemplateAssociateCredential(
+    f"{tenant.name}-cluster-state-management-k8s",
+    job_template_id=cluster_state_template.job_template_id,
+    credential_id=awx_context.management_kubernetes_credential_id,
+    opts=pulumi.ResourceOptions(parent=self, provider=awx_context.provider),
+)
+```
+
+The first playbook should run on `localhost` and query management-cluster
+Kubernetes APIs. This validates the AWX/Kubernetes credential path without
+requiring SSH to CAPD nodes.
+
+Suggested new playbook path:
 
 ```text
-tenant_name: local
-cluster_name: local-workload
-cluster_class: local
-shard_name: local
-kubeconfig_secret_namespace: default
-kubeconfig_secret_name: local-workload-kubeconfig
-kubeconfig_secret_key: value
-slurm_namespace: slurm
-slurm_release_name: slurm
-slurm_role: primary
-node_type_label: slinky.slurm.net/node-type
-controller_node_type: controller
-compute_node_type: compute
-worker_machine_deployments: (local-head, local-compute)
+projects/awx/playbooks/collect_cluster_state.yml
 ```
 
-Outputs:
+It should report, at minimum:
 
-- `inventory_source_id`
-- `inventory_source_name`
-- `kubernetes_credential_id` if managed by AWX
-- `cluster_group_name`
-- `controller_group_name`
-- `compute_group_name`
-- `diagnostic_job_template_id` if created
+- CAPI `Cluster` status for each workload cluster.
+- CAPI `Machine` status and addresses.
+- `Node` list if the current RBAC allows it.
 
-## AWX Resources to Create
+## Dynamic Inventory Source Path
 
-Exact resource names depend on the bridged Terraform provider schema, but conceptually:
+After the provider-managed inventory/group/job-template path works, add a
+project-backed inventory source for real host discovery:
 
-### Organization
-
-Use an existing/shared organization if global config already created it. For this phase, if the AWX provider requires an organization for inventories/templates and no global org exists, create a minimal shared one:
-
-```text
-ca4s
+```python
+awx.InventorySource(
+    f"{cluster.instance}-inventory-source",
+    inventory=tenant_inventory.inventory_id,
+    source="scm",
+    source_project=awx_context.project_id,
+    source_path="projects/awx/inventory/capi_slurm_inventory.py",
+    source_vars=workload_cluster_inventory_source_vars(cluster),
+    overwrite=True,
+    overwrite_vars=True,
+    update_on_launch=True,
+    opts=pulumi.ResourceOptions(parent=self, provider=awx_context.provider),
+)
 ```
 
-This is logically control-plane-owned, but may be temporarily created by the first tenant binding until `AWXConfiguration` exists.
-
-### Project
-
-Create or reference a project pointing at the GitOps repository.
-
-Options:
-
-1. Shared project, control-plane-owned:
-   - Name: `cluster-api-provider-slinky`
-   - SCM URL: in-cluster or AWX-reachable GitOps URL.
-
-2. Per-tenant project:
-   - Not needed initially unless tenant repos diverge.
-
-Recommendation: shared project.
-
-### Inventory
-
-Create one aggregate inventory per logical tenant / Slurm deployment:
-
-```text
-local
-```
-
-Inventory variables should include tenant context:
-
-```yaml
-tenant_name: local
-slurm_name: local
-slurm_namespace: slurm
-slurm_release_name: slurm-...
-node_type_label: slinky.slurm.net/node-type
-controller_node_type: controller
-compute_node_type: compute
-workload_clusters:
-  - shard_name: local
-    capi_cluster_name: local-workload
-    kubeconfig_secret_namespace: default
-    kubeconfig_secret_name: local-workload-kubeconfig
-```
-
-For a future tenant split across multiple workload clusters, the inventory remains tenant-level and the workload-cluster list grows. Tenant-wide job templates should bind to this aggregate inventory.
-
-### Inventory Source
-
-Initial approach:
-
-- Use a project-backed inventory source pointing at a dynamic inventory script committed in the repo.
-- Replace the old `projects/test/roles/sync/files/run.py` assumptions.
-- Create one inventory source per workload cluster shard, all attached to the tenant aggregate inventory.
-
-New script should discover current CAPI topology by labels and ownership, not MachinePool:
-
-- Head/controller group: Machines or Nodes with `slinky.slurm.net/node-type=controller`.
-- Compute group: Machines or Nodes with `slinky.slurm.net/node-type=compute`.
-- Filter by `cluster.x-k8s.io/cluster-name=<cluster_name>`.
-
-Inventory source configuration:
-
-```text
-source: scm
-source_project: cluster-api-provider-slinky
-source_path: projects/awx/inventory/capi_slurm_inventory.py
-source_vars: shard_name, cluster_name, node labels, Slurm role
-update_on_launch: true
-overwrite: true
-overwrite_vars: true
-```
-
-If AWX inventory-source merging becomes too limiting at large scale, switch the aggregate layer to a constructed inventory: each `AWXWorkloadClusterBinding` creates a per-cluster inventory, and `AWXTenantBinding` creates the constructed inventory and tenant job templates against that aggregate. The component boundary stays the same.
-
-### Credentials
-
-#### SCM Credential
-
-Credential for AWX to clone the GitOps repo.
-
-Initial local option:
-
-- Use Gitea username/password from the `gitea-credentials` Secret.
-- This is easy because Gitea is local and already has an admin credential.
-
-Better future option:
-
-- Use a deploy key / SSH private key Secret, matching the Flux/GitOps credential model.
-
-#### Kubernetes Credential
-
-Credential for inventory and job templates to query management-cluster CAPI objects.
-
-Initial option:
-
-- Use the PKO / management-cluster service account token model only if AWX can safely consume a scoped token.
-- Create a dedicated `awx-runner` ServiceAccount with read-only CAPI permissions plus any needed pod/log permissions.
-- Store the kubeconfig/token/CA as an AWX Kubernetes credential.
-
-Permissions should start read-only:
-
-- `clusters.cluster.x-k8s.io`
-- `machines.cluster.x-k8s.io`
-- `machinedeployments.cluster.x-k8s.io`
-- `machinesets.cluster.x-k8s.io`
-- `dockerclusters.infrastructure.cluster.x-k8s.io`
-- `nodes` in the workload cluster only if the inventory script queries workload nodes directly.
-
-#### Machine Credential
-
-Only needed for SSH-based jobs.
-
-Initial local options:
-
-- Reuse a configured private key if available through Pulumi config.
-- Or skip SSH templates until we have a managed key story.
-
-Recommendation for first implementation:
-
-- Create Kubernetes and SCM credentials first.
-- Add machine credential only if we implement a job template that actually SSHes into CAPD nodes.
-
-## Job Templates
-
-Create job templates bound to the per-tenant inventory.
-
-### `sync-inventory`
-
-Purpose:
-
-- Force inventory source update from CAPI/Slurm state.
-
-If the AWX provider has an inventory source update resource, prefer that. Otherwise, create the inventory source with `update_on_launch=true` and let downstream job templates refresh it.
-
-### `slurm-smoke`
-
-Purpose:
-
-- Verify tenant Slurm responds and compute nodes are visible.
-
-Possible playbook:
-
-```text
-projects/awx/playbooks/slurm_smoke.yml
-```
-
-Checks:
-
-- `sinfo`
-- `squeue`
-- optional `srun hostname`
-
-This requires either:
-
-- SSH credential to login node / compute nodes, or
-- Kubernetes credential to exec into the login pod.
-
-Recommendation: prefer Kubernetes exec into the login pod first; it avoids managing SSH keys in AWX.
-
-### `collect-cluster-state`
-
-Purpose:
-
-- Gather CAPI Machine status, Kubernetes node status, Slurm NodeSet status.
-
-This can use the Kubernetes credential and does not require SSH.
-
-## Inventory Script Refactor
-
-Create a new inventory script instead of evolving the old test script in place:
+Suggested inventory script path:
 
 ```text
 projects/awx/inventory/capi_slurm_inventory.py
 ```
 
-Requirements:
+The inventory script should discover nodes from Kubernetes/CAPI, not from
+Pulumi state. Inputs should come from inventory source variables:
 
-- No `/runner/.kube/config` mount assumption.
-- Read kubeconfig/token from AWX credential-provided environment or file path.
-- Accept cluster name and label selectors from inventory variables or environment.
-- Support current topology with `MachineDeployment`, not `MachinePool`.
-- Group hosts by node type:
+- CAPI cluster name.
+- Management namespace.
+- Node type label, currently `slinky.slurm.net/node-type`.
+- Controller node type, currently `controller`.
+- Compute node type, currently `compute`.
+
+Expected group shape:
 
 ```json
 {
-  "all": {"children": ["controller", "compute"]},
-  "controller": {"hosts": [...]},
-  "compute": {"hosts": [...]},
-  "_meta": {"hostvars": {...}}
+  "all": {"children": ["slurm", "cluster_local_workload"]},
+  "slurm": {"children": ["controller", "compute"]},
+  "cluster_local_workload": {
+    "children": ["controller_local_workload", "compute_local_workload"]
+  },
+  "controller": {"children": ["controller_local_workload"]},
+  "compute": {"children": ["compute_local_workload"]},
+  "_meta": {"hostvars": {}}
 }
 ```
 
-For local CAPD, hostvars can use CAPI Machine addresses:
+This lets tenant-wide templates target `compute` or `slurm`, while shard-level
+diagnostics can target `cluster_<name>`.
 
-- Prefer `ExternalIP` if present.
-- Fallback to `InternalIP`.
-- Hostname from `status.addresses[type=Hostname]`.
+## Init Stack Wiring
 
-## Wiring in Pulumi
+`InitStackLocal` becomes the composition point:
 
-### Step 1: Bridge AWX provider
+```python
+control_plane = ControlPlaneLocal(...)
+tenants = TenantsLocal(
+    "tenants-local",
+    opts=pulumi.ResourceOptions(parent=self, depends_on=[control_plane]),
+)
+awx_tenants = AWXTenants(
+    "awx-tenants",
+    awx_context=control_plane.awx_context,
+    tenants=tenants.tenant_inventories,
+    opts=pulumi.ResourceOptions(parent=self, depends_on=[control_plane, tenants]),
+)
+```
 
-- Add provider SDK under `pulumi/sdks/awx`.
-- Add it to `pulumi/stacks/init/requirements.txt`.
-- Verify import works inside PKO workspace.
+Stack outputs can include:
 
-### Step 2: Add AWX API readiness/provider component
+```python
+pulumi.export("awx_tenant_bindings", awx_tenants.bindings_output)
+```
 
-- Add `AWXProviderConfig` or `AWXAPI` component under `control_plane/awx`.
-- Export provider and readiness output.
-- Wire it in `ControlPlaneLocal` after `AWXInstance`.
-
-### Step 3: Add workload-cluster descriptor output
-
-In `LocalWorkloadClusterClass`, output an `AWXWorkloadClusterDescriptor` with:
-
-- tenant/workload/shard identity
-- CAPI cluster name
-- kubeconfig Secret ref
-- Slurm namespace/release once known
-- node label conventions
-- worker MachineDeployment names
-
-### Step 4: Add tenant binding component
-
-Instantiate `AWXTenantBinding` once per tenant after:
-
-- AWX provider config is ready.
-- The tenant's workload cluster descriptors exist.
-- Slurm release exists, if job templates reference Slurm objects.
-
-`AWXTenantBinding` then instantiates one `AWXWorkloadClusterBinding` per descriptor. The local default is one tenant with one workload cluster; the future >5k-node shape is one tenant with multiple workload cluster descriptors.
-
-This may require threading a control-plane AWX provider output into `TenantsLocal`, or introducing a coordinator component in `InitStackLocal` that receives both:
-
-- `ControlPlaneLocal.awx_api`
-- `TenantsLocal.workload_cluster_descriptors`
-
-Recommendation: avoid making workload cluster classes import control-plane AWX modules directly. Use descriptors and a separate binding component to keep the boundary explicit.
+Keep `TenantsLocal.workload_clusters` as the existing operational output, and
+add `TenantsLocal.tenant_inventories` as the AWX-oriented data contract.
 
 ## Dependency Graph
 
@@ -511,65 +392,85 @@ Recommendation: avoid making workload cluster classes import control-plane AWX m
 AWXOperator
   -> AWXInstance
     -> AWXProviderConfig
+      -> AWXConfiguration
+        -> organization
+        -> SCM credential
+        -> shared project
+        -> management Kubernetes credential
+        -> AWXControlPlaneContext
 
-LocalWorkloadClusterClass
-  -> CAPI Cluster / MachineDeployments
-  -> Slurm release
-  -> AWXWorkloadClusterDescriptor output
+TenantsLocal
+  -> LocalWorkloadClusterClass[*]
+    -> CAPI cluster / MachineDeployments
+    -> workload kubeconfig Secret
+    -> Slurm release
+    -> WorkloadClusterInventory
+  -> TenantInventory[*]
 
-AWXProviderConfig + AWXTenantDescriptor(workload cluster descriptors)
-  -> AWXTenantBinding
-    -> Inventory
-    -> Project / shared credentials if not global
-    -> Tenant job templates
-    -> AWXWorkloadClusterBinding[*]
-      -> Inventory Source
-      -> Per-cluster credentials
-      -> Per-cluster diagnostic job templates if needed
+AWXControlPlaneContext + TenantInventory[*]
+  -> AWXTenants
+    -> AWXTenantBinding[*]
+      -> awx.Inventory
+      -> localhost awx.Host
+      -> AWXWorkloadClusterBinding[*]
+        -> awx.Group cluster/controller/compute groups
+      -> awx.JobTemplate cluster-state
+      -> awx.JobTemplateAssociateCredential management Kubernetes credential
 ```
 
-## Testing Plan
+## First Implementation Slice
 
-### Unit Tests
+Keep the first PR deliberately narrow:
 
-- Descriptor generation for `LocalWorkloadClusterClass`.
-- Inventory naming and variable rendering.
-- AWX tenant binding resource-name helpers.
-- Inventory script parsing/grouping against fixture CAPI Machine lists.
+1. Add descriptor dataclasses and rendering helpers.
+2. Add `AWXControlPlaneContext` output from `AWXConfiguration` /
+   `ControlPlaneLocal`.
+3. Expose `tenant_inventories` from `TenantsLocal`.
+4. Add `AWXTenants`, `AWXTenantBinding`, and `AWXWorkloadClusterBinding`.
+5. Create one inventory, one localhost host, workload-cluster groups, and one
+   management-cluster state job template for the local tenant.
+6. Attach the existing `ca4s-management-kubernetes` credential to that job
+   template.
 
-### Render/Static Checks
+Do not add SSH machine credentials, schedules, workflow templates, or AWX RBAC in
+this slice.
 
-- `py_compile` changed modules.
-- Unit tests under `pulumi/tests/unit`.
-- Validate inventory script executable output is JSON and AWX-compatible.
+## Follow-On Slices
 
-### Runtime Validation
+1. Add the project-backed dynamic inventory script and `awx.InventorySource`.
+2. Add a Slurm smoke job that uses Kubernetes exec into a login/controller pod.
+3. Add SSH/node-host execution once there is a clean key-management story.
+4. Add explicit tenant config with multiple workload-cluster shards.
+5. Add AWX team/RBAC ownership boundaries.
 
-On local fresh stack:
+## Tests
 
-1. AWX web pod is Ready.
-2. AWX provider readiness succeeds against in-cluster service URL.
-3. AWX organization/project/inventory/job templates exist.
-4. Inventory source sync succeeds.
-5. Inventory contains controller and compute groups for `local-workload`.
-6. Smoke job template launch succeeds.
-7. No manual UI configuration is required.
+Unit tests should cover:
+
+- Tenant/workload descriptor generation from the current local flat config.
+- Stable inventory/group/job-template names.
+- Stable JSON rendering for tenant inventory variables and group variables.
+- AWX binding components creating the expected Pulumi resource graph under
+  mocks.
+- Dynamic inventory script JSON output once that script exists.
+
+Runtime validation should cover:
+
+1. PKO stack reaches `Ready=True`.
+2. AWX tenant inventory exists.
+3. Workload-cluster AWX groups exist.
+4. Cluster-state job template exists and has the management Kubernetes
+   credential associated.
+5. Launching the job can call the management Kubernetes API and list the local
+   workload cluster without printing credential material.
 
 ## Open Questions
 
-- Which Terraform AWX provider should we bridge and pin?
-- Does the provider support inventory source sync / job launch resources, or only static object management?
-- Do we want Kubernetes-exec-based jobs first, or SSH-to-node jobs first?
-- Should AWX tenant bindings live in the workload package or in a control-plane AWX package with tenant descriptors as input?
-- What is the minimum RBAC for the AWX Kubernetes credential?
-
-## Recommended First PR Shape
-
-Keep the first implementation small:
-
-1. Bridge AWX provider.
-2. Add AWX provider readiness/config component.
-3. Add one `AWXTenantBinding` for the local workload cluster.
-4. Create one AWX inventory and one project-backed inventory source.
-5. Create one read-only cluster-state job template.
-6. Leave SSH/machine credentials and Slurm smoke execution for the next pass.
+- Should tenant naming initially be fixed to `local`, or should the current flat
+  config get an optional `tenantName` field before AWX binding lands?
+- Should the first cluster-state playbook use `kubernetes.core.k8s_info`, a small
+  Python helper, or direct `kubectl` from the execution environment?
+- Do we need a custom AWX execution environment with Kubernetes Python modules,
+  or can the first job use tooling already present in the default AWX runner?
+- Should inventory groups be Pulumi-managed permanently, or only a bootstrap
+  until SCM inventory source owns all groups/hosts?
