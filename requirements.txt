@@ -22,6 +22,10 @@ pulumi-random>=4.0,<5.0
 # AWX API objects after the AWX Operator has created the instance.
 -e ./pulumi/sdks/awx
 
+# Generated Flux CRD shim used by the control-plane stack to read the typed
+# spec of the PKO GitRepository source.
+-e ./pulumi/sdks/flux
+
 # ed25519 keypair derivation for the in-cluster Gitea SSH host key
 # and the PKO admin SSH key (see pulumi/gitrepo/gitea_builtin.py).
 # Required at language-host time (during ``pulumi up``) and inside the

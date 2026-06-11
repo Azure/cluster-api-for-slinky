@@ -7,14 +7,13 @@ import json
 
 import pulumi
 import pulumi_awx as awx
+from pulumi_flux_crds.source.v1 import GitRepository
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
 from ._provider import AWXProviderConfig, decode_secret_data_value
 
 
-FLUX_SOURCE_API_VERSION = "source.toolkit.fluxcd.io/v1"
-FLUX_SOURCE_KIND = "GitRepository"
 FLUX_GIT_IDENTITY_KEY = "identity"
 AWX_ORGANIZATION_NAME = "ca4s"
 AWX_SCM_CREDENTIAL_NAME = "ca4s-gitops-scm"
@@ -33,17 +32,20 @@ def _required_string(value: object, path: str) -> str:
     return value
 
 
-def flux_source_url(spec: Mapping[str, object]) -> str:
-    return _required_string(spec.get("url"), "spec.url")
+def flux_source_url(spec: object) -> str:
+    return _required_string(_required_mapping(spec, "spec").get("url"), "spec.url")
 
 
-def flux_source_branch(spec: Mapping[str, object]) -> str:
-    ref = _required_mapping(spec.get("ref"), "spec.ref")
+def flux_source_branch(spec: object) -> str:
+    ref = _required_mapping(_required_mapping(spec, "spec").get("ref"), "spec.ref")
     return _required_string(ref.get("branch"), "spec.ref.branch")
 
 
-def flux_source_secret_name(spec: Mapping[str, object]) -> str:
-    secret_ref = _required_mapping(spec.get("secretRef"), "spec.secretRef")
+def flux_source_secret_name(spec: object) -> str:
+    secret_ref = _required_mapping(
+        _required_mapping(spec, "spec").get("secret_ref"),
+        "spec.secretRef",
+    )
     return _required_string(secret_ref.get("name"), "spec.secretRef.name")
 
 
@@ -87,12 +89,9 @@ class AWXConfiguration(pulumi.ComponentResource):
         )
 
         awx_provider = provider_config.provider
-
-        flux_source = k8s.apiextensions.CustomResource.get(
+        flux_source = GitRepository.get(
             f"{name}-flux-source",
             id=Output.concat(flux_source_namespace, "/", flux_source_name),
-            api_version=FLUX_SOURCE_API_VERSION,
-            kind=FLUX_SOURCE_KIND,
             opts=ResourceOptions(parent=self, provider=k8s_provider),
         )
         scm_url = flux_source.spec.apply(flux_source_url)

@@ -2,6 +2,7 @@
   "extraPaths": [
     "pulumi/sdks/local",
     "pulumi/sdks/gitea",
-    "pulumi/sdks/awx"
+    "pulumi/sdks/awx",
+    "pulumi/sdks/flux"
   ]
 }

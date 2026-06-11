@@ -35,17 +35,28 @@ def test_decode_secret_data_value_rejects_missing_key(
         decode_secret_data_value(data, "password")
 
 
+@pytest.mark.parametrize(
+    ("scm_url", "project_name"),
+    [
+        ("ssh://git@gitea-ssh.gitea.svc.cluster.local:22/caps/repo.git", "repo"),
+        ("https://example.invalid/org/project", "project"),
+        ("", "gitops"),
+    ],
+)
+def test_project_name_from_scm_url(scm_url: str, project_name: str) -> None:
+    assert project_name_from_scm_url(scm_url) == project_name
+
+
 def test_flux_source_helpers_extract_project_inputs() -> None:
     spec = {
         "url": "ssh://git@gitea-ssh.gitea.svc.cluster.local:22/caps/repo.git",
         "ref": {"branch": "main"},
-        "secretRef": {"name": "gitops-source-ssh"},
+        "secret_ref": {"name": "gitops-source-ssh"},
     }
 
     assert flux_source_url(spec) == spec["url"]
     assert flux_source_branch(spec) == "main"
     assert flux_source_secret_name(spec) == "gitops-source-ssh"
-    assert project_name_from_scm_url(spec["url"]) == "repo"
 
 
 @pytest.mark.parametrize(
@@ -53,7 +64,7 @@ def test_flux_source_helpers_extract_project_inputs() -> None:
     [
         (flux_source_url, {}),
         (flux_source_branch, {"ref": {}}),
-        (flux_source_secret_name, {"secretRef": {}}),
+        (flux_source_secret_name, {"secret_ref": {}}),
     ],
 )
 def test_flux_source_helpers_reject_invalid_shape(helper: object, spec: object) -> None:
