@@ -157,7 +157,6 @@ class AWXConfiguration(pulumi.ComponentResource):
             scm_branch=scm_branch,
             scm_clean=True,
             scm_update_on_launch=True,
-            wait_for_sync=True,
             timeout=300,
             opts=ResourceOptions(
                 parent=self,
