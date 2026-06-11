@@ -1,17 +1,15 @@
-"""Pulumi dynamic resource that syncs a local Git commit into Gitea.
+"""Pulumi dynamic resource that pushes a local Git commit to an SSH remote.
 
-After the Gitea repository resource lands an empty repo inside
-Gitea, this resource makes sure the repo's default branch points at the
-current ``HEAD`` of a local Git working tree. It always attempts a normal
-non-force push during replacement; if the remote already matches, Git exits
-successfully with no change, and if the branch diverged, Git rejects the push.
+``GitSync`` hydrates a Git remote from the local working tree that Pulumi is
+running from. It is intentionally small and imperative: the repo already exists,
+the auth material is supplied by the caller, and this resource only performs a
+non-force ``git push HEAD:refs/heads/<branch>`` when its replacement inputs
+change.
 
-The resource id is ``<owner>/<repo>@<head_sha>``. Pulumi diffs that against
-the previous-run id; if ``head_sha`` changed, it schedules a replacement and
-the replacement syncs the new commit. The optional ``triggers`` input is an
-operator-controlled replacement knob for forcing a reconciliation without
-changing the local commit. Remote branch checks are deliberately avoided so
-``pulumi preview`` stays local and does not depend on live Gitea availability.
+The canonical remote is the same SSH URL used by Flux ``GitRepository``. For a
+local in-cluster Git service, the actual push can use a different host-reachable
+SSH endpoint while preserving the canonical host as ``HostKeyAlias`` for strict
+host-key verification.
 """
 
 from __future__ import annotations
@@ -22,7 +20,8 @@ import subprocess
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Optional
+from typing import Optional
+from urllib.parse import quote, urlsplit
 
 import pulumi
 from pulumi.dynamic import (
@@ -45,17 +44,25 @@ def _git_head_sha(source_dir: str) -> str:
     ).stdout.strip()
 
 
-class _GiteaSyncProvider(ResourceProvider):
-    """Synchronizes a local Git tree to a Gitea repo's default branch."""
+def _split_ssh_url(repo_url: str):
+    parsed = urlsplit(repo_url)
+    if parsed.scheme != "ssh":
+        raise ValueError(f"GitSync currently supports only ssh:// URLs, got {repo_url!r}")
+    if not parsed.hostname:
+        raise ValueError(f"GitSync SSH URL must include a hostname, got {repo_url!r}")
+    if parsed.password:
+        raise ValueError("GitSync SSH URLs with passwords are not supported")
+    if not parsed.path or parsed.path == "/":
+        raise ValueError(f"GitSync SSH URL must include a repository path, got {repo_url!r}")
+    return parsed
+
+
+class _GitSyncProvider(ResourceProvider):
+    """Synchronizes a local Git tree to an SSH remote branch."""
 
     def _redact(self, text: str, props: dict) -> str:
-        for secret_key in ("ssh_private_key",):
-            secret = props.get(secret_key)
-            if not secret:
-                continue
-            raw = str(secret)
-            text = text.replace(raw, "<redacted>")
-        return text
+        secret = props.get("ssh_private_key")
+        return text.replace(str(secret), "<redacted>") if secret else text
 
     @contextmanager
     def _temp_file(self, content: str, mode: int) -> Iterator[str]:
@@ -70,27 +77,28 @@ class _GiteaSyncProvider(ResourceProvider):
             yield temp_file.name
 
     def _build_git_url(self, props: dict) -> str:
-        """Construct the host-reachable SSH clone URL."""
-        owner = props["owner"]
-        repo = props["repo_name"]
-        return f"ssh://git@{props['ssh_host']}:{int(props['ssh_port'])}/{owner}/{repo}.git"
+        parsed = _split_ssh_url(str(props["repo_url"]))
+        userinfo = f"{quote(parsed.username)}@" if parsed.username else ""
+        return f"ssh://{userinfo}{props['ssh_host']}:{int(props['ssh_port'])}{parsed.path}"
 
     def _git_env(self) -> dict[str, str]:
         return {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
 
-    def _ssh_material(self, props: dict) -> tuple[str, str]:
-        private_key = str(props["ssh_private_key"])
+    def _known_hosts(self, props: dict) -> str:
+        parsed = _split_ssh_url(str(props["repo_url"]))
         host_public_key = str(props["ssh_host_public_key"]).strip()
-        known_hosts = f"{props['ssh_host_alias']} {host_public_key}\n"
-        return private_key, known_hosts
+        return f"{parsed.hostname} {host_public_key}\n"
 
     def _push(self, props: dict) -> None:
-        private_key, known_hosts = self._ssh_material(props)
+        private_key = str(props["ssh_private_key"])
         with (
             self._temp_file(private_key, 0o600) as key_path,
-            self._temp_file(known_hosts, 0o644) as known_hosts_path,
+            self._temp_file(self._known_hosts(props), 0o644) as known_hosts_path,
         ):
-            git_url = self._build_git_url(props)
+            parsed = _split_ssh_url(str(props["repo_url"]))
+            host_alias = parsed.hostname
+            if host_alias is None:
+                raise ValueError(f"GitSync SSH URL must include a hostname, got {props['repo_url']!r}")
             ssh_command = " ".join(
                 [
                     "ssh",
@@ -105,15 +113,15 @@ class _GiteaSyncProvider(ResourceProvider):
                     "-o",
                     f"UserKnownHostsFile={shlex.quote(known_hosts_path)}",
                     "-o",
-                    f"HostKeyAlias={shlex.quote(str(props['ssh_host_alias']))}",
+                    f"HostKeyAlias={shlex.quote(host_alias)}",
                 ]
             )
             subprocess.run(
                 [
                     "git",
                     "push",
-                    git_url,
-                    f"HEAD:refs/heads/{props['default_branch']}",
+                    self._build_git_url(props),
+                    f"HEAD:refs/heads/{props['repo_branch']}",
                 ],
                 cwd=props["source_dir"],
                 check=True,
@@ -128,30 +136,22 @@ class _GiteaSyncProvider(ResourceProvider):
             self._push(props)
         except subprocess.CalledProcessError as exc:
             raise RuntimeError(
-                "git push to sync Gitea repo "
-                f"{props['owner']}/{props['repo_name']} failed without --force. "
-                "The remote branch may have diverged: "
+                "git push failed without --force. The remote branch may have diverged: "
                 f"{self._redact((exc.stderr or '').strip(), props)[:500]}"
             ) from exc
 
         return CreateResult(
-            id_=f"{props['owner']}/{props['repo_name']}@{head}",
-            outs={
-                **props,
-                "head_sha": head,
-                "pushed": True,
-            },
+            id_=f"{props['repo_url']}@{head}",
+            outs={**props, "head_sha": head, "pushed": True},
         )
 
     def diff(self, _id: str, old: dict, new: dict) -> DiffResult:
         replaces = []
         for key in (
-            "owner",
-            "repo_name",
-            "default_branch",
+            "repo_url",
+            "repo_branch",
             "source_dir",
             "ssh_host",
-            "ssh_host_alias",
             "ssh_port",
             "ssh_private_key",
             "ssh_host_public_key",
@@ -172,46 +172,41 @@ class _GiteaSyncProvider(ResourceProvider):
         return
 
 
-class GiteaSync(Resource):
-    """Keeps ``<owner>/<repo>:<branch>`` aligned with local ``HEAD``."""
+class GitSync(Resource):
+    """Keeps an SSH Git remote branch aligned with local ``HEAD``."""
 
     head_sha: pulumi.Output[str]
     pushed: pulumi.Output[bool]
-    owner: pulumi.Output[str]
-    repo_name: pulumi.Output[str]
-    default_branch: pulumi.Output[str]
+    repo_url: pulumi.Output[str]
+    repo_branch: pulumi.Output[str]
     source_dir: pulumi.Output[str]
-    triggers: pulumi.Output[dict[str, Any]]
+    triggers: pulumi.Output[dict[str, object]]
 
     def __init__(
         self,
         name: str,
         *,
+        repo_url: pulumi.Input[str],
+        repo_branch: pulumi.Input[str],
         ssh_private_key: pulumi.Input[str],
         ssh_host_public_key: pulumi.Input[str],
         ssh_host: pulumi.Input[str],
-        ssh_host_alias: pulumi.Input[str],
         ssh_port: pulumi.Input[int],
-        owner: pulumi.Input[str],
-        repo_name: pulumi.Input[str],
-        default_branch: pulumi.Input[str],
         source_dir: str,
-        triggers: Optional[pulumi.Input[dict[str, Any]]] = None,
+        triggers: Optional[pulumi.Input[dict[str, object]]] = None,
         opts: Optional[pulumi.ResourceOptions] = None,
     ) -> None:
         head = _git_head_sha(source_dir)
         super().__init__(
-            _GiteaSyncProvider(),
+            _GitSyncProvider(),
             name,
             {
+                "repo_url": repo_url,
+                "repo_branch": repo_branch,
                 "ssh_private_key": ssh_private_key,
                 "ssh_host_public_key": ssh_host_public_key,
                 "ssh_host": ssh_host,
-                "ssh_host_alias": ssh_host_alias,
                 "ssh_port": ssh_port,
-                "owner": owner,
-                "repo_name": repo_name,
-                "default_branch": default_branch,
                 "source_dir": source_dir,
                 "head_sha": head,
                 "pushed": None,

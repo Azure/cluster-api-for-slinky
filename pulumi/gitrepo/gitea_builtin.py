@@ -28,10 +28,10 @@ What we deploy
   so ``pulumi destroy`` / ``helm uninstall`` reclaims the PVC rather
   than leaking it. The HTTP Service is exposed as ``LoadBalancer`` so
     cloud-provider-kind can publish a host-reachable address for the bridged
-    Gitea provider and ``GiteaSync`` to use; SSH stays on ``ClusterIP``.
+    Gitea provider and ``GitSync`` to use.
 * A ``pulumi_gitea.Repository`` that lands an empty
     ``<owner>/<repo_name>`` inside Gitea.
-* A ``GiteaSync`` (``gitrepo.gitea_sync``) that pushes the local working
+* A ``GitSync`` (``gitrepo.git_sync``) that pushes the local working
     tree's current ``HEAD`` into the repo's default branch when the remote
     branch is missing or stale. It never force-pushes and resolves the
     current LoadBalancer address right before talking to Git.
@@ -69,7 +69,7 @@ from pulumi import Output, ResourceOptions
 from gitrepo._base import GitOpsRepositoryProvider, GitOpsWebhookProvider
 from gitrepo.external_secrets import ExternalSecretsOperator
 from gitrepo.flux_git_auth import FluxGitAuthSecret
-from gitrepo.gitea_sync import GiteaSync
+from gitrepo.git_sync import GitSync
 from pko._flux import FluxGitSource
 from pko._release import PKO_NAMESPACE
 
@@ -249,7 +249,7 @@ def _chart_values(
         # at two points in this stack:
         #   * pulumi_gitea.Repository, to call the Gitea REST admin API
         #     from the host;
-        #   * GiteaSync, to ``git push`` the local working tree over SSH.
+        #   * GitSync, to ``git push`` the local working tree over SSH.
         #
         # ``clusterIP: ""`` is critical here: the chart defaults this to
         # ``None`` (i.e. a *headless* Service), which is incompatible
@@ -379,7 +379,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         Override the defaults for the Gitea admin user. ``admin_username``
         must not be the literal ``"admin"`` (Gitea reserves it).
     repo_owner, repo_name, default_branch :
-        Coordinates for the Gitea repository and ``GiteaSync`` children:
+        Coordinates for the Gitea repository and ``GitSync`` children:
         which Gitea user/org owns the seeded repo, what it's called,
         and what branch the local working tree gets pushed to.
         ``repo_owner`` defaults to ``admin_username`` so the URL is
@@ -392,7 +392,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         as a sync input — when it advances, the sync pushes. ``sync_triggers``
         can force the same push path without changing ``HEAD``.
     sync_triggers :
-        Optional operator-controlled replacement inputs for ``GiteaSync``.
+        Optional operator-controlled replacement inputs for ``GitSync``.
         Changing any key/value forces a non-force push attempt.
     opts :
         Standard Pulumi ``ResourceOptions``.
@@ -432,6 +432,8 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
                 "(default is 'caps-admin')."
             )
         owner = repo_owner if repo_owner is not None else admin_username
+        repo_url = Output.from_input(_in_cluster_ssh_url(owner, repo_name))
+        repo_branch = Output.from_input(default_branch)
 
         # Dedicated Kubernetes provider parented to this component. Every
         # child k8s resource carries it in its ResourceOptions so they all
@@ -856,16 +858,14 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             lambda data: _decode_secret_data_key(data, _HOST_PUBLIC_KEY_SECRET_KEY)
         )
 
-        sync = GiteaSync(
+        sync = GitSync(
             f"{name}-sync",
+            repo_url=repo_url,
+            repo_branch=repo_branch,
             ssh_private_key=user_private_key,
             ssh_host_public_key=host_public_key,
             ssh_host=external_ssh_host,
-            ssh_host_alias=_in_cluster_ssh_host(),
             ssh_port=_GITEA_SSH_PORT,
-            owner=owner,
-            repo_name=repo_name,
-            default_branch=default_branch,
             source_dir=source_dir,
             triggers=sync_triggers,
             opts=ResourceOptions(
@@ -898,9 +898,9 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         # ``ssh_private_key_secret_name`` / ``ssh_private_key_secret_namespace``.
         # Secret data stays in Kubernetes and is not surfaced through Pulumi
         # outputs or component inputs.
-        self.url = Output.from_input(_in_cluster_ssh_url(owner, repo_name))
+        self.url = repo_url
         self.url_external = Output.concat(external_base, "/", owner, "/", repo_name, ".git")
-        self.default_branch = Output.from_input(default_branch)
+        self.default_branch = repo_branch
         self.ssh_private_key_secret_name = Output.from_input(_USER_KEY_SECRET)
         self.ssh_private_key_secret_namespace = Output.from_input(_GITEA_NAMESPACE)
 

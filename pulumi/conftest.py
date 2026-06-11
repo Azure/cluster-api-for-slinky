@@ -2,7 +2,7 @@
 
 This file is intentionally minimal. Add fixtures here when they're useful
 across BOTH ``tests/unit/`` and ``tests/integration/`` (e.g. a temp-dir
-fixture that fakes a working git tree for ``GiteaSync`` tests). Fixtures
+fixture that fakes a working git tree for ``GitSync`` tests). Fixtures
 used by only one tier should live in that tier's ``conftest.py`` instead.
 
 Pulumi's mock harness setup belongs in this file as well once we start

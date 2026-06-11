@@ -85,11 +85,15 @@ def run() -> None:
     # stacks tend to be loud about in much less friendly ways.
     gitops_provider = config.get("gitops_provider") or "gitea-builtin"
 
-    # Operator-controlled replacement inputs for the one-shot Gitea sync.
+    # Operator-controlled replacement inputs for the one-shot Git sync.
     # Example:
-    #     pulumi config set --path 'gitea_sync_triggers.generation' rerun-1 -s local
+    #     pulumi config set --path 'gitops_sync_triggers.generation' rerun-1 -s local
     # Bump any key/value to force a normal non-force push without changing HEAD.
-    gitea_sync_triggers = config.get_object("gitea_sync_triggers") or {}
+    gitops_sync_triggers = (
+        config.get_object("gitops_sync_triggers")
+        or config.get_object("gitea_sync_triggers")
+        or {}
+    )
     configured_gitops_provider_args = config.get_object("gitops_provider_args") or {}
 
     # ----------------------------------------------------------------------
@@ -182,7 +186,7 @@ def run() -> None:
             "flux_provider": mgmt_provider,
             "flux_infrastructure": flux,
             "pko_namespace_resource": pko_namespace,
-            "sync_triggers": gitea_sync_triggers,
+            "sync_triggers": gitops_sync_triggers,
         },
     )
 
