@@ -59,6 +59,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import os
+import struct
 from typing import Any, Mapping, Optional
 
 import pulumi
@@ -122,14 +123,14 @@ _GITEA_HTTP_PORT = 3000
 _GITEA_SSH_SERVICE = "gitea-ssh"
 _GITEA_SSH_PORT = 22
 
-# Prefix for the Secret holding the pre-generated Gitea SSH *host* keypair. Mounted
+# Prefix for the Secret holding the pre-generated Gitea SSH host keypair. Mounted
 # into the Gitea pod via the chart's ``extraVolumes`` +
 # ``extraContainerVolumeMounts`` so Gitea boots with a deterministic
-# host key (instead of auto-generating one on first boot, which would
-# bust our pre-computed ``known_hosts`` entry). Two keys:
-#   * ``ssh_host_ed25519_key``      — PKCS8 PEM private key.
+# ed25519 host key. The suffix is a short hash of the public key so
+# rotation changes the Kubernetes object name (immutable Secret). Two keys:
+#   * ``ssh_host_ed25519_key``      — OpenSSH-format private key.
 #   * ``ssh_host_ed25519_key.pub``  — OpenSSH-format public key.
-_HOST_KEY_SECRET_PREFIX = "gitea-ssh-host-keys-pkcs8"
+_HOST_KEY_SECRET_PREFIX = "gitea-ssh-host-keys"
 
 # Prefix for the source Secret that holds the admin user's SSH private key. The
 # name is derived from the matching public key so every consumer follows the
@@ -369,13 +370,57 @@ def _k8s_secret_data(value: str) -> str:
     return base64.b64encode(value.encode("ascii")).decode("ascii")
 
 
+def _ssh_string(value: bytes) -> bytes:
+    return struct.pack(">I", len(value)) + value
+
+
+def _openssh_ed25519_private_key(*, seed: bytes, public_key: bytes) -> str:
+    key_type = b"ssh-ed25519"
+    public_blob = _ssh_string(key_type) + _ssh_string(public_key)
+    checkint = b"\x00\x00\x00\x00"
+    private_blob = b"".join(
+        (
+            checkint,
+            checkint,
+            _ssh_string(key_type),
+            _ssh_string(public_key),
+            _ssh_string(seed + public_key),
+            _ssh_string(b""),
+        )
+    )
+    padding_length = 8 - (len(private_blob) % 8)
+    if padding_length == 0:
+        padding_length = 8
+    private_blob += bytes(range(1, padding_length + 1))
+    payload = b"".join(
+        (
+            b"openssh-key-v1\x00",
+            _ssh_string(b"none"),
+            _ssh_string(b"none"),
+            _ssh_string(b""),
+            struct.pack(">I", 1),
+            _ssh_string(public_blob),
+            _ssh_string(private_blob),
+        )
+    )
+    encoded = base64.b64encode(payload).decode("ascii")
+    wrapped = "\n".join(
+        encoded[index : index + 70] for index in range(0, len(encoded), 70)
+    )
+    return (
+        "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+        f"{wrapped}\n"
+        "-----END OPENSSH PRIVATE KEY-----\n"
+    )
+
+
 def _derive_ed25519_keypair(seed_b64: str) -> dict[str, str]:
     """Derive an ed25519 keypair from 32 bytes of randomness.
 
     Pulumi state already persists the seed bytes (via
     :class:`pulumi_random.RandomBytes`), so derivation is deterministic
     across reapplies — changing the seed bytes is the only thing that
-    rotates the key. Returns PKCS8 PEM private and OpenSSH public
+    rotates the key. Returns OpenSSH private and OpenSSH public
     (single-line ``ssh-ed25519 <base64> <comment>``-style without the
     comment) strings.
     """
@@ -386,11 +431,11 @@ def _derive_ed25519_keypair(seed_b64: str) -> dict[str, str]:
         )
     priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed)
     pub = priv.public_key()
-    priv_pem = priv.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    ).decode("ascii")
+    public_raw = pub.public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    priv_pem = _openssh_ed25519_private_key(seed=seed, public_key=public_raw)
     pub_openssh = pub.public_bytes(
         encoding=serialization.Encoding.OpenSSH,
         format=serialization.PublicFormat.OpenSSH,
