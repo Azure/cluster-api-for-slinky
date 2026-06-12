@@ -30,23 +30,10 @@ Attributes that every concrete subclass must populate
 * ``default_branch``    — Branch name the seed push targeted and the Flux
                           ``GitRepository.spec.ref.branch`` should track.
                           Conventionally ``main``.
-* ``ssh_private_key_secret`` — Source Kubernetes Secret resource itself.
-                          Its name is usually derived from the matching public
-                          key hash so rotations create a new Secret and update
-                          downstream references instead of replacing a
-                          fixed-name Secret in place.
-                          Downstream components use its ``data`` Output to
-                          copy the conventional ``id_ed25519`` key into their own namespaces without
-                          rereading a just-created Secret from the API server
-                          during preview. Callers that need a serializable
-                          reference can read ``metadata.name`` and
-                          ``metadata.namespace`` from this resource.
-* ``ssh_known_hosts``   — Single-line ``known_hosts`` entry for the in-cluster
-                          SSH endpoint (``<hostname> <alg> <pubkey-base64>``).
-                          Stored with the Flux ``GitRepository`` credentials so
-                          source-controller verifies the Gitea host key without
-                          manual TOFU. This is public host-key material, not a
-                          secret.
+* ``ssh_private_key_secret_name`` / ``ssh_private_key_secret_namespace`` —
+                          Source Kubernetes Secret reference for the generated
+                          SSH identity. Concrete providers must not expose the
+                          Secret data through Pulumi outputs.
 
 Lifetime model
 --------------
@@ -65,7 +52,6 @@ from typing import Any
 
 import pulumi
 from pulumi import Output
-from pulumi_kubernetes.core.v1 import Secret
 
 
 # Single source of truth for the Pulumi resource type token used by the
@@ -118,9 +104,8 @@ class GitOpsRepositoryProvider(pulumi.ComponentResource):
 
     Subclasses MUST:
       1. Call ``super().__init__(name, t=<their own type token>, opts=opts)``.
-         2. Populate every attribute declared in the module docstring. Plain values
-            should be wrapped with ``Output.from_input(...)``; resource attributes
-            such as ``ssh_private_key_secret`` should hold the resource object.
+            2. Populate every attribute declared in the module docstring. Plain values
+                should be wrapped with ``Output.from_input(...)``.
          3. Call ``self.register_outputs({...})`` with the serializable Output
             values so they show up in ``pulumi stack output`` when the component is
             used at the top level. Resource-object attributes do not need to be
@@ -137,8 +122,8 @@ class GitOpsRepositoryProvider(pulumi.ComponentResource):
     url: "Output[str]"
     url_external: "Output[str]"
     default_branch: "Output[str]"
-    ssh_private_key_secret: "Secret"
-    ssh_known_hosts: "Output[str]"
+    ssh_private_key_secret_name: "Output[str]"
+    ssh_private_key_secret_namespace: "Output[str]"
     flux_source: pulumi.Resource
     flux_source_name: "Output[str]"
     flux_receiver_token: "Output[str]"
@@ -160,8 +145,8 @@ class GitOpsRepository(pulumi.ComponentResource):
     url: "Output[str]"
     url_external: "Output[str]"
     default_branch: "Output[str]"
-    ssh_private_key_secret: "Secret"
-    ssh_known_hosts: "Output[str]"
+    ssh_private_key_secret_name: "Output[str]"
+    ssh_private_key_secret_namespace: "Output[str]"
     flux_source: pulumi.Resource
     flux_source_name: "Output[str]"
     flux_receiver_token: "Output[str]"
@@ -188,8 +173,8 @@ class GitOpsRepository(pulumi.ComponentResource):
         self.url = concrete.url
         self.url_external = concrete.url_external
         self.default_branch = concrete.default_branch
-        self.ssh_private_key_secret = concrete.ssh_private_key_secret
-        self.ssh_known_hosts = concrete.ssh_known_hosts
+        self.ssh_private_key_secret_name = concrete.ssh_private_key_secret_name
+        self.ssh_private_key_secret_namespace = concrete.ssh_private_key_secret_namespace
         self.flux_source = concrete.flux_source
         self.flux_source_name = concrete.flux_source_name
         self.flux_receiver_token = concrete.flux_receiver_token
@@ -201,7 +186,8 @@ class GitOpsRepository(pulumi.ComponentResource):
                 "url": self.url,
                 "url_external": self.url_external,
                 "default_branch": self.default_branch,
-                "ssh_known_hosts": self.ssh_known_hosts,
+                "ssh_private_key_secret_name": self.ssh_private_key_secret_name,
+                "ssh_private_key_secret_namespace": self.ssh_private_key_secret_namespace,
                 "flux_source_name": self.flux_source_name,
                 "flux_receiver_token": self.flux_receiver_token,
                 "flux_receiver_url": self.flux_receiver_url,

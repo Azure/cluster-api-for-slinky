@@ -24,10 +24,12 @@ class InitStackLocal(pulumi.ComponentResource):
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:pko:InitStackLocal", name, props={}, opts=opts)
-        del inputs
+        stack_spec = inputs.stack_spec
 
         control_plane = ControlPlaneLocal(
             "control-plane",
+            flux_source_namespace=stack_spec.pko_namespace,
+            flux_source_name=stack_spec.flux_source_name,
             opts=pulumi.ResourceOptions(parent=self),
         )
         tenants = TenantsLocal(

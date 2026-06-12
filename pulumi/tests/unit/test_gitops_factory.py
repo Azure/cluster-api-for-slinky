@@ -22,6 +22,7 @@ so a fixture in tests/unit/conftest.py would activate it for this file.
 """
 
 import pytest
+
 from gitrepo import GitOpsRepository  # noqa: F401
 from gitrepo.gitea_builtin import GiteaBuiltinRepository  # noqa: F401
 

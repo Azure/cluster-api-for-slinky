@@ -23,7 +23,9 @@ def _stack_spec() -> StackCRSpec:
 
 
 def test_init_stack_config_wraps_shared_spec_and_child_config() -> None:
-    child_config = {"ca4s-workload-cluster:registry": {"kind": "local-port", "port": 5002}}
+    child_config = {
+        "ca4s-workload-cluster:registry": {"kind": "local-port", "port": 5002},
+    }
 
     config = init_stack_config(stack_spec=_stack_spec(), child_config=child_config)
 

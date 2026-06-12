@@ -85,11 +85,15 @@ def run() -> None:
     # stacks tend to be loud about in much less friendly ways.
     gitops_provider = config.get("gitops_provider") or "gitea-builtin"
 
-    # Operator-controlled replacement inputs for the one-shot Gitea sync.
+    # Operator-controlled replacement inputs for the one-shot Git sync.
     # Example:
-    #     pulumi config set --path 'gitea_sync_triggers.generation' rerun-1 -s local
+    #     pulumi config set --path 'gitops_sync_triggers.generation' rerun-1 -s local
     # Bump any key/value to force a normal non-force push without changing HEAD.
-    gitea_sync_triggers = config.get_object("gitea_sync_triggers") or {}
+    gitops_sync_triggers = (
+        config.get_object("gitops_sync_triggers")
+        or config.get_object("gitea_sync_triggers")
+        or {}
+    )
     configured_gitops_provider_args = config.get_object("gitops_provider_args") or {}
 
     # ----------------------------------------------------------------------
@@ -167,7 +171,8 @@ def run() -> None:
     # TODO(multi-target): add cloud-hosted GitOps impls (GitHub,
     # GitLab). Each impl populates the same GitOpsRepository contract
     # defined in ``gitrepo/_base.py`` (``url``, ``url_external``,
-    # ``default_branch``, ``ssh_private_key_secret``, ``ssh_known_hosts``).
+    # ``default_branch``, ``ssh_private_key_secret_name`` /
+    # ``ssh_private_key_secret_namespace``).
     # Cloud impls won't need ``kubeconfig`` for the *source* of truth (the git
     # server lives off-cluster) but DO need credentials projected into the
     # management cluster so Flux source-controller can produce artifacts for PKO.
@@ -181,7 +186,7 @@ def run() -> None:
             "flux_provider": mgmt_provider,
             "flux_infrastructure": flux,
             "pko_namespace_resource": pko_namespace,
-            "sync_triggers": gitea_sync_triggers,
+            "sync_triggers": gitops_sync_triggers,
         },
     )
 
@@ -229,7 +234,9 @@ def run() -> None:
         flux_source_name=repo.flux_source_name,
         flux_source_resource=repo.flux_source,
         env=pulumi.get_stack(),
-        config={REGISTRY_CONFIG_KEY: local_port_registry_setting(registry.port)},
+        config={
+            REGISTRY_CONFIG_KEY: local_port_registry_setting(registry.port),
+        },
     )
 
     gitops_webhook = GitOpsWebhook(
@@ -275,14 +282,13 @@ def run() -> None:
     pulumi.export("gitops_url", repo.url)
     pulumi.export("gitops_url_external", repo.url_external)
     pulumi.export("gitops_default_branch", repo.default_branch)
-    pulumi.export("gitops_ssh_known_hosts", repo.ssh_known_hosts)
     pulumi.export(
         "gitops_ssh_private_key_secret_name",
-        repo.ssh_private_key_secret.metadata["name"],
+        repo.ssh_private_key_secret_name,
     )
     pulumi.export(
         "gitops_ssh_private_key_secret_namespace",
-        repo.ssh_private_key_secret.metadata["namespace"],
+        repo.ssh_private_key_secret_namespace,
     )
 
     # Phase 3: PKO bootstrap handles + the one outer-owned init Stack CR name.
