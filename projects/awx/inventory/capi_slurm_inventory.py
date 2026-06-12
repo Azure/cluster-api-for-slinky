@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """AWX dynamic inventory for CAPI/Slinky workload clusters.
 
 The script is designed for the stock AWX execution environment. It uses the

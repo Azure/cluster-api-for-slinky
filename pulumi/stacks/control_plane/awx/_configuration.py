@@ -23,6 +23,7 @@ AWX_INJECTABLE_KUBERNETES_CREDENTIAL_NAME = "ca4s-management-kubernetes-env"
 AWX_DYNAMIC_INVENTORY_NAME = "ca4s-dynamic-inventory"
 AWX_DYNAMIC_INVENTORY_SOURCE_NAME = "ca4s-capi-slurm"
 AWX_CLUSTER_STATE_JOB_TEMPLATE_NAME = "ca4s-collect-cluster-state"
+AWX_EXECUTION_ENVIRONMENT_NAME = "AWX EE (latest)"
 _SOURCE_CONTROL_CREDENTIAL_TYPE = "Source Control"
 _KUBERNETES_CREDENTIAL_TYPE = "OpenShift or Kubernetes API Bearer Token"
 _AWX_NAMESPACE = "awx"
@@ -447,6 +448,14 @@ class AWXConfiguration(pulumi.ComponentResource):
             ),
         )
 
+        execution_environment = awx.get_execution_environment_output(
+            name=AWX_EXECUTION_ENVIRONMENT_NAME,
+            opts=pulumi.InvokeOutputOptions(
+                provider=awx_provider,
+                depends_on=[organization],
+            ),
+        )
+
         dynamic_inventory = awx.Inventory(
             f"{name}-dynamic-inventory",
             name=AWX_DYNAMIC_INVENTORY_NAME,
@@ -468,6 +477,7 @@ class AWXConfiguration(pulumi.ComponentResource):
             source="scm",
             source_project=project.project_id,
             source_path=_DYNAMIC_INVENTORY_PATH,
+            execution_environment=execution_environment.id,
             source_vars=dynamic_inventory_variables(),
             overwrite=True,
             overwrite_vars=True,
@@ -486,6 +496,7 @@ class AWXConfiguration(pulumi.ComponentResource):
             inventory=dynamic_inventory.inventory_id,
             project=project.project_id,
             playbook=_CLUSTER_STATE_PLAYBOOK_PATH,
+            execution_environment=execution_environment.id,
             job_type="run",
             ask_variables_on_launch=True,
             allow_simultaneous=True,

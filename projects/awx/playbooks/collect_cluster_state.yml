@@ -7,7 +7,7 @@
   tasks:
     - name: Query CAPI machine inventory summary
       ansible.builtin.command:
-        cmd: python3 ../inventory/capi_slurm_inventory.py --summary
+        cmd: python ../inventory/capi_slurm_inventory.py --summary
         chdir: "{{ playbook_dir }}"
       changed_when: false
       register: capi_inventory_summary

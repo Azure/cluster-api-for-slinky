@@ -79,8 +79,11 @@ resources and Nodes, but cannot read Kubernetes Secrets.
 
 ## Stock Execution Environment
 
-The default AWX execution environment image `quay.io/ansible/awx-ee:24.6.1`
-already contains enough tooling for the first implementation:
+The control-plane stack uses the existing AWX execution environment
+`AWX EE (latest)`, whose image is `quay.io/ansible/awx-ee:latest`. In the
+current image, Python dependencies are installed for `/usr/bin/python` rather
+than `/usr/bin/python3`, so CA4S scripts use the `python` alias explicitly.
+That interpreter contains enough tooling for the first implementation:
 
 - `ansible-runner`
 - `ansible-playbook`
@@ -88,7 +91,7 @@ already contains enough tooling for the first implementation:
 - Python `yaml`
 - Python `requests`
 
-It does not need the old runner enhancements:
+This execution environment does not need the old runner enhancements:
 
 - no `/runner/.kube` hostPath/PVC mount
 - no `host.docker.internal` kubeconfig rewrite
