@@ -62,6 +62,9 @@ class ControlPlaneLocal(pulumi.ComponentResource):
     awx_project_name: pulumi.Output[str]
     awx_scm_credential_id: pulumi.Output[float]
     awx_management_kubernetes_credential_id: pulumi.Output[float]
+    awx_dynamic_inventory_id: pulumi.Output[float]
+    awx_dynamic_inventory_source_id: pulumi.Output[float]
+    awx_cluster_state_job_template_id: pulumi.Output[float]
     control_plane_ready: pulumi.Output[bool]
     todo: pulumi.Output[str]
 
@@ -127,10 +130,19 @@ class ControlPlaneLocal(pulumi.ComponentResource):
         self.awx_management_kubernetes_credential_id = (
             awx_configuration.management_kubernetes_credential_id
         )
+        self.awx_dynamic_inventory_id = awx_configuration.dynamic_inventory_id
+        self.awx_dynamic_inventory_source_id = (
+            awx_configuration.dynamic_inventory_source_id
+        )
+        self.awx_cluster_state_job_template_id = (
+            awx_configuration.cluster_state_job_template_id
+        )
         self.control_plane_ready = pulumi.Output.all(
             capi.provider_version,
             awx_configuration.project_id,
             awx_configuration.management_kubernetes_credential_id,
+            awx_configuration.dynamic_inventory_source_id,
+            awx_configuration.cluster_state_job_template_id,
         ).apply(lambda _: True)
         self.todo = pulumi.Output.from_input(
             "Wire AWX tenant inventories, credentials, and Slurm day-2 job templates."
@@ -155,6 +167,13 @@ class ControlPlaneLocal(pulumi.ComponentResource):
                 "awx_scm_credential_id": self.awx_scm_credential_id,
                 "awx_management_kubernetes_credential_id": (
                     self.awx_management_kubernetes_credential_id
+                ),
+                "awx_dynamic_inventory_id": self.awx_dynamic_inventory_id,
+                "awx_dynamic_inventory_source_id": (
+                    self.awx_dynamic_inventory_source_id
+                ),
+                "awx_cluster_state_job_template_id": (
+                    self.awx_cluster_state_job_template_id
                 ),
                 "control_plane_ready": self.control_plane_ready,
                 "todo": self.todo,

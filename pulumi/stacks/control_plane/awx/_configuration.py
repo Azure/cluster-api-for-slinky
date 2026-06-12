@@ -18,6 +18,11 @@ FLUX_GIT_IDENTITY_KEY = "identity"
 AWX_ORGANIZATION_NAME = "ca4s"
 AWX_SCM_CREDENTIAL_NAME = "ca4s-gitops-scm"
 AWX_MANAGEMENT_KUBERNETES_CREDENTIAL_NAME = "ca4s-management-kubernetes"
+AWX_INJECTABLE_KUBERNETES_CREDENTIAL_TYPE_NAME = "CA4S Kubernetes API Bearer Token"
+AWX_INJECTABLE_KUBERNETES_CREDENTIAL_NAME = "ca4s-management-kubernetes-env"
+AWX_DYNAMIC_INVENTORY_NAME = "ca4s-dynamic-inventory"
+AWX_DYNAMIC_INVENTORY_SOURCE_NAME = "ca4s-capi-slurm"
+AWX_CLUSTER_STATE_JOB_TEMPLATE_NAME = "ca4s-collect-cluster-state"
 _SOURCE_CONTROL_CREDENTIAL_TYPE = "Source Control"
 _KUBERNETES_CREDENTIAL_TYPE = "OpenShift or Kubernetes API Bearer Token"
 _AWX_NAMESPACE = "awx"
@@ -27,6 +32,12 @@ _KUBERNETES_API_ENDPOINT = "https://kubernetes.default.svc"
 _SERVICE_ACCOUNT_TOKEN_KEY = "token"
 _SERVICE_ACCOUNT_CA_KEY = "ca.crt"
 _WAIT_FOR_SERVICE_ACCOUNT_TOKEN = "jsonpath={.data.token}"
+_DYNAMIC_INVENTORY_PATH = "projects/awx/inventory/capi_slurm_inventory.py"
+_CLUSTER_STATE_PLAYBOOK_PATH = "projects/awx/playbooks/collect_cluster_state.yml"
+_CAPI_NAMESPACE = "default"
+_NODE_TYPE_LABEL = "slinky.slurm.net/node-type"
+_CONTROLLER_NODE_TYPE = "controller"
+_COMPUTE_NODE_TYPE = "compute"
 
 
 def _required_mapping(value: object, path: str) -> Mapping[str, object]:
@@ -87,6 +98,67 @@ def management_kubernetes_credential_inputs(
     )
 
 
+def injectable_kubernetes_credential_type_inputs() -> str:
+    return json.dumps(
+        {
+            "fields": [
+                {
+                    "id": "host",
+                    "label": "Kubernetes API endpoint",
+                    "type": "string",
+                },
+                {
+                    "id": "bearer_token",
+                    "label": "Kubernetes API bearer token",
+                    "secret": True,
+                    "type": "string",
+                },
+                {
+                    "default": True,
+                    "id": "verify_ssl",
+                    "label": "Verify SSL",
+                    "type": "boolean",
+                },
+                {
+                    "id": "ssl_ca_cert",
+                    "label": "Kubernetes API certificate authority",
+                    "multiline": True,
+                    "secret": True,
+                    "type": "string",
+                },
+            ],
+            "required": ["host", "bearer_token"],
+        },
+        sort_keys=True,
+    )
+
+
+def injectable_kubernetes_credential_type_injectors() -> str:
+    return json.dumps(
+        {
+            "env": {
+                "CA4S_K8S_BEARER_TOKEN": "{{ bearer_token }}",
+                "CA4S_K8S_HOST": "{{ host }}",
+                "CA4S_K8S_SSL_CA_CERT": "{{ ssl_ca_cert }}",
+                "CA4S_K8S_VERIFY_SSL": "{{ verify_ssl }}",
+            }
+        },
+        sort_keys=True,
+    )
+
+
+def dynamic_inventory_variables() -> str:
+    return json.dumps(
+        {
+            "capi_namespace": _CAPI_NAMESPACE,
+            "compute_node_type": _COMPUTE_NODE_TYPE,
+            "controller_node_type": _CONTROLLER_NODE_TYPE,
+            "node_type_label": _NODE_TYPE_LABEL,
+        },
+        sort_keys=True,
+    )
+
+
 class AWXConfiguration(pulumi.ComponentResource):
     """Shared AWX organization, SCM credential, and GitOps project."""
 
@@ -96,6 +168,14 @@ class AWXConfiguration(pulumi.ComponentResource):
     scm_credential_name: Output[str]
     management_kubernetes_credential_id: Output[float]
     management_kubernetes_credential_name: Output[str]
+    injectable_kubernetes_credential_id: Output[float]
+    injectable_kubernetes_credential_name: Output[str]
+    dynamic_inventory_id: Output[float]
+    dynamic_inventory_name: Output[str]
+    dynamic_inventory_source_id: Output[float]
+    dynamic_inventory_source_name: Output[str]
+    cluster_state_job_template_id: Output[float]
+    cluster_state_job_template_name: Output[str]
     project_id: Output[float]
     project_name: Output[str]
 
@@ -312,6 +392,36 @@ class AWXConfiguration(pulumi.ComponentResource):
             ),
         )
 
+        injectable_kubernetes_credential_type = awx.CredentialType(
+            f"{name}-injectable-kubernetes-credential-type",
+            name=AWX_INJECTABLE_KUBERNETES_CREDENTIAL_TYPE_NAME,
+            description="Injectable Kubernetes API credential for CA4S AWX jobs",
+            kind="cloud",
+            inputs=injectable_kubernetes_credential_type_inputs(),
+            injectors=injectable_kubernetes_credential_type_injectors(),
+            opts=ResourceOptions(
+                parent=self,
+                provider=awx_provider,
+                depends_on=[organization],
+            ),
+        )
+        injectable_kubernetes_credential = awx.Credential(
+            f"{name}-injectable-kubernetes-credential",
+            name=AWX_INJECTABLE_KUBERNETES_CREDENTIAL_NAME,
+            description=(
+                "Read-only management-cluster Kubernetes API credential for "
+                "AWX execution environments"
+            ),
+            credential_type=injectable_kubernetes_credential_type.credential_type_id,
+            organization=organization.organization_id,
+            inputs=management_kubernetes_inputs,
+            opts=ResourceOptions(
+                parent=self,
+                provider=awx_provider,
+                depends_on=[organization, injectable_kubernetes_credential_type],
+            ),
+        )
+
         project = awx.Project(
             f"{name}-project",
             name=project_name,
@@ -337,6 +447,66 @@ class AWXConfiguration(pulumi.ComponentResource):
             ),
         )
 
+        dynamic_inventory = awx.Inventory(
+            f"{name}-dynamic-inventory",
+            name=AWX_DYNAMIC_INVENTORY_NAME,
+            description="Dynamic inventory for CAPI/Slinky workload clusters",
+            organization=organization.organization_id,
+            variables=dynamic_inventory_variables(),
+            opts=ResourceOptions(
+                parent=self,
+                provider=awx_provider,
+                depends_on=[organization],
+            ),
+        )
+        dynamic_inventory_source = awx.InventorySource(
+            f"{name}-dynamic-inventory-source",
+            name=AWX_DYNAMIC_INVENTORY_SOURCE_NAME,
+            description="CAPI/Slinky dynamic inventory discovered from the management cluster",
+            inventory=dynamic_inventory.inventory_id,
+            credential=injectable_kubernetes_credential.credential_id,
+            source="scm",
+            source_project=project.project_id,
+            source_path=_DYNAMIC_INVENTORY_PATH,
+            source_vars=dynamic_inventory_variables(),
+            overwrite=True,
+            overwrite_vars=True,
+            update_on_launch=True,
+            timeout=300,
+            opts=ResourceOptions(
+                parent=self,
+                provider=awx_provider,
+                depends_on=[project, injectable_kubernetes_credential],
+            ),
+        )
+        cluster_state_job_template = awx.JobTemplate(
+            f"{name}-cluster-state-job-template",
+            name=AWX_CLUSTER_STATE_JOB_TEMPLATE_NAME,
+            description="Collect management-cluster CAPI state for Slinky workload clusters",
+            inventory=dynamic_inventory.inventory_id,
+            project=project.project_id,
+            playbook=_CLUSTER_STATE_PLAYBOOK_PATH,
+            job_type="run",
+            ask_variables_on_launch=True,
+            allow_simultaneous=True,
+            timeout=300,
+            opts=ResourceOptions(
+                parent=self,
+                provider=awx_provider,
+                depends_on=[dynamic_inventory_source],
+            ),
+        )
+        awx.JobTemplateAssociateCredential(
+            f"{name}-cluster-state-kubernetes-credential",
+            credential_id=injectable_kubernetes_credential.credential_id,
+            job_template_id=cluster_state_job_template.job_template_id,
+            opts=ResourceOptions(
+                parent=self,
+                provider=awx_provider,
+                depends_on=[cluster_state_job_template, injectable_kubernetes_credential],
+            ),
+        )
+
         self.organization_id = organization.organization_id
         self.organization_name = organization.name
         self.scm_credential_id = scm_credential.credential_id
@@ -345,6 +515,16 @@ class AWXConfiguration(pulumi.ComponentResource):
             management_kubernetes_credential.credential_id
         )
         self.management_kubernetes_credential_name = management_kubernetes_credential.name
+        self.injectable_kubernetes_credential_id = (
+            injectable_kubernetes_credential.credential_id
+        )
+        self.injectable_kubernetes_credential_name = injectable_kubernetes_credential.name
+        self.dynamic_inventory_id = dynamic_inventory.inventory_id
+        self.dynamic_inventory_name = dynamic_inventory.name
+        self.dynamic_inventory_source_id = dynamic_inventory_source.inventory_source_id
+        self.dynamic_inventory_source_name = dynamic_inventory_source.name
+        self.cluster_state_job_template_id = cluster_state_job_template.job_template_id
+        self.cluster_state_job_template_name = cluster_state_job_template.name
         self.project_id = project.project_id
         self.project_name = project.name
 
@@ -360,6 +540,18 @@ class AWXConfiguration(pulumi.ComponentResource):
                 "management_kubernetes_credential_name": (
                     self.management_kubernetes_credential_name
                 ),
+                "injectable_kubernetes_credential_id": (
+                    self.injectable_kubernetes_credential_id
+                ),
+                "injectable_kubernetes_credential_name": (
+                    self.injectable_kubernetes_credential_name
+                ),
+                "dynamic_inventory_id": self.dynamic_inventory_id,
+                "dynamic_inventory_name": self.dynamic_inventory_name,
+                "dynamic_inventory_source_id": self.dynamic_inventory_source_id,
+                "dynamic_inventory_source_name": self.dynamic_inventory_source_name,
+                "cluster_state_job_template_id": self.cluster_state_job_template_id,
+                "cluster_state_job_template_name": self.cluster_state_job_template_name,
                 "project_id": self.project_id,
                 "project_name": self.project_name,
             }

@@ -6,9 +6,12 @@ import pytest
 
 from stacks.control_plane.awx import awx_api_url, decode_secret_data_value
 from stacks.control_plane.awx._configuration import (
+    dynamic_inventory_variables,
     flux_source_branch,
     flux_source_secret_name,
     flux_source_url,
+    injectable_kubernetes_credential_type_injectors,
+    injectable_kubernetes_credential_type_inputs,
     project_name_from_scm_url,
     management_kubernetes_credential_inputs,
     source_control_credential_inputs,
@@ -88,4 +91,33 @@ def test_management_kubernetes_credential_inputs_are_stable_json() -> None:
     ) == (
         '{"bearer_token": "TOKEN", "host": "https://kubernetes.default.svc", '
         '"ssl_ca_cert": "CA", "verify_ssl": true}'
+    )
+
+
+def test_injectable_kubernetes_credential_type_inputs_are_stable_json() -> None:
+    assert injectable_kubernetes_credential_type_inputs() == (
+        '{"fields": [{"id": "host", "label": "Kubernetes API endpoint", '
+        '"type": "string"}, {"id": "bearer_token", "label": '
+        '"Kubernetes API bearer token", "secret": true, "type": "string"}, '
+        '{"default": true, "id": "verify_ssl", "label": "Verify SSL", '
+        '"type": "boolean"}, {"id": "ssl_ca_cert", "label": '
+        '"Kubernetes API certificate authority", "multiline": true, '
+        '"secret": true, "type": "string"}], "required": '
+        '["host", "bearer_token"]}'
+    )
+
+
+def test_injectable_kubernetes_credential_type_injectors_are_stable_json() -> None:
+    assert injectable_kubernetes_credential_type_injectors() == (
+        '{"env": {"CA4S_K8S_BEARER_TOKEN": "{{ bearer_token }}", '
+        '"CA4S_K8S_HOST": "{{ host }}", "CA4S_K8S_SSL_CA_CERT": '
+        '"{{ ssl_ca_cert }}", "CA4S_K8S_VERIFY_SSL": "{{ verify_ssl }}"}}'
+    )
+
+
+def test_dynamic_inventory_variables_are_stable_json() -> None:
+    assert dynamic_inventory_variables() == (
+        '{"capi_namespace": "default", "compute_node_type": "compute", '
+        '"controller_node_type": "controller", '
+        '"node_type_label": "slinky.slurm.net/node-type"}'
     )
