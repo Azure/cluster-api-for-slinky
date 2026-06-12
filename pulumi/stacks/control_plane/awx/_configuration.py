@@ -13,6 +13,11 @@ from pulumi import Output, ResourceOptions
 
 from ._provider import AWXProviderConfig, decode_secret_data_value
 
+try:
+    from awx_project_sync import AWXProjectSync, flux_artifact_revision_sha
+except ModuleNotFoundError:
+    from ._project_sync import AWXProjectSync, flux_artifact_revision_sha
+
 
 FLUX_GIT_IDENTITY_KEY = "identity"
 AWX_ORGANIZATION_NAME = "ca4s"
@@ -447,6 +452,15 @@ class AWXConfiguration(pulumi.ComponentResource):
                 depends_on=[scm_credential],
             ),
         )
+        project_sync = AWXProjectSync(
+            f"{name}-project-sync",
+            api_url=provider_config.api_url,
+            username=provider_config.admin_user,
+            password=provider_config.admin_password,
+            project_id=project.project_id,
+            expected_revision=flux_source.status.apply(flux_artifact_revision_sha),
+            opts=ResourceOptions(parent=self, depends_on=[project]),
+        )
 
         execution_environment = awx.get_execution_environment_output(
             name=AWX_EXECUTION_ENVIRONMENT_NAME,
@@ -486,7 +500,7 @@ class AWXConfiguration(pulumi.ComponentResource):
             opts=ResourceOptions(
                 parent=self,
                 provider=awx_provider,
-                depends_on=[project, injectable_kubernetes_credential],
+                depends_on=[project_sync, injectable_kubernetes_credential],
             ),
         )
         cluster_state_job_template = awx.JobTemplate(
@@ -504,7 +518,7 @@ class AWXConfiguration(pulumi.ComponentResource):
             opts=ResourceOptions(
                 parent=self,
                 provider=awx_provider,
-                depends_on=[dynamic_inventory_source],
+                depends_on=[dynamic_inventory_source, project_sync],
             ),
         )
         awx.JobTemplateAssociateCredential(

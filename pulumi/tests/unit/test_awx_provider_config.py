@@ -16,6 +16,7 @@ from stacks.control_plane.awx._configuration import (
     management_kubernetes_credential_inputs,
     source_control_credential_inputs,
 )
+from stacks.control_plane.awx._project_sync import flux_artifact_revision_sha
 
 
 def test_awx_api_url_uses_in_cluster_service_dns() -> None:
@@ -121,3 +122,19 @@ def test_dynamic_inventory_variables_are_stable_json() -> None:
         '"controller_node_type": "controller", '
         '"node_type_label": "slinky.slurm.net/node-type"}'
     )
+
+
+@pytest.mark.parametrize(
+    ("status", "sha"),
+    [
+        ({"artifact": {"revision": "main@sha1:abc123"}}, "abc123"),
+        ({"artifact": {"revision": "abc123"}}, "abc123"),
+    ],
+)
+def test_flux_artifact_revision_sha_extracts_git_sha(status: object, sha: str) -> None:
+    assert flux_artifact_revision_sha(status) == sha
+
+
+def test_flux_artifact_revision_sha_rejects_missing_revision() -> None:
+    with pytest.raises(ValueError, match="status.artifact.revision"):
+        flux_artifact_revision_sha({})
