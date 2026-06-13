@@ -104,7 +104,7 @@ def management_kubernetes_credential_inputs(
         "bearer_token": bearer_token,
         "host": host,
         "ssl_ca_cert": ssl_ca_cert,
-        "verify_ssl": "true",
+        "verify_ssl": True,
     }
 
 
