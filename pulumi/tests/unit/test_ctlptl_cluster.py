@@ -22,7 +22,7 @@ def test_render_generates_docker_hub_hosts_for_registry_cache(
 ) -> None:
     state_dir = tmp_path / "ctlptl"
     monkeypatch.setattr(ctlptl_cluster, "_GENERATED_CONFIG_DIR", state_dir)
-    monkeypatch.setenv("HOME", "/home/tester")
+    monkeypatch.delenv("HOME", raising=False)
 
     rendered = ctlptl_cluster._render("kind-mgmt-test", "registry-test")
 
@@ -30,6 +30,8 @@ def test_render_generates_docker_hub_hosts_for_registry_cache(
     hosts_toml = hosts_path.read_text(encoding="utf-8")
 
     assert "registry: registry-test" not in rendered
+    assert "${HOME}" not in rendered
+    assert "/root/.kube" not in rendered
     assert f"hostPath: {hosts_path}" in rendered
     assert "containerPath: /etc/containerd/certs.d/docker.io/hosts.toml" in rendered
     assert 'server = "https://registry-1.docker.io"' in hosts_toml
@@ -38,13 +40,13 @@ def test_render_generates_docker_hub_hosts_for_registry_cache(
 
 
 def test_render_requires_registry_name(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HOME", "/home/tester")
+    monkeypatch.delenv("HOME", raising=False)
 
     with pytest.raises(RuntimeError, match="registry_name is required"):
         ctlptl_cluster._render("kind-mgmt-test", None)
 
 
-@pytest.mark.skip(reason="TODO: stub subprocess.run for `ctlptl apply`; assert ``${CLUSTER_NAME}`` and ``${REGISTRY_NAME}`` placeholders are substituted with the autonamed cluster name and the registry_name input, respectively")
+@pytest.mark.skip(reason="TODO: stub subprocess.run for `ctlptl apply`; assert ``${CLUSTER_NAME}`` is substituted with the autonamed cluster name and the registry_name input is rendered into the generated Docker Hub hosts file")
 def test_create_substitutes_template_placeholders() -> None:
     pass
 

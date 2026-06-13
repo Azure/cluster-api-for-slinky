@@ -6,7 +6,7 @@ tenant-AGNOSTIC management-cluster operators:
 
 * Cluster API Operator + the core, kubeadm bootstrap, kubeadm control-plane,
   and Docker infrastructure providers.
-* AWX (successor to ``awx.yaml``). Exposed via a ``Service: LoadBalancer``
+* AWX. Exposed via a ``Service: LoadBalancer``
   serviced by cloud-provider-kind in local; no ingress controller in
   the picture yet.
 

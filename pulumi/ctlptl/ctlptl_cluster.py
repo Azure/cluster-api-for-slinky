@@ -51,28 +51,25 @@ The ctlptl manifest is vendored into this module as ``_MANIFEST_TEMPLATE``
 — callers no longer pass it in. Customizability is explicitly deferred; if
 you need to tweak the kind config, edit the template constant below.
 
-The template contains four shell-style placeholders that the provider
+The template contains two shell-style placeholders that the provider
 substitutes when rendering the manifest:
 
 * ``${CLUSTER_NAME}`` → the autonamed or pinned ``cluster_name``. Must be
   expanded inside the provider because the autonamed value only exists
   inside ``create()``.
-* ``${REGISTRY_NAME}`` → the value of the ``registry_name`` input in the
-    generated Docker Hub ``hosts.toml``. The ctlptl ``Cluster`` manifest does not
-    set its own ``registry`` field because that path lets ctlptl recreate the
-    sibling registry without the proxy env, destroying the retained cache.
-* ``${HOME}`` → read from the program's environment at apply time. It
-  expands to a host-local filesystem path (used for ``hostPath`` mounts);
-  the provider runs in the user's environment, so reading ``$HOME`` there
-  is correct.
 * ``${DOCKER_IO_HOSTS_TOML}`` → generated ``hosts.toml`` file mounted into
     kind nodes for containerd's Docker Hub pull-through registry cache config.
+
+The ``registry_name`` input is rendered into that generated Docker Hub
+``hosts.toml`` file. The ctlptl ``Cluster`` manifest does not set its own
+``registry`` field because that path lets ctlptl recreate the sibling registry
+without the proxy env, destroying the retained cache.
 
 * Inputs:
     - ``cluster_name``  : optional explicit ctlptl ``Cluster.name`` value.
                           When omitted, autoname kicks in.
-    - ``registry_name`` : optional sibling registry name to substitute for
-                          ``${REGISTRY_NAME}``. Pass
+    - ``registry_name`` : optional sibling registry name rendered into the
+                          generated Docker Hub ``hosts.toml``. Pass
                           ``CtlptlRegistry().registry_name`` to wire the
                           dependency implicitly. Required because Docker Hub
                           pulls are routed through the sibling registry cache.
@@ -122,7 +119,6 @@ path (``ctlptl.ctlptl_cluster``) keeps that round-trip robust.
 
 from __future__ import annotations
 
-import os
 import secrets
 import shutil
 import subprocess
@@ -182,11 +178,6 @@ kindV1Alpha4Cluster:
     - hostPath: ${DOCKER_IO_HOSTS_TOML}
       containerPath: /etc/containerd/certs.d/docker.io/hosts.toml
       readOnly: true
-    # Exposes the host kubeconfig to in-cluster consumers via hostPath /root/.kube:
-    #   - AWX / ansible-runner (mounted at /runner/.kube, see awx.yaml, pod-spec-override.yaml)
-    #   - cluster-autoscaler   (mounted at /mnt/kubeconfig, see cluster-autoscaler.yaml)
-    - hostPath: ${HOME}/.kube
-      containerPath: /root/.kube
     # required by CAPD (capd-controller-manager may be scheduled on either kind node)
     - hostPath: /var/run/docker.sock
       containerPath: /var/run/docker.sock
@@ -285,24 +276,17 @@ def _render(cluster_name: str, registry_name: Optional[str] = None) -> str:
     Substitution policy:
     * ``${CLUSTER_NAME}`` → ``cluster_name``. Done here because the
       autonamed value only exists inside ``create()``.
-    * ``${REGISTRY_NAME}`` → ``registry_name`` when truthy. Doing it here
-      lets the caller pass ``CtlptlRegistry().registry_name`` directly as
-      an ``Input[str]``, giving Pulumi the cross-resource dependency edge
-      for free (no ``depends_on`` needed). The value is only rendered into the
-      generated Docker Hub hosts file, not the ctlptl ``Cluster`` spec.
-    * ``${HOME}`` → the program's ``$HOME`` env var, raised if missing.
+        * ``registry_name`` → rendered into the generated Docker Hub hosts file,
+            not the ctlptl ``Cluster`` spec. Accepting it here lets the caller pass
+            ``CtlptlRegistry().registry_name`` directly as an ``Input[str]``, giving
+            Pulumi the cross-resource dependency edge for free (no ``depends_on``
+            needed).
         * ``${DOCKER_IO_HOSTS_TOML}`` → generated hostPath file pointing Docker Hub
             pulls at the sibling ctlptl registry's in-cluster address.
 
         A missing ``registry_name`` is rejected here because Docker Hub pull-through
         cache config depends on the sibling registry's in-cluster name.
     """
-    home = os.environ.get("HOME")
-    if not home:
-        raise RuntimeError(
-            "HOME environment variable is not set; required for ctlptl manifest "
-            "${HOME} substitution (hostPath mount of ~/.kube into the worker)"
-        )
     if not registry_name:
         raise RuntimeError(
             "registry_name is required to render kind registry cache config"
@@ -310,8 +294,6 @@ def _render(cluster_name: str, registry_name: Optional[str] = None) -> str:
     docker_io_hosts_toml = _docker_io_hosts_toml(cluster_name, registry_name)
     rendered = _MANIFEST_TEMPLATE
     rendered = rendered.replace("${CLUSTER_NAME}", cluster_name)
-    rendered = rendered.replace("${REGISTRY_NAME}", registry_name)
-    rendered = rendered.replace("${HOME}", home)
     rendered = rendered.replace(
         "${DOCKER_IO_HOSTS_TOML}", str(docker_io_hosts_toml)
     )
@@ -439,9 +421,9 @@ class CtlptlCluster(Resource):
     ``kind-`` for product=kind).
 
     Pass ``registry_name=registry.registry_name`` to wire this cluster to a
-    sibling ``CtlptlRegistry``. The provider substitutes the value into
-    ``${REGISTRY_NAME}`` inside the manifest, and Pulumi's Output→Input
-    machinery tracks the dependency — no explicit ``depends_on`` needed.
+    sibling ``CtlptlRegistry``. The provider renders the value into the
+    generated Docker Hub hosts file, and Pulumi's Output→Input machinery
+    tracks the dependency — no explicit ``depends_on`` needed.
     """
 
     cluster_name: Output[str]
@@ -467,10 +449,9 @@ class CtlptlCluster(Resource):
                 "cluster_name": cluster_name,
                 # ``registry_name`` may be None — when supplied (typically
                 # ``CtlptlRegistry().registry_name``), the provider
-                # substitutes it into the manifest's ``${REGISTRY_NAME}``
-                # placeholder. Passing the Output here also wires the
-                # cross-resource dependency without an explicit
-                # ``depends_on``.
+                # renders it into the generated Docker Hub hosts file.
+                # Passing the Output here also wires the cross-resource
+                # dependency without an explicit ``depends_on``.
                 "registry_name": registry_name,
                 # Hidden seed used by ``create()`` for autoname derivation.
                 # Sourced from the Pulumi logical name so the autonamed

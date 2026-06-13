@@ -28,8 +28,8 @@ CAPI_OPERATOR_CHART_NAME = "cluster-api-operator"
 CAPI_OPERATOR_CHART_VERSION = "0.27.0"
 CAPI_OPERATOR_RELEASE_NAME = "cluster-api-operator"
 
-# Keep these aligned with the clusterctl binary used for local validation and
-# with the v1beta2 manifests in capi-quickstart.yaml.
+# Keep this aligned with the CAPI v1beta2 workload resources emitted by the
+# local workload-cluster class.
 CAPI_PROVIDER_VERSION = "v1.12.8"
 
 CAPI_OPERATOR_NAMESPACE = "capi-operator-system"

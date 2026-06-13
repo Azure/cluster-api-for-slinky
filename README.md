@@ -14,13 +14,25 @@ CAPS enables efficient management at scale of Slinky-based converged Slurm and K
 
 Currently only local clusters powered by Cluster API Provider Docker (CAPD) is supported.
 
+### Prerequisites
+
+Install the following:
+
+| Tool | Purpose | Install |
+|---|---|---|
+| [Docker](https://docs.docker.com/engine/install/) | Container runtime hosting both the kind nodes and the CAPD workload-cluster containers | see *Recommended local setup* below |
+| [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) | Spins up the management Kubernetes cluster | `go install sigs.k8s.io/kind@latest` |
+| [`cloud-provider-kind`](https://github.com/kubernetes-sigs/cloud-provider-kind) | Host-side daemon that makes `type: LoadBalancer` Services on kind reachable from the host (Pulumi spawns/kills it via the `CloudProviderKind` resource) | `go install sigs.k8s.io/cloud-provider-kind@latest` |
+| [`ctlptl`](https://github.com/tilt-dev/ctlptl) | Declarative front-end that wraps `kind` to create the management cluster + local image registry (driven by Pulumi, see below) | `go install github.com/tilt-dev/ctlptl/cmd/ctlptl@latest` |
+| [`pulumi`](https://www.pulumi.com/docs/install/) | Drives the local bootstrap stack ([`pulumi/`](pulumi/)), which is the supported way to bring up the management cluster, GitOps source, PKO, AWX, and local workload cluster | `curl -fsSL https://get.pulumi.com \| sh` |
+| `kubectl`, `helm` | Standard inspection and recovery tooling for the managed local stack | upstream binaries |
+
 ### Recommended local setup
 
 | Platform | Recommended | Also supported | Why it matters |
 |---|---|---|---|
-| **Windows (WSL2)** | **Native Docker inside your WSL2 distro** + WSL2 mirrored networking (`networkingMode=mirrored` in `%USERPROFILE%\.wslconfig` on the Windows host) | Docker Desktop with WSL2 integration | Native Docker keeps dockerd + kind bridge + your shell in one network namespace, so the LB EXTERNAL-IP is directly curlable. Docker Desktop runs dockerd in a separate `docker-desktop` distro and isolates the bridge — `localhost:<port>` works, but EXTERNAL-IP does not. |
+| **Windows (WSL2)** | **Native Docker inside your WSL2 distro** + WSL2 mirrored networking (`networkingMode=mirrored` in `%USERPROFILE%\.wslconfig` on the Windows host) | — | Native Docker keeps dockerd + kind bridge + your shell in one network namespace, so the LB EXTERNAL-IP is directly curlable. |
 | **Linux** | Native Docker (distro package) | — | Just works. |
-| **macOS** | **OrbStack** (proxies container subnets back to the host) | Docker Desktop, Colima, Rancher Desktop, Podman Machine | OrbStack makes LB EXTERNAL-IPs directly curlable from the Mac shell; the others restrict you to `localhost:<port>`. Note: validation of the Gitea hydration path on each Mac runtime is still pending (see [TODOs](#todo)). |
 
 **Windows (WSL2) one-time setup:**
 
@@ -41,7 +53,7 @@ sudo tee /etc/wsl.conf >/dev/null <<'EOF'
 systemd=true
 EOF
 
-# install native Docker (replaces Docker Desktop if you had it integrated)
+# install native Docker
 sudo apt install docker.io docker-buildx
 sudo usermod -aG docker $USER
 ```
@@ -74,11 +86,14 @@ under `[boot]` in `/etc/wsl.conf`.
 
 **Docker Hub mirror:**
 
-Local runs pull several images whose canonical names live on Docker Hub
-(`kindest/node`, `pulumi/pulumi-kubernetes-operator`, `pulumi/pulumi`, and the
-`envoyproxy/envoy` image launched internally by `cloud-provider-kind`). To avoid
-Docker Hub anonymous pull limits, configure the host Docker daemon with Google's
-Docker Hub mirror:
+Local runs pull Docker Hub images through two different paths. The
+Pulumi-managed ctlptl registry is used by containerd inside the kind and CAPD
+nodes, but it is not a mirror for the host Docker daemon itself. Host-side pulls
+therefore still need Docker's own mirror configuration: the initial
+`kindest/node` management-node images, CAPD DockerMachine node images, and the
+`envoyproxy/envoy` image launched internally by `cloud-provider-kind` are pulled
+by host Docker, bypassing the ctlptl registry. Configure the host Docker daemon
+with Google's Docker Hub mirror:
 
 ```bash
 sudo mkdir -p /etc/docker
@@ -95,39 +110,15 @@ sudo systemctl restart docker
 docker info --format '{{json .RegistryConfig.Mirrors}}'
 ```
 
-The Pulumi-managed management kind cluster also configures `mirror.gcr.io` as a
-containerd mirror for in-cluster `docker.io` pulls, and CAPD workload nodes are
-bootstrapped with the same mirror. The host Docker daemon setting is still
-needed for host-side pulls: initial kind node images, CAPD DockerMachine node
-images, and `cloud-provider-kind` load-balancer proxy containers.
-
-### Prerequisites
-
-Install the following:
-
-| Tool | Purpose | Install |
-|---|---|---|
-| [Docker](https://docs.docker.com/engine/install/) | Container runtime hosting both the kind nodes and the CAPD workload-cluster containers | see *Recommended local setup* above |
-| [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) | Spins up the management Kubernetes cluster | `go install sigs.k8s.io/kind@latest` |
-| [`cloud-provider-kind`](https://github.com/kubernetes-sigs/cloud-provider-kind) | Host-side daemon that makes `type: LoadBalancer` Services on kind reachable from the host (Pulumi spawns/kills it via the `CloudProviderKind` resource) | `go install sigs.k8s.io/cloud-provider-kind@latest` |
-| [`ctlptl`](https://github.com/tilt-dev/ctlptl) | Declarative front-end that wraps `kind` to create the management cluster + local image registry (driven by Pulumi, see below) | `go install github.com/tilt-dev/ctlptl/cmd/ctlptl@latest` |
-| [`pulumi`](https://www.pulumi.com/docs/install/) | Drives the local bootstrap stack ([`pulumi/`](pulumi/)), which is the sole supported way to bring up the management cluster + Gitea + (eventually) PKO | `curl -fsSL https://get.pulumi.com \| sh` |
-| `kubectl`, `helm`, `clusterctl` | Standard tooling for the post-bootstrap steps below | upstream binaries |
-
-<a id="todo"></a>
-
-#### TODOs (macOS Gitea-hydration path)
-
-The GitOps phase of the bootstrap stack seeds Gitea via a one-time
-`git push` from the Pulumi host. Before declaring macOS supported:
-
-- Validate the `kubectl port-forward` + `git push http://localhost:<port>/…` path on **Docker Desktop**, **Colima**, **Rancher Desktop**, **OrbStack**.
-- Decide whether `GiteaSeed` should special-case OrbStack to skip port-forward (uses direct EXTERNAL-IP for speed) or always use port-forward for consistency.
-- Add a Mac-equivalent of the Linux `setcap` preflight in `CloudProviderKind` — likely a `run_as_root: bool` input that wraps `argv` in `sudo -n` and `delete()` in `sudo -n kill`. Only needed if a Mac user wants bridge-IP mode; the default port-mapping mode does not need it.
+The management kind cluster routes in-cluster `docker.io` pulls through the
+ctlptl registry cache, which is backed by `mirror.gcr.io`; this is the path used
+for Docker Hub pod images such as the Pulumi Kubernetes Operator and PKO
+workspace image. CAPD workload nodes are bootstrapped to use the same local
+registry cache through its host-published port.
 
 ### Local Python environment (Pulumi + tests)
 
-The umbrella stack and its test suite share a single virtualenv at the repo root. [`pulumi/Pulumi.yaml`](pulumi/Pulumi.yaml) pins `runtime.options.virtualenv` to `../.venv`, so `pulumi up` and `pytest` resolve the same `pulumi`, `pulumi-kubernetes`, `pulumi-random`, `ruamel.yaml`, `pytest`, `pytest-mock`, and `responses` versions out of [`requirements.txt`](requirements.txt). One-time setup:
+The umbrella stack and its test suite share a single virtualenv at the repo root. [`pulumi/Pulumi.yaml`](pulumi/Pulumi.yaml) pins `runtime.options.virtualenv` to `../.venv`, so `pulumi up` and `pytest` resolve the same Pulumi SDKs, generated provider SDKs, and test libraries out of [`requirements.txt`](requirements.txt). One-time setup:
 
 ```bash
 python3 -m venv .venv
@@ -143,238 +134,142 @@ cd pulumi
 
 The pytest config lives in [`pulumi/pyproject.toml`](pulumi/pyproject.toml). Default `addopts` skip the `integration`-marked end-to-end suite that drives a real `pulumi up`/`destroy` cycle; opt in with `../.venv/bin/python -m pytest -m integration` once you have Docker running and ~2 min to spare.
 
-### Bringing up the management cluster (+ Gitea)
+### Bringing up the local stack
 
-The repo ships a single umbrella Pulumi program under [`pulumi/`](pulumi/) that brings up everything the developer loop needs in dependency order. Phase 1 — cluster + registry + LB controller:
+The repo ships a single umbrella Pulumi program under [`pulumi/`](pulumi/). It
+creates the local developer environment in dependency order:
 
-1. Creates a local image registry (`CtlptlRegistry`) on an ephemeral host port that ctlptl picks via [freeport](https://github.com/phayes/freeport) and persists in Pulumi state.
-2. Creates the management kind cluster (`CtlptlCluster`) from a vendored manifest, wired to the registry created in step 1 and to your `$HOME/.kube` for in-cluster kubeconfig mounts.
-3. Spawns the [`cloud-provider-kind`](https://github.com/kubernetes-sigs/cloud-provider-kind) daemon (`CloudProviderKind`) as a detached host process so `type: LoadBalancer` Services on kind get real `127.0.0.1:<port>` IPs. PID + log file are persisted in Pulumi state; the daemon is killed on `pulumi destroy`.
+1. A local image registry and management kind cluster through ctlptl.
+2. A `cloud-provider-kind` daemon so `LoadBalancer` Services are reachable from
+   the host.
+3. In-cluster Gitea plus a seeded GitOps repository containing the current local
+   `HEAD`.
+4. Flux source wiring and a PKO `Stack` that runs the inner `ca4s-init` program.
+5. Control-plane services: CAPI Operator, cert-manager, AWX Operator, AWX
+   instance, and AWX API configuration.
+6. A local CAPD workload cluster with local-path storage, Calico, workload
+   cert-manager, kube-prometheus-stack, Slinky operator, and Slurm.
 
-The ctlptl manifest is vendored inside the Pulumi program ([`pulumi/ctlptl/ctlptl_cluster.py`](pulumi/ctlptl/ctlptl_cluster.py)); there is no on-disk YAML to edit. The [`ctlptl.yaml`](ctlptl.yaml) and [`setup.sh`](setup.sh) at the repo root are **deprecated** and will be removed.
-
-Phase 2 — GitOps source (in-cluster Gitea by default; see [`pulumi/gitrepo/`](pulumi/gitrepo/)):
-
-1. Installs Gitea via the upstream Helm chart (pinned in [`gitea_builtin.py`](pulumi/gitrepo/gitea_builtin.py)) into the management cluster — sqlite + in-memory cache, single 2 GiB PVC backing `/data` so the seeded repo survives pod restarts.
-2. Generates a random admin password, stores it as `gitea-credentials` (`username` / `password` keys) in the `gitea` namespace — same Secret consumed by the Gitea chart's `existingSecret` and by downstream PKO `Stack.spec.gitAuth.basicAuth` (both `userName` and `password` `SecretKeySelector`s point at this Secret's matching keys).
-3. Exposes Gitea's HTTP service as `type: LoadBalancer` so `cloud-provider-kind` publishes a host-reachable address.
-4. Creates the empty `<admin>/cluster-api-provider-slinky` repository via Gitea's REST API ([`gitea_repo.py`](pulumi/gitrepo/gitea_repo.py)).
-5. Force-pushes the local working tree's current `HEAD` into that repo's default branch ([`gitea_seed.py`](pulumi/gitrepo/gitea_seed.py)) — the seed re-runs only when local `HEAD` moves.
-
-Phase 3 — PKO bootstrap: *not yet implemented*; tracked as a TODO block in [`pulumi/stack_local.py`](pulumi/stack_local.py).
+The old root-level AWX, CAPI quickstart, Helm values, and setup manifests have
+been removed. The supported local path is Pulumi/PKO.
 
 ```bash
 cd pulumi
 pulumi stack init local        # first time only; creates Pulumi.local.yaml
-pulumi up -s local
-# Phase 1 outputs:
-CONTEXT=$(pulumi stack output context -s local)             # e.g. kind-mgmt-<hash>
-REGISTRY_PORT=$(pulumi stack output registry_port -s local) # e.g. 43181
-kubectl cluster-info --context "$CONTEXT"
-echo "local registry at localhost:${REGISTRY_PORT}"
-
-# Phase 2 outputs (GitOpsRepository contract — consumed by PKO):
-pulumi stack output gitops_url -s local                          # in-cluster URL for PKO Stack.spec.projectRepo
-pulumi stack output gitops_url_external -s local                 # host-reachable URL, e.g. http://172.18.0.5:3000/...
-pulumi stack output gitops_default_branch -s local               # main
-pulumi stack output gitops_credentials_secret_name -s local      # gitea-credentials
-pulumi stack output gitops_credentials_secret_namespace -s local # gitea
+pulumi up -s local --yes
 ```
 
-The admin password is stored encrypted in Pulumi state; surface it for AWX / browser use with:
+Watch the PKO init stack reconcile:
 
 ```bash
-kubectl -n gitea get secret gitea-credentials -o jsonpath='{.data.password}' | base64 -d ; echo
+CONTEXT=$(pulumi stack output context -s local)
+PKO_INIT_STACK=$(pulumi stack output pko_init_stack -s local)
+kubectl --context "$CONTEXT" -n pulumi-kubernetes-operator get stack "$PKO_INIT_STACK" -w
 ```
 
-Install AWX Operator.
+Optional troubleshooting snippets:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-helm repo add awx-operator https://ansible-community.github.io/awx-operator-helm/
-helm install my-awx-operator awx-operator/awx-operator -n awx --create-namespace -f awx.yaml
-# display your AWX admin password
-kubectl get secret awx-admin-password -n awx -o jsonpath="{.data.password}" | base64 --decode ; echo
+# REGISTRY_PORT=$(pulumi stack output registry_port -s local)
+# kubectl cluster-info --context "$CONTEXT"
+# echo "local registry at localhost:${REGISTRY_PORT}"
+
+# pulumi stack output gitops_url -s local
+# pulumi stack output gitops_url_external -s local
+# pulumi stack output pko_flux_source_name -s local
+
+# request="manual-$(date +%s)"
+# kubectl --context "$CONTEXT" -n pulumi-kubernetes-operator annotate gitrepository gitops-source \
+#   reconcile.fluxcd.io/requestedAt="$request" --overwrite
+# kubectl --context "$CONTEXT" -n pulumi-kubernetes-operator wait gitrepository/gitops-source \
+#   --for=jsonpath='{.status.lastHandledReconcileAt}'="$request" --timeout=180s
+
+# request="manual-$(date +%s)"
+# kubectl --context "$CONTEXT" -n pulumi-kubernetes-operator annotate stack "$PKO_INIT_STACK" \
+#   pulumi.com/reconciliation-request="$request" --overwrite
 ```
 
-Using your AWX `admin` username and password, log in to AWX. Forward the AWX service to a local port (the kind cluster no longer publishes 32000 on the host — we use just-in-time port forwarding instead to avoid conflicts):
+### Workload Cluster And Slurm
+
+Extract the CAPD workload-cluster kubeconfig from the management cluster:
 
 ```bash
-kubectl -n awx port-forward svc/awx-service 8080:80
+MGMT_CONTEXT=$(pulumi -C pulumi stack output context -s local)
+WORKLOAD_CLUSTER=$(kubectl --context "$MGMT_CONTEXT" -n default \
+  get cluster -o jsonpath='{.items[0].metadata.name}')
+WORKLOAD_KUBECONFIG="$PWD/${WORKLOAD_CLUSTER}.kubeconfig"
+
+kubectl --context "$MGMT_CONTEXT" -n default \
+  get secret "${WORKLOAD_CLUSTER}-kubeconfig" \
+  -o jsonpath='{.data.value}' | base64 -d > "$WORKLOAD_KUBECONFIG"
 ```
 
-Then browse to `http://localhost:8080`.
+Port-forward the Slurm login service and verify access:
 
-Go to `Administration -> Instance Groups -> default`, press `Edit`, then check `Customize pod specification` and paste `pod-spec-override.yaml` into the `Custom pod spec` field, in order for the kubeconfig directory to properly mount into AWX runners, so that AWX can access data of management cluster. (TODO: instead of this kubeconfig mounting hack, properly introduce k8s credentials into AWX via awx-operator or some other methods)
-
-Go to `Resources -> Credentials` and add your Gitea username and password as a credential of type `Source Control`.
-
-Go to `Resources -> Projects` and add a project of Source Control Type `Git`. The Source Control URL should be `http://host.docker.internal:3000/<your gitea admin username>/cluster-api-provider-slinky.git`, with appropriate branch/tag/commit name and Source Control Credential pointing to the credential you added in the last step.
-
-Go to `Resources -> Inventories` and add an inventory. Go to `Sources` of this inventory, add an inventory source `Sourced from a project`, and choose the Project you added in the last step, with Inventory file set as `projects/test/roles/sync/files/run.py`. For Update options, select `Overwrite` and `Update on launch`.
-
-Go to `Resources -> Credentials` and add another credential of type `Machine`, with `root` as username and containing your SSH private key (and passphrase if you have any). This SSH Key would be used by Ansible to access pseudo-nodes bootstrapped by CAPD.
-
-Go to `Resources -> Templates` and add a job template, with Job Type of `Run`, Inventory and project set to what you created in previous steps, Playbook set to `projects/test/run.yml`, and Credentials set to the previous credential. This is a sample Ansible job that collects hostnames of nodes in the inventory, which will trigger the refresh of the inventory (which collects Cluster API node data) every time it runs.
-
-Install [CAPD](https://github.com/kubernetes-sigs/cluster-api/blob/main/test/infrastructure/docker/README.md) and turn your current Kind cluster into a CAPD management cluster, which we will use to create and manage CAPD workload clusters in the steps after.
 ```bash
-export CLUSTER_TOPOLOGY=true
-clusterctl init --infrastructure docker
-# enhance metadata propagation so that Slinky labels from CAPI Machines land on workload Nodes
-kubectl -n capi-system patch deployment/capi-controller-manager --type=json -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--additional-sync-machine-labels=.*slinky\\.slurm\\.net.*"}]'
-```
-
-open `capi-quickstart.yaml` and modify the SSH public key (corresponding to the private key in AWX) inside `preKubeCommands` (around line 329).
-
-Create the CAPD cluster. wait for the cluster to be ready.
-```bash
-kubectl apply -f capi-quickstart.yaml
-# wait some time
-clusterctl get kubeconfig capi-quickstart > capi-quickstart.kubeconfig
-# https://cluster-api.sigs.k8s.io/clusterctl/developers#fix-kubeconfig-when-using-docker-desktop-and-clusterctl
-# Point the kubeconfig to the exposed port of the load balancer, rather than the inaccessible container IP.
-sed -i -e "s/server:.*/server: https:\/\/$(docker port capi-quickstart-lb 6443/tcp | sed "s/0.0.0.0/host.docker.internal/")/g" ./capi-quickstart.kubeconfig
-# CAPD nodes won't be ready until we install CNI
-# Download Calico manifest and replace docker.io images with quay.io to avoid Docker Hub rate limits
-curl -sL https://raw.githubusercontent.com/projectcalico/calico/v3.30.3/manifests/calico.yaml \
-  | sed 's|docker.io/calico/|quay.io/calico/|g' \
-  | kubectl --kubeconfig=./capi-quickstart.kubeconfig apply -f -
-# monitor CAPD cluster and wait for it to become ready
-watch -c clusterctl describe cluster capi-quickstart --color
-```
-
-Run the job in AWX. The job should now output the hostnames of all pseudo-nodes of the CAPD cluster (which are Docker containers under the hood), and the inventory's host list should also contain those hosts. This means that AWX is now aware of these nodes and Ansible can bootstrap SSSD/Storage/networking/etc.
-
-Next, we introduce Slurm into the cluster by installing `slurm-operator`. We need to switch to the CAPD cluster's k8s context first.
-```bash
-export KUBECONFIG="$(pwd)/capi-quickstart.kubeconfig"
-# add a local-path-based StorageClass for Slurm persistence
-kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.32/deploy/local-path-storage.yaml
-kubectl patch storageclass local-path -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
-kubectl patch storageclass local-path -p '{"metadata":{"annotations":{"defaultVolumeType":"local"}}}'
-# relax pod security for local storage to work
-kubectl label ns local-path-storage pod-security.kubernetes.io/enforce=privileged --overwrite
-kubectl label ns local-path-storage pod-security.kubernetes.io/enforce-version=latest --overwrite
-# Pin platform Deployments installed as raw manifests (calico-kube-controllers, coredns,
-# local-path-provisioner) to the controller node, so cluster-autoscaler can scale compute in.
-./scripts/pin-platform-pods.sh
-helm install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.18.2 -f cert-manager-values.yaml --namespace cert-manager --create-namespace
-helm install slurm-operator-crds oci://ghcr.io/slinkyproject/charts/slurm-operator-crds
-helm install slurm-operator oci://ghcr.io/slinkyproject/charts/slurm-operator -f slurm-operator-values.yaml --namespace=slinky --create-namespace
-helm install slurm oci://ghcr.io/slinkyproject/charts/slurm -f slurm-cluster.yaml --set-file "loginsets.slinky.rootSshAuthorizedKeys=${HOME}/.ssh/id_rsa.pub" --namespace=slurm --create-namespace
-kubectl label ns slurm pod-security.kubernetes.io/enforce=privileged --overwrite
-kubectl label ns slurm pod-security.kubernetes.io/enforce-version=latest --overwrite
-```
-
-The Pulumi workload-cluster class installs `kube-prometheus-stack` before Slinky
-so Slurm `ServiceMonitor` resources have their CRDs available. To access the
-Grafana instance created by the managed stack:
-```bash
-export KUBECONFIG="$(pwd)/capi-quickstart.kubeconfig"
-# check status
-kubectl --namespace prometheus get pods -l "release=prometheus"
-# get Grafana 'admin' user password
-kubectl --namespace prometheus get secrets prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo
-# access Grafana local instance
-export POD_NAME=$(kubectl --namespace prometheus get pod -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance=prometheus" -oname)
-kubectl --namespace prometheus port-forward $POD_NAME 3000
-```
-
-In a separate terminal, port forward the Slurm login node:
-```bash
-kubectl -n slurm port-forward svc/slurm-login-slinky 2222:22
-```
-
-Log into the Slurm login node:
-```bash
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm port-forward svc/slurm-login-slinky 2222:22
 ssh -p 2222 root@127.0.0.1
-```
-
-Run Slurm commands to quickly verify that Slurm is functioning:
-```bash
 sinfo
-srun hostname
-sbatch --wrap="sleep 60"
-squeue
-sacct
 ```
 
-## Platform pod placement
+### Autoscaling
 
-The controller worker `MachineDeployment` is tainted with `slinky.slurm.net/controller:NoSchedule`; the compute `MachineDeployment` is untainted so Cluster Autoscaler can remove idle compute nodes without fighting tenant/platform pods. Slurm NodeSet pods reach compute nodes via `nodeAffinity` and pod anti-affinity.
+See [docs/autoscaling.md](docs/autoscaling.md) for the autoscaling design,
+including NodeSet placement, Cluster Autoscaler ownership, and scale-in behavior.
 
-Every other platform component (`cert-manager`, `slurm-operator`, `kube-prometheus-stack`, `keda`, `local-path-provisioner`, `coredns`, `calico-kube-controllers`) is pinned to the controller node so that **no non-DaemonSet pod ever lands on a compute node and blocks cluster-autoscaler scale-in**. DaemonSets (`calico-node`, `kube-proxy`, `prometheus-node-exporter`) intentionally run everywhere — they don't block scale-in.
+With the login node port forwarded to port `2222`, run the manual demand
+generator:
 
-| File | Used by |
-|---|---|
-| `cert-manager-values.yaml` | `helm install cert-manager -f cert-manager-values.yaml` |
-| `slurm-operator-values.yaml` | `helm install slurm-operator -f slurm-operator-values.yaml` |
-| `slurm-cluster.yaml` | `helm install slurm -f slurm-cluster.yaml` (head pods + NodeSet affinity) |
-| `prometheus-values.yaml` | Legacy manual Prometheus install values; Pulumi now renders equivalent placement values directly. |
-| `keda-values.yaml` | `helm install keda -f keda-values.yaml` |
-| `scripts/pin-platform-pods.sh` | Post-install patches for raw-manifest Deployments (coredns, calico-kube-controllers, local-path-provisioner) |
-
-## Locally building Slinky
-
-<!--
-TODO(host-registry-port): the helm-oci pulls below hardcode
-`host.docker.internal:5000`. The registry's host port is now allocated at
-runtime by Pulumi (see `pulumi -C pulumi stack output
-registry_port -s local`), so these commands will fail until callers either:
-  (a) read the chosen port from the stack output and substitute it in, or
-  (b) reach the registry by its container name on the kind network
-      (`pulumi -C pulumi stack output registry_name -s local`, port 5000)
-      from inside the cluster.
-The matching containerd mirror in capi-quickstart.yaml is also stale; see
-the TODO in scripts/generate_capi_quickstart.py.
--->
-
-```bash
-# Local container registry for Slinky development, created by the Pulumi
-# bootstrap stack (pulumi/). Read its host-side address with:
-#   pulumi -C pulumi stack output registry_port -s local
-# and its in-cluster container name with:
-#   pulumi -C pulumi stack output registry_name -s local
-# in another slurm-operator repo, run `make push REGISTRY=host.docker.internal:5000/slinky`, then we switch to CAPD cluster and install:
-helm install slurm-operator-crds oci://host.docker.internal:5000/slinky/charts/slurm-operator-crds
-helm install slurm-operator oci://host.docker.internal:5000/slinky/charts/slurm-operator -f slurm-operator-values.yaml --namespace=slinky --create-namespace
-helm install slurm oci://host.docker.internal:5000/slinky/charts/slurm -f slurm-cluster.yaml --set-file "loginsets.slinky.rootSshAuthorizedKeys=${HOME}/.ssh/id_rsa.pub" --namespace=slurm --create-namespace
-kubectl label ns slurm pod-security.kubernetes.io/enforce=privileged --overwrite
-kubectl label ns slurm pod-security.kubernetes.io/enforce-version=latest --overwrite
-```
-
-## Autoscaling
-
-The autoscaling logical workflow behaves as follows:
-- Slurm jobs are submitted
-- slurmctld built-in metrics endpoint exports Slurm job queue data into Prometheus
-- Keda (or some other more sophisticated custom logic) scales Slinky NodeSet replicas based on Prometheus data
-- more NodeSet replicas lead to unschedulable NodeSet pods
-- Cluster Autoscaler sees unschedulable pods, and Cluster API cloud provider of Cluster Autoscaler scales up the compute MachineDeployment
-- The compute MachineDeployment increases its number of replicas, which brings more nodes into the workload cluster
-- NodeSet pods is now schedulable onto the newly-introduced nodes
-- new nodes join the Slurm cluster and pick up the jobs
-
-The Pulumi workload-cluster class installs Cluster Autoscaler into the management cluster. For autoscaled worker classes, Pulumi creates the CAPI MachineDeployment with min/max autoscaler annotations and omits `spec.replicas`; Cluster Autoscaler then owns the live replica count. Pulumi also ignores `spec.replicas` drift for those MachineDeployments so PKO does not fight autoscaler decisions.
-
-We then install KEDA to scale the Slurm NodeSet based on Prometheus metrics of pending jobs:
-```bash
-# Switch to CAPI workload cluster again
-export KUBECONFIG="$(pwd)/capi-quickstart.kubeconfig"
-helm repo add kedacore https://kedacore.github.io/charts
-helm repo update
-helm install keda kedacore/keda -f keda-values.yaml --namespace keda --create-namespace
-kubectl apply -f nodeset-scaledobject.yaml
-```
-
-Finally, with login node still port forwarded to port 2222, let's do some autoscale testing:
 ```bash
 scp -P 2222 scripts/sleep-exclusive.slurm root@127.0.0.1:~/
 scp -P 2222 scripts/slurm_load_generator.sh root@127.0.0.1:~/
 ssh -p 2222 root@127.0.0.1 'chmod +x slurm_load_generator.sh'
 ssh -p 2222 root@127.0.0.1 './slurm_load_generator.sh'
 ```
+
+In another shell, watch Slurm nodes come and go:
+
+```bash
+while true; do
+  ssh -p 2222 root@127.0.0.1 sinfo
+  sleep 10
+done
+```
+
+## Components
+
+The local stack is split into a few cooperating components:
+
+- **ctlptl registry and management kind cluster**: ctlptl creates the local
+  registry and the management kind cluster. The management cluster hosts the
+  control-plane services and the CAPI resources that describe workload clusters.
+- **cloud-provider-kind**: a host-side daemon that gives kind `LoadBalancer`
+  Services reachable addresses, including the Gitea and AWX Services used during
+  local development.
+- **Gitea and Flux**: Gitea is the in-cluster GitOps source seeded from local
+  `HEAD`. Flux watches that repository and produces source artifacts for PKO.
+- **Pulumi Kubernetes Operator (PKO)**: PKO runs the inner Pulumi stacks from
+  Flux artifacts. The outer stack owns the initial `ca4s-init` Stack CR; that
+  inner stack owns the control-plane and workload-cluster components.
+- **Cluster API and CAPD**: CAPI models the workload cluster in the management
+  cluster. CAPD turns those CAPI resources into local Docker-backed Kubernetes
+  nodes.
+- **Workload services**: the workload cluster installs Calico, local-path
+  storage, cert-manager, kube-prometheus-stack, the Slinky operator, and Slurm.
+- **AWX**: AWX is managed by the control-plane stack. Pulumi creates the AWX
+  organization, GitOps source-control credential, project-sync fence, management
+  Kubernetes credential type, dynamic CAPI/Slinky inventory source, and the
+  `ca4s-collect-cluster-state` job template.
+
+To inspect AWX locally:
+
+```bash
+kubectl -n awx port-forward svc/awx-service 8080:80
+kubectl -n awx get secret awx-admin-password \
+  -o jsonpath='{.data.password}' | base64 -d ; echo
+```
+
+Then browse to `http://localhost:8080` and log in as `admin`.
 
 ## Contributing
 

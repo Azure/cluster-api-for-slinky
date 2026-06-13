@@ -69,11 +69,10 @@ def run() -> None:
 
     config = pulumi.Config()
 
-    # Default ``True``: on WSL2/Mac/Windows the kind docker bridge is not
-    # routable from the host, so we want cloud-provider-kind to publish each
-    # LoadBalancer Service via ``docker run -p 127.0.0.1:<port>:<port>`` and
-    # advertise ``EXTERNAL-IP=127.0.0.1``. On a pure-Linux host with native
-    # Docker, you can override to ``false`` for bridge-IP semantics:
+    # Default ``True``: publish each LoadBalancer Service via
+    # ``docker run -p 127.0.0.1:<port>:<port>`` and advertise
+    # ``EXTERNAL-IP=127.0.0.1``. On native Docker, you can override to
+    # ``false`` for bridge-IP semantics:
     #     pulumi config set enable_lb_port_mapping false -s local
     enable_lb_port_mapping = config.get_bool("enable_lb_port_mapping")
     if enable_lb_port_mapping is None:
@@ -123,8 +122,8 @@ def run() -> None:
         #
         # Passing ``registry.registry_name`` (an ``Output[str]``) here
         # both:
-        #   (a) tells the provider what to substitute for
-        #       ``${REGISTRY_NAME}`` inside the manifest, and
+        #   (a) tells the provider which registry container to write into
+        #       the management nodes' generated Docker Hub hosts.toml, and
         #   (b) wires a Pulumi DAG edge registry -> cluster, so the
         #       registry container is created first and torn down last —
         #       no explicit ``depends_on`` required.

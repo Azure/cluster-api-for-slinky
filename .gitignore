@@ -2,6 +2,7 @@
 # Licensed under the MIT license.
 
 .venv
+.vscode/
 
 # CAPD workload cluster kubeconfig shall not be committed to source control
 *.kubeconfig

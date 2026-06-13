@@ -36,10 +36,9 @@ Inputs
   per-Service haproxy container's ``-p 127.0.0.1:<port>:<port>``
   mapping and reports ``EXTERNAL-IP=127.0.0.1``. When ``False``,
   the EXTERNAL-IP is an address on the kind docker bridge, which is
-  routable on native Linux but **not** from inside a WSL2 distro
-  (Docker Desktop runs the daemon in a separate VM). Default ``True``
-  is the right choice for Mac/Windows/WSL2; flip to ``False`` on a
-  pure-Linux host if you prefer bridge-IP semantics.
+    routable when native Docker runs in the same network namespace as
+    your shell. Default ``True`` gives consistent localhost access; set
+    ``False`` if you prefer bridge-IP semantics on native Docker.
 
 State stored
 ------------
@@ -62,20 +61,14 @@ Caveats
   experimentation). If one is already running, ``pulumi up`` will
   spawn a second copy and the two will fight over Service
   reconciliation. Kill any existing daemon before the first ``up``.
-* On Linux, ``CAP_NET_ADMIN`` + ``CAP_NET_BIND_SERVICE`` on the binary
-  are only useful in the **niche** case of bridge-IP mode
-  (``enable_lb_port_mapping=False``) on a host where the kind docker
-  bridge isn't already in your shell's network namespace — e.g.,
-  Docker Desktop's split-namespace WSL2 integration, which puts
-  dockerd in a separate distro. On native Docker (recommended:
-  Linux desktop or WSL2 with native ``dockerd``) the kind bridge
-  *is* in your shell's netns, the kernel routes to it natively, and
-  the LB ``EXTERNAL-IP`` is curlable with no caps required. The
-  default ``enable_lb_port_mapping=True`` mode publishes ports via
-  per-Service envoy containers and likewise needs no caps. ``create``
-  emits a non-fatal diagnostic via ``pulumi.log.warn`` when the caps
-  are missing, naming the exact ``setcap`` command and the specific
-  scenario where it helps; no resource failure occurs.
+* On native Docker (recommended: Linux desktop or WSL2 with native
+    ``dockerd``), the kind bridge is in your shell's network namespace,
+    the kernel routes to it natively, and the LB ``EXTERNAL-IP`` is
+    curlable with no caps required. The default
+    ``enable_lb_port_mapping=True`` mode publishes ports via per-Service
+    envoy containers and likewise needs no caps. ``create`` emits a
+    non-fatal diagnostic via ``pulumi.log.warn`` when Linux file caps are
+    missing, but no resource failure occurs.
 
 Pickling note
 -------------
@@ -290,36 +283,22 @@ class _CloudProviderKindProvider(ResourceProvider):
             f"--enable-lb-port-mapping={'true' if enable_lb_port_mapping else 'false'}",
         ]
 
-        # Capability diagnostic (non-fatal). ``cap_net_admin`` +
-        # ``cap_net_bind_service`` on the binary only matter in a
-        # narrow case: bridge-IP mode (``enable_lb_port_mapping=False``)
-        # on a host where the kind docker bridge lives in a network
-        # namespace different from your shell — e.g., Docker Desktop's
-        # split-namespace WSL2 integration, where dockerd runs in a
-        # separate ``docker-desktop`` distro. In that case the daemon
-        # needs to add the LB IP to a host interface for the kernel to
-        # route to it. On native Docker (the recommended setup on
-        # Linux/WSL2) the bridge already is in your shell's netns, the
-        # kernel routes to it natively, and these caps are not needed.
-        # The default ``enable_lb_port_mapping=True`` publishes per-
-        # Service host ports via Docker and likewise needs no caps.
-        # We emit a warning if caps are missing, so users who later flip
-        # ``enable_lb_port_mapping=False`` on a split-namespace host have
-        # a paper trail of what to do — but we never fail the resource.
+        # Capability diagnostic (non-fatal). On native Docker (the recommended
+        # setup on Linux/WSL2), the kind bridge already is in your shell's
+        # network namespace, the kernel routes to it natively, and these caps
+        # are not needed. The default ``enable_lb_port_mapping=True`` publishes
+        # per-Service host ports via Docker and likewise needs no caps.
         missing = _missing_caps(binary)
         if missing:
             log.warn(
                 f"cloud-provider-kind at {binary} has no Linux file "
                 f"capabilities ({', '.join(sorted(missing))} missing). "
                 "This is only relevant if you flip "
-                "`enable_lb_port_mapping=False` AND your host has the "
-                "kind docker bridge in a different network namespace "
-                "than your shell (the classic example is Docker Desktop's "
-                "WSL2 integration). On native Docker — the recommended "
-                "setup on Linux and WSL2 — the bridge is in your netns "
-                "and the LB EXTERNAL-IP is reachable without any caps. "
-                "If you ever need to enable bridge-IP mode on a split-"
-                f"namespace setup, grant them with: {_setcap_command(binary)}"
+                "`enable_lb_port_mapping=False` and need bridge-IP behavior. "
+                "On native Docker — the recommended setup on Linux and WSL2 — "
+                "the bridge is in your netns and the LB EXTERNAL-IP is "
+                "reachable without any caps. Grant them with: "
+                f"{_setcap_command(binary)}"
             )
 
         mirrors = _docker_registry_mirrors()
@@ -445,11 +424,8 @@ class CloudProviderKind(Resource):
     enable_lb_port_mapping
         When ``True`` (default), pass ``--enable-lb-port-mapping=true``
         so the daemon publishes each ``LoadBalancer`` Service's port via
-        ``docker run -p 127.0.0.1:<port>:<port>`` on the host. This is
-        the right setting for Mac/Windows/WSL2 where the kind docker
-        bridge isn't routable from the host. On a pure-Linux host with
-        native Docker you can set this to ``False`` to get bridge-IP
-        semantics instead.
+        ``docker run -p 127.0.0.1:<port>:<port>`` on the host. Set this to
+        ``False`` on native Docker if you prefer bridge-IP semantics instead.
     """
 
     pid: Output[int]

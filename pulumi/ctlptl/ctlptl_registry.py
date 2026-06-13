@@ -39,8 +39,8 @@ Diff semantics for ``registry_name``
   value that differs from what state currently holds.
 
 The autonamed value is surfaced as the ``registry_name`` output so the
-cluster manifest can reference the registry by its actual name (the
-``${REGISTRY_NAME}`` placeholder in ``CtlptlCluster``'s vendored manifest).
+management cluster can route containerd's Docker Hub pulls through the registry
+by its actual Docker container name.
 
 Port semantics
 --------------

@@ -1,7 +1,4 @@
-# Python dependencies for cluster-api-provider-slinky tooling scripts
-
-# YAML round-trip preservation for generate_capi_quickstart.py
-ruamel.yaml>=0.18,<0.19
+# Python dependencies for cluster-api-provider-slinky Pulumi stacks and tests
 
 # Pulumi Python SDK (used by the umbrella stack at pulumi/)
 pulumi>=3.0,<4.0
@@ -34,8 +31,8 @@ requests>=2.31,<3.0
 
 # ---------------------------------------------------------------------------
 # Test / dev tooling. Imported only from pulumi/tests/. Not needed at
-# runtime for ``pulumi up``; kept in the same file (instead of a separate
-# requirements-dev.txt) to keep ``setup.sh`` to one ``pip install -r`` call.
+# runtime for ``pulumi up``; kept in the same file for a single local setup
+# command.
 # ---------------------------------------------------------------------------
 
 # Test runner + plugins.

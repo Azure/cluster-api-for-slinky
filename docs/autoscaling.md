@@ -1,14 +1,16 @@
 # Autoscaling: From Slurm Jobs to CAPD Nodes
 
-This document explains the end-to-end autoscaling pipeline that dynamically
-provisions Kubernetes (CAPD) nodes in response to pending Slurm jobs.
+This document explains the intended end-to-end autoscaling pipeline that
+dynamically provisions Kubernetes (CAPD) nodes in response to pending Slurm
+jobs. The Pulumi local stack currently owns the Cluster Autoscaler side of the
+pipeline; workload-driven NodeSet scaling remains future work.
 
 ## High-Level Flow
 
 ```
 Slurm pending jobs
   → Prometheus scrapes slurmctld metrics
-    → KEDA scales the NodeSet (slurmd pod count)
+    → KEDA or a future controller scales the NodeSet (slurmd pod count)
       → Unschedulable slurmd pods appear
         → Cluster Autoscaler scales the compute MachineDeployment
           → CAPD creates new Docker "nodes"
@@ -21,10 +23,10 @@ Slurm pending jobs
 
 ### 1. Slurm Metrics → Prometheus
 
-The `slurmctld` controller exposes a built-in Prometheus metrics endpoint
-(enabled via `controller.metrics.enabled: true` in `slurm-cluster.yaml`).
-A `ServiceMonitor` lets Prometheus scrape this endpoint automatically. The
-key metric is:
+The `slurmctld` controller exposes a built-in Prometheus metrics endpoint. The
+Pulumi workload-cluster class enables controller metrics in generated Slurm Helm
+values and installs kube-prometheus-stack before Slinky so the Slurm chart's
+`ServiceMonitor` resources can be created. The key metric is:
 
 ```
 slurm_partition_jobs_pending{partition="all"}
@@ -34,8 +36,8 @@ This is the number of Slurm jobs waiting for compute resources.
 
 ### 2. KEDA ScaledObject → NodeSet Replicas
 
-A KEDA `ScaledObject` (`nodeset-scaledobject.yaml`) watches the pending-jobs
-metric and maps it to the replica count of a Slinky **NodeSet**:
+The intended KEDA integration watches the pending-jobs metric and maps it to the
+replica count of a Slinky **NodeSet**:
 
 ```yaml
 spec:
@@ -53,16 +55,17 @@ spec:
       activationThreshold: '1'
 ```
 
-When at least one job is pending, KEDA increases the NodeSet replica count
-(up to 10). Each replica becomes one `slurmd` pod—essentially one Slurm
-compute node. When pending jobs drop to zero, KEDA scales back down (minimum
-of 1 replica).
+When at least one job is pending, the scaler increases the NodeSet replica
+count. Each replica becomes one `slurmd` pod, essentially one Slurm compute
+node. When pending jobs drop to zero, the scaler reduces replicas back to its
+configured minimum.
 
 ### 3. Unschedulable Pods → Cluster Autoscaler → MachineDeployment
 
 Because of the **anti-affinity** rule (see below), each slurmd pod requires
-its own dedicated Kubernetes node. When KEDA requests more NodeSet replicas
-than there are available compute nodes, the new pods become *unschedulable*.
+its own dedicated Kubernetes node. When the scaler requests more NodeSet
+replicas than there are available compute nodes, the new pods become
+*unschedulable*.
 
 The **Cluster Autoscaler** runs on the management cluster and watches the
 workload cluster through the CAPI-generated workload kubeconfig. The local
@@ -176,15 +179,15 @@ Pulumi worker class
   → MachineDeployment metadata.labels
     → Machine metadata.labels
       → Kubernetes Node labels  (via CAPI controller --additional-sync-machine-labels)
-        → Pod nodeAffinity selectors match  (slurm-cluster.yaml)
+        → Pod nodeAffinity selectors match  (generated Slurm Helm values)
 ```
 
 ---
 
 ## Anti-Affinity: One slurmd Per Node
 
-The NodeSet in `slurm-cluster.yaml` declares a **hard pod anti-affinity**
-rule on the compute pods:
+The generated Slurm Helm values declare a **hard pod anti-affinity** rule on the
+compute NodeSet pods:
 
 ```yaml
 nodesets:
@@ -225,7 +228,7 @@ This enforces two constraints:
 The anti-affinity rule is what *bridges* KEDA scaling to infrastructure
 scaling:
 
-1. KEDA increases the NodeSet to N replicas (N slurmd pods requested).
+1. The scaler increases the NodeSet to N replicas (N slurmd pods requested).
 2. If only M < N compute nodes exist, the remaining N − M pods are
    **unschedulable** — the scheduler cannot place two slurmd pods on the
    same node.
@@ -261,6 +264,15 @@ This ensures all Slurm management components run on the controller worker
 rather than on compute workers, keeping head-node traffic isolated from worker
 workloads.
 
+Other non-DaemonSet platform components are also pinned to the controller
+worker, including `cert-manager`, `slurm-operator`, `kube-prometheus-stack`,
+`local-path-provisioner`, `coredns`, and `calico-kube-controllers`. The goal is
+that no ordinary platform Deployment lands on a compute node and prevents
+Cluster Autoscaler from removing that node when Slurm demand drops. DaemonSets
+such as `calico-node`, `kube-proxy`, and `prometheus-node-exporter` still run on
+every node; Cluster Autoscaler understands DaemonSet overhead and they do not
+block scale-in by themselves.
+
 ---
 
 ## Controller Node Taint Isolation
@@ -281,14 +293,18 @@ with `nodeAffinity`, and this keeps Cluster Autoscaler scale-in simpler: idle
 compute nodes are not held alive by platform pods that accidentally tolerated a
 compute taint.
 
+Placement is rendered directly by the Pulumi workload-cluster class. There are
+no separate root-level Helm values files for the managed local stack.
+
 ### Who Tolerates the Taint
 
 | Component | Tolerates controller taint? | How |
 |-----------|-----------------------------|-----|
 | Slurm controller/login/restapi | Yes | Generated chart values add `slinky.slurm.net/controller` toleration and controller node affinity |
+| Pinned platform Deployments | Yes | Generated Pulumi/Helm values add controller tolerations plus controller node affinity so they avoid compute nodes |
 | slurmd NodeSet workers | No | They select compute nodes by `slinky.slurm.net/node-type: compute` |
 | DaemonSets | Usually yes | Kubernetes DaemonSet defaults or chart tolerations allow node agents everywhere |
-| Tenant/platform Deployments | No | They stay off the controller worker unless explicitly configured |
+| Tenant workloads | No | They stay off the controller worker unless explicitly configured |
 
 ### NodeSet Placement
 
@@ -311,26 +327,8 @@ nodesets:
 
 ## Summary Diagram
 
-```
-┌──────────────────────── Management Cluster (Kind) ───────────────────────┐
-│                                                                          │
-│  Cluster Autoscaler ──discovers──▶ MachineDeployment (compute)           │
-│         │                          label: autoscaler-enabled             │
-│         │                          annotations: min=1, max=10            │
-│         │                                  │                             │
-│         │ scales up/down                   │ CAPD creates Docker nodes   │
-│         ▼                                  ▼                             │
-│  ┌─────────────────────── Workload Cluster ────────────────────────┐     │
-│  │                                                                 │     │
-│  │  Prometheus ◀── scrapes ── slurmctld (metrics)                  │     │
-│  │      │                        ▲                                 │     │
-│  │      ▼                        │ on controller node              │     │
-│  │    KEDA ──scales──▶ NodeSet (slurm-worker-slinky)               │     │
-│  │                        │                                        │     │
-│  │                        ├─▶ slurmd pod ──▶ compute node 1        │     │
-│  │                        ├─▶ slurmd pod ──▶ compute node 2        │     │
-│  │                        └─▶ slurmd pod ──▶ compute node N        │     │
-│  │                           (1:1, enforced by anti-affinity)      │     │
-│  └─────────────────────────────────────────────────────────────────┘     │
-└──────────────────────────────────────────────────────────────────────────┘
-```
+![Autoscaling flow from Slurm jobs to CAPD nodes](images/autoscaling.svg)
+
+[Open the autoscaling SVG](images/autoscaling.svg)
+
+[View the Graphviz source](images/autoscaling.dot)
