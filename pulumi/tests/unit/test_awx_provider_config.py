@@ -16,6 +16,7 @@ from stacks.control_plane.awx._configuration import (
     management_kubernetes_credential_inputs,
     source_control_credential_inputs,
 )
+from stacks.control_plane.awx._provider import awx_ready_instance_count
 from stacks.control_plane.awx._project_sync import flux_artifact_revision_sha
 
 
@@ -30,6 +31,53 @@ def test_decode_secret_data_value_decodes_base64_key() -> None:
     encoded = base64.b64encode(b"secret-password").decode("ascii")
 
     assert decode_secret_data_value({"password": encoded}, "password") == "secret-password"
+
+
+def test_awx_ready_instance_count_requires_enabled_ready_capacity() -> None:
+    assert (
+        awx_ready_instance_count(
+            {
+                "results": [
+                    {
+                        "enabled": True,
+                        "node_state": "ready",
+                        "node_type": "control",
+                        "capacity": 320,
+                    },
+                    {
+                        "enabled": True,
+                        "node_state": "ready",
+                        "node_type": "execution",
+                        "capacity": 320,
+                    },
+                    {
+                        "enabled": False,
+                        "node_state": "ready",
+                        "node_type": "control",
+                        "capacity": 320,
+                    },
+                    {
+                        "enabled": True,
+                        "node_state": "installed",
+                        "node_type": "control",
+                        "capacity": 320,
+                    },
+                    {
+                        "enabled": True,
+                        "node_state": "ready",
+                        "node_type": "control",
+                        "capacity": 0,
+                    },
+                ]
+            }
+        )
+        == 1
+    )
+
+
+@pytest.mark.parametrize("payload", [None, {}, {"results": "not a list"}])
+def test_awx_ready_instance_count_rejects_invalid_payload(payload: object) -> None:
+    assert awx_ready_instance_count(payload) == 0
 
 
 @pytest.mark.parametrize("data", [None, {}, {"password": ""}])
