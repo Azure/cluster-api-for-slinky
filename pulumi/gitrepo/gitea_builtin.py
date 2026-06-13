@@ -669,7 +669,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             opts=ResourceOptions(
                 parent=self,
                 provider=k8s_provider,
-                depends_on=[public_key_reader_binding],
+                depends_on=[eso, public_key_reader_binding],
             ),
         )
         user_public_key_secret = k8s.apiextensions.CustomResource(

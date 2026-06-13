@@ -159,17 +159,15 @@ pulumi stack init local        # first time only; creates Pulumi.local.yaml
 pulumi up -s local --yes
 ```
 
-Watch the PKO init stack reconcile:
-
-```bash
-CONTEXT=$(pulumi stack output context -s local)
-PKO_INIT_STACK=$(pulumi stack output pko_init_stack -s local)
-kubectl --context "$CONTEXT" -n pulumi-kubernetes-operator get stack "$PKO_INIT_STACK" -w
-```
+The outer `pulumi up` waits for the PKO init stack to finish reconciliation.
 
 Optional troubleshooting snippets:
 
 ```bash
+# CONTEXT=$(pulumi stack output context -s local)
+# PKO_INIT_STACK=$(pulumi stack output pko_init_stack -s local)
+# kubectl --context "$CONTEXT" -n pulumi-kubernetes-operator get stack "$PKO_INIT_STACK" -w
+
 # REGISTRY_PORT=$(pulumi stack output registry_port -s local)
 # kubectl cluster-info --context "$CONTEXT"
 # echo "local registry at localhost:${REGISTRY_PORT}"
@@ -204,12 +202,12 @@ kubectl --context "$MGMT_CONTEXT" -n default \
   -o jsonpath='{.data.value}' | base64 -d > "$WORKLOAD_KUBECONFIG"
 ```
 
-Port-forward the Slurm login service and verify access:
+Find the Slurm login pod and verify access:
 
 ```bash
-kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm port-forward svc/slurm-login-slinky 2222:22
-ssh -p 2222 root@127.0.0.1
-sinfo
+LOGIN_POD=$(kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm \
+  get endpoints slurm-login-slinky -o jsonpath='{.subsets[0].addresses[0].targetRef.name}')
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec -it "$LOGIN_POD" -- sinfo
 ```
 
 ### Autoscaling
@@ -217,23 +215,26 @@ sinfo
 See [docs/autoscaling.md](docs/autoscaling.md) for the autoscaling design,
 including NodeSet placement, Cluster Autoscaler ownership, and scale-in behavior.
 
-With the login node port forwarded to port `2222`, run the manual demand
-generator:
+Run the manual demand generator through the login pod:
 
 ```bash
-scp -P 2222 scripts/sleep-exclusive.slurm root@127.0.0.1:~/
-scp -P 2222 scripts/slurm_load_generator.sh root@127.0.0.1:~/
-ssh -p 2222 root@127.0.0.1 'chmod +x slurm_load_generator.sh'
-ssh -p 2222 root@127.0.0.1 './slurm_load_generator.sh'
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm cp scripts/sleep-exclusive.slurm "$LOGIN_POD:/root/sleep-exclusive.slurm"
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm cp scripts/slurm_load_generator.sh "$LOGIN_POD:/root/slurm_load_generator.sh"
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec "$LOGIN_POD" -- chmod +x /root/slurm_load_generator.sh
+LOAD_PID=$(kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec "$LOGIN_POD" -- \
+  sh -lc 'nohup env MIN_RATE=8 MAX_RATE=8 RATE_ADJUST_INTERVAL_MINUTES=1 /root/slurm_load_generator.sh >/root/slurm_load_generator.log 2>&1 & echo $!')
 ```
 
-In another shell, watch Slurm nodes come and go:
+Watch Slurm nodes come and go:
 
 ```bash
-while true; do
-  ssh -p 2222 root@127.0.0.1 sinfo
-  sleep 10
-done
+watch -n 10 "kubectl --kubeconfig '$WORKLOAD_KUBECONFIG' -n slurm exec '$LOGIN_POD' -- sinfo"
+```
+
+Stop the load generator after the watch:
+
+```bash
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec "$LOGIN_POD" -- kill "$LOAD_PID"
 ```
 
 ## Components

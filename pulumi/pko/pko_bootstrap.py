@@ -34,6 +34,11 @@ from pko._init_stack import INIT_PROJECT, INIT_REPO_DIR, init_stack_config
 from pko._stack_cr import StackCRSpec, build_stack_spec
 
 
+_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
+_WAIT_FOR_READY = "condition=Ready"
+_INIT_STACK_TIMEOUT = "60m"
+
+
 class PKOBootstrap(pulumi.ComponentResource):
     """Install PKO and hand off control to the inner Stack CRs.
 
@@ -62,6 +67,9 @@ class PKOBootstrap(pulumi.ComponentResource):
             component.
         opts:
             Standard Pulumi ``ResourceOptions``.
+
+    The init Stack CR is annotated with ``pulumi.com/waitFor`` so the outer
+    ``pulumi up`` does not return until PKO reports the init stack Ready.
 
     Outputs:
         namespace:
@@ -152,10 +160,20 @@ class PKOBootstrap(pulumi.ComponentResource):
             f"{name}-init",
             api_version="pulumi.com/v1",
             kind="Stack",
-            metadata={"namespace": PKO_NAMESPACE},
+            metadata={
+                "namespace": PKO_NAMESPACE,
+                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_READY},
+            },
             spec=init_spec,
             opts=ResourceOptions(
-                parent=self, provider=provider, depends_on=cr_deps
+                parent=self,
+                provider=provider,
+                depends_on=cr_deps,
+                custom_timeouts=pulumi.CustomTimeouts(
+                    create=_INIT_STACK_TIMEOUT,
+                    update=_INIT_STACK_TIMEOUT,
+                    delete=_INIT_STACK_TIMEOUT,
+                ),
             ),
         )
         init_stack_name = init_stack.metadata["name"]  # type: ignore[attr-defined]
