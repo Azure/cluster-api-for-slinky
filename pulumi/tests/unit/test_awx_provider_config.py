@@ -92,7 +92,6 @@ def test_management_kubernetes_credential_inputs_match_provider_shape() -> None:
         "bearer_token": "TOKEN",
         "host": "https://kubernetes.default.svc",
         "ssl_ca_cert": "CA",
-        "verify_ssl": True,
     }
 
 
