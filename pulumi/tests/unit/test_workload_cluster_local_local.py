@@ -5,6 +5,8 @@ from stacks.workload_cluster.workload_cluster_local_local import (
     _AUTOSCALER_MIN_ANNOTATION,
     _CLUSTER_AUTOSCALER_DISCOVERY_LABEL,
     _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE,
+    _DELETE_FOREGROUND,
+    _DELETION_PROPAGATION_ANNOTATION,
     WorkerClassSpec,
     _autoscaled_worker_classes,
     _cluster_autoscaler_fullname,
@@ -12,6 +14,7 @@ from stacks.workload_cluster.workload_cluster_local_local import (
     _cluster_autoscaler_namespace,
     _cluster_autoscaler_release_name,
     _cluster_autoscaler_values,
+    _foreground_delete_annotations,
     _machine_deployment_labels,
     _prometheus_values,
     _worker_labels,
@@ -52,6 +55,21 @@ def test_fixed_worker_class_is_not_autoscaler_discovered() -> None:
     assert _machine_deployment_labels("local-workload", worker) == {
         "cluster.x-k8s.io/cluster-name": "local-workload",
         "slinky.slurm.net/node-type": "controller",
+    }
+
+
+def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
+    annotations = _foreground_delete_annotations(
+        {
+            _AUTOSCALER_MIN_ANNOTATION: "1",
+            _AUTOSCALER_MAX_ANNOTATION: "10",
+        }
+    )
+
+    assert annotations == {
+        _AUTOSCALER_MIN_ANNOTATION: "1",
+        _AUTOSCALER_MAX_ANNOTATION: "10",
+        _DELETION_PROPAGATION_ANNOTATION: _DELETE_FOREGROUND,
     }
 
 

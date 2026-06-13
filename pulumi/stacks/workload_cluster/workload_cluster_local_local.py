@@ -118,6 +118,8 @@ _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneAvailable"
+_DELETION_PROPAGATION_ANNOTATION = "pulumi.com/deletionPropagationPolicy"
+_DELETE_FOREGROUND = "Foreground"
 _SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
@@ -219,6 +221,15 @@ def _health_check() -> dict[str, object]:
                 {"type": "Ready", "status": "False", "timeoutSeconds": 300},
             ],
         },
+    }
+
+
+def _foreground_delete_annotations(
+    annotations: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    return {
+        **(dict(annotations) if annotations else {}),
+        _DELETION_PROPAGATION_ANNOTATION: _DELETE_FOREGROUND,
     }
 
 
@@ -1117,7 +1128,7 @@ class WorkerClass(pulumi.ComponentResource):
                 "name": machine_deployment_name,
                 "namespace": _NAMESPACE,
                 "labels": machine_deployment_labels,
-                **({"annotations": worker.annotations} if worker.annotations else {}),
+                "annotations": _foreground_delete_annotations(worker.annotations),
             },
             spec=machine_deployment_spec,
             opts=child_options(
@@ -1326,6 +1337,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
+                "annotations": _foreground_delete_annotations(),
             },
             spec={
                 "clusterNetwork": {
@@ -1354,7 +1366,9 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": {_WAIT_FOR_ANNOTATION: "condition=Ready"},
+                "annotations": _foreground_delete_annotations(
+                    {_WAIT_FOR_ANNOTATION: "condition=Ready"}
+                ),
             },
             spec={},
             opts=child_options(
@@ -1379,7 +1393,9 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             metadata={
                 "name": control_plane_template_name,
                 "namespace": _NAMESPACE,
-                "annotations": {_WAIT_FOR_ANNOTATION: "condition=Initialized"},
+                "annotations": _foreground_delete_annotations(
+                    {_WAIT_FOR_ANNOTATION: "condition=Initialized"}
+                ),
             },
             spec={
                 "replicas": 1,
