@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import subprocess
+
 import pytest
 
+import gitrepo.git_sync as git_sync
 from gitrepo.git_sync import _GitSyncProvider, _split_ssh_url
 
 
@@ -55,3 +58,48 @@ def test_known_hosts_uses_canonical_flux_host() -> None:
 def test_split_ssh_url_rejects_non_ssh() -> None:
     with pytest.raises(ValueError, match="supports only ssh://"):
         _split_ssh_url("https://example.invalid/repo.git")
+
+
+def test_push_retries_transient_ssh_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = _GitSyncProvider()
+    attempts = 0
+
+    def fake_push_once(props: dict[str, object]) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise subprocess.CalledProcessError(
+                128,
+                ["git", "push"],
+                stderr="kex_exchange_identification: read: Connection reset by peer",
+            )
+
+    monkeypatch.setattr(provider, "_push_once", fake_push_once)
+    monkeypatch.setattr(git_sync.time, "sleep", lambda _seconds: None)
+
+    provider._push(_props())
+
+    assert attempts == 2
+
+
+def test_push_does_not_retry_non_transient_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = _GitSyncProvider()
+    attempts = 0
+
+    def fake_push_once(props: dict[str, object]) -> None:
+        nonlocal attempts
+        attempts += 1
+        raise subprocess.CalledProcessError(
+            1,
+            ["git", "push"],
+            stderr="! [rejected] HEAD -> main (non-fast-forward)",
+        )
+
+    monkeypatch.setattr(provider, "_push_once", fake_push_once)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        provider._push(_props())
+
+    assert attempts == 1

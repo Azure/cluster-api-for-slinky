@@ -20,19 +20,20 @@ __all__ = ['ExecutionEnvironmentArgs', 'ExecutionEnvironment']
 class ExecutionEnvironmentArgs:
     def __init__(__self__, *,
                  image: pulumi.Input[_builtins.str],
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
+                 execution_environment_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization: pulumi.Input[Optional[_builtins.str]] = None,
                  pull: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a ExecutionEnvironment resource.
 
-        :param pulumi.Input[_builtins.str] image: The full image location, including the container registry, image name, and version tag.
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.str] description: Optional description of this execution environment.
-        :param pulumi.Input[_builtins.str] name: Name of this execution environment.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this execution environment.
+        :param pulumi.Input[_builtins.str] image: The container image used for the execution environment.
+        :param pulumi.Input[_builtins.str] credential: The credential used to access the execution environment.
+        :param pulumi.Input[_builtins.str] description: The description of the execution environment.
+        :param pulumi.Input[_builtins.str] name: The name of the execution environment.
+        :param pulumi.Input[_builtins.str] organization: The organization that the execution environment belongs to.
         :param pulumi.Input[_builtins.str] pull: Pull image before running?
         """
         pulumi.set(__self__, "image", image)
@@ -40,6 +41,8 @@ class ExecutionEnvironmentArgs:
             pulumi.set(__self__, "credential", credential)
         if description is not None:
             pulumi.set(__self__, "description", description)
+        if execution_environment_id is not None:
+            pulumi.set(__self__, "execution_environment_id", execution_environment_id)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if organization is not None:
@@ -51,7 +54,7 @@ class ExecutionEnvironmentArgs:
     @pulumi.getter
     def image(self) -> pulumi.Input[_builtins.str]:
         """
-        The full image location, including the container registry, image name, and version tag.
+        The container image used for the execution environment.
         """
         return pulumi.get(self, "image")
 
@@ -61,21 +64,21 @@ class ExecutionEnvironmentArgs:
 
     @_builtins.property
     @pulumi.getter
-    def credential(self) -> pulumi.Input[Optional[_builtins.float]]:
+    def credential(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Credential
+        The credential used to access the execution environment.
         """
         return pulumi.get(self, "credential")
 
     @credential.setter
-    def credential(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def credential(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "credential", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this execution environment.
+        The description of the execution environment.
         """
         return pulumi.get(self, "description")
 
@@ -84,10 +87,19 @@ class ExecutionEnvironmentArgs:
         pulumi.set(self, "description", value)
 
     @_builtins.property
+    @pulumi.getter(name="executionEnvironmentId")
+    def execution_environment_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "execution_environment_id")
+
+    @execution_environment_id.setter
+    def execution_environment_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "execution_environment_id", value)
+
+    @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this execution environment.
+        The name of the execution environment.
         """
         return pulumi.get(self, "name")
 
@@ -97,14 +109,14 @@ class ExecutionEnvironmentArgs:
 
     @_builtins.property
     @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
+    def organization(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The organization used to determine access to this execution environment.
+        The organization that the execution environment belongs to.
         """
         return pulumi.get(self, "organization")
 
     @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def organization(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "organization", value)
 
     @_builtins.property
@@ -123,24 +135,21 @@ class ExecutionEnvironmentArgs:
 @pulumi.input_type
 class _ExecutionEnvironmentState:
     def __init__(__self__, *,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 execution_environment_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 execution_environment_id: pulumi.Input[Optional[_builtins.str]] = None,
                  image: pulumi.Input[Optional[_builtins.str]] = None,
-                 managed: pulumi.Input[Optional[_builtins.bool]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization: pulumi.Input[Optional[_builtins.str]] = None,
                  pull: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering ExecutionEnvironment resources.
 
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.str] description: Optional description of this execution environment.
-        :param pulumi.Input[_builtins.float] execution_environment_id: Database ID for this execution environment.
-        :param pulumi.Input[_builtins.str] image: The full image location, including the container registry, image name, and version tag.
-        :param pulumi.Input[_builtins.bool] managed: Managed
-        :param pulumi.Input[_builtins.str] name: Name of this execution environment.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this execution environment.
+        :param pulumi.Input[_builtins.str] credential: The credential used to access the execution environment.
+        :param pulumi.Input[_builtins.str] description: The description of the execution environment.
+        :param pulumi.Input[_builtins.str] image: The container image used for the execution environment.
+        :param pulumi.Input[_builtins.str] name: The name of the execution environment.
+        :param pulumi.Input[_builtins.str] organization: The organization that the execution environment belongs to.
         :param pulumi.Input[_builtins.str] pull: Pull image before running?
         """
         if credential is not None:
@@ -151,8 +160,6 @@ class _ExecutionEnvironmentState:
             pulumi.set(__self__, "execution_environment_id", execution_environment_id)
         if image is not None:
             pulumi.set(__self__, "image", image)
-        if managed is not None:
-            pulumi.set(__self__, "managed", managed)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if organization is not None:
@@ -162,21 +169,21 @@ class _ExecutionEnvironmentState:
 
     @_builtins.property
     @pulumi.getter
-    def credential(self) -> pulumi.Input[Optional[_builtins.float]]:
+    def credential(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Credential
+        The credential used to access the execution environment.
         """
         return pulumi.get(self, "credential")
 
     @credential.setter
-    def credential(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def credential(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "credential", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this execution environment.
+        The description of the execution environment.
         """
         return pulumi.get(self, "description")
 
@@ -186,21 +193,18 @@ class _ExecutionEnvironmentState:
 
     @_builtins.property
     @pulumi.getter(name="executionEnvironmentId")
-    def execution_environment_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this execution environment.
-        """
+    def execution_environment_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "execution_environment_id")
 
     @execution_environment_id.setter
-    def execution_environment_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def execution_environment_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "execution_environment_id", value)
 
     @_builtins.property
     @pulumi.getter
     def image(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The full image location, including the container registry, image name, and version tag.
+        The container image used for the execution environment.
         """
         return pulumi.get(self, "image")
 
@@ -210,21 +214,9 @@ class _ExecutionEnvironmentState:
 
     @_builtins.property
     @pulumi.getter
-    def managed(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Managed
-        """
-        return pulumi.get(self, "managed")
-
-    @managed.setter
-    def managed(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "managed", value)
-
-    @_builtins.property
-    @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this execution environment.
+        The name of the execution environment.
         """
         return pulumi.get(self, "name")
 
@@ -234,14 +226,14 @@ class _ExecutionEnvironmentState:
 
     @_builtins.property
     @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
+    def organization(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The organization used to determine access to this execution environment.
+        The organization that the execution environment belongs to.
         """
         return pulumi.get(self, "organization")
 
     @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def organization(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "organization", value)
 
     @_builtins.property
@@ -263,11 +255,12 @@ class ExecutionEnvironment(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
+                 execution_environment_id: pulumi.Input[Optional[_builtins.str]] = None,
                  image: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization: pulumi.Input[Optional[_builtins.str]] = None,
                  pull: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -275,11 +268,11 @@ class ExecutionEnvironment(pulumi.CustomResource):
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.str] description: Optional description of this execution environment.
-        :param pulumi.Input[_builtins.str] image: The full image location, including the container registry, image name, and version tag.
-        :param pulumi.Input[_builtins.str] name: Name of this execution environment.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this execution environment.
+        :param pulumi.Input[_builtins.str] credential: The credential used to access the execution environment.
+        :param pulumi.Input[_builtins.str] description: The description of the execution environment.
+        :param pulumi.Input[_builtins.str] image: The container image used for the execution environment.
+        :param pulumi.Input[_builtins.str] name: The name of the execution environment.
+        :param pulumi.Input[_builtins.str] organization: The organization that the execution environment belongs to.
         :param pulumi.Input[_builtins.str] pull: Pull image before running?
         """
         ...
@@ -306,11 +299,12 @@ class ExecutionEnvironment(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
+                 execution_environment_id: pulumi.Input[Optional[_builtins.str]] = None,
                  image: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization: pulumi.Input[Optional[_builtins.str]] = None,
                  pull: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -323,14 +317,13 @@ class ExecutionEnvironment(pulumi.CustomResource):
 
             __props__.__dict__["credential"] = credential
             __props__.__dict__["description"] = description
+            __props__.__dict__["execution_environment_id"] = execution_environment_id
             if image is None and not opts.urn:
                 raise TypeError("Missing required property 'image'")
             __props__.__dict__["image"] = image
             __props__.__dict__["name"] = name
             __props__.__dict__["organization"] = organization
             __props__.__dict__["pull"] = pull
-            __props__.__dict__["execution_environment_id"] = None
-            __props__.__dict__["managed"] = None
         super(ExecutionEnvironment, __self__).__init__(
             'awx:index/executionEnvironment:ExecutionEnvironment',
             resource_name,
@@ -342,13 +335,12 @@ class ExecutionEnvironment(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            credential: pulumi.Input[Optional[_builtins.float]] = None,
+            credential: pulumi.Input[Optional[_builtins.str]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
-            execution_environment_id: pulumi.Input[Optional[_builtins.float]] = None,
+            execution_environment_id: pulumi.Input[Optional[_builtins.str]] = None,
             image: pulumi.Input[Optional[_builtins.str]] = None,
-            managed: pulumi.Input[Optional[_builtins.bool]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            organization: pulumi.Input[Optional[_builtins.float]] = None,
+            organization: pulumi.Input[Optional[_builtins.str]] = None,
             pull: pulumi.Input[Optional[_builtins.str]] = None) -> 'ExecutionEnvironment':
         """
         Get an existing ExecutionEnvironment resource's state with the given name, id, and optional extra
@@ -357,13 +349,11 @@ class ExecutionEnvironment(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.str] description: Optional description of this execution environment.
-        :param pulumi.Input[_builtins.float] execution_environment_id: Database ID for this execution environment.
-        :param pulumi.Input[_builtins.str] image: The full image location, including the container registry, image name, and version tag.
-        :param pulumi.Input[_builtins.bool] managed: Managed
-        :param pulumi.Input[_builtins.str] name: Name of this execution environment.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this execution environment.
+        :param pulumi.Input[_builtins.str] credential: The credential used to access the execution environment.
+        :param pulumi.Input[_builtins.str] description: The description of the execution environment.
+        :param pulumi.Input[_builtins.str] image: The container image used for the execution environment.
+        :param pulumi.Input[_builtins.str] name: The name of the execution environment.
+        :param pulumi.Input[_builtins.str] organization: The organization that the execution environment belongs to.
         :param pulumi.Input[_builtins.str] pull: Pull image before running?
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -374,7 +364,6 @@ class ExecutionEnvironment(pulumi.CustomResource):
         __props__.__dict__["description"] = description
         __props__.__dict__["execution_environment_id"] = execution_environment_id
         __props__.__dict__["image"] = image
-        __props__.__dict__["managed"] = managed
         __props__.__dict__["name"] = name
         __props__.__dict__["organization"] = organization
         __props__.__dict__["pull"] = pull
@@ -382,63 +371,52 @@ class ExecutionEnvironment(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter
-    def credential(self) -> pulumi.Output[_builtins.float]:
+    def credential(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Credential
+        The credential used to access the execution environment.
         """
         return pulumi.get(self, "credential")
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Optional description of this execution environment.
+        The description of the execution environment.
         """
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter(name="executionEnvironmentId")
-    def execution_environment_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this execution environment.
-        """
+    def execution_environment_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "execution_environment_id")
 
     @_builtins.property
     @pulumi.getter
     def image(self) -> pulumi.Output[_builtins.str]:
         """
-        The full image location, including the container registry, image name, and version tag.
+        The container image used for the execution environment.
         """
         return pulumi.get(self, "image")
 
     @_builtins.property
     @pulumi.getter
-    def managed(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Managed
-        """
-        return pulumi.get(self, "managed")
-
-    @_builtins.property
-    @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this execution environment.
+        The name of the execution environment.
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def organization(self) -> pulumi.Output[_builtins.float]:
+    def organization(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The organization used to determine access to this execution environment.
+        The organization that the execution environment belongs to.
         """
         return pulumi.get(self, "organization")
 
     @_builtins.property
     @pulumi.getter
-    def pull(self) -> pulumi.Output[_builtins.str]:
+    def pull(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         Pull image before running?
         """

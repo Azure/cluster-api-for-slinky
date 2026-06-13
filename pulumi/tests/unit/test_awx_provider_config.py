@@ -77,22 +77,23 @@ def test_flux_source_helpers_reject_invalid_shape(helper: object, spec: object) 
         helper(spec)  # type: ignore[operator]
 
 
-def test_source_control_credential_inputs_are_stable_json() -> None:
-    assert (
-        source_control_credential_inputs(ssh_key_data="PRIVATE KEY")
-        == '{"ssh_key_data": "PRIVATE KEY"}'
-    )
+def test_source_control_credential_inputs_match_provider_shape() -> None:
+    assert source_control_credential_inputs(ssh_key_data="PRIVATE KEY") == {
+        "ssh_key_data": "PRIVATE KEY",
+    }
 
 
-def test_management_kubernetes_credential_inputs_are_stable_json() -> None:
+def test_management_kubernetes_credential_inputs_match_provider_shape() -> None:
     assert management_kubernetes_credential_inputs(
         host="https://kubernetes.default.svc",
         bearer_token="TOKEN",
         ssl_ca_cert="CA",
-    ) == (
-        '{"bearer_token": "TOKEN", "host": "https://kubernetes.default.svc", '
-        '"ssl_ca_cert": "CA", "verify_ssl": true}'
-    )
+    ) == {
+        "bearer_token": "TOKEN",
+        "host": "https://kubernetes.default.svc",
+        "ssl_ca_cert": "CA",
+        "verify_ssl": "true",
+    }
 
 
 def test_injectable_kubernetes_credential_type_inputs_are_stable_json() -> None:

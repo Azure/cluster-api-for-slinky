@@ -26,24 +26,13 @@ class GetTeamResult:
     """
     A collection of values returned by getTeam.
     """
-    def __init__(__self__, description=None, id=None, name=None, organization=None):
-        if description and not isinstance(description, str):
-            raise TypeError("Expected argument 'description' to be a str")
-        pulumi.set(__self__, "description", description)
+    def __init__(__self__, id=None, name=None):
         if id and not isinstance(id, float):
             raise TypeError("Expected argument 'id' to be a float")
         pulumi.set(__self__, "id", id)
         if name and not isinstance(name, str):
             raise TypeError("Expected argument 'name' to be a str")
         pulumi.set(__self__, "name", name)
-        if organization and not isinstance(organization, float):
-            raise TypeError("Expected argument 'organization' to be a float")
-        pulumi.set(__self__, "organization", organization)
-
-    @_builtins.property
-    @pulumi.getter
-    def description(self) -> _builtins.str:
-        return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
@@ -55,11 +44,6 @@ class GetTeamResult:
     def name(self) -> _builtins.str:
         return pulumi.get(self, "name")
 
-    @_builtins.property
-    @pulumi.getter
-    def organization(self) -> _builtins.float:
-        return pulumi.get(self, "organization")
-
 
 class AwaitableGetTeamResult(GetTeamResult):
     # pylint: disable=using-constant-test
@@ -67,10 +51,8 @@ class AwaitableGetTeamResult(GetTeamResult):
         if False:
             yield self
         return GetTeamResult(
-            description=self.description,
             id=self.id,
-            name=self.name,
-            organization=self.organization)
+            name=self.name)
 
 
 def get_team(id: Optional[_builtins.float] = None,
@@ -86,10 +68,8 @@ def get_team(id: Optional[_builtins.float] = None,
     __ret__ = pulumi.runtime.invoke('awx:index/getTeam:getTeam', __args__, opts=opts, typ=GetTeamResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetTeamResult(
-        description=pulumi.get(__ret__, 'description'),
         id=pulumi.get(__ret__, 'id'),
-        name=pulumi.get(__ret__, 'name'),
-        organization=pulumi.get(__ret__, 'organization'))
+        name=pulumi.get(__ret__, 'name'))
 def get_team_output(id: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
                     name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                     opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetTeamResult]:
@@ -102,7 +82,5 @@ def get_team_output(id: pulumi.Input[Optional[Optional[_builtins.float]]] = None
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('awx:index/getTeam:getTeam', __args__, opts=opts, typ=GetTeamResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetTeamResult(
-        description=pulumi.get(__response__, 'description'),
         id=pulumi.get(__response__, 'id'),
-        name=pulumi.get(__response__, 'name'),
-        organization=pulumi.get(__response__, 'organization')))
+        name=pulumi.get(__response__, 'name')))

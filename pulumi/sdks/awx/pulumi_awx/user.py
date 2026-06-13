@@ -13,30 +13,36 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import NotRequired, TypedDict, TypeAlias
 from . import _utilities
+from . import outputs
+from ._inputs import *
 
 __all__ = ['UserArgs', 'User']
 
 @pulumi.input_type
 class UserArgs:
     def __init__(__self__, *,
+                 password: pulumi.Input[_builtins.str],
                  username: pulumi.Input[_builtins.str],
                  email: pulumi.Input[Optional[_builtins.str]] = None,
                  first_name: pulumi.Input[Optional[_builtins.str]] = None,
                  is_superuser: pulumi.Input[Optional[_builtins.bool]] = None,
                  is_system_auditor: pulumi.Input[Optional[_builtins.bool]] = None,
                  last_name: pulumi.Input[Optional[_builtins.str]] = None,
-                 password: pulumi.Input[Optional[_builtins.str]] = None):
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input['UserRoleEntitlementArgs']]]] = None,
+                 user_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a User resource.
 
-        :param pulumi.Input[_builtins.str] username: Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.
-        :param pulumi.Input[_builtins.str] email: Email address
-        :param pulumi.Input[_builtins.str] first_name: First name
-        :param pulumi.Input[_builtins.bool] is_superuser: Designates that this user has all permissions without explicitly assigning them.
-        :param pulumi.Input[_builtins.bool] is_system_auditor: Is system auditor
-        :param pulumi.Input[_builtins.str] last_name: Last name
-        :param pulumi.Input[_builtins.str] password: Field used to change the password.
+        :param pulumi.Input[_builtins.str] password: The password of the user
+        :param pulumi.Input[_builtins.str] username: The username of the user
+        :param pulumi.Input[_builtins.str] email: The email of the user
+        :param pulumi.Input[_builtins.str] first_name: The first name of the user
+        :param pulumi.Input[_builtins.bool] is_superuser: The superuser status of the user
+        :param pulumi.Input[_builtins.bool] is_system_auditor: The system auditor status of the user
+        :param pulumi.Input[_builtins.str] last_name: The last name of the user
+        :param pulumi.Input[Sequence[pulumi.Input['UserRoleEntitlementArgs']]] role_entitlements: Set of role IDs of the role entitlements
         """
+        pulumi.set(__self__, "password", password)
         pulumi.set(__self__, "username", username)
         if email is not None:
             pulumi.set(__self__, "email", email)
@@ -48,14 +54,28 @@ class UserArgs:
             pulumi.set(__self__, "is_system_auditor", is_system_auditor)
         if last_name is not None:
             pulumi.set(__self__, "last_name", last_name)
-        if password is not None:
-            pulumi.set(__self__, "password", password)
+        if role_entitlements is not None:
+            pulumi.set(__self__, "role_entitlements", role_entitlements)
+        if user_id is not None:
+            pulumi.set(__self__, "user_id", user_id)
+
+    @_builtins.property
+    @pulumi.getter
+    def password(self) -> pulumi.Input[_builtins.str]:
+        """
+        The password of the user
+        """
+        return pulumi.get(self, "password")
+
+    @password.setter
+    def password(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "password", value)
 
     @_builtins.property
     @pulumi.getter
     def username(self) -> pulumi.Input[_builtins.str]:
         """
-        Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.
+        The username of the user
         """
         return pulumi.get(self, "username")
 
@@ -67,7 +87,7 @@ class UserArgs:
     @pulumi.getter
     def email(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Email address
+        The email of the user
         """
         return pulumi.get(self, "email")
 
@@ -79,7 +99,7 @@ class UserArgs:
     @pulumi.getter(name="firstName")
     def first_name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        First name
+        The first name of the user
         """
         return pulumi.get(self, "first_name")
 
@@ -91,7 +111,7 @@ class UserArgs:
     @pulumi.getter(name="isSuperuser")
     def is_superuser(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Designates that this user has all permissions without explicitly assigning them.
+        The superuser status of the user
         """
         return pulumi.get(self, "is_superuser")
 
@@ -103,7 +123,7 @@ class UserArgs:
     @pulumi.getter(name="isSystemAuditor")
     def is_system_auditor(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Is system auditor
+        The system auditor status of the user
         """
         return pulumi.get(self, "is_system_auditor")
 
@@ -115,7 +135,7 @@ class UserArgs:
     @pulumi.getter(name="lastName")
     def last_name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Last name
+        The last name of the user
         """
         return pulumi.get(self, "last_name")
 
@@ -124,65 +144,65 @@ class UserArgs:
         pulumi.set(self, "last_name", value)
 
     @_builtins.property
-    @pulumi.getter
-    def password(self) -> pulumi.Input[Optional[_builtins.str]]:
+    @pulumi.getter(name="roleEntitlements")
+    def role_entitlements(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['UserRoleEntitlementArgs']]]]:
         """
-        Field used to change the password.
+        Set of role IDs of the role entitlements
         """
-        return pulumi.get(self, "password")
+        return pulumi.get(self, "role_entitlements")
 
-    @password.setter
-    def password(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "password", value)
+    @role_entitlements.setter
+    def role_entitlements(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['UserRoleEntitlementArgs']]]]):
+        pulumi.set(self, "role_entitlements", value)
+
+    @_builtins.property
+    @pulumi.getter(name="userId")
+    def user_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "user_id")
+
+    @user_id.setter
+    def user_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "user_id", value)
 
 
 @pulumi.input_type
 class _UserState:
     def __init__(__self__, *,
                  email: pulumi.Input[Optional[_builtins.str]] = None,
-                 external_account: pulumi.Input[Optional[_builtins.str]] = None,
                  first_name: pulumi.Input[Optional[_builtins.str]] = None,
                  is_superuser: pulumi.Input[Optional[_builtins.bool]] = None,
                  is_system_auditor: pulumi.Input[Optional[_builtins.bool]] = None,
-                 last_login: pulumi.Input[Optional[_builtins.str]] = None,
                  last_name: pulumi.Input[Optional[_builtins.str]] = None,
-                 ldap_dn: pulumi.Input[Optional[_builtins.str]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
-                 user_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input['UserRoleEntitlementArgs']]]] = None,
+                 user_id: pulumi.Input[Optional[_builtins.str]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering User resources.
 
-        :param pulumi.Input[_builtins.str] email: Email address
-        :param pulumi.Input[_builtins.str] external_account: Set if the account is managed by an external service
-        :param pulumi.Input[_builtins.str] first_name: First name
-        :param pulumi.Input[_builtins.bool] is_superuser: Designates that this user has all permissions without explicitly assigning them.
-        :param pulumi.Input[_builtins.bool] is_system_auditor: Is system auditor
-        :param pulumi.Input[_builtins.str] last_login: Last login
-        :param pulumi.Input[_builtins.str] last_name: Last name
-        :param pulumi.Input[_builtins.str] ldap_dn: Ldap dn
-        :param pulumi.Input[_builtins.str] password: Field used to change the password.
-        :param pulumi.Input[_builtins.float] user_id: Database ID for this user.
-        :param pulumi.Input[_builtins.str] username: Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.
+        :param pulumi.Input[_builtins.str] email: The email of the user
+        :param pulumi.Input[_builtins.str] first_name: The first name of the user
+        :param pulumi.Input[_builtins.bool] is_superuser: The superuser status of the user
+        :param pulumi.Input[_builtins.bool] is_system_auditor: The system auditor status of the user
+        :param pulumi.Input[_builtins.str] last_name: The last name of the user
+        :param pulumi.Input[_builtins.str] password: The password of the user
+        :param pulumi.Input[Sequence[pulumi.Input['UserRoleEntitlementArgs']]] role_entitlements: Set of role IDs of the role entitlements
+        :param pulumi.Input[_builtins.str] username: The username of the user
         """
         if email is not None:
             pulumi.set(__self__, "email", email)
-        if external_account is not None:
-            pulumi.set(__self__, "external_account", external_account)
         if first_name is not None:
             pulumi.set(__self__, "first_name", first_name)
         if is_superuser is not None:
             pulumi.set(__self__, "is_superuser", is_superuser)
         if is_system_auditor is not None:
             pulumi.set(__self__, "is_system_auditor", is_system_auditor)
-        if last_login is not None:
-            pulumi.set(__self__, "last_login", last_login)
         if last_name is not None:
             pulumi.set(__self__, "last_name", last_name)
-        if ldap_dn is not None:
-            pulumi.set(__self__, "ldap_dn", ldap_dn)
         if password is not None:
             pulumi.set(__self__, "password", password)
+        if role_entitlements is not None:
+            pulumi.set(__self__, "role_entitlements", role_entitlements)
         if user_id is not None:
             pulumi.set(__self__, "user_id", user_id)
         if username is not None:
@@ -192,7 +212,7 @@ class _UserState:
     @pulumi.getter
     def email(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Email address
+        The email of the user
         """
         return pulumi.get(self, "email")
 
@@ -201,22 +221,10 @@ class _UserState:
         pulumi.set(self, "email", value)
 
     @_builtins.property
-    @pulumi.getter(name="externalAccount")
-    def external_account(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Set if the account is managed by an external service
-        """
-        return pulumi.get(self, "external_account")
-
-    @external_account.setter
-    def external_account(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "external_account", value)
-
-    @_builtins.property
     @pulumi.getter(name="firstName")
     def first_name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        First name
+        The first name of the user
         """
         return pulumi.get(self, "first_name")
 
@@ -228,7 +236,7 @@ class _UserState:
     @pulumi.getter(name="isSuperuser")
     def is_superuser(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Designates that this user has all permissions without explicitly assigning them.
+        The superuser status of the user
         """
         return pulumi.get(self, "is_superuser")
 
@@ -240,7 +248,7 @@ class _UserState:
     @pulumi.getter(name="isSystemAuditor")
     def is_system_auditor(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Is system auditor
+        The system auditor status of the user
         """
         return pulumi.get(self, "is_system_auditor")
 
@@ -249,22 +257,10 @@ class _UserState:
         pulumi.set(self, "is_system_auditor", value)
 
     @_builtins.property
-    @pulumi.getter(name="lastLogin")
-    def last_login(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Last login
-        """
-        return pulumi.get(self, "last_login")
-
-    @last_login.setter
-    def last_login(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "last_login", value)
-
-    @_builtins.property
     @pulumi.getter(name="lastName")
     def last_name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Last name
+        The last name of the user
         """
         return pulumi.get(self, "last_name")
 
@@ -273,22 +269,10 @@ class _UserState:
         pulumi.set(self, "last_name", value)
 
     @_builtins.property
-    @pulumi.getter(name="ldapDn")
-    def ldap_dn(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Ldap dn
-        """
-        return pulumi.get(self, "ldap_dn")
-
-    @ldap_dn.setter
-    def ldap_dn(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "ldap_dn", value)
-
-    @_builtins.property
     @pulumi.getter
     def password(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Field used to change the password.
+        The password of the user
         """
         return pulumi.get(self, "password")
 
@@ -297,22 +281,31 @@ class _UserState:
         pulumi.set(self, "password", value)
 
     @_builtins.property
+    @pulumi.getter(name="roleEntitlements")
+    def role_entitlements(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['UserRoleEntitlementArgs']]]]:
+        """
+        Set of role IDs of the role entitlements
+        """
+        return pulumi.get(self, "role_entitlements")
+
+    @role_entitlements.setter
+    def role_entitlements(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['UserRoleEntitlementArgs']]]]):
+        pulumi.set(self, "role_entitlements", value)
+
+    @_builtins.property
     @pulumi.getter(name="userId")
-    def user_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this user.
-        """
+    def user_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "user_id")
 
     @user_id.setter
-    def user_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def user_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "user_id", value)
 
     @_builtins.property
     @pulumi.getter
     def username(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.
+        The username of the user
         """
         return pulumi.get(self, "username")
 
@@ -333,6 +326,8 @@ class User(pulumi.CustomResource):
                  is_system_auditor: pulumi.Input[Optional[_builtins.bool]] = None,
                  last_name: pulumi.Input[Optional[_builtins.str]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict']]]]] = None,
+                 user_id: pulumi.Input[Optional[_builtins.str]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -340,13 +335,14 @@ class User(pulumi.CustomResource):
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] email: Email address
-        :param pulumi.Input[_builtins.str] first_name: First name
-        :param pulumi.Input[_builtins.bool] is_superuser: Designates that this user has all permissions without explicitly assigning them.
-        :param pulumi.Input[_builtins.bool] is_system_auditor: Is system auditor
-        :param pulumi.Input[_builtins.str] last_name: Last name
-        :param pulumi.Input[_builtins.str] password: Field used to change the password.
-        :param pulumi.Input[_builtins.str] username: Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.
+        :param pulumi.Input[_builtins.str] email: The email of the user
+        :param pulumi.Input[_builtins.str] first_name: The first name of the user
+        :param pulumi.Input[_builtins.bool] is_superuser: The superuser status of the user
+        :param pulumi.Input[_builtins.bool] is_system_auditor: The system auditor status of the user
+        :param pulumi.Input[_builtins.str] last_name: The last name of the user
+        :param pulumi.Input[_builtins.str] password: The password of the user
+        :param pulumi.Input[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict']]]] role_entitlements: Set of role IDs of the role entitlements
+        :param pulumi.Input[_builtins.str] username: The username of the user
         """
         ...
     @overload
@@ -378,6 +374,8 @@ class User(pulumi.CustomResource):
                  is_system_auditor: pulumi.Input[Optional[_builtins.bool]] = None,
                  last_name: pulumi.Input[Optional[_builtins.str]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict']]]]] = None,
+                 user_id: pulumi.Input[Optional[_builtins.str]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -393,14 +391,14 @@ class User(pulumi.CustomResource):
             __props__.__dict__["is_superuser"] = is_superuser
             __props__.__dict__["is_system_auditor"] = is_system_auditor
             __props__.__dict__["last_name"] = last_name
+            if password is None and not opts.urn:
+                raise TypeError("Missing required property 'password'")
             __props__.__dict__["password"] = None if password is None else pulumi.Output.secret(password)
+            __props__.__dict__["role_entitlements"] = role_entitlements
+            __props__.__dict__["user_id"] = user_id
             if username is None and not opts.urn:
                 raise TypeError("Missing required property 'username'")
             __props__.__dict__["username"] = username
-            __props__.__dict__["external_account"] = None
-            __props__.__dict__["last_login"] = None
-            __props__.__dict__["ldap_dn"] = None
-            __props__.__dict__["user_id"] = None
         secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["password"])
         opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(User, __self__).__init__(
@@ -415,15 +413,13 @@ class User(pulumi.CustomResource):
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
             email: pulumi.Input[Optional[_builtins.str]] = None,
-            external_account: pulumi.Input[Optional[_builtins.str]] = None,
             first_name: pulumi.Input[Optional[_builtins.str]] = None,
             is_superuser: pulumi.Input[Optional[_builtins.bool]] = None,
             is_system_auditor: pulumi.Input[Optional[_builtins.bool]] = None,
-            last_login: pulumi.Input[Optional[_builtins.str]] = None,
             last_name: pulumi.Input[Optional[_builtins.str]] = None,
-            ldap_dn: pulumi.Input[Optional[_builtins.str]] = None,
             password: pulumi.Input[Optional[_builtins.str]] = None,
-            user_id: pulumi.Input[Optional[_builtins.float]] = None,
+            role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict']]]]] = None,
+            user_id: pulumi.Input[Optional[_builtins.str]] = None,
             username: pulumi.Input[Optional[_builtins.str]] = None) -> 'User':
         """
         Get an existing User resource's state with the given name, id, and optional extra
@@ -432,120 +428,96 @@ class User(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] email: Email address
-        :param pulumi.Input[_builtins.str] external_account: Set if the account is managed by an external service
-        :param pulumi.Input[_builtins.str] first_name: First name
-        :param pulumi.Input[_builtins.bool] is_superuser: Designates that this user has all permissions without explicitly assigning them.
-        :param pulumi.Input[_builtins.bool] is_system_auditor: Is system auditor
-        :param pulumi.Input[_builtins.str] last_login: Last login
-        :param pulumi.Input[_builtins.str] last_name: Last name
-        :param pulumi.Input[_builtins.str] ldap_dn: Ldap dn
-        :param pulumi.Input[_builtins.str] password: Field used to change the password.
-        :param pulumi.Input[_builtins.float] user_id: Database ID for this user.
-        :param pulumi.Input[_builtins.str] username: Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.
+        :param pulumi.Input[_builtins.str] email: The email of the user
+        :param pulumi.Input[_builtins.str] first_name: The first name of the user
+        :param pulumi.Input[_builtins.bool] is_superuser: The superuser status of the user
+        :param pulumi.Input[_builtins.bool] is_system_auditor: The system auditor status of the user
+        :param pulumi.Input[_builtins.str] last_name: The last name of the user
+        :param pulumi.Input[_builtins.str] password: The password of the user
+        :param pulumi.Input[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict']]]] role_entitlements: Set of role IDs of the role entitlements
+        :param pulumi.Input[_builtins.str] username: The username of the user
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
         __props__ = _UserState.__new__(_UserState)
 
         __props__.__dict__["email"] = email
-        __props__.__dict__["external_account"] = external_account
         __props__.__dict__["first_name"] = first_name
         __props__.__dict__["is_superuser"] = is_superuser
         __props__.__dict__["is_system_auditor"] = is_system_auditor
-        __props__.__dict__["last_login"] = last_login
         __props__.__dict__["last_name"] = last_name
-        __props__.__dict__["ldap_dn"] = ldap_dn
         __props__.__dict__["password"] = password
+        __props__.__dict__["role_entitlements"] = role_entitlements
         __props__.__dict__["user_id"] = user_id
         __props__.__dict__["username"] = username
         return User(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter
-    def email(self) -> pulumi.Output[_builtins.str]:
+    def email(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Email address
+        The email of the user
         """
         return pulumi.get(self, "email")
 
     @_builtins.property
-    @pulumi.getter(name="externalAccount")
-    def external_account(self) -> pulumi.Output[_builtins.str]:
-        """
-        Set if the account is managed by an external service
-        """
-        return pulumi.get(self, "external_account")
-
-    @_builtins.property
     @pulumi.getter(name="firstName")
-    def first_name(self) -> pulumi.Output[_builtins.str]:
+    def first_name(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        First name
+        The first name of the user
         """
         return pulumi.get(self, "first_name")
 
     @_builtins.property
     @pulumi.getter(name="isSuperuser")
-    def is_superuser(self) -> pulumi.Output[_builtins.bool]:
+    def is_superuser(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        Designates that this user has all permissions without explicitly assigning them.
+        The superuser status of the user
         """
         return pulumi.get(self, "is_superuser")
 
     @_builtins.property
     @pulumi.getter(name="isSystemAuditor")
-    def is_system_auditor(self) -> pulumi.Output[_builtins.bool]:
+    def is_system_auditor(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        Is system auditor
+        The system auditor status of the user
         """
         return pulumi.get(self, "is_system_auditor")
 
     @_builtins.property
-    @pulumi.getter(name="lastLogin")
-    def last_login(self) -> pulumi.Output[_builtins.str]:
-        """
-        Last login
-        """
-        return pulumi.get(self, "last_login")
-
-    @_builtins.property
     @pulumi.getter(name="lastName")
-    def last_name(self) -> pulumi.Output[_builtins.str]:
+    def last_name(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Last name
+        The last name of the user
         """
         return pulumi.get(self, "last_name")
-
-    @_builtins.property
-    @pulumi.getter(name="ldapDn")
-    def ldap_dn(self) -> pulumi.Output[_builtins.str]:
-        """
-        Ldap dn
-        """
-        return pulumi.get(self, "ldap_dn")
 
     @_builtins.property
     @pulumi.getter
     def password(self) -> pulumi.Output[_builtins.str]:
         """
-        Field used to change the password.
+        The password of the user
         """
         return pulumi.get(self, "password")
 
     @_builtins.property
+    @pulumi.getter(name="roleEntitlements")
+    def role_entitlements(self) -> pulumi.Output[Optional[Sequence['outputs.UserRoleEntitlement']]]:
+        """
+        Set of role IDs of the role entitlements
+        """
+        return pulumi.get(self, "role_entitlements")
+
+    @_builtins.property
     @pulumi.getter(name="userId")
-    def user_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this user.
-        """
+    def user_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "user_id")
 
     @_builtins.property
     @pulumi.getter
     def username(self) -> pulumi.Output[_builtins.str]:
         """
-        Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.
+        The username of the user
         """
         return pulumi.get(self, "username")
 

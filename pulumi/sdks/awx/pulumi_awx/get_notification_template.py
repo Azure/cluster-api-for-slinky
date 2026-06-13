@@ -26,33 +26,13 @@ class GetNotificationTemplateResult:
     """
     A collection of values returned by getNotificationTemplate.
     """
-    def __init__(__self__, description=None, id=None, messages=None, name=None, notification_configuration=None, notification_type=None, organization=None):
-        if description and not isinstance(description, str):
-            raise TypeError("Expected argument 'description' to be a str")
-        pulumi.set(__self__, "description", description)
+    def __init__(__self__, id=None, name=None):
         if id and not isinstance(id, float):
             raise TypeError("Expected argument 'id' to be a float")
         pulumi.set(__self__, "id", id)
-        if messages and not isinstance(messages, str):
-            raise TypeError("Expected argument 'messages' to be a str")
-        pulumi.set(__self__, "messages", messages)
         if name and not isinstance(name, str):
             raise TypeError("Expected argument 'name' to be a str")
         pulumi.set(__self__, "name", name)
-        if notification_configuration and not isinstance(notification_configuration, str):
-            raise TypeError("Expected argument 'notification_configuration' to be a str")
-        pulumi.set(__self__, "notification_configuration", notification_configuration)
-        if notification_type and not isinstance(notification_type, str):
-            raise TypeError("Expected argument 'notification_type' to be a str")
-        pulumi.set(__self__, "notification_type", notification_type)
-        if organization and not isinstance(organization, float):
-            raise TypeError("Expected argument 'organization' to be a float")
-        pulumi.set(__self__, "organization", organization)
-
-    @_builtins.property
-    @pulumi.getter
-    def description(self) -> _builtins.str:
-        return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
@@ -61,28 +41,8 @@ class GetNotificationTemplateResult:
 
     @_builtins.property
     @pulumi.getter
-    def messages(self) -> _builtins.str:
-        return pulumi.get(self, "messages")
-
-    @_builtins.property
-    @pulumi.getter
     def name(self) -> _builtins.str:
         return pulumi.get(self, "name")
-
-    @_builtins.property
-    @pulumi.getter(name="notificationConfiguration")
-    def notification_configuration(self) -> _builtins.str:
-        return pulumi.get(self, "notification_configuration")
-
-    @_builtins.property
-    @pulumi.getter(name="notificationType")
-    def notification_type(self) -> _builtins.str:
-        return pulumi.get(self, "notification_type")
-
-    @_builtins.property
-    @pulumi.getter
-    def organization(self) -> _builtins.float:
-        return pulumi.get(self, "organization")
 
 
 class AwaitableGetNotificationTemplateResult(GetNotificationTemplateResult):
@@ -91,13 +51,8 @@ class AwaitableGetNotificationTemplateResult(GetNotificationTemplateResult):
         if False:
             yield self
         return GetNotificationTemplateResult(
-            description=self.description,
             id=self.id,
-            messages=self.messages,
-            name=self.name,
-            notification_configuration=self.notification_configuration,
-            notification_type=self.notification_type,
-            organization=self.organization)
+            name=self.name)
 
 
 def get_notification_template(id: Optional[_builtins.float] = None,
@@ -113,13 +68,8 @@ def get_notification_template(id: Optional[_builtins.float] = None,
     __ret__ = pulumi.runtime.invoke('awx:index/getNotificationTemplate:getNotificationTemplate', __args__, opts=opts, typ=GetNotificationTemplateResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetNotificationTemplateResult(
-        description=pulumi.get(__ret__, 'description'),
         id=pulumi.get(__ret__, 'id'),
-        messages=pulumi.get(__ret__, 'messages'),
-        name=pulumi.get(__ret__, 'name'),
-        notification_configuration=pulumi.get(__ret__, 'notification_configuration'),
-        notification_type=pulumi.get(__ret__, 'notification_type'),
-        organization=pulumi.get(__ret__, 'organization'))
+        name=pulumi.get(__ret__, 'name'))
 def get_notification_template_output(id: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
                                      name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                      opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetNotificationTemplateResult]:
@@ -132,10 +82,5 @@ def get_notification_template_output(id: pulumi.Input[Optional[Optional[_builtin
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('awx:index/getNotificationTemplate:getNotificationTemplate', __args__, opts=opts, typ=GetNotificationTemplateResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetNotificationTemplateResult(
-        description=pulumi.get(__response__, 'description'),
         id=pulumi.get(__response__, 'id'),
-        messages=pulumi.get(__response__, 'messages'),
-        name=pulumi.get(__response__, 'name'),
-        notification_configuration=pulumi.get(__response__, 'notification_configuration'),
-        notification_type=pulumi.get(__response__, 'notification_type'),
-        organization=pulumi.get(__response__, 'organization')))
+        name=pulumi.get(__response__, 'name')))

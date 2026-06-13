@@ -20,85 +20,44 @@ __all__ = ['ScheduleArgs', 'Schedule']
 class ScheduleArgs:
     def __init__(__self__, *,
                  rrule: pulumi.Input[_builtins.str],
-                 unified_job_template: pulumi.Input[_builtins.float],
+                 unified_job_template_id: pulumi.Input[_builtins.float],
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 diff_mode: pulumi.Input[Optional[_builtins.bool]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-                 execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
                  extra_data: pulumi.Input[Optional[_builtins.str]] = None,
-                 forks: pulumi.Input[Optional[_builtins.float]] = None,
                  inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_slice_count: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 job_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
-                 skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None):
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Schedule resource.
 
-        :param pulumi.Input[_builtins.str] rrule: A value representing the schedules iCal recurrence rule.
-        :param pulumi.Input[_builtins.float] unified_job_template: Unified job template
-        :param pulumi.Input[_builtins.str] description: Optional description of this schedule.
-        :param pulumi.Input[_builtins.bool] diff_mode: Diff mode
-        :param pulumi.Input[_builtins.bool] enabled: Enables processing of this schedule.
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] extra_data: Extra data
-        :param pulumi.Input[_builtins.float] forks: Forks
-        :param pulumi.Input[_builtins.float] inventory: Inventory applied as a prompt, assuming job template prompts for inventory
-        :param pulumi.Input[_builtins.float] job_slice_count: Job slice count
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.str] job_type: Job type
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this schedule.
-        :param pulumi.Input[_builtins.str] scm_branch: Scm branch
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.float] timeout: Timeout
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
+        :param pulumi.Input[_builtins.str] rrule: RRule for the schedule. See https://github.com/ansible/awx/blob/devel/awx/api/templates/api/_schedule_detail.md for more information.
+        :param pulumi.Input[_builtins.float] unified_job_template_id: The ID of the Unified Job Template to be scheduled
+        :param pulumi.Input[_builtins.str] description: Description of the schedule
+        :param pulumi.Input[_builtins.bool] enabled: Enable or disable the schedule
+        :param pulumi.Input[_builtins.str] extra_data: Extra data to be pass for the schedule (JSON format)
+        :param pulumi.Input[_builtins.float] inventory: The ID of the Inventory to be used for the schedule
+        :param pulumi.Input[_builtins.str] name: Name of the schedule
         """
         pulumi.set(__self__, "rrule", rrule)
-        pulumi.set(__self__, "unified_job_template", unified_job_template)
+        pulumi.set(__self__, "unified_job_template_id", unified_job_template_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
-        if diff_mode is not None:
-            pulumi.set(__self__, "diff_mode", diff_mode)
         if enabled is not None:
             pulumi.set(__self__, "enabled", enabled)
-        if execution_environment is not None:
-            pulumi.set(__self__, "execution_environment", execution_environment)
         if extra_data is not None:
             pulumi.set(__self__, "extra_data", extra_data)
-        if forks is not None:
-            pulumi.set(__self__, "forks", forks)
         if inventory is not None:
             pulumi.set(__self__, "inventory", inventory)
-        if job_slice_count is not None:
-            pulumi.set(__self__, "job_slice_count", job_slice_count)
-        if job_tags is not None:
-            pulumi.set(__self__, "job_tags", job_tags)
-        if job_type is not None:
-            pulumi.set(__self__, "job_type", job_type)
-        if limit is not None:
-            pulumi.set(__self__, "limit", limit)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if scm_branch is not None:
-            pulumi.set(__self__, "scm_branch", scm_branch)
-        if skip_tags is not None:
-            pulumi.set(__self__, "skip_tags", skip_tags)
-        if timeout is not None:
-            pulumi.set(__self__, "timeout", timeout)
-        if verbosity is not None:
-            pulumi.set(__self__, "verbosity", verbosity)
+        if schedule_id is not None:
+            pulumi.set(__self__, "schedule_id", schedule_id)
 
     @_builtins.property
     @pulumi.getter
     def rrule(self) -> pulumi.Input[_builtins.str]:
         """
-        A value representing the schedules iCal recurrence rule.
+        RRule for the schedule. See https://github.com/ansible/awx/blob/devel/awx/api/templates/api/_schedule_detail.md for more information.
         """
         return pulumi.get(self, "rrule")
 
@@ -107,22 +66,22 @@ class ScheduleArgs:
         pulumi.set(self, "rrule", value)
 
     @_builtins.property
-    @pulumi.getter(name="unifiedJobTemplate")
-    def unified_job_template(self) -> pulumi.Input[_builtins.float]:
+    @pulumi.getter(name="unifiedJobTemplateId")
+    def unified_job_template_id(self) -> pulumi.Input[_builtins.float]:
         """
-        Unified job template
+        The ID of the Unified Job Template to be scheduled
         """
-        return pulumi.get(self, "unified_job_template")
+        return pulumi.get(self, "unified_job_template_id")
 
-    @unified_job_template.setter
-    def unified_job_template(self, value: pulumi.Input[_builtins.float]):
-        pulumi.set(self, "unified_job_template", value)
+    @unified_job_template_id.setter
+    def unified_job_template_id(self, value: pulumi.Input[_builtins.float]):
+        pulumi.set(self, "unified_job_template_id", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this schedule.
+        Description of the schedule
         """
         return pulumi.get(self, "description")
 
@@ -131,22 +90,10 @@ class ScheduleArgs:
         pulumi.set(self, "description", value)
 
     @_builtins.property
-    @pulumi.getter(name="diffMode")
-    def diff_mode(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Diff mode
-        """
-        return pulumi.get(self, "diff_mode")
-
-    @diff_mode.setter
-    def diff_mode(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "diff_mode", value)
-
-    @_builtins.property
     @pulumi.getter
     def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Enables processing of this schedule.
+        Enable or disable the schedule
         """
         return pulumi.get(self, "enabled")
 
@@ -155,22 +102,10 @@ class ScheduleArgs:
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
-    @pulumi.getter(name="executionEnvironment")
-    def execution_environment(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The container image to be used for execution.
-        """
-        return pulumi.get(self, "execution_environment")
-
-    @execution_environment.setter
-    def execution_environment(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "execution_environment", value)
-
-    @_builtins.property
     @pulumi.getter(name="extraData")
     def extra_data(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Extra data
+        Extra data to be pass for the schedule (JSON format)
         """
         return pulumi.get(self, "extra_data")
 
@@ -180,21 +115,9 @@ class ScheduleArgs:
 
     @_builtins.property
     @pulumi.getter
-    def forks(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Forks
-        """
-        return pulumi.get(self, "forks")
-
-    @forks.setter
-    def forks(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "forks", value)
-
-    @_builtins.property
-    @pulumi.getter
     def inventory(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Inventory applied as a prompt, assuming job template prompts for inventory
+        The ID of the Inventory to be used for the schedule
         """
         return pulumi.get(self, "inventory")
 
@@ -203,58 +126,10 @@ class ScheduleArgs:
         pulumi.set(self, "inventory", value)
 
     @_builtins.property
-    @pulumi.getter(name="jobSliceCount")
-    def job_slice_count(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Job slice count
-        """
-        return pulumi.get(self, "job_slice_count")
-
-    @job_slice_count.setter
-    def job_slice_count(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "job_slice_count", value)
-
-    @_builtins.property
-    @pulumi.getter(name="jobTags")
-    def job_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Job tags
-        """
-        return pulumi.get(self, "job_tags")
-
-    @job_tags.setter
-    def job_tags(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "job_tags", value)
-
-    @_builtins.property
-    @pulumi.getter(name="jobType")
-    def job_type(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Job type
-        """
-        return pulumi.get(self, "job_type")
-
-    @job_type.setter
-    def job_type(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "job_type", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def limit(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Limit
-        """
-        return pulumi.get(self, "limit")
-
-    @limit.setter
-    def limit(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "limit", value)
-
-    @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this schedule.
+        Name of the schedule
         """
         return pulumi.get(self, "name")
 
@@ -263,163 +138,59 @@ class ScheduleArgs:
         pulumi.set(self, "name", value)
 
     @_builtins.property
-    @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Scm branch
-        """
-        return pulumi.get(self, "scm_branch")
+    @pulumi.getter(name="scheduleId")
+    def schedule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "schedule_id")
 
-    @scm_branch.setter
-    def scm_branch(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "scm_branch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="skipTags")
-    def skip_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Skip tags
-        """
-        return pulumi.get(self, "skip_tags")
-
-    @skip_tags.setter
-    def skip_tags(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "skip_tags", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Timeout
-        """
-        return pulumi.get(self, "timeout")
-
-    @timeout.setter
-    def timeout(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "timeout", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def verbosity(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Verbosity
-        """
-        return pulumi.get(self, "verbosity")
-
-    @verbosity.setter
-    def verbosity(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "verbosity", value)
+    @schedule_id.setter
+    def schedule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "schedule_id", value)
 
 
 @pulumi.input_type
 class _ScheduleState:
     def __init__(__self__, *,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 diff_mode: pulumi.Input[Optional[_builtins.bool]] = None,
-                 dtend: pulumi.Input[Optional[_builtins.str]] = None,
-                 dtstart: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-                 execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
                  extra_data: pulumi.Input[Optional[_builtins.str]] = None,
-                 forks: pulumi.Input[Optional[_builtins.float]] = None,
                  inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_slice_count: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 job_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 next_run: pulumi.Input[Optional[_builtins.str]] = None,
                  rrule: pulumi.Input[Optional[_builtins.str]] = None,
-                 schedule_id: pulumi.Input[Optional[_builtins.float]] = None,
-                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
-                 skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
-                 timezone: pulumi.Input[Optional[_builtins.str]] = None,
-                 unified_job_template: pulumi.Input[Optional[_builtins.float]] = None,
-                 until: pulumi.Input[Optional[_builtins.str]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None):
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 unified_job_template_id: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering Schedule resources.
 
-        :param pulumi.Input[_builtins.str] description: Optional description of this schedule.
-        :param pulumi.Input[_builtins.bool] diff_mode: Diff mode
-        :param pulumi.Input[_builtins.str] dtend: The last occurrence of the schedule occurs before this time, aftewards the schedule expires.
-        :param pulumi.Input[_builtins.str] dtstart: The first occurrence of the schedule occurs on or after this time.
-        :param pulumi.Input[_builtins.bool] enabled: Enables processing of this schedule.
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] extra_data: Extra data
-        :param pulumi.Input[_builtins.float] forks: Forks
-        :param pulumi.Input[_builtins.float] inventory: Inventory applied as a prompt, assuming job template prompts for inventory
-        :param pulumi.Input[_builtins.float] job_slice_count: Job slice count
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.str] job_type: Job type
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this schedule.
-        :param pulumi.Input[_builtins.str] next_run: The next time that the scheduled action will run.
-        :param pulumi.Input[_builtins.str] rrule: A value representing the schedules iCal recurrence rule.
-        :param pulumi.Input[_builtins.float] schedule_id: Database ID for this schedule.
-        :param pulumi.Input[_builtins.str] scm_branch: Scm branch
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.float] timeout: Timeout
-        :param pulumi.Input[_builtins.str] timezone: The timezone this schedule runs in. This field is extracted from the RRULE. If the timezone in the RRULE is a link to another timezone, the link will be reflected in this field.
-        :param pulumi.Input[_builtins.float] unified_job_template: Unified job template
-        :param pulumi.Input[_builtins.str] until: The date this schedule will end. This field is computed from the RRULE. If the schedule does not end an empty string will be returned
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
+        :param pulumi.Input[_builtins.str] description: Description of the schedule
+        :param pulumi.Input[_builtins.bool] enabled: Enable or disable the schedule
+        :param pulumi.Input[_builtins.str] extra_data: Extra data to be pass for the schedule (JSON format)
+        :param pulumi.Input[_builtins.float] inventory: The ID of the Inventory to be used for the schedule
+        :param pulumi.Input[_builtins.str] name: Name of the schedule
+        :param pulumi.Input[_builtins.str] rrule: RRule for the schedule. See https://github.com/ansible/awx/blob/devel/awx/api/templates/api/_schedule_detail.md for more information.
+        :param pulumi.Input[_builtins.float] unified_job_template_id: The ID of the Unified Job Template to be scheduled
         """
         if description is not None:
             pulumi.set(__self__, "description", description)
-        if diff_mode is not None:
-            pulumi.set(__self__, "diff_mode", diff_mode)
-        if dtend is not None:
-            pulumi.set(__self__, "dtend", dtend)
-        if dtstart is not None:
-            pulumi.set(__self__, "dtstart", dtstart)
         if enabled is not None:
             pulumi.set(__self__, "enabled", enabled)
-        if execution_environment is not None:
-            pulumi.set(__self__, "execution_environment", execution_environment)
         if extra_data is not None:
             pulumi.set(__self__, "extra_data", extra_data)
-        if forks is not None:
-            pulumi.set(__self__, "forks", forks)
         if inventory is not None:
             pulumi.set(__self__, "inventory", inventory)
-        if job_slice_count is not None:
-            pulumi.set(__self__, "job_slice_count", job_slice_count)
-        if job_tags is not None:
-            pulumi.set(__self__, "job_tags", job_tags)
-        if job_type is not None:
-            pulumi.set(__self__, "job_type", job_type)
-        if limit is not None:
-            pulumi.set(__self__, "limit", limit)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if next_run is not None:
-            pulumi.set(__self__, "next_run", next_run)
         if rrule is not None:
             pulumi.set(__self__, "rrule", rrule)
         if schedule_id is not None:
             pulumi.set(__self__, "schedule_id", schedule_id)
-        if scm_branch is not None:
-            pulumi.set(__self__, "scm_branch", scm_branch)
-        if skip_tags is not None:
-            pulumi.set(__self__, "skip_tags", skip_tags)
-        if timeout is not None:
-            pulumi.set(__self__, "timeout", timeout)
-        if timezone is not None:
-            pulumi.set(__self__, "timezone", timezone)
-        if unified_job_template is not None:
-            pulumi.set(__self__, "unified_job_template", unified_job_template)
-        if until is not None:
-            pulumi.set(__self__, "until", until)
-        if verbosity is not None:
-            pulumi.set(__self__, "verbosity", verbosity)
+        if unified_job_template_id is not None:
+            pulumi.set(__self__, "unified_job_template_id", unified_job_template_id)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this schedule.
+        Description of the schedule
         """
         return pulumi.get(self, "description")
 
@@ -428,46 +199,10 @@ class _ScheduleState:
         pulumi.set(self, "description", value)
 
     @_builtins.property
-    @pulumi.getter(name="diffMode")
-    def diff_mode(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Diff mode
-        """
-        return pulumi.get(self, "diff_mode")
-
-    @diff_mode.setter
-    def diff_mode(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "diff_mode", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def dtend(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The last occurrence of the schedule occurs before this time, aftewards the schedule expires.
-        """
-        return pulumi.get(self, "dtend")
-
-    @dtend.setter
-    def dtend(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "dtend", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def dtstart(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The first occurrence of the schedule occurs on or after this time.
-        """
-        return pulumi.get(self, "dtstart")
-
-    @dtstart.setter
-    def dtstart(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "dtstart", value)
-
-    @_builtins.property
     @pulumi.getter
     def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Enables processing of this schedule.
+        Enable or disable the schedule
         """
         return pulumi.get(self, "enabled")
 
@@ -476,22 +211,10 @@ class _ScheduleState:
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
-    @pulumi.getter(name="executionEnvironment")
-    def execution_environment(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The container image to be used for execution.
-        """
-        return pulumi.get(self, "execution_environment")
-
-    @execution_environment.setter
-    def execution_environment(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "execution_environment", value)
-
-    @_builtins.property
     @pulumi.getter(name="extraData")
     def extra_data(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Extra data
+        Extra data to be pass for the schedule (JSON format)
         """
         return pulumi.get(self, "extra_data")
 
@@ -501,21 +224,9 @@ class _ScheduleState:
 
     @_builtins.property
     @pulumi.getter
-    def forks(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Forks
-        """
-        return pulumi.get(self, "forks")
-
-    @forks.setter
-    def forks(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "forks", value)
-
-    @_builtins.property
-    @pulumi.getter
     def inventory(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Inventory applied as a prompt, assuming job template prompts for inventory
+        The ID of the Inventory to be used for the schedule
         """
         return pulumi.get(self, "inventory")
 
@@ -524,58 +235,10 @@ class _ScheduleState:
         pulumi.set(self, "inventory", value)
 
     @_builtins.property
-    @pulumi.getter(name="jobSliceCount")
-    def job_slice_count(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Job slice count
-        """
-        return pulumi.get(self, "job_slice_count")
-
-    @job_slice_count.setter
-    def job_slice_count(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "job_slice_count", value)
-
-    @_builtins.property
-    @pulumi.getter(name="jobTags")
-    def job_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Job tags
-        """
-        return pulumi.get(self, "job_tags")
-
-    @job_tags.setter
-    def job_tags(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "job_tags", value)
-
-    @_builtins.property
-    @pulumi.getter(name="jobType")
-    def job_type(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Job type
-        """
-        return pulumi.get(self, "job_type")
-
-    @job_type.setter
-    def job_type(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "job_type", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def limit(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Limit
-        """
-        return pulumi.get(self, "limit")
-
-    @limit.setter
-    def limit(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "limit", value)
-
-    @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this schedule.
+        Name of the schedule
         """
         return pulumi.get(self, "name")
 
@@ -584,22 +247,10 @@ class _ScheduleState:
         pulumi.set(self, "name", value)
 
     @_builtins.property
-    @pulumi.getter(name="nextRun")
-    def next_run(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The next time that the scheduled action will run.
-        """
-        return pulumi.get(self, "next_run")
-
-    @next_run.setter
-    def next_run(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "next_run", value)
-
-    @_builtins.property
     @pulumi.getter
     def rrule(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        A value representing the schedules iCal recurrence rule.
+        RRule for the schedule. See https://github.com/ansible/awx/blob/devel/awx/api/templates/api/_schedule_detail.md for more information.
         """
         return pulumi.get(self, "rrule")
 
@@ -609,99 +260,24 @@ class _ScheduleState:
 
     @_builtins.property
     @pulumi.getter(name="scheduleId")
-    def schedule_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this schedule.
-        """
+    def schedule_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "schedule_id")
 
     @schedule_id.setter
-    def schedule_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def schedule_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "schedule_id", value)
 
     @_builtins.property
-    @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
+    @pulumi.getter(name="unifiedJobTemplateId")
+    def unified_job_template_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Scm branch
+        The ID of the Unified Job Template to be scheduled
         """
-        return pulumi.get(self, "scm_branch")
+        return pulumi.get(self, "unified_job_template_id")
 
-    @scm_branch.setter
-    def scm_branch(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "scm_branch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="skipTags")
-    def skip_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Skip tags
-        """
-        return pulumi.get(self, "skip_tags")
-
-    @skip_tags.setter
-    def skip_tags(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "skip_tags", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Timeout
-        """
-        return pulumi.get(self, "timeout")
-
-    @timeout.setter
-    def timeout(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "timeout", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def timezone(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The timezone this schedule runs in. This field is extracted from the RRULE. If the timezone in the RRULE is a link to another timezone, the link will be reflected in this field.
-        """
-        return pulumi.get(self, "timezone")
-
-    @timezone.setter
-    def timezone(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "timezone", value)
-
-    @_builtins.property
-    @pulumi.getter(name="unifiedJobTemplate")
-    def unified_job_template(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Unified job template
-        """
-        return pulumi.get(self, "unified_job_template")
-
-    @unified_job_template.setter
-    def unified_job_template(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "unified_job_template", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def until(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The date this schedule will end. This field is computed from the RRULE. If the schedule does not end an empty string will be returned
-        """
-        return pulumi.get(self, "until")
-
-    @until.setter
-    def until(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "until", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def verbosity(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Verbosity
-        """
-        return pulumi.get(self, "verbosity")
-
-    @verbosity.setter
-    def verbosity(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "verbosity", value)
+    @unified_job_template_id.setter
+    def unified_job_template_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "unified_job_template_id", value)
 
 
 @pulumi.type_token("awx:index/schedule:Schedule")
@@ -711,47 +287,26 @@ class Schedule(pulumi.CustomResource):
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 diff_mode: pulumi.Input[Optional[_builtins.bool]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-                 execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
                  extra_data: pulumi.Input[Optional[_builtins.str]] = None,
-                 forks: pulumi.Input[Optional[_builtins.float]] = None,
                  inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_slice_count: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 job_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  rrule: pulumi.Input[Optional[_builtins.str]] = None,
-                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
-                 skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
-                 unified_job_template: pulumi.Input[Optional[_builtins.float]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 unified_job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a Schedule resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] description: Optional description of this schedule.
-        :param pulumi.Input[_builtins.bool] diff_mode: Diff mode
-        :param pulumi.Input[_builtins.bool] enabled: Enables processing of this schedule.
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] extra_data: Extra data
-        :param pulumi.Input[_builtins.float] forks: Forks
-        :param pulumi.Input[_builtins.float] inventory: Inventory applied as a prompt, assuming job template prompts for inventory
-        :param pulumi.Input[_builtins.float] job_slice_count: Job slice count
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.str] job_type: Job type
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this schedule.
-        :param pulumi.Input[_builtins.str] rrule: A value representing the schedules iCal recurrence rule.
-        :param pulumi.Input[_builtins.str] scm_branch: Scm branch
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.float] timeout: Timeout
-        :param pulumi.Input[_builtins.float] unified_job_template: Unified job template
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
+        :param pulumi.Input[_builtins.str] description: Description of the schedule
+        :param pulumi.Input[_builtins.bool] enabled: Enable or disable the schedule
+        :param pulumi.Input[_builtins.str] extra_data: Extra data to be pass for the schedule (JSON format)
+        :param pulumi.Input[_builtins.float] inventory: The ID of the Inventory to be used for the schedule
+        :param pulumi.Input[_builtins.str] name: Name of the schedule
+        :param pulumi.Input[_builtins.str] rrule: RRule for the schedule. See https://github.com/ansible/awx/blob/devel/awx/api/templates/api/_schedule_detail.md for more information.
+        :param pulumi.Input[_builtins.float] unified_job_template_id: The ID of the Unified Job Template to be scheduled
         """
         ...
     @overload
@@ -778,23 +333,13 @@ class Schedule(pulumi.CustomResource):
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 diff_mode: pulumi.Input[Optional[_builtins.bool]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-                 execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
                  extra_data: pulumi.Input[Optional[_builtins.str]] = None,
-                 forks: pulumi.Input[Optional[_builtins.float]] = None,
                  inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_slice_count: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 job_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  rrule: pulumi.Input[Optional[_builtins.str]] = None,
-                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
-                 skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
-                 unified_job_template: pulumi.Input[Optional[_builtins.float]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None,
+                 schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 unified_job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -805,33 +350,17 @@ class Schedule(pulumi.CustomResource):
             __props__ = ScheduleArgs.__new__(ScheduleArgs)
 
             __props__.__dict__["description"] = description
-            __props__.__dict__["diff_mode"] = diff_mode
             __props__.__dict__["enabled"] = enabled
-            __props__.__dict__["execution_environment"] = execution_environment
             __props__.__dict__["extra_data"] = extra_data
-            __props__.__dict__["forks"] = forks
             __props__.__dict__["inventory"] = inventory
-            __props__.__dict__["job_slice_count"] = job_slice_count
-            __props__.__dict__["job_tags"] = job_tags
-            __props__.__dict__["job_type"] = job_type
-            __props__.__dict__["limit"] = limit
             __props__.__dict__["name"] = name
             if rrule is None and not opts.urn:
                 raise TypeError("Missing required property 'rrule'")
             __props__.__dict__["rrule"] = rrule
-            __props__.__dict__["scm_branch"] = scm_branch
-            __props__.__dict__["skip_tags"] = skip_tags
-            __props__.__dict__["timeout"] = timeout
-            if unified_job_template is None and not opts.urn:
-                raise TypeError("Missing required property 'unified_job_template'")
-            __props__.__dict__["unified_job_template"] = unified_job_template
-            __props__.__dict__["verbosity"] = verbosity
-            __props__.__dict__["dtend"] = None
-            __props__.__dict__["dtstart"] = None
-            __props__.__dict__["next_run"] = None
-            __props__.__dict__["schedule_id"] = None
-            __props__.__dict__["timezone"] = None
-            __props__.__dict__["until"] = None
+            __props__.__dict__["schedule_id"] = schedule_id
+            if unified_job_template_id is None and not opts.urn:
+                raise TypeError("Missing required property 'unified_job_template_id'")
+            __props__.__dict__["unified_job_template_id"] = unified_job_template_id
         super(Schedule, __self__).__init__(
             'awx:index/schedule:Schedule',
             resource_name,
@@ -844,29 +373,13 @@ class Schedule(pulumi.CustomResource):
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
-            diff_mode: pulumi.Input[Optional[_builtins.bool]] = None,
-            dtend: pulumi.Input[Optional[_builtins.str]] = None,
-            dtstart: pulumi.Input[Optional[_builtins.str]] = None,
             enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-            execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
             extra_data: pulumi.Input[Optional[_builtins.str]] = None,
-            forks: pulumi.Input[Optional[_builtins.float]] = None,
             inventory: pulumi.Input[Optional[_builtins.float]] = None,
-            job_slice_count: pulumi.Input[Optional[_builtins.float]] = None,
-            job_tags: pulumi.Input[Optional[_builtins.str]] = None,
-            job_type: pulumi.Input[Optional[_builtins.str]] = None,
-            limit: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            next_run: pulumi.Input[Optional[_builtins.str]] = None,
             rrule: pulumi.Input[Optional[_builtins.str]] = None,
-            schedule_id: pulumi.Input[Optional[_builtins.float]] = None,
-            scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
-            skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
-            timeout: pulumi.Input[Optional[_builtins.float]] = None,
-            timezone: pulumi.Input[Optional[_builtins.str]] = None,
-            unified_job_template: pulumi.Input[Optional[_builtins.float]] = None,
-            until: pulumi.Input[Optional[_builtins.str]] = None,
-            verbosity: pulumi.Input[Optional[_builtins.str]] = None) -> 'Schedule':
+            schedule_id: pulumi.Input[Optional[_builtins.str]] = None,
+            unified_job_template_id: pulumi.Input[Optional[_builtins.float]] = None) -> 'Schedule':
         """
         Get an existing Schedule resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -874,250 +387,86 @@ class Schedule(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] description: Optional description of this schedule.
-        :param pulumi.Input[_builtins.bool] diff_mode: Diff mode
-        :param pulumi.Input[_builtins.str] dtend: The last occurrence of the schedule occurs before this time, aftewards the schedule expires.
-        :param pulumi.Input[_builtins.str] dtstart: The first occurrence of the schedule occurs on or after this time.
-        :param pulumi.Input[_builtins.bool] enabled: Enables processing of this schedule.
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] extra_data: Extra data
-        :param pulumi.Input[_builtins.float] forks: Forks
-        :param pulumi.Input[_builtins.float] inventory: Inventory applied as a prompt, assuming job template prompts for inventory
-        :param pulumi.Input[_builtins.float] job_slice_count: Job slice count
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.str] job_type: Job type
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this schedule.
-        :param pulumi.Input[_builtins.str] next_run: The next time that the scheduled action will run.
-        :param pulumi.Input[_builtins.str] rrule: A value representing the schedules iCal recurrence rule.
-        :param pulumi.Input[_builtins.float] schedule_id: Database ID for this schedule.
-        :param pulumi.Input[_builtins.str] scm_branch: Scm branch
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.float] timeout: Timeout
-        :param pulumi.Input[_builtins.str] timezone: The timezone this schedule runs in. This field is extracted from the RRULE. If the timezone in the RRULE is a link to another timezone, the link will be reflected in this field.
-        :param pulumi.Input[_builtins.float] unified_job_template: Unified job template
-        :param pulumi.Input[_builtins.str] until: The date this schedule will end. This field is computed from the RRULE. If the schedule does not end an empty string will be returned
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
+        :param pulumi.Input[_builtins.str] description: Description of the schedule
+        :param pulumi.Input[_builtins.bool] enabled: Enable or disable the schedule
+        :param pulumi.Input[_builtins.str] extra_data: Extra data to be pass for the schedule (JSON format)
+        :param pulumi.Input[_builtins.float] inventory: The ID of the Inventory to be used for the schedule
+        :param pulumi.Input[_builtins.str] name: Name of the schedule
+        :param pulumi.Input[_builtins.str] rrule: RRule for the schedule. See https://github.com/ansible/awx/blob/devel/awx/api/templates/api/_schedule_detail.md for more information.
+        :param pulumi.Input[_builtins.float] unified_job_template_id: The ID of the Unified Job Template to be scheduled
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
         __props__ = _ScheduleState.__new__(_ScheduleState)
 
         __props__.__dict__["description"] = description
-        __props__.__dict__["diff_mode"] = diff_mode
-        __props__.__dict__["dtend"] = dtend
-        __props__.__dict__["dtstart"] = dtstart
         __props__.__dict__["enabled"] = enabled
-        __props__.__dict__["execution_environment"] = execution_environment
         __props__.__dict__["extra_data"] = extra_data
-        __props__.__dict__["forks"] = forks
         __props__.__dict__["inventory"] = inventory
-        __props__.__dict__["job_slice_count"] = job_slice_count
-        __props__.__dict__["job_tags"] = job_tags
-        __props__.__dict__["job_type"] = job_type
-        __props__.__dict__["limit"] = limit
         __props__.__dict__["name"] = name
-        __props__.__dict__["next_run"] = next_run
         __props__.__dict__["rrule"] = rrule
         __props__.__dict__["schedule_id"] = schedule_id
-        __props__.__dict__["scm_branch"] = scm_branch
-        __props__.__dict__["skip_tags"] = skip_tags
-        __props__.__dict__["timeout"] = timeout
-        __props__.__dict__["timezone"] = timezone
-        __props__.__dict__["unified_job_template"] = unified_job_template
-        __props__.__dict__["until"] = until
-        __props__.__dict__["verbosity"] = verbosity
+        __props__.__dict__["unified_job_template_id"] = unified_job_template_id
         return Schedule(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Optional description of this schedule.
+        Description of the schedule
         """
         return pulumi.get(self, "description")
 
     @_builtins.property
-    @pulumi.getter(name="diffMode")
-    def diff_mode(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Diff mode
-        """
-        return pulumi.get(self, "diff_mode")
-
-    @_builtins.property
     @pulumi.getter
-    def dtend(self) -> pulumi.Output[_builtins.str]:
+    def enabled(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        The last occurrence of the schedule occurs before this time, aftewards the schedule expires.
-        """
-        return pulumi.get(self, "dtend")
-
-    @_builtins.property
-    @pulumi.getter
-    def dtstart(self) -> pulumi.Output[_builtins.str]:
-        """
-        The first occurrence of the schedule occurs on or after this time.
-        """
-        return pulumi.get(self, "dtstart")
-
-    @_builtins.property
-    @pulumi.getter
-    def enabled(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Enables processing of this schedule.
+        Enable or disable the schedule
         """
         return pulumi.get(self, "enabled")
 
     @_builtins.property
-    @pulumi.getter(name="executionEnvironment")
-    def execution_environment(self) -> pulumi.Output[_builtins.float]:
-        """
-        The container image to be used for execution.
-        """
-        return pulumi.get(self, "execution_environment")
-
-    @_builtins.property
     @pulumi.getter(name="extraData")
-    def extra_data(self) -> pulumi.Output[_builtins.str]:
+    def extra_data(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Extra data
+        Extra data to be pass for the schedule (JSON format)
         """
         return pulumi.get(self, "extra_data")
 
     @_builtins.property
     @pulumi.getter
-    def forks(self) -> pulumi.Output[_builtins.float]:
+    def inventory(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        Forks
-        """
-        return pulumi.get(self, "forks")
-
-    @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Output[_builtins.float]:
-        """
-        Inventory applied as a prompt, assuming job template prompts for inventory
+        The ID of the Inventory to be used for the schedule
         """
         return pulumi.get(self, "inventory")
-
-    @_builtins.property
-    @pulumi.getter(name="jobSliceCount")
-    def job_slice_count(self) -> pulumi.Output[_builtins.float]:
-        """
-        Job slice count
-        """
-        return pulumi.get(self, "job_slice_count")
-
-    @_builtins.property
-    @pulumi.getter(name="jobTags")
-    def job_tags(self) -> pulumi.Output[_builtins.str]:
-        """
-        Job tags
-        """
-        return pulumi.get(self, "job_tags")
-
-    @_builtins.property
-    @pulumi.getter(name="jobType")
-    def job_type(self) -> pulumi.Output[_builtins.str]:
-        """
-        Job type
-        """
-        return pulumi.get(self, "job_type")
-
-    @_builtins.property
-    @pulumi.getter
-    def limit(self) -> pulumi.Output[_builtins.str]:
-        """
-        Limit
-        """
-        return pulumi.get(self, "limit")
 
     @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this schedule.
+        Name of the schedule
         """
         return pulumi.get(self, "name")
-
-    @_builtins.property
-    @pulumi.getter(name="nextRun")
-    def next_run(self) -> pulumi.Output[_builtins.str]:
-        """
-        The next time that the scheduled action will run.
-        """
-        return pulumi.get(self, "next_run")
 
     @_builtins.property
     @pulumi.getter
     def rrule(self) -> pulumi.Output[_builtins.str]:
         """
-        A value representing the schedules iCal recurrence rule.
+        RRule for the schedule. See https://github.com/ansible/awx/blob/devel/awx/api/templates/api/_schedule_detail.md for more information.
         """
         return pulumi.get(self, "rrule")
 
     @_builtins.property
     @pulumi.getter(name="scheduleId")
-    def schedule_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this schedule.
-        """
+    def schedule_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "schedule_id")
 
     @_builtins.property
-    @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> pulumi.Output[_builtins.str]:
+    @pulumi.getter(name="unifiedJobTemplateId")
+    def unified_job_template_id(self) -> pulumi.Output[_builtins.float]:
         """
-        Scm branch
+        The ID of the Unified Job Template to be scheduled
         """
-        return pulumi.get(self, "scm_branch")
-
-    @_builtins.property
-    @pulumi.getter(name="skipTags")
-    def skip_tags(self) -> pulumi.Output[_builtins.str]:
-        """
-        Skip tags
-        """
-        return pulumi.get(self, "skip_tags")
-
-    @_builtins.property
-    @pulumi.getter
-    def timeout(self) -> pulumi.Output[_builtins.float]:
-        """
-        Timeout
-        """
-        return pulumi.get(self, "timeout")
-
-    @_builtins.property
-    @pulumi.getter
-    def timezone(self) -> pulumi.Output[_builtins.str]:
-        """
-        The timezone this schedule runs in. This field is extracted from the RRULE. If the timezone in the RRULE is a link to another timezone, the link will be reflected in this field.
-        """
-        return pulumi.get(self, "timezone")
-
-    @_builtins.property
-    @pulumi.getter(name="unifiedJobTemplate")
-    def unified_job_template(self) -> pulumi.Output[_builtins.float]:
-        """
-        Unified job template
-        """
-        return pulumi.get(self, "unified_job_template")
-
-    @_builtins.property
-    @pulumi.getter
-    def until(self) -> pulumi.Output[_builtins.str]:
-        """
-        The date this schedule will end. This field is computed from the RRULE. If the schedule does not end an empty string will be returned
-        """
-        return pulumi.get(self, "until")
-
-    @_builtins.property
-    @pulumi.getter
-    def verbosity(self) -> pulumi.Output[_builtins.str]:
-        """
-        Verbosity
-        """
-        return pulumi.get(self, "verbosity")
+        return pulumi.get(self, "unified_job_template_id")
 

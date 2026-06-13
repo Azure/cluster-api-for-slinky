@@ -13,45 +13,57 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import NotRequired, TypedDict, TypeAlias
 from . import _utilities
+from . import outputs
+from ._inputs import *
 
 __all__ = ['TeamArgs', 'Team']
 
 @pulumi.input_type
 class TeamArgs:
     def __init__(__self__, *,
-                 organization: pulumi.Input[_builtins.float],
+                 organization_id: pulumi.Input[_builtins.float],
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None):
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input['TeamRoleEntitlementArgs']]]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 timeouts: pulumi.Input[Optional['TeamTimeoutsArgs']] = None):
         """
         The set of arguments for constructing a Team resource.
 
-        :param pulumi.Input[_builtins.float] organization: Organization
-        :param pulumi.Input[_builtins.str] description: Optional description of this team.
-        :param pulumi.Input[_builtins.str] name: Name of this team.
+        :param pulumi.Input[_builtins.float] organization_id: Numeric ID of the Team organization
+        :param pulumi.Input[_builtins.str] description: Optional description of this Team.
+        :param pulumi.Input[_builtins.str] name: Name of this Team
+        :param pulumi.Input[Sequence[pulumi.Input['TeamRoleEntitlementArgs']]] role_entitlements: Set of role IDs of the role entitlements
         """
-        pulumi.set(__self__, "organization", organization)
+        pulumi.set(__self__, "organization_id", organization_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if name is not None:
             pulumi.set(__self__, "name", name)
+        if role_entitlements is not None:
+            pulumi.set(__self__, "role_entitlements", role_entitlements)
+        if team_id is not None:
+            pulumi.set(__self__, "team_id", team_id)
+        if timeouts is not None:
+            pulumi.set(__self__, "timeouts", timeouts)
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[_builtins.float]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[_builtins.float]:
         """
-        Organization
+        Numeric ID of the Team organization
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
 
-    @organization.setter
-    def organization(self, value: pulumi.Input[_builtins.float]):
-        pulumi.set(self, "organization", value)
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[_builtins.float]):
+        pulumi.set(self, "organization_id", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this team.
+        Optional description of this Team.
         """
         return pulumi.get(self, "description")
 
@@ -63,13 +75,43 @@ class TeamArgs:
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this team.
+        Name of this Team
         """
         return pulumi.get(self, "name")
 
     @name.setter
     def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
+
+    @_builtins.property
+    @pulumi.getter(name="roleEntitlements")
+    def role_entitlements(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['TeamRoleEntitlementArgs']]]]:
+        """
+        Set of role IDs of the role entitlements
+        """
+        return pulumi.get(self, "role_entitlements")
+
+    @role_entitlements.setter
+    def role_entitlements(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['TeamRoleEntitlementArgs']]]]):
+        pulumi.set(self, "role_entitlements", value)
+
+    @_builtins.property
+    @pulumi.getter(name="teamId")
+    def team_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "team_id")
+
+    @team_id.setter
+    def team_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "team_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def timeouts(self) -> pulumi.Input[Optional['TeamTimeoutsArgs']]:
+        return pulumi.get(self, "timeouts")
+
+    @timeouts.setter
+    def timeouts(self, value: pulumi.Input[Optional['TeamTimeoutsArgs']]):
+        pulumi.set(self, "timeouts", value)
 
 
 @pulumi.input_type
@@ -77,30 +119,36 @@ class _TeamState:
     def __init__(__self__, *,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
-                 team_id: pulumi.Input[Optional[_builtins.float]] = None):
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input['TeamRoleEntitlementArgs']]]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 timeouts: pulumi.Input[Optional['TeamTimeoutsArgs']] = None):
         """
         Input properties used for looking up and filtering Team resources.
 
-        :param pulumi.Input[_builtins.str] description: Optional description of this team.
-        :param pulumi.Input[_builtins.str] name: Name of this team.
-        :param pulumi.Input[_builtins.float] organization: Organization
-        :param pulumi.Input[_builtins.float] team_id: Database ID for this team.
+        :param pulumi.Input[_builtins.str] description: Optional description of this Team.
+        :param pulumi.Input[_builtins.str] name: Name of this Team
+        :param pulumi.Input[_builtins.float] organization_id: Numeric ID of the Team organization
+        :param pulumi.Input[Sequence[pulumi.Input['TeamRoleEntitlementArgs']]] role_entitlements: Set of role IDs of the role entitlements
         """
         if description is not None:
             pulumi.set(__self__, "description", description)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if organization is not None:
-            pulumi.set(__self__, "organization", organization)
+        if organization_id is not None:
+            pulumi.set(__self__, "organization_id", organization_id)
+        if role_entitlements is not None:
+            pulumi.set(__self__, "role_entitlements", role_entitlements)
         if team_id is not None:
             pulumi.set(__self__, "team_id", team_id)
+        if timeouts is not None:
+            pulumi.set(__self__, "timeouts", timeouts)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this team.
+        Optional description of this Team.
         """
         return pulumi.get(self, "description")
 
@@ -112,7 +160,7 @@ class _TeamState:
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this team.
+        Name of this Team
         """
         return pulumi.get(self, "name")
 
@@ -121,28 +169,46 @@ class _TeamState:
         pulumi.set(self, "name", value)
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Organization
+        Numeric ID of the Team organization
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
 
-    @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization", value)
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "organization_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="roleEntitlements")
+    def role_entitlements(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['TeamRoleEntitlementArgs']]]]:
+        """
+        Set of role IDs of the role entitlements
+        """
+        return pulumi.get(self, "role_entitlements")
+
+    @role_entitlements.setter
+    def role_entitlements(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['TeamRoleEntitlementArgs']]]]):
+        pulumi.set(self, "role_entitlements", value)
 
     @_builtins.property
     @pulumi.getter(name="teamId")
-    def team_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this team.
-        """
+    def team_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "team_id")
 
     @team_id.setter
-    def team_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def team_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "team_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def timeouts(self) -> pulumi.Input[Optional['TeamTimeoutsArgs']]:
+        return pulumi.get(self, "timeouts")
+
+    @timeouts.setter
+    def timeouts(self, value: pulumi.Input[Optional['TeamTimeoutsArgs']]):
+        pulumi.set(self, "timeouts", value)
 
 
 @pulumi.type_token("awx:index/team:Team")
@@ -153,16 +219,20 @@ class Team(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict']]]]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 timeouts: pulumi.Input[Optional[Union['TeamTimeoutsArgs', 'TeamTimeoutsArgsDict']]] = None,
                  __props__=None):
         """
         Create a Team resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] description: Optional description of this team.
-        :param pulumi.Input[_builtins.str] name: Name of this team.
-        :param pulumi.Input[_builtins.float] organization: Organization
+        :param pulumi.Input[_builtins.str] description: Optional description of this Team.
+        :param pulumi.Input[_builtins.str] name: Name of this Team
+        :param pulumi.Input[_builtins.float] organization_id: Numeric ID of the Team organization
+        :param pulumi.Input[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict']]]] role_entitlements: Set of role IDs of the role entitlements
         """
         ...
     @overload
@@ -190,7 +260,10 @@ class Team(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict']]]]] = None,
+                 team_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 timeouts: pulumi.Input[Optional[Union['TeamTimeoutsArgs', 'TeamTimeoutsArgsDict']]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -202,10 +275,12 @@ class Team(pulumi.CustomResource):
 
             __props__.__dict__["description"] = description
             __props__.__dict__["name"] = name
-            if organization is None and not opts.urn:
-                raise TypeError("Missing required property 'organization'")
-            __props__.__dict__["organization"] = organization
-            __props__.__dict__["team_id"] = None
+            if organization_id is None and not opts.urn:
+                raise TypeError("Missing required property 'organization_id'")
+            __props__.__dict__["organization_id"] = organization_id
+            __props__.__dict__["role_entitlements"] = role_entitlements
+            __props__.__dict__["team_id"] = team_id
+            __props__.__dict__["timeouts"] = timeouts
         super(Team, __self__).__init__(
             'awx:index/team:Team',
             resource_name,
@@ -219,8 +294,10 @@ class Team(pulumi.CustomResource):
             opts: Optional[pulumi.ResourceOptions] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            organization: pulumi.Input[Optional[_builtins.float]] = None,
-            team_id: pulumi.Input[Optional[_builtins.float]] = None) -> 'Team':
+            organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+            role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict']]]]] = None,
+            team_id: pulumi.Input[Optional[_builtins.str]] = None,
+            timeouts: pulumi.Input[Optional[Union['TeamTimeoutsArgs', 'TeamTimeoutsArgsDict']]] = None) -> 'Team':
         """
         Get an existing Team resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -228,10 +305,10 @@ class Team(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] description: Optional description of this team.
-        :param pulumi.Input[_builtins.str] name: Name of this team.
-        :param pulumi.Input[_builtins.float] organization: Organization
-        :param pulumi.Input[_builtins.float] team_id: Database ID for this team.
+        :param pulumi.Input[_builtins.str] description: Optional description of this Team.
+        :param pulumi.Input[_builtins.str] name: Name of this Team
+        :param pulumi.Input[_builtins.float] organization_id: Numeric ID of the Team organization
+        :param pulumi.Input[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict']]]] role_entitlements: Set of role IDs of the role entitlements
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -239,15 +316,17 @@ class Team(pulumi.CustomResource):
 
         __props__.__dict__["description"] = description
         __props__.__dict__["name"] = name
-        __props__.__dict__["organization"] = organization
+        __props__.__dict__["organization_id"] = organization_id
+        __props__.__dict__["role_entitlements"] = role_entitlements
         __props__.__dict__["team_id"] = team_id
+        __props__.__dict__["timeouts"] = timeouts
         return Team(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Optional description of this team.
+        Optional description of this Team.
         """
         return pulumi.get(self, "description")
 
@@ -255,23 +334,33 @@ class Team(pulumi.CustomResource):
     @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this team.
+        Name of this Team
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Output[_builtins.float]:
         """
-        Organization
+        Numeric ID of the Team organization
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
+
+    @_builtins.property
+    @pulumi.getter(name="roleEntitlements")
+    def role_entitlements(self) -> pulumi.Output[Optional[Sequence['outputs.TeamRoleEntitlement']]]:
+        """
+        Set of role IDs of the role entitlements
+        """
+        return pulumi.get(self, "role_entitlements")
 
     @_builtins.property
     @pulumi.getter(name="teamId")
-    def team_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this team.
-        """
+    def team_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "team_id")
+
+    @_builtins.property
+    @pulumi.getter
+    def timeouts(self) -> pulumi.Output[Optional['outputs.TeamTimeouts']]:
+        return pulumi.get(self, "timeouts")
 

@@ -19,41 +19,64 @@ __all__ = ['CredentialTypeArgs', 'CredentialType']
 @pulumi.input_type
 class CredentialTypeArgs:
     def __init__(__self__, *,
-                 kind: pulumi.Input[_builtins.str],
+                 injectors: pulumi.Input[_builtins.str],
+                 inputs: pulumi.Input[_builtins.str],
+                 credential_type_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 injectors: pulumi.Input[Optional[_builtins.str]] = None,
-                 inputs: pulumi.Input[Optional[_builtins.str]] = None,
+                 kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a CredentialType resource.
 
-        :param pulumi.Input[_builtins.str] kind: The credential type
+        :param pulumi.Input[_builtins.str] injectors: Injectors for this credential type.
+        :param pulumi.Input[_builtins.str] inputs: Inputs for this credential type.
         :param pulumi.Input[_builtins.str] description: Optional description of this credential type.
-        :param pulumi.Input[_builtins.str] injectors: Enter injectors using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        :param pulumi.Input[_builtins.str] inputs: Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
+        :param pulumi.Input[_builtins.str] kind: Can be one of: <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`" pulumi-lang-hcl="`cloud`">`cloud`</span> or <span pulumi-lang-nodejs="`net`" pulumi-lang-dotnet="`Net`" pulumi-lang-go="`net`" pulumi-lang-python="`net`" pulumi-lang-yaml="`net`" pulumi-lang-java="`net`" pulumi-lang-hcl="`net`">`net`</span>
         :param pulumi.Input[_builtins.str] name: Name of this credential type.
         """
-        pulumi.set(__self__, "kind", kind)
+        pulumi.set(__self__, "injectors", injectors)
+        pulumi.set(__self__, "inputs", inputs)
+        if credential_type_id is not None:
+            pulumi.set(__self__, "credential_type_id", credential_type_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
-        if injectors is not None:
-            pulumi.set(__self__, "injectors", injectors)
-        if inputs is not None:
-            pulumi.set(__self__, "inputs", inputs)
+        if kind is not None:
+            pulumi.set(__self__, "kind", kind)
         if name is not None:
             pulumi.set(__self__, "name", name)
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> pulumi.Input[_builtins.str]:
+    def injectors(self) -> pulumi.Input[_builtins.str]:
         """
-        The credential type
+        Injectors for this credential type.
         """
-        return pulumi.get(self, "kind")
+        return pulumi.get(self, "injectors")
 
-    @kind.setter
-    def kind(self, value: pulumi.Input[_builtins.str]):
-        pulumi.set(self, "kind", value)
+    @injectors.setter
+    def injectors(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "injectors", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def inputs(self) -> pulumi.Input[_builtins.str]:
+        """
+        Inputs for this credential type.
+        """
+        return pulumi.get(self, "inputs")
+
+    @inputs.setter
+    def inputs(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "inputs", value)
+
+    @_builtins.property
+    @pulumi.getter(name="credentialTypeId")
+    def credential_type_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "credential_type_id")
+
+    @credential_type_id.setter
+    def credential_type_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "credential_type_id", value)
 
     @_builtins.property
     @pulumi.getter
@@ -69,27 +92,15 @@ class CredentialTypeArgs:
 
     @_builtins.property
     @pulumi.getter
-    def injectors(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Enter injectors using either JSON or YAML syntax. Refer to the documentation for example syntax.
+        Can be one of: <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`" pulumi-lang-hcl="`cloud`">`cloud`</span> or <span pulumi-lang-nodejs="`net`" pulumi-lang-dotnet="`Net`" pulumi-lang-go="`net`" pulumi-lang-python="`net`" pulumi-lang-yaml="`net`" pulumi-lang-java="`net`" pulumi-lang-hcl="`net`">`net`</span>
         """
-        return pulumi.get(self, "injectors")
+        return pulumi.get(self, "kind")
 
-    @injectors.setter
-    def injectors(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "injectors", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def inputs(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        """
-        return pulumi.get(self, "inputs")
-
-    @inputs.setter
-    def inputs(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "inputs", value)
+    @kind.setter
+    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "kind", value)
 
     @_builtins.property
     @pulumi.getter
@@ -107,25 +118,20 @@ class CredentialTypeArgs:
 @pulumi.input_type
 class _CredentialTypeState:
     def __init__(__self__, *,
-                 credential_type_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_type_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  injectors: pulumi.Input[Optional[_builtins.str]] = None,
                  inputs: pulumi.Input[Optional[_builtins.str]] = None,
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
-                 managed: pulumi.Input[Optional[_builtins.bool]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None,
-                 namespace: pulumi.Input[Optional[_builtins.str]] = None):
+                 name: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering CredentialType resources.
 
-        :param pulumi.Input[_builtins.float] credential_type_id: Database ID for this credential type.
         :param pulumi.Input[_builtins.str] description: Optional description of this credential type.
-        :param pulumi.Input[_builtins.str] injectors: Enter injectors using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        :param pulumi.Input[_builtins.str] inputs: Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        :param pulumi.Input[_builtins.str] kind: The credential type
-        :param pulumi.Input[_builtins.bool] managed: Is the resource managed
+        :param pulumi.Input[_builtins.str] injectors: Injectors for this credential type.
+        :param pulumi.Input[_builtins.str] inputs: Inputs for this credential type.
+        :param pulumi.Input[_builtins.str] kind: Can be one of: <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`" pulumi-lang-hcl="`cloud`">`cloud`</span> or <span pulumi-lang-nodejs="`net`" pulumi-lang-dotnet="`Net`" pulumi-lang-go="`net`" pulumi-lang-python="`net`" pulumi-lang-yaml="`net`" pulumi-lang-java="`net`" pulumi-lang-hcl="`net`">`net`</span>
         :param pulumi.Input[_builtins.str] name: Name of this credential type.
-        :param pulumi.Input[_builtins.str] namespace: The namespace to which the resource belongs to
         """
         if credential_type_id is not None:
             pulumi.set(__self__, "credential_type_id", credential_type_id)
@@ -137,23 +143,16 @@ class _CredentialTypeState:
             pulumi.set(__self__, "inputs", inputs)
         if kind is not None:
             pulumi.set(__self__, "kind", kind)
-        if managed is not None:
-            pulumi.set(__self__, "managed", managed)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if namespace is not None:
-            pulumi.set(__self__, "namespace", namespace)
 
     @_builtins.property
     @pulumi.getter(name="credentialTypeId")
-    def credential_type_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this credential type.
-        """
+    def credential_type_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "credential_type_id")
 
     @credential_type_id.setter
-    def credential_type_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def credential_type_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "credential_type_id", value)
 
     @_builtins.property
@@ -172,7 +171,7 @@ class _CredentialTypeState:
     @pulumi.getter
     def injectors(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Enter injectors using either JSON or YAML syntax. Refer to the documentation for example syntax.
+        Injectors for this credential type.
         """
         return pulumi.get(self, "injectors")
 
@@ -184,7 +183,7 @@ class _CredentialTypeState:
     @pulumi.getter
     def inputs(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
+        Inputs for this credential type.
         """
         return pulumi.get(self, "inputs")
 
@@ -196,25 +195,13 @@ class _CredentialTypeState:
     @pulumi.getter
     def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The credential type
+        Can be one of: <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`" pulumi-lang-hcl="`cloud`">`cloud`</span> or <span pulumi-lang-nodejs="`net`" pulumi-lang-dotnet="`Net`" pulumi-lang-go="`net`" pulumi-lang-python="`net`" pulumi-lang-yaml="`net`" pulumi-lang-java="`net`" pulumi-lang-hcl="`net`">`net`</span>
         """
         return pulumi.get(self, "kind")
 
     @kind.setter
     def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "kind", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def managed(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Is the resource managed
-        """
-        return pulumi.get(self, "managed")
-
-    @managed.setter
-    def managed(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "managed", value)
 
     @_builtins.property
     @pulumi.getter
@@ -228,18 +215,6 @@ class _CredentialTypeState:
     def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
-    @_builtins.property
-    @pulumi.getter
-    def namespace(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The namespace to which the resource belongs to
-        """
-        return pulumi.get(self, "namespace")
-
-    @namespace.setter
-    def namespace(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "namespace", value)
-
 
 @pulumi.type_token("awx:index/credentialType:CredentialType")
 class CredentialType(pulumi.CustomResource):
@@ -247,6 +222,7 @@ class CredentialType(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
+                 credential_type_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  injectors: pulumi.Input[Optional[_builtins.str]] = None,
                  inputs: pulumi.Input[Optional[_builtins.str]] = None,
@@ -259,9 +235,9 @@ class CredentialType(pulumi.CustomResource):
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] description: Optional description of this credential type.
-        :param pulumi.Input[_builtins.str] injectors: Enter injectors using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        :param pulumi.Input[_builtins.str] inputs: Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        :param pulumi.Input[_builtins.str] kind: The credential type
+        :param pulumi.Input[_builtins.str] injectors: Injectors for this credential type.
+        :param pulumi.Input[_builtins.str] inputs: Inputs for this credential type.
+        :param pulumi.Input[_builtins.str] kind: Can be one of: <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`" pulumi-lang-hcl="`cloud`">`cloud`</span> or <span pulumi-lang-nodejs="`net`" pulumi-lang-dotnet="`Net`" pulumi-lang-go="`net`" pulumi-lang-python="`net`" pulumi-lang-yaml="`net`" pulumi-lang-java="`net`" pulumi-lang-hcl="`net`">`net`</span>
         :param pulumi.Input[_builtins.str] name: Name of this credential type.
         """
         ...
@@ -288,6 +264,7 @@ class CredentialType(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
+                 credential_type_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  injectors: pulumi.Input[Optional[_builtins.str]] = None,
                  inputs: pulumi.Input[Optional[_builtins.str]] = None,
@@ -302,16 +279,16 @@ class CredentialType(pulumi.CustomResource):
                 raise TypeError('__props__ is only valid when passed in combination with a valid opts.id to get an existing resource')
             __props__ = CredentialTypeArgs.__new__(CredentialTypeArgs)
 
+            __props__.__dict__["credential_type_id"] = credential_type_id
             __props__.__dict__["description"] = description
+            if injectors is None and not opts.urn:
+                raise TypeError("Missing required property 'injectors'")
             __props__.__dict__["injectors"] = injectors
+            if inputs is None and not opts.urn:
+                raise TypeError("Missing required property 'inputs'")
             __props__.__dict__["inputs"] = inputs
-            if kind is None and not opts.urn:
-                raise TypeError("Missing required property 'kind'")
             __props__.__dict__["kind"] = kind
             __props__.__dict__["name"] = name
-            __props__.__dict__["credential_type_id"] = None
-            __props__.__dict__["managed"] = None
-            __props__.__dict__["namespace"] = None
         super(CredentialType, __self__).__init__(
             'awx:index/credentialType:CredentialType',
             resource_name,
@@ -323,14 +300,12 @@ class CredentialType(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            credential_type_id: pulumi.Input[Optional[_builtins.float]] = None,
+            credential_type_id: pulumi.Input[Optional[_builtins.str]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
             injectors: pulumi.Input[Optional[_builtins.str]] = None,
             inputs: pulumi.Input[Optional[_builtins.str]] = None,
             kind: pulumi.Input[Optional[_builtins.str]] = None,
-            managed: pulumi.Input[Optional[_builtins.bool]] = None,
-            name: pulumi.Input[Optional[_builtins.str]] = None,
-            namespace: pulumi.Input[Optional[_builtins.str]] = None) -> 'CredentialType':
+            name: pulumi.Input[Optional[_builtins.str]] = None) -> 'CredentialType':
         """
         Get an existing CredentialType resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -338,14 +313,11 @@ class CredentialType(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.float] credential_type_id: Database ID for this credential type.
         :param pulumi.Input[_builtins.str] description: Optional description of this credential type.
-        :param pulumi.Input[_builtins.str] injectors: Enter injectors using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        :param pulumi.Input[_builtins.str] inputs: Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        :param pulumi.Input[_builtins.str] kind: The credential type
-        :param pulumi.Input[_builtins.bool] managed: Is the resource managed
+        :param pulumi.Input[_builtins.str] injectors: Injectors for this credential type.
+        :param pulumi.Input[_builtins.str] inputs: Inputs for this credential type.
+        :param pulumi.Input[_builtins.str] kind: Can be one of: <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`" pulumi-lang-hcl="`cloud`">`cloud`</span> or <span pulumi-lang-nodejs="`net`" pulumi-lang-dotnet="`Net`" pulumi-lang-go="`net`" pulumi-lang-python="`net`" pulumi-lang-yaml="`net`" pulumi-lang-java="`net`" pulumi-lang-hcl="`net`">`net`</span>
         :param pulumi.Input[_builtins.str] name: Name of this credential type.
-        :param pulumi.Input[_builtins.str] namespace: The namespace to which the resource belongs to
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -356,22 +328,17 @@ class CredentialType(pulumi.CustomResource):
         __props__.__dict__["injectors"] = injectors
         __props__.__dict__["inputs"] = inputs
         __props__.__dict__["kind"] = kind
-        __props__.__dict__["managed"] = managed
         __props__.__dict__["name"] = name
-        __props__.__dict__["namespace"] = namespace
         return CredentialType(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter(name="credentialTypeId")
-    def credential_type_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this credential type.
-        """
+    def credential_type_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "credential_type_id")
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         Optional description of this credential type.
         """
@@ -381,7 +348,7 @@ class CredentialType(pulumi.CustomResource):
     @pulumi.getter
     def injectors(self) -> pulumi.Output[_builtins.str]:
         """
-        Enter injectors using either JSON or YAML syntax. Refer to the documentation for example syntax.
+        Injectors for this credential type.
         """
         return pulumi.get(self, "injectors")
 
@@ -389,25 +356,17 @@ class CredentialType(pulumi.CustomResource):
     @pulumi.getter
     def inputs(self) -> pulumi.Output[_builtins.str]:
         """
-        Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
+        Inputs for this credential type.
         """
         return pulumi.get(self, "inputs")
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> pulumi.Output[_builtins.str]:
+    def kind(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The credential type
+        Can be one of: <span pulumi-lang-nodejs="`cloud`" pulumi-lang-dotnet="`Cloud`" pulumi-lang-go="`cloud`" pulumi-lang-python="`cloud`" pulumi-lang-yaml="`cloud`" pulumi-lang-java="`cloud`" pulumi-lang-hcl="`cloud`">`cloud`</span> or <span pulumi-lang-nodejs="`net`" pulumi-lang-dotnet="`Net`" pulumi-lang-go="`net`" pulumi-lang-python="`net`" pulumi-lang-yaml="`net`" pulumi-lang-java="`net`" pulumi-lang-hcl="`net`">`net`</span>
         """
         return pulumi.get(self, "kind")
-
-    @_builtins.property
-    @pulumi.getter
-    def managed(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Is the resource managed
-        """
-        return pulumi.get(self, "managed")
 
     @_builtins.property
     @pulumi.getter
@@ -416,12 +375,4 @@ class CredentialType(pulumi.CustomResource):
         Name of this credential type.
         """
         return pulumi.get(self, "name")
-
-    @_builtins.property
-    @pulumi.getter
-    def namespace(self) -> pulumi.Output[_builtins.str]:
-        """
-        The namespace to which the resource belongs to
-        """
-        return pulumi.get(self, "namespace")
 

@@ -21,454 +21,97 @@ __all__ = ['ProjectArgs', 'Project']
 @pulumi.input_type
 class ProjectArgs:
     def __init__(__self__, *,
+                 organization_id: pulumi.Input[_builtins.float],
+                 scm_type: pulumi.Input[_builtins.str],
                  allow_override: pulumi.Input[Optional[_builtins.bool]] = None,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 default_environment: pulumi.Input[Optional[_builtins.float]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  local_path: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 project_id: pulumi.Input[Optional[_builtins.str]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  scm_clean: pulumi.Input[Optional[_builtins.bool]] = None,
+                 scm_credential_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_delete_on_update: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_refspec: pulumi.Input[Optional[_builtins.str]] = None,
-                 scm_track_submodules: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_type: pulumi.Input[Optional[_builtins.str]] = None,
                  scm_update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  scm_url: pulumi.Input[Optional[_builtins.str]] = None,
-                 signature_validation_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
-                 timeouts: pulumi.Input[Optional['ProjectTimeoutsArgs']] = None,
-                 wait_for_sync: pulumi.Input[Optional[_builtins.bool]] = None):
+                 timeouts: pulumi.Input[Optional['ProjectTimeoutsArgs']] = None):
         """
         The set of arguments for constructing a Project resource.
 
-        :param pulumi.Input[_builtins.bool] allow_override: Allow changing the SCM branch or revision in a job template that uses this project.
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.float] default_environment: The default execution environment for jobs run using this project.
+        :param pulumi.Input[_builtins.float] organization_id: Numeric ID of the project organization
+        :param pulumi.Input[_builtins.str] scm_type: One of "" (manual), git, hg, svn
+        :param pulumi.Input[_builtins.bool] allow_override: Allow SCM branch override
         :param pulumi.Input[_builtins.str] description: Optional description of this project.
         :param pulumi.Input[_builtins.str] local_path: Local path (relative to PROJECTS_ROOT) containing playbooks and related files for this project.
-        :param pulumi.Input[_builtins.str] name: Name of this project.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this template.
+        :param pulumi.Input[_builtins.str] name: Name of this project
         :param pulumi.Input[_builtins.str] scm_branch: Specific branch, tag or commit to checkout.
-        :param pulumi.Input[_builtins.bool] scm_clean: Discard any local changes before syncing the project.
-        :param pulumi.Input[_builtins.bool] scm_delete_on_update: Delete the project before syncing.
-        :param pulumi.Input[_builtins.str] scm_refspec: For git projects, an additional refspec to fetch.
-        :param pulumi.Input[_builtins.bool] scm_track_submodules: Track submodules latest commits on defined branch.
-        :param pulumi.Input[_builtins.str] scm_type: Specifies the source control system used to store the project.
-        :param pulumi.Input[_builtins.float] scm_update_cache_timeout: The number of seconds after the last project update ran that a new project update will be launched as a job dependency.
-        :param pulumi.Input[_builtins.bool] scm_update_on_launch: Update the project when a job is launched that uses the project.
-        :param pulumi.Input[_builtins.str] scm_url: The location where the project is stored.
-        :param pulumi.Input[_builtins.float] signature_validation_credential: An optional credential used for validating files in the project against unexpected changes.
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.bool] wait_for_sync: If true, wait for AWX to finish the SCM update kicked off on create or update before returning. Configure the maximum wait via the timeouts block.
+        :param pulumi.Input[_builtins.float] scm_credential_id: Numeric ID of the scm used credential
         """
+        pulumi.set(__self__, "organization_id", organization_id)
+        pulumi.set(__self__, "scm_type", scm_type)
         if allow_override is not None:
             pulumi.set(__self__, "allow_override", allow_override)
-        if credential is not None:
-            pulumi.set(__self__, "credential", credential)
-        if default_environment is not None:
-            pulumi.set(__self__, "default_environment", default_environment)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if local_path is not None:
             pulumi.set(__self__, "local_path", local_path)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if organization is not None:
-            pulumi.set(__self__, "organization", organization)
-        if scm_branch is not None:
-            pulumi.set(__self__, "scm_branch", scm_branch)
-        if scm_clean is not None:
-            pulumi.set(__self__, "scm_clean", scm_clean)
-        if scm_delete_on_update is not None:
-            pulumi.set(__self__, "scm_delete_on_update", scm_delete_on_update)
-        if scm_refspec is not None:
-            pulumi.set(__self__, "scm_refspec", scm_refspec)
-        if scm_track_submodules is not None:
-            pulumi.set(__self__, "scm_track_submodules", scm_track_submodules)
-        if scm_type is not None:
-            pulumi.set(__self__, "scm_type", scm_type)
-        if scm_update_cache_timeout is not None:
-            pulumi.set(__self__, "scm_update_cache_timeout", scm_update_cache_timeout)
-        if scm_update_on_launch is not None:
-            pulumi.set(__self__, "scm_update_on_launch", scm_update_on_launch)
-        if scm_url is not None:
-            pulumi.set(__self__, "scm_url", scm_url)
-        if signature_validation_credential is not None:
-            pulumi.set(__self__, "signature_validation_credential", signature_validation_credential)
-        if timeout is not None:
-            pulumi.set(__self__, "timeout", timeout)
-        if timeouts is not None:
-            pulumi.set(__self__, "timeouts", timeouts)
-        if wait_for_sync is not None:
-            pulumi.set(__self__, "wait_for_sync", wait_for_sync)
-
-    @_builtins.property
-    @pulumi.getter(name="allowOverride")
-    def allow_override(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Allow changing the SCM branch or revision in a job template that uses this project.
-        """
-        return pulumi.get(self, "allow_override")
-
-    @allow_override.setter
-    def allow_override(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "allow_override", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def credential(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Credential
-        """
-        return pulumi.get(self, "credential")
-
-    @credential.setter
-    def credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "credential", value)
-
-    @_builtins.property
-    @pulumi.getter(name="defaultEnvironment")
-    def default_environment(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The default execution environment for jobs run using this project.
-        """
-        return pulumi.get(self, "default_environment")
-
-    @default_environment.setter
-    def default_environment(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "default_environment", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Optional description of this project.
-        """
-        return pulumi.get(self, "description")
-
-    @description.setter
-    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "description", value)
-
-    @_builtins.property
-    @pulumi.getter(name="localPath")
-    def local_path(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Local path (relative to PROJECTS_ROOT) containing playbooks and related files for this project.
-        """
-        return pulumi.get(self, "local_path")
-
-    @local_path.setter
-    def local_path(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "local_path", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Name of this project.
-        """
-        return pulumi.get(self, "name")
-
-    @name.setter
-    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "name", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The organization used to determine access to this template.
-        """
-        return pulumi.get(self, "organization")
-
-    @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Specific branch, tag or commit to checkout.
-        """
-        return pulumi.get(self, "scm_branch")
-
-    @scm_branch.setter
-    def scm_branch(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "scm_branch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmClean")
-    def scm_clean(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Discard any local changes before syncing the project.
-        """
-        return pulumi.get(self, "scm_clean")
-
-    @scm_clean.setter
-    def scm_clean(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "scm_clean", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmDeleteOnUpdate")
-    def scm_delete_on_update(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Delete the project before syncing.
-        """
-        return pulumi.get(self, "scm_delete_on_update")
-
-    @scm_delete_on_update.setter
-    def scm_delete_on_update(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "scm_delete_on_update", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmRefspec")
-    def scm_refspec(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        For git projects, an additional refspec to fetch.
-        """
-        return pulumi.get(self, "scm_refspec")
-
-    @scm_refspec.setter
-    def scm_refspec(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "scm_refspec", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmTrackSubmodules")
-    def scm_track_submodules(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Track submodules latest commits on defined branch.
-        """
-        return pulumi.get(self, "scm_track_submodules")
-
-    @scm_track_submodules.setter
-    def scm_track_submodules(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "scm_track_submodules", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmType")
-    def scm_type(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Specifies the source control system used to store the project.
-        """
-        return pulumi.get(self, "scm_type")
-
-    @scm_type.setter
-    def scm_type(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "scm_type", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmUpdateCacheTimeout")
-    def scm_update_cache_timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The number of seconds after the last project update ran that a new project update will be launched as a job dependency.
-        """
-        return pulumi.get(self, "scm_update_cache_timeout")
-
-    @scm_update_cache_timeout.setter
-    def scm_update_cache_timeout(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "scm_update_cache_timeout", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmUpdateOnLaunch")
-    def scm_update_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Update the project when a job is launched that uses the project.
-        """
-        return pulumi.get(self, "scm_update_on_launch")
-
-    @scm_update_on_launch.setter
-    def scm_update_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "scm_update_on_launch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmUrl")
-    def scm_url(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The location where the project is stored.
-        """
-        return pulumi.get(self, "scm_url")
-
-    @scm_url.setter
-    def scm_url(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "scm_url", value)
-
-    @_builtins.property
-    @pulumi.getter(name="signatureValidationCredential")
-    def signature_validation_credential(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        An optional credential used for validating files in the project against unexpected changes.
-        """
-        return pulumi.get(self, "signature_validation_credential")
-
-    @signature_validation_credential.setter
-    def signature_validation_credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "signature_validation_credential", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The amount of time (in seconds) to run before the task is canceled.
-        """
-        return pulumi.get(self, "timeout")
-
-    @timeout.setter
-    def timeout(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "timeout", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def timeouts(self) -> pulumi.Input[Optional['ProjectTimeoutsArgs']]:
-        return pulumi.get(self, "timeouts")
-
-    @timeouts.setter
-    def timeouts(self, value: pulumi.Input[Optional['ProjectTimeoutsArgs']]):
-        pulumi.set(self, "timeouts", value)
-
-    @_builtins.property
-    @pulumi.getter(name="waitForSync")
-    def wait_for_sync(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        If true, wait for AWX to finish the SCM update kicked off on create or update before returning. Configure the maximum wait via the timeouts block.
-        """
-        return pulumi.get(self, "wait_for_sync")
-
-    @wait_for_sync.setter
-    def wait_for_sync(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "wait_for_sync", value)
-
-
-@pulumi.input_type
-class _ProjectState:
-    def __init__(__self__, *,
-                 allow_override: pulumi.Input[Optional[_builtins.bool]] = None,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 default_environment: pulumi.Input[Optional[_builtins.float]] = None,
-                 description: pulumi.Input[Optional[_builtins.str]] = None,
-                 local_path: pulumi.Input[Optional[_builtins.str]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
-                 project_id: pulumi.Input[Optional[_builtins.float]] = None,
-                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
-                 scm_clean: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_delete_on_update: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_refspec: pulumi.Input[Optional[_builtins.str]] = None,
-                 scm_track_submodules: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 scm_update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
-                 scm_update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_url: pulumi.Input[Optional[_builtins.str]] = None,
-                 signature_validation_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
-                 timeouts: pulumi.Input[Optional['ProjectTimeoutsArgs']] = None,
-                 wait_for_sync: pulumi.Input[Optional[_builtins.bool]] = None):
-        """
-        Input properties used for looking up and filtering Project resources.
-
-        :param pulumi.Input[_builtins.bool] allow_override: Allow changing the SCM branch or revision in a job template that uses this project.
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.float] default_environment: The default execution environment for jobs run using this project.
-        :param pulumi.Input[_builtins.str] description: Optional description of this project.
-        :param pulumi.Input[_builtins.str] local_path: Local path (relative to PROJECTS_ROOT) containing playbooks and related files for this project.
-        :param pulumi.Input[_builtins.str] name: Name of this project.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this template.
-        :param pulumi.Input[_builtins.float] project_id: Database ID for this project.
-        :param pulumi.Input[_builtins.str] scm_branch: Specific branch, tag or commit to checkout.
-        :param pulumi.Input[_builtins.bool] scm_clean: Discard any local changes before syncing the project.
-        :param pulumi.Input[_builtins.bool] scm_delete_on_update: Delete the project before syncing.
-        :param pulumi.Input[_builtins.str] scm_refspec: For git projects, an additional refspec to fetch.
-        :param pulumi.Input[_builtins.bool] scm_track_submodules: Track submodules latest commits on defined branch.
-        :param pulumi.Input[_builtins.str] scm_type: Specifies the source control system used to store the project.
-        :param pulumi.Input[_builtins.float] scm_update_cache_timeout: The number of seconds after the last project update ran that a new project update will be launched as a job dependency.
-        :param pulumi.Input[_builtins.bool] scm_update_on_launch: Update the project when a job is launched that uses the project.
-        :param pulumi.Input[_builtins.str] scm_url: The location where the project is stored.
-        :param pulumi.Input[_builtins.float] signature_validation_credential: An optional credential used for validating files in the project against unexpected changes.
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.bool] wait_for_sync: If true, wait for AWX to finish the SCM update kicked off on create or update before returning. Configure the maximum wait via the timeouts block.
-        """
-        if allow_override is not None:
-            pulumi.set(__self__, "allow_override", allow_override)
-        if credential is not None:
-            pulumi.set(__self__, "credential", credential)
-        if default_environment is not None:
-            pulumi.set(__self__, "default_environment", default_environment)
-        if description is not None:
-            pulumi.set(__self__, "description", description)
-        if local_path is not None:
-            pulumi.set(__self__, "local_path", local_path)
-        if name is not None:
-            pulumi.set(__self__, "name", name)
-        if organization is not None:
-            pulumi.set(__self__, "organization", organization)
         if project_id is not None:
             pulumi.set(__self__, "project_id", project_id)
         if scm_branch is not None:
             pulumi.set(__self__, "scm_branch", scm_branch)
         if scm_clean is not None:
             pulumi.set(__self__, "scm_clean", scm_clean)
+        if scm_credential_id is not None:
+            pulumi.set(__self__, "scm_credential_id", scm_credential_id)
         if scm_delete_on_update is not None:
             pulumi.set(__self__, "scm_delete_on_update", scm_delete_on_update)
-        if scm_refspec is not None:
-            pulumi.set(__self__, "scm_refspec", scm_refspec)
-        if scm_track_submodules is not None:
-            pulumi.set(__self__, "scm_track_submodules", scm_track_submodules)
-        if scm_type is not None:
-            pulumi.set(__self__, "scm_type", scm_type)
         if scm_update_cache_timeout is not None:
             pulumi.set(__self__, "scm_update_cache_timeout", scm_update_cache_timeout)
         if scm_update_on_launch is not None:
             pulumi.set(__self__, "scm_update_on_launch", scm_update_on_launch)
         if scm_url is not None:
             pulumi.set(__self__, "scm_url", scm_url)
-        if signature_validation_credential is not None:
-            pulumi.set(__self__, "signature_validation_credential", signature_validation_credential)
-        if timeout is not None:
-            pulumi.set(__self__, "timeout", timeout)
         if timeouts is not None:
             pulumi.set(__self__, "timeouts", timeouts)
-        if wait_for_sync is not None:
-            pulumi.set(__self__, "wait_for_sync", wait_for_sync)
+
+    @_builtins.property
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[_builtins.float]:
+        """
+        Numeric ID of the project organization
+        """
+        return pulumi.get(self, "organization_id")
+
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[_builtins.float]):
+        pulumi.set(self, "organization_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scmType")
+    def scm_type(self) -> pulumi.Input[_builtins.str]:
+        """
+        One of "" (manual), git, hg, svn
+        """
+        return pulumi.get(self, "scm_type")
+
+    @scm_type.setter
+    def scm_type(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "scm_type", value)
 
     @_builtins.property
     @pulumi.getter(name="allowOverride")
     def allow_override(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Allow changing the SCM branch or revision in a job template that uses this project.
+        Allow SCM branch override
         """
         return pulumi.get(self, "allow_override")
 
     @allow_override.setter
     def allow_override(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "allow_override", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def credential(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Credential
-        """
-        return pulumi.get(self, "credential")
-
-    @credential.setter
-    def credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "credential", value)
-
-    @_builtins.property
-    @pulumi.getter(name="defaultEnvironment")
-    def default_environment(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The default execution environment for jobs run using this project.
-        """
-        return pulumi.get(self, "default_environment")
-
-    @default_environment.setter
-    def default_environment(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "default_environment", value)
 
     @_builtins.property
     @pulumi.getter
@@ -498,7 +141,7 @@ class _ProjectState:
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this project.
+        Name of this project
         """
         return pulumi.get(self, "name")
 
@@ -507,27 +150,12 @@ class _ProjectState:
         pulumi.set(self, "name", value)
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The organization used to determine access to this template.
-        """
-        return pulumi.get(self, "organization")
-
-    @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization", value)
-
-    @_builtins.property
     @pulumi.getter(name="projectId")
-    def project_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this project.
-        """
+    def project_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "project_id")
 
     @project_id.setter
-    def project_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def project_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "project_id", value)
 
     @_builtins.property
@@ -545,9 +173,6 @@ class _ProjectState:
     @_builtins.property
     @pulumi.getter(name="scmClean")
     def scm_clean(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Discard any local changes before syncing the project.
-        """
         return pulumi.get(self, "scm_clean")
 
     @scm_clean.setter
@@ -555,11 +180,20 @@ class _ProjectState:
         pulumi.set(self, "scm_clean", value)
 
     @_builtins.property
+    @pulumi.getter(name="scmCredentialId")
+    def scm_credential_id(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Numeric ID of the scm used credential
+        """
+        return pulumi.get(self, "scm_credential_id")
+
+    @scm_credential_id.setter
+    def scm_credential_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "scm_credential_id", value)
+
+    @_builtins.property
     @pulumi.getter(name="scmDeleteOnUpdate")
     def scm_delete_on_update(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Delete the project before syncing.
-        """
         return pulumi.get(self, "scm_delete_on_update")
 
     @scm_delete_on_update.setter
@@ -567,47 +201,8 @@ class _ProjectState:
         pulumi.set(self, "scm_delete_on_update", value)
 
     @_builtins.property
-    @pulumi.getter(name="scmRefspec")
-    def scm_refspec(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        For git projects, an additional refspec to fetch.
-        """
-        return pulumi.get(self, "scm_refspec")
-
-    @scm_refspec.setter
-    def scm_refspec(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "scm_refspec", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmTrackSubmodules")
-    def scm_track_submodules(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Track submodules latest commits on defined branch.
-        """
-        return pulumi.get(self, "scm_track_submodules")
-
-    @scm_track_submodules.setter
-    def scm_track_submodules(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "scm_track_submodules", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmType")
-    def scm_type(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Specifies the source control system used to store the project.
-        """
-        return pulumi.get(self, "scm_type")
-
-    @scm_type.setter
-    def scm_type(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "scm_type", value)
-
-    @_builtins.property
     @pulumi.getter(name="scmUpdateCacheTimeout")
     def scm_update_cache_timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The number of seconds after the last project update ran that a new project update will be launched as a job dependency.
-        """
         return pulumi.get(self, "scm_update_cache_timeout")
 
     @scm_update_cache_timeout.setter
@@ -617,9 +212,6 @@ class _ProjectState:
     @_builtins.property
     @pulumi.getter(name="scmUpdateOnLaunch")
     def scm_update_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Update the project when a job is launched that uses the project.
-        """
         return pulumi.get(self, "scm_update_on_launch")
 
     @scm_update_on_launch.setter
@@ -629,38 +221,11 @@ class _ProjectState:
     @_builtins.property
     @pulumi.getter(name="scmUrl")
     def scm_url(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The location where the project is stored.
-        """
         return pulumi.get(self, "scm_url")
 
     @scm_url.setter
     def scm_url(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "scm_url", value)
-
-    @_builtins.property
-    @pulumi.getter(name="signatureValidationCredential")
-    def signature_validation_credential(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        An optional credential used for validating files in the project against unexpected changes.
-        """
-        return pulumi.get(self, "signature_validation_credential")
-
-    @signature_validation_credential.setter
-    def signature_validation_credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "signature_validation_credential", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The amount of time (in seconds) to run before the task is canceled.
-        """
-        return pulumi.get(self, "timeout")
-
-    @timeout.setter
-    def timeout(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "timeout", value)
 
     @_builtins.property
     @pulumi.getter
@@ -671,17 +236,226 @@ class _ProjectState:
     def timeouts(self, value: pulumi.Input[Optional['ProjectTimeoutsArgs']]):
         pulumi.set(self, "timeouts", value)
 
-    @_builtins.property
-    @pulumi.getter(name="waitForSync")
-    def wait_for_sync(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        If true, wait for AWX to finish the SCM update kicked off on create or update before returning. Configure the maximum wait via the timeouts block.
-        """
-        return pulumi.get(self, "wait_for_sync")
 
-    @wait_for_sync.setter
-    def wait_for_sync(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "wait_for_sync", value)
+@pulumi.input_type
+class _ProjectState:
+    def __init__(__self__, *,
+                 allow_override: pulumi.Input[Optional[_builtins.bool]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 local_path: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 project_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
+                 scm_clean: pulumi.Input[Optional[_builtins.bool]] = None,
+                 scm_credential_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 scm_delete_on_update: pulumi.Input[Optional[_builtins.bool]] = None,
+                 scm_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 scm_update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
+                 scm_update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 scm_url: pulumi.Input[Optional[_builtins.str]] = None,
+                 timeouts: pulumi.Input[Optional['ProjectTimeoutsArgs']] = None):
+        """
+        Input properties used for looking up and filtering Project resources.
+
+        :param pulumi.Input[_builtins.bool] allow_override: Allow SCM branch override
+        :param pulumi.Input[_builtins.str] description: Optional description of this project.
+        :param pulumi.Input[_builtins.str] local_path: Local path (relative to PROJECTS_ROOT) containing playbooks and related files for this project.
+        :param pulumi.Input[_builtins.str] name: Name of this project
+        :param pulumi.Input[_builtins.float] organization_id: Numeric ID of the project organization
+        :param pulumi.Input[_builtins.str] scm_branch: Specific branch, tag or commit to checkout.
+        :param pulumi.Input[_builtins.float] scm_credential_id: Numeric ID of the scm used credential
+        :param pulumi.Input[_builtins.str] scm_type: One of "" (manual), git, hg, svn
+        """
+        if allow_override is not None:
+            pulumi.set(__self__, "allow_override", allow_override)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if local_path is not None:
+            pulumi.set(__self__, "local_path", local_path)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if organization_id is not None:
+            pulumi.set(__self__, "organization_id", organization_id)
+        if project_id is not None:
+            pulumi.set(__self__, "project_id", project_id)
+        if scm_branch is not None:
+            pulumi.set(__self__, "scm_branch", scm_branch)
+        if scm_clean is not None:
+            pulumi.set(__self__, "scm_clean", scm_clean)
+        if scm_credential_id is not None:
+            pulumi.set(__self__, "scm_credential_id", scm_credential_id)
+        if scm_delete_on_update is not None:
+            pulumi.set(__self__, "scm_delete_on_update", scm_delete_on_update)
+        if scm_type is not None:
+            pulumi.set(__self__, "scm_type", scm_type)
+        if scm_update_cache_timeout is not None:
+            pulumi.set(__self__, "scm_update_cache_timeout", scm_update_cache_timeout)
+        if scm_update_on_launch is not None:
+            pulumi.set(__self__, "scm_update_on_launch", scm_update_on_launch)
+        if scm_url is not None:
+            pulumi.set(__self__, "scm_url", scm_url)
+        if timeouts is not None:
+            pulumi.set(__self__, "timeouts", timeouts)
+
+    @_builtins.property
+    @pulumi.getter(name="allowOverride")
+    def allow_override(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Allow SCM branch override
+        """
+        return pulumi.get(self, "allow_override")
+
+    @allow_override.setter
+    def allow_override(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "allow_override", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Optional description of this project.
+        """
+        return pulumi.get(self, "description")
+
+    @description.setter
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "description", value)
+
+    @_builtins.property
+    @pulumi.getter(name="localPath")
+    def local_path(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Local path (relative to PROJECTS_ROOT) containing playbooks and related files for this project.
+        """
+        return pulumi.get(self, "local_path")
+
+    @local_path.setter
+    def local_path(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "local_path", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Name of this project
+        """
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "name", value)
+
+    @_builtins.property
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Numeric ID of the project organization
+        """
+        return pulumi.get(self, "organization_id")
+
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "organization_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="projectId")
+    def project_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "project_id")
+
+    @project_id.setter
+    def project_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "project_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scmBranch")
+    def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Specific branch, tag or commit to checkout.
+        """
+        return pulumi.get(self, "scm_branch")
+
+    @scm_branch.setter
+    def scm_branch(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "scm_branch", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scmClean")
+    def scm_clean(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "scm_clean")
+
+    @scm_clean.setter
+    def scm_clean(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "scm_clean", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scmCredentialId")
+    def scm_credential_id(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Numeric ID of the scm used credential
+        """
+        return pulumi.get(self, "scm_credential_id")
+
+    @scm_credential_id.setter
+    def scm_credential_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "scm_credential_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scmDeleteOnUpdate")
+    def scm_delete_on_update(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "scm_delete_on_update")
+
+    @scm_delete_on_update.setter
+    def scm_delete_on_update(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "scm_delete_on_update", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scmType")
+    def scm_type(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        One of "" (manual), git, hg, svn
+        """
+        return pulumi.get(self, "scm_type")
+
+    @scm_type.setter
+    def scm_type(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "scm_type", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scmUpdateCacheTimeout")
+    def scm_update_cache_timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
+        return pulumi.get(self, "scm_update_cache_timeout")
+
+    @scm_update_cache_timeout.setter
+    def scm_update_cache_timeout(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "scm_update_cache_timeout", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scmUpdateOnLaunch")
+    def scm_update_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "scm_update_on_launch")
+
+    @scm_update_on_launch.setter
+    def scm_update_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "scm_update_on_launch", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scmUrl")
+    def scm_url(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "scm_url")
+
+    @scm_url.setter
+    def scm_url(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "scm_url", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def timeouts(self) -> pulumi.Input[Optional['ProjectTimeoutsArgs']]:
+        return pulumi.get(self, "timeouts")
+
+    @timeouts.setter
+    def timeouts(self, value: pulumi.Input[Optional['ProjectTimeoutsArgs']]):
+        pulumi.set(self, "timeouts", value)
 
 
 @pulumi.type_token("awx:index/project:Project")
@@ -691,56 +465,40 @@ class Project(pulumi.CustomResource):
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
                  allow_override: pulumi.Input[Optional[_builtins.bool]] = None,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 default_environment: pulumi.Input[Optional[_builtins.float]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  local_path: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 project_id: pulumi.Input[Optional[_builtins.str]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  scm_clean: pulumi.Input[Optional[_builtins.bool]] = None,
+                 scm_credential_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_delete_on_update: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_refspec: pulumi.Input[Optional[_builtins.str]] = None,
-                 scm_track_submodules: pulumi.Input[Optional[_builtins.bool]] = None,
                  scm_type: pulumi.Input[Optional[_builtins.str]] = None,
                  scm_update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  scm_url: pulumi.Input[Optional[_builtins.str]] = None,
-                 signature_validation_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  timeouts: pulumi.Input[Optional[Union['ProjectTimeoutsArgs', 'ProjectTimeoutsArgsDict']]] = None,
-                 wait_for_sync: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         """
         Create a Project resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.bool] allow_override: Allow changing the SCM branch or revision in a job template that uses this project.
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.float] default_environment: The default execution environment for jobs run using this project.
+        :param pulumi.Input[_builtins.bool] allow_override: Allow SCM branch override
         :param pulumi.Input[_builtins.str] description: Optional description of this project.
         :param pulumi.Input[_builtins.str] local_path: Local path (relative to PROJECTS_ROOT) containing playbooks and related files for this project.
-        :param pulumi.Input[_builtins.str] name: Name of this project.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this template.
+        :param pulumi.Input[_builtins.str] name: Name of this project
+        :param pulumi.Input[_builtins.float] organization_id: Numeric ID of the project organization
         :param pulumi.Input[_builtins.str] scm_branch: Specific branch, tag or commit to checkout.
-        :param pulumi.Input[_builtins.bool] scm_clean: Discard any local changes before syncing the project.
-        :param pulumi.Input[_builtins.bool] scm_delete_on_update: Delete the project before syncing.
-        :param pulumi.Input[_builtins.str] scm_refspec: For git projects, an additional refspec to fetch.
-        :param pulumi.Input[_builtins.bool] scm_track_submodules: Track submodules latest commits on defined branch.
-        :param pulumi.Input[_builtins.str] scm_type: Specifies the source control system used to store the project.
-        :param pulumi.Input[_builtins.float] scm_update_cache_timeout: The number of seconds after the last project update ran that a new project update will be launched as a job dependency.
-        :param pulumi.Input[_builtins.bool] scm_update_on_launch: Update the project when a job is launched that uses the project.
-        :param pulumi.Input[_builtins.str] scm_url: The location where the project is stored.
-        :param pulumi.Input[_builtins.float] signature_validation_credential: An optional credential used for validating files in the project against unexpected changes.
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.bool] wait_for_sync: If true, wait for AWX to finish the SCM update kicked off on create or update before returning. Configure the maximum wait via the timeouts block.
+        :param pulumi.Input[_builtins.float] scm_credential_id: Numeric ID of the scm used credential
+        :param pulumi.Input[_builtins.str] scm_type: One of "" (manual), git, hg, svn
         """
         ...
     @overload
     def __init__(__self__,
                  resource_name: str,
-                 args: Optional[ProjectArgs] = None,
+                 args: ProjectArgs,
                  opts: Optional[pulumi.ResourceOptions] = None):
         """
         Create a Project resource with the given unique name, props, and options.
@@ -761,25 +519,20 @@ class Project(pulumi.CustomResource):
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
                  allow_override: pulumi.Input[Optional[_builtins.bool]] = None,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 default_environment: pulumi.Input[Optional[_builtins.float]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  local_path: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 project_id: pulumi.Input[Optional[_builtins.str]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  scm_clean: pulumi.Input[Optional[_builtins.bool]] = None,
+                 scm_credential_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_delete_on_update: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_refspec: pulumi.Input[Optional[_builtins.str]] = None,
-                 scm_track_submodules: pulumi.Input[Optional[_builtins.bool]] = None,
                  scm_type: pulumi.Input[Optional[_builtins.str]] = None,
                  scm_update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  scm_url: pulumi.Input[Optional[_builtins.str]] = None,
-                 signature_validation_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  timeouts: pulumi.Input[Optional[Union['ProjectTimeoutsArgs', 'ProjectTimeoutsArgsDict']]] = None,
-                 wait_for_sync: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -790,26 +543,24 @@ class Project(pulumi.CustomResource):
             __props__ = ProjectArgs.__new__(ProjectArgs)
 
             __props__.__dict__["allow_override"] = allow_override
-            __props__.__dict__["credential"] = credential
-            __props__.__dict__["default_environment"] = default_environment
             __props__.__dict__["description"] = description
             __props__.__dict__["local_path"] = local_path
             __props__.__dict__["name"] = name
-            __props__.__dict__["organization"] = organization
+            if organization_id is None and not opts.urn:
+                raise TypeError("Missing required property 'organization_id'")
+            __props__.__dict__["organization_id"] = organization_id
+            __props__.__dict__["project_id"] = project_id
             __props__.__dict__["scm_branch"] = scm_branch
             __props__.__dict__["scm_clean"] = scm_clean
+            __props__.__dict__["scm_credential_id"] = scm_credential_id
             __props__.__dict__["scm_delete_on_update"] = scm_delete_on_update
-            __props__.__dict__["scm_refspec"] = scm_refspec
-            __props__.__dict__["scm_track_submodules"] = scm_track_submodules
+            if scm_type is None and not opts.urn:
+                raise TypeError("Missing required property 'scm_type'")
             __props__.__dict__["scm_type"] = scm_type
             __props__.__dict__["scm_update_cache_timeout"] = scm_update_cache_timeout
             __props__.__dict__["scm_update_on_launch"] = scm_update_on_launch
             __props__.__dict__["scm_url"] = scm_url
-            __props__.__dict__["signature_validation_credential"] = signature_validation_credential
-            __props__.__dict__["timeout"] = timeout
             __props__.__dict__["timeouts"] = timeouts
-            __props__.__dict__["wait_for_sync"] = wait_for_sync
-            __props__.__dict__["project_id"] = None
         super(Project, __self__).__init__(
             'awx:index/project:Project',
             resource_name,
@@ -822,26 +573,20 @@ class Project(pulumi.CustomResource):
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
             allow_override: pulumi.Input[Optional[_builtins.bool]] = None,
-            credential: pulumi.Input[Optional[_builtins.float]] = None,
-            default_environment: pulumi.Input[Optional[_builtins.float]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
             local_path: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            organization: pulumi.Input[Optional[_builtins.float]] = None,
-            project_id: pulumi.Input[Optional[_builtins.float]] = None,
+            organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+            project_id: pulumi.Input[Optional[_builtins.str]] = None,
             scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
             scm_clean: pulumi.Input[Optional[_builtins.bool]] = None,
+            scm_credential_id: pulumi.Input[Optional[_builtins.float]] = None,
             scm_delete_on_update: pulumi.Input[Optional[_builtins.bool]] = None,
-            scm_refspec: pulumi.Input[Optional[_builtins.str]] = None,
-            scm_track_submodules: pulumi.Input[Optional[_builtins.bool]] = None,
             scm_type: pulumi.Input[Optional[_builtins.str]] = None,
             scm_update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
             scm_update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             scm_url: pulumi.Input[Optional[_builtins.str]] = None,
-            signature_validation_credential: pulumi.Input[Optional[_builtins.float]] = None,
-            timeout: pulumi.Input[Optional[_builtins.float]] = None,
-            timeouts: pulumi.Input[Optional[Union['ProjectTimeoutsArgs', 'ProjectTimeoutsArgsDict']]] = None,
-            wait_for_sync: pulumi.Input[Optional[_builtins.bool]] = None) -> 'Project':
+            timeouts: pulumi.Input[Optional[Union['ProjectTimeoutsArgs', 'ProjectTimeoutsArgsDict']]] = None) -> 'Project':
         """
         Get an existing Project resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -849,81 +594,47 @@ class Project(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.bool] allow_override: Allow changing the SCM branch or revision in a job template that uses this project.
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.float] default_environment: The default execution environment for jobs run using this project.
+        :param pulumi.Input[_builtins.bool] allow_override: Allow SCM branch override
         :param pulumi.Input[_builtins.str] description: Optional description of this project.
         :param pulumi.Input[_builtins.str] local_path: Local path (relative to PROJECTS_ROOT) containing playbooks and related files for this project.
-        :param pulumi.Input[_builtins.str] name: Name of this project.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this template.
-        :param pulumi.Input[_builtins.float] project_id: Database ID for this project.
+        :param pulumi.Input[_builtins.str] name: Name of this project
+        :param pulumi.Input[_builtins.float] organization_id: Numeric ID of the project organization
         :param pulumi.Input[_builtins.str] scm_branch: Specific branch, tag or commit to checkout.
-        :param pulumi.Input[_builtins.bool] scm_clean: Discard any local changes before syncing the project.
-        :param pulumi.Input[_builtins.bool] scm_delete_on_update: Delete the project before syncing.
-        :param pulumi.Input[_builtins.str] scm_refspec: For git projects, an additional refspec to fetch.
-        :param pulumi.Input[_builtins.bool] scm_track_submodules: Track submodules latest commits on defined branch.
-        :param pulumi.Input[_builtins.str] scm_type: Specifies the source control system used to store the project.
-        :param pulumi.Input[_builtins.float] scm_update_cache_timeout: The number of seconds after the last project update ran that a new project update will be launched as a job dependency.
-        :param pulumi.Input[_builtins.bool] scm_update_on_launch: Update the project when a job is launched that uses the project.
-        :param pulumi.Input[_builtins.str] scm_url: The location where the project is stored.
-        :param pulumi.Input[_builtins.float] signature_validation_credential: An optional credential used for validating files in the project against unexpected changes.
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.bool] wait_for_sync: If true, wait for AWX to finish the SCM update kicked off on create or update before returning. Configure the maximum wait via the timeouts block.
+        :param pulumi.Input[_builtins.float] scm_credential_id: Numeric ID of the scm used credential
+        :param pulumi.Input[_builtins.str] scm_type: One of "" (manual), git, hg, svn
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
         __props__ = _ProjectState.__new__(_ProjectState)
 
         __props__.__dict__["allow_override"] = allow_override
-        __props__.__dict__["credential"] = credential
-        __props__.__dict__["default_environment"] = default_environment
         __props__.__dict__["description"] = description
         __props__.__dict__["local_path"] = local_path
         __props__.__dict__["name"] = name
-        __props__.__dict__["organization"] = organization
+        __props__.__dict__["organization_id"] = organization_id
         __props__.__dict__["project_id"] = project_id
         __props__.__dict__["scm_branch"] = scm_branch
         __props__.__dict__["scm_clean"] = scm_clean
+        __props__.__dict__["scm_credential_id"] = scm_credential_id
         __props__.__dict__["scm_delete_on_update"] = scm_delete_on_update
-        __props__.__dict__["scm_refspec"] = scm_refspec
-        __props__.__dict__["scm_track_submodules"] = scm_track_submodules
         __props__.__dict__["scm_type"] = scm_type
         __props__.__dict__["scm_update_cache_timeout"] = scm_update_cache_timeout
         __props__.__dict__["scm_update_on_launch"] = scm_update_on_launch
         __props__.__dict__["scm_url"] = scm_url
-        __props__.__dict__["signature_validation_credential"] = signature_validation_credential
-        __props__.__dict__["timeout"] = timeout
         __props__.__dict__["timeouts"] = timeouts
-        __props__.__dict__["wait_for_sync"] = wait_for_sync
         return Project(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter(name="allowOverride")
-    def allow_override(self) -> pulumi.Output[_builtins.bool]:
+    def allow_override(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        Allow changing the SCM branch or revision in a job template that uses this project.
+        Allow SCM branch override
         """
         return pulumi.get(self, "allow_override")
 
     @_builtins.property
     @pulumi.getter
-    def credential(self) -> pulumi.Output[_builtins.float]:
-        """
-        Credential
-        """
-        return pulumi.get(self, "credential")
-
-    @_builtins.property
-    @pulumi.getter(name="defaultEnvironment")
-    def default_environment(self) -> pulumi.Output[_builtins.float]:
-        """
-        The default execution environment for jobs run using this project.
-        """
-        return pulumi.get(self, "default_environment")
-
-    @_builtins.property
-    @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         Optional description of this project.
         """
@@ -931,7 +642,7 @@ class Project(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="localPath")
-    def local_path(self) -> pulumi.Output[_builtins.str]:
+    def local_path(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         Local path (relative to PROJECTS_ROOT) containing playbooks and related files for this project.
         """
@@ -941,29 +652,26 @@ class Project(pulumi.CustomResource):
     @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this project.
+        Name of this project
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Output[_builtins.float]:
         """
-        The organization used to determine access to this template.
+        Numeric ID of the project organization
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
 
     @_builtins.property
     @pulumi.getter(name="projectId")
-    def project_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this project.
-        """
+    def project_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "project_id")
 
     @_builtins.property
     @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> pulumi.Output[_builtins.str]:
+    def scm_branch(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         Specific branch, tag or commit to checkout.
         """
@@ -971,94 +679,47 @@ class Project(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="scmClean")
-    def scm_clean(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Discard any local changes before syncing the project.
-        """
+    def scm_clean(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "scm_clean")
 
     @_builtins.property
+    @pulumi.getter(name="scmCredentialId")
+    def scm_credential_id(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Numeric ID of the scm used credential
+        """
+        return pulumi.get(self, "scm_credential_id")
+
+    @_builtins.property
     @pulumi.getter(name="scmDeleteOnUpdate")
-    def scm_delete_on_update(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Delete the project before syncing.
-        """
+    def scm_delete_on_update(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "scm_delete_on_update")
-
-    @_builtins.property
-    @pulumi.getter(name="scmRefspec")
-    def scm_refspec(self) -> pulumi.Output[_builtins.str]:
-        """
-        For git projects, an additional refspec to fetch.
-        """
-        return pulumi.get(self, "scm_refspec")
-
-    @_builtins.property
-    @pulumi.getter(name="scmTrackSubmodules")
-    def scm_track_submodules(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Track submodules latest commits on defined branch.
-        """
-        return pulumi.get(self, "scm_track_submodules")
 
     @_builtins.property
     @pulumi.getter(name="scmType")
     def scm_type(self) -> pulumi.Output[_builtins.str]:
         """
-        Specifies the source control system used to store the project.
+        One of "" (manual), git, hg, svn
         """
         return pulumi.get(self, "scm_type")
 
     @_builtins.property
     @pulumi.getter(name="scmUpdateCacheTimeout")
-    def scm_update_cache_timeout(self) -> pulumi.Output[_builtins.float]:
-        """
-        The number of seconds after the last project update ran that a new project update will be launched as a job dependency.
-        """
+    def scm_update_cache_timeout(self) -> pulumi.Output[Optional[_builtins.float]]:
         return pulumi.get(self, "scm_update_cache_timeout")
 
     @_builtins.property
     @pulumi.getter(name="scmUpdateOnLaunch")
-    def scm_update_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Update the project when a job is launched that uses the project.
-        """
+    def scm_update_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "scm_update_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="scmUrl")
-    def scm_url(self) -> pulumi.Output[_builtins.str]:
-        """
-        The location where the project is stored.
-        """
+    def scm_url(self) -> pulumi.Output[Optional[_builtins.str]]:
         return pulumi.get(self, "scm_url")
-
-    @_builtins.property
-    @pulumi.getter(name="signatureValidationCredential")
-    def signature_validation_credential(self) -> pulumi.Output[_builtins.float]:
-        """
-        An optional credential used for validating files in the project against unexpected changes.
-        """
-        return pulumi.get(self, "signature_validation_credential")
-
-    @_builtins.property
-    @pulumi.getter
-    def timeout(self) -> pulumi.Output[_builtins.float]:
-        """
-        The amount of time (in seconds) to run before the task is canceled.
-        """
-        return pulumi.get(self, "timeout")
 
     @_builtins.property
     @pulumi.getter
     def timeouts(self) -> pulumi.Output[Optional['outputs.ProjectTimeouts']]:
         return pulumi.get(self, "timeouts")
-
-    @_builtins.property
-    @pulumi.getter(name="waitForSync")
-    def wait_for_sync(self) -> pulumi.Output[_builtins.bool]:
-        """
-        If true, wait for AWX to finish the SCM update kicked off on create or update before returning. Configure the maximum wait via the timeouts block.
-        """
-        return pulumi.get(self, "wait_for_sync")
 

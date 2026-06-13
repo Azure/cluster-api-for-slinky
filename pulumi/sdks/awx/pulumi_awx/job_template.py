@@ -19,12 +19,14 @@ __all__ = ['JobTemplateArgs', 'JobTemplate']
 @pulumi.input_type
 class JobTemplateArgs:
     def __init__(__self__, *,
+                 job_type: pulumi.Input[_builtins.str],
+                 project_id: pulumi.Input[_builtins.float],
                  allow_simultaneous: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_credential_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_diff_mode_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_execution_environment_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_forks_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_instance_groups_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_instance_group_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_slice_count_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_type_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -37,78 +39,52 @@ class JobTemplateArgs:
                  ask_variables_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_verbosity_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  become_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 custom_virtualenv: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  diff_mode: pulumi.Input[Optional[_builtins.bool]] = None,
-                 execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
+                 execution_environment: pulumi.Input[Optional[_builtins.str]] = None,
                  extra_vars: pulumi.Input[Optional[_builtins.str]] = None,
                  force_handlers: pulumi.Input[Optional[_builtins.bool]] = None,
                  forks: pulumi.Input[Optional[_builtins.float]] = None,
                  host_config_key: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  job_slice_count: pulumi.Input[Optional[_builtins.float]] = None,
                  job_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 job_type: pulumi.Input[Optional[_builtins.str]] = None,
+                 job_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  playbook: pulumi.Input[Optional[_builtins.str]] = None,
-                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
-                 project: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
                  start_at_task: pulumi.Input[Optional[_builtins.str]] = None,
                  survey_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  use_fact_cache: pulumi.Input[Optional[_builtins.bool]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None,
-                 webhook_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 webhook_service: pulumi.Input[Optional[_builtins.str]] = None):
+                 verbosity: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a JobTemplate resource.
 
-        :param pulumi.Input[_builtins.bool] allow_simultaneous: Allow simultaneous
-        :param pulumi.Input[_builtins.bool] ask_credential_on_launch: Ask credential on launch
-        :param pulumi.Input[_builtins.bool] ask_diff_mode_on_launch: Ask diff mode on launch
-        :param pulumi.Input[_builtins.bool] ask_execution_environment_on_launch: Ask execution environment on launch
-        :param pulumi.Input[_builtins.bool] ask_forks_on_launch: Ask forks on launch
-        :param pulumi.Input[_builtins.bool] ask_instance_groups_on_launch: Ask instance groups on launch
-        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Ask inventory on launch
-        :param pulumi.Input[_builtins.bool] ask_job_slice_count_on_launch: Ask job slice count on launch
-        :param pulumi.Input[_builtins.bool] ask_job_type_on_launch: Ask job type on launch
-        :param pulumi.Input[_builtins.bool] ask_labels_on_launch: Ask labels on launch
-        :param pulumi.Input[_builtins.bool] ask_limit_on_launch: Ask limit on launch
-        :param pulumi.Input[_builtins.bool] ask_scm_branch_on_launch: Ask scm branch on launch
-        :param pulumi.Input[_builtins.bool] ask_skip_tags_on_launch: Ask skip tags on launch
-        :param pulumi.Input[_builtins.bool] ask_tags_on_launch: Ask tags on launch
-        :param pulumi.Input[_builtins.bool] ask_timeout_on_launch: Ask timeout on launch
-        :param pulumi.Input[_builtins.bool] ask_variables_on_launch: Ask variables on launch
-        :param pulumi.Input[_builtins.bool] ask_verbosity_on_launch: Ask verbosity on launch
-        :param pulumi.Input[_builtins.bool] become_enabled: Become enabled
-        :param pulumi.Input[_builtins.str] description: Optional description of this job template.
-        :param pulumi.Input[_builtins.bool] diff_mode: If enabled, textual changes made to any templated files on the host are shown in the standard output
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] extra_vars: Extra vars
-        :param pulumi.Input[_builtins.bool] force_handlers: Force handlers
-        :param pulumi.Input[_builtins.float] forks: Forks
-        :param pulumi.Input[_builtins.str] host_config_key: Host config key
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.float] job_slice_count: The number of jobs to slice into at runtime. Will cause the Job Template to launch a workflow if value is greater than 1.
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.str] job_type: Job type
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this job template.
-        :param pulumi.Input[_builtins.str] playbook: Playbook
-        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: If enabled, the job template will prevent adding any inventory or organization instance groups to the list of preferred instances groups to run on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        :param pulumi.Input[_builtins.float] project: Project
-        :param pulumi.Input[_builtins.str] scm_branch: Branch to use in job run. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.str] start_at_task: Start at task
-        :param pulumi.Input[_builtins.bool] survey_enabled: Survey enabled
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.bool] use_fact_cache: If enabled, the service will act as an Ansible Fact Cache Plugin; persisting facts at the end of a playbook run to the database and caching facts for use by Ansible.
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
-        :param pulumi.Input[_builtins.float] webhook_credential: Personal Access Token for posting back the status to the service API
-        :param pulumi.Input[_builtins.str] webhook_service: Service that webhook requests will be accepted from
+        :param pulumi.Input[_builtins.str] job_type: Can be one of: <span pulumi-lang-nodejs="`run`" pulumi-lang-dotnet="`Run`" pulumi-lang-go="`run`" pulumi-lang-python="`run`" pulumi-lang-yaml="`run`" pulumi-lang-java="`run`" pulumi-lang-hcl="`run`">`run`</span>, <span pulumi-lang-nodejs="`check`" pulumi-lang-dotnet="`Check`" pulumi-lang-go="`check`" pulumi-lang-python="`check`" pulumi-lang-yaml="`check`" pulumi-lang-java="`check`" pulumi-lang-hcl="`check`">`check`</span>, or <span pulumi-lang-nodejs="`scan`" pulumi-lang-dotnet="`Scan`" pulumi-lang-go="`scan`" pulumi-lang-python="`scan`" pulumi-lang-yaml="`scan`" pulumi-lang-java="`scan`" pulumi-lang-hcl="`scan`">`scan`</span>
+        :param pulumi.Input[_builtins.float] project_id: The project ID to associate with the job template.
+        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Defaults to false. Whether to ask for inventory on launch. If set to false, <span pulumi-lang-nodejs="`inventoryId`" pulumi-lang-dotnet="`InventoryId`" pulumi-lang-go="`inventoryId`" pulumi-lang-python="`inventory_id`" pulumi-lang-yaml="`inventoryId`" pulumi-lang-java="`inventoryId`" pulumi-lang-hcl="`inventory_id`">`inventoryId`</span> must be set.
+        :param pulumi.Input[_builtins.str] description: The description of the job template.
+        :param pulumi.Input[_builtins.str] execution_environment: The selected execution environment that this playbook will be run in.
+        :param pulumi.Input[_builtins.str] extra_vars: The extra variables to associate with the job template.
+        :param pulumi.Input[_builtins.bool] force_handlers: Force handlers to run on the job template.
+        :param pulumi.Input[_builtins.float] forks: The number of forks to associate with the job template.
+        :param pulumi.Input[_builtins.str] inventory_id: The inventory ID to associate with the job template. If not set, <span pulumi-lang-nodejs="`askInventoryOnLaunch`" pulumi-lang-dotnet="`AskInventoryOnLaunch`" pulumi-lang-go="`askInventoryOnLaunch`" pulumi-lang-python="`ask_inventory_on_launch`" pulumi-lang-yaml="`askInventoryOnLaunch`" pulumi-lang-java="`askInventoryOnLaunch`" pulumi-lang-hcl="`ask_inventory_on_launch`">`askInventoryOnLaunch`</span> must be true.
+        :param pulumi.Input[_builtins.str] job_tags: The job tags to associate with the job template.
+        :param pulumi.Input[_builtins.str] limit: The limit to apply to filter hosts that run on this job template.
+        :param pulumi.Input[_builtins.str] name: The name of the job template.
+        :param pulumi.Input[_builtins.str] playbook: The playbook to associate with the job template.
+        :param pulumi.Input[_builtins.str] skip_tags: The tags to skip on the job template.
+        :param pulumi.Input[_builtins.str] start_at_task: The task to start at on the job template.
+        :param pulumi.Input[_builtins.float] timeout: The timeout to associate with the job template. Default is 0
+        :param pulumi.Input[_builtins.bool] use_fact_cache: Use the fact cache on the job template.
+        :param pulumi.Input[_builtins.float] verbosity: One of 0,1,2,3,4,5
         """
+        pulumi.set(__self__, "job_type", job_type)
+        pulumi.set(__self__, "project_id", project_id)
         if allow_simultaneous is not None:
             pulumi.set(__self__, "allow_simultaneous", allow_simultaneous)
         if ask_credential_on_launch is not None:
@@ -119,8 +95,8 @@ class JobTemplateArgs:
             pulumi.set(__self__, "ask_execution_environment_on_launch", ask_execution_environment_on_launch)
         if ask_forks_on_launch is not None:
             pulumi.set(__self__, "ask_forks_on_launch", ask_forks_on_launch)
-        if ask_instance_groups_on_launch is not None:
-            pulumi.set(__self__, "ask_instance_groups_on_launch", ask_instance_groups_on_launch)
+        if ask_instance_group_on_launch is not None:
+            pulumi.set(__self__, "ask_instance_group_on_launch", ask_instance_group_on_launch)
         if ask_inventory_on_launch is not None:
             pulumi.set(__self__, "ask_inventory_on_launch", ask_inventory_on_launch)
         if ask_job_slice_count_on_launch is not None:
@@ -145,6 +121,8 @@ class JobTemplateArgs:
             pulumi.set(__self__, "ask_verbosity_on_launch", ask_verbosity_on_launch)
         if become_enabled is not None:
             pulumi.set(__self__, "become_enabled", become_enabled)
+        if custom_virtualenv is not None:
+            pulumi.set(__self__, "custom_virtualenv", custom_virtualenv)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if diff_mode is not None:
@@ -159,24 +137,20 @@ class JobTemplateArgs:
             pulumi.set(__self__, "forks", forks)
         if host_config_key is not None:
             pulumi.set(__self__, "host_config_key", host_config_key)
-        if inventory is not None:
-            pulumi.set(__self__, "inventory", inventory)
+        if inventory_id is not None:
+            pulumi.set(__self__, "inventory_id", inventory_id)
         if job_slice_count is not None:
             pulumi.set(__self__, "job_slice_count", job_slice_count)
         if job_tags is not None:
             pulumi.set(__self__, "job_tags", job_tags)
-        if job_type is not None:
-            pulumi.set(__self__, "job_type", job_type)
+        if job_template_id is not None:
+            pulumi.set(__self__, "job_template_id", job_template_id)
         if limit is not None:
             pulumi.set(__self__, "limit", limit)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if playbook is not None:
             pulumi.set(__self__, "playbook", playbook)
-        if prevent_instance_group_fallback is not None:
-            pulumi.set(__self__, "prevent_instance_group_fallback", prevent_instance_group_fallback)
-        if project is not None:
-            pulumi.set(__self__, "project", project)
         if scm_branch is not None:
             pulumi.set(__self__, "scm_branch", scm_branch)
         if skip_tags is not None:
@@ -191,17 +165,34 @@ class JobTemplateArgs:
             pulumi.set(__self__, "use_fact_cache", use_fact_cache)
         if verbosity is not None:
             pulumi.set(__self__, "verbosity", verbosity)
-        if webhook_credential is not None:
-            pulumi.set(__self__, "webhook_credential", webhook_credential)
-        if webhook_service is not None:
-            pulumi.set(__self__, "webhook_service", webhook_service)
+
+    @_builtins.property
+    @pulumi.getter(name="jobType")
+    def job_type(self) -> pulumi.Input[_builtins.str]:
+        """
+        Can be one of: <span pulumi-lang-nodejs="`run`" pulumi-lang-dotnet="`Run`" pulumi-lang-go="`run`" pulumi-lang-python="`run`" pulumi-lang-yaml="`run`" pulumi-lang-java="`run`" pulumi-lang-hcl="`run`">`run`</span>, <span pulumi-lang-nodejs="`check`" pulumi-lang-dotnet="`Check`" pulumi-lang-go="`check`" pulumi-lang-python="`check`" pulumi-lang-yaml="`check`" pulumi-lang-java="`check`" pulumi-lang-hcl="`check`">`check`</span>, or <span pulumi-lang-nodejs="`scan`" pulumi-lang-dotnet="`Scan`" pulumi-lang-go="`scan`" pulumi-lang-python="`scan`" pulumi-lang-yaml="`scan`" pulumi-lang-java="`scan`" pulumi-lang-hcl="`scan`">`scan`</span>
+        """
+        return pulumi.get(self, "job_type")
+
+    @job_type.setter
+    def job_type(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "job_type", value)
+
+    @_builtins.property
+    @pulumi.getter(name="projectId")
+    def project_id(self) -> pulumi.Input[_builtins.float]:
+        """
+        The project ID to associate with the job template.
+        """
+        return pulumi.get(self, "project_id")
+
+    @project_id.setter
+    def project_id(self, value: pulumi.Input[_builtins.float]):
+        pulumi.set(self, "project_id", value)
 
     @_builtins.property
     @pulumi.getter(name="allowSimultaneous")
     def allow_simultaneous(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Allow simultaneous
-        """
         return pulumi.get(self, "allow_simultaneous")
 
     @allow_simultaneous.setter
@@ -211,9 +202,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askCredentialOnLaunch")
     def ask_credential_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask credential on launch
-        """
         return pulumi.get(self, "ask_credential_on_launch")
 
     @ask_credential_on_launch.setter
@@ -223,9 +211,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askDiffModeOnLaunch")
     def ask_diff_mode_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask diff mode on launch
-        """
         return pulumi.get(self, "ask_diff_mode_on_launch")
 
     @ask_diff_mode_on_launch.setter
@@ -235,9 +220,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askExecutionEnvironmentOnLaunch")
     def ask_execution_environment_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask execution environment on launch
-        """
         return pulumi.get(self, "ask_execution_environment_on_launch")
 
     @ask_execution_environment_on_launch.setter
@@ -247,9 +229,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askForksOnLaunch")
     def ask_forks_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask forks on launch
-        """
         return pulumi.get(self, "ask_forks_on_launch")
 
     @ask_forks_on_launch.setter
@@ -257,22 +236,19 @@ class JobTemplateArgs:
         pulumi.set(self, "ask_forks_on_launch", value)
 
     @_builtins.property
-    @pulumi.getter(name="askInstanceGroupsOnLaunch")
-    def ask_instance_groups_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask instance groups on launch
-        """
-        return pulumi.get(self, "ask_instance_groups_on_launch")
+    @pulumi.getter(name="askInstanceGroupOnLaunch")
+    def ask_instance_group_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "ask_instance_group_on_launch")
 
-    @ask_instance_groups_on_launch.setter
-    def ask_instance_groups_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_instance_groups_on_launch", value)
+    @ask_instance_group_on_launch.setter
+    def ask_instance_group_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "ask_instance_group_on_launch", value)
 
     @_builtins.property
     @pulumi.getter(name="askInventoryOnLaunch")
     def ask_inventory_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Ask inventory on launch
+        Defaults to false. Whether to ask for inventory on launch. If set to false, <span pulumi-lang-nodejs="`inventoryId`" pulumi-lang-dotnet="`InventoryId`" pulumi-lang-go="`inventoryId`" pulumi-lang-python="`inventory_id`" pulumi-lang-yaml="`inventoryId`" pulumi-lang-java="`inventoryId`" pulumi-lang-hcl="`inventory_id`">`inventoryId`</span> must be set.
         """
         return pulumi.get(self, "ask_inventory_on_launch")
 
@@ -283,9 +259,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askJobSliceCountOnLaunch")
     def ask_job_slice_count_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask job slice count on launch
-        """
         return pulumi.get(self, "ask_job_slice_count_on_launch")
 
     @ask_job_slice_count_on_launch.setter
@@ -295,9 +268,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askJobTypeOnLaunch")
     def ask_job_type_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask job type on launch
-        """
         return pulumi.get(self, "ask_job_type_on_launch")
 
     @ask_job_type_on_launch.setter
@@ -307,9 +277,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askLabelsOnLaunch")
     def ask_labels_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask labels on launch
-        """
         return pulumi.get(self, "ask_labels_on_launch")
 
     @ask_labels_on_launch.setter
@@ -319,9 +286,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askLimitOnLaunch")
     def ask_limit_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask limit on launch
-        """
         return pulumi.get(self, "ask_limit_on_launch")
 
     @ask_limit_on_launch.setter
@@ -331,9 +295,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askScmBranchOnLaunch")
     def ask_scm_branch_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask scm branch on launch
-        """
         return pulumi.get(self, "ask_scm_branch_on_launch")
 
     @ask_scm_branch_on_launch.setter
@@ -343,9 +304,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askSkipTagsOnLaunch")
     def ask_skip_tags_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask skip tags on launch
-        """
         return pulumi.get(self, "ask_skip_tags_on_launch")
 
     @ask_skip_tags_on_launch.setter
@@ -355,9 +313,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askTagsOnLaunch")
     def ask_tags_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask tags on launch
-        """
         return pulumi.get(self, "ask_tags_on_launch")
 
     @ask_tags_on_launch.setter
@@ -367,9 +322,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askTimeoutOnLaunch")
     def ask_timeout_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask timeout on launch
-        """
         return pulumi.get(self, "ask_timeout_on_launch")
 
     @ask_timeout_on_launch.setter
@@ -379,9 +331,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askVariablesOnLaunch")
     def ask_variables_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask variables on launch
-        """
         return pulumi.get(self, "ask_variables_on_launch")
 
     @ask_variables_on_launch.setter
@@ -391,9 +340,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="askVerbosityOnLaunch")
     def ask_verbosity_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask verbosity on launch
-        """
         return pulumi.get(self, "ask_verbosity_on_launch")
 
     @ask_verbosity_on_launch.setter
@@ -403,9 +349,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="becomeEnabled")
     def become_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Become enabled
-        """
         return pulumi.get(self, "become_enabled")
 
     @become_enabled.setter
@@ -413,10 +356,19 @@ class JobTemplateArgs:
         pulumi.set(self, "become_enabled", value)
 
     @_builtins.property
+    @pulumi.getter(name="customVirtualenv")
+    def custom_virtualenv(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "custom_virtualenv")
+
+    @custom_virtualenv.setter
+    def custom_virtualenv(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "custom_virtualenv", value)
+
+    @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this job template.
+        The description of the job template.
         """
         return pulumi.get(self, "description")
 
@@ -427,9 +379,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="diffMode")
     def diff_mode(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        If enabled, textual changes made to any templated files on the host are shown in the standard output
-        """
         return pulumi.get(self, "diff_mode")
 
     @diff_mode.setter
@@ -438,21 +387,21 @@ class JobTemplateArgs:
 
     @_builtins.property
     @pulumi.getter(name="executionEnvironment")
-    def execution_environment(self) -> pulumi.Input[Optional[_builtins.float]]:
+    def execution_environment(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The container image to be used for execution.
+        The selected execution environment that this playbook will be run in.
         """
         return pulumi.get(self, "execution_environment")
 
     @execution_environment.setter
-    def execution_environment(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def execution_environment(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "execution_environment", value)
 
     @_builtins.property
     @pulumi.getter(name="extraVars")
     def extra_vars(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Extra vars
+        The extra variables to associate with the job template.
         """
         return pulumi.get(self, "extra_vars")
 
@@ -464,7 +413,7 @@ class JobTemplateArgs:
     @pulumi.getter(name="forceHandlers")
     def force_handlers(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Force handlers
+        Force handlers to run on the job template.
         """
         return pulumi.get(self, "force_handlers")
 
@@ -476,7 +425,7 @@ class JobTemplateArgs:
     @pulumi.getter
     def forks(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Forks
+        The number of forks to associate with the job template.
         """
         return pulumi.get(self, "forks")
 
@@ -487,9 +436,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="hostConfigKey")
     def host_config_key(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Host config key
-        """
         return pulumi.get(self, "host_config_key")
 
     @host_config_key.setter
@@ -497,23 +443,20 @@ class JobTemplateArgs:
         pulumi.set(self, "host_config_key", value)
 
     @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Inventory
+        The inventory ID to associate with the job template. If not set, <span pulumi-lang-nodejs="`askInventoryOnLaunch`" pulumi-lang-dotnet="`AskInventoryOnLaunch`" pulumi-lang-go="`askInventoryOnLaunch`" pulumi-lang-python="`ask_inventory_on_launch`" pulumi-lang-yaml="`askInventoryOnLaunch`" pulumi-lang-java="`askInventoryOnLaunch`" pulumi-lang-hcl="`ask_inventory_on_launch`">`askInventoryOnLaunch`</span> must be true.
         """
-        return pulumi.get(self, "inventory")
+        return pulumi.get(self, "inventory_id")
 
-    @inventory.setter
-    def inventory(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "inventory", value)
+    @inventory_id.setter
+    def inventory_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "inventory_id", value)
 
     @_builtins.property
     @pulumi.getter(name="jobSliceCount")
     def job_slice_count(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The number of jobs to slice into at runtime. Will cause the Job Template to launch a workflow if value is greater than 1.
-        """
         return pulumi.get(self, "job_slice_count")
 
     @job_slice_count.setter
@@ -524,7 +467,7 @@ class JobTemplateArgs:
     @pulumi.getter(name="jobTags")
     def job_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Job tags
+        The job tags to associate with the job template.
         """
         return pulumi.get(self, "job_tags")
 
@@ -533,22 +476,19 @@ class JobTemplateArgs:
         pulumi.set(self, "job_tags", value)
 
     @_builtins.property
-    @pulumi.getter(name="jobType")
-    def job_type(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Job type
-        """
-        return pulumi.get(self, "job_type")
+    @pulumi.getter(name="jobTemplateId")
+    def job_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "job_template_id")
 
-    @job_type.setter
-    def job_type(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "job_type", value)
+    @job_template_id.setter
+    def job_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "job_template_id", value)
 
     @_builtins.property
     @pulumi.getter
     def limit(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Limit
+        The limit to apply to filter hosts that run on this job template.
         """
         return pulumi.get(self, "limit")
 
@@ -560,7 +500,7 @@ class JobTemplateArgs:
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this job template.
+        The name of the job template.
         """
         return pulumi.get(self, "name")
 
@@ -572,7 +512,7 @@ class JobTemplateArgs:
     @pulumi.getter
     def playbook(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Playbook
+        The playbook to associate with the job template.
         """
         return pulumi.get(self, "playbook")
 
@@ -581,35 +521,8 @@ class JobTemplateArgs:
         pulumi.set(self, "playbook", value)
 
     @_builtins.property
-    @pulumi.getter(name="preventInstanceGroupFallback")
-    def prevent_instance_group_fallback(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        If enabled, the job template will prevent adding any inventory or organization instance groups to the list of preferred instances groups to run on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        """
-        return pulumi.get(self, "prevent_instance_group_fallback")
-
-    @prevent_instance_group_fallback.setter
-    def prevent_instance_group_fallback(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "prevent_instance_group_fallback", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def project(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Project
-        """
-        return pulumi.get(self, "project")
-
-    @project.setter
-    def project(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "project", value)
-
-    @_builtins.property
     @pulumi.getter(name="scmBranch")
     def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Branch to use in job run. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        """
         return pulumi.get(self, "scm_branch")
 
     @scm_branch.setter
@@ -620,7 +533,7 @@ class JobTemplateArgs:
     @pulumi.getter(name="skipTags")
     def skip_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Skip tags
+        The tags to skip on the job template.
         """
         return pulumi.get(self, "skip_tags")
 
@@ -632,7 +545,7 @@ class JobTemplateArgs:
     @pulumi.getter(name="startAtTask")
     def start_at_task(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Start at task
+        The task to start at on the job template.
         """
         return pulumi.get(self, "start_at_task")
 
@@ -643,9 +556,6 @@ class JobTemplateArgs:
     @_builtins.property
     @pulumi.getter(name="surveyEnabled")
     def survey_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Survey enabled
-        """
         return pulumi.get(self, "survey_enabled")
 
     @survey_enabled.setter
@@ -656,7 +566,7 @@ class JobTemplateArgs:
     @pulumi.getter
     def timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        The amount of time (in seconds) to run before the task is canceled.
+        The timeout to associate with the job template. Default is 0
         """
         return pulumi.get(self, "timeout")
 
@@ -668,7 +578,7 @@ class JobTemplateArgs:
     @pulumi.getter(name="useFactCache")
     def use_fact_cache(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        If enabled, the service will act as an Ansible Fact Cache Plugin; persisting facts at the end of a playbook run to the database and caching facts for use by Ansible.
+        Use the fact cache on the job template.
         """
         return pulumi.get(self, "use_fact_cache")
 
@@ -678,39 +588,15 @@ class JobTemplateArgs:
 
     @_builtins.property
     @pulumi.getter
-    def verbosity(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def verbosity(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Verbosity
+        One of 0,1,2,3,4,5
         """
         return pulumi.get(self, "verbosity")
 
     @verbosity.setter
-    def verbosity(self, value: pulumi.Input[Optional[_builtins.str]]):
+    def verbosity(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "verbosity", value)
-
-    @_builtins.property
-    @pulumi.getter(name="webhookCredential")
-    def webhook_credential(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Personal Access Token for posting back the status to the service API
-        """
-        return pulumi.get(self, "webhook_credential")
-
-    @webhook_credential.setter
-    def webhook_credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "webhook_credential", value)
-
-    @_builtins.property
-    @pulumi.getter(name="webhookService")
-    def webhook_service(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Service that webhook requests will be accepted from
-        """
-        return pulumi.get(self, "webhook_service")
-
-    @webhook_service.setter
-    def webhook_service(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "webhook_service", value)
 
 
 @pulumi.input_type
@@ -721,7 +607,7 @@ class _JobTemplateState:
                  ask_diff_mode_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_execution_environment_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_forks_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_instance_groups_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_instance_group_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_slice_count_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_type_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -734,81 +620,51 @@ class _JobTemplateState:
                  ask_variables_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_verbosity_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  become_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 custom_virtualenv: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  diff_mode: pulumi.Input[Optional[_builtins.bool]] = None,
-                 execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
+                 execution_environment: pulumi.Input[Optional[_builtins.str]] = None,
                  extra_vars: pulumi.Input[Optional[_builtins.str]] = None,
                  force_handlers: pulumi.Input[Optional[_builtins.bool]] = None,
                  forks: pulumi.Input[Optional[_builtins.float]] = None,
                  host_config_key: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  job_slice_count: pulumi.Input[Optional[_builtins.float]] = None,
                  job_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 job_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  job_type: pulumi.Input[Optional[_builtins.str]] = None,
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
                  playbook: pulumi.Input[Optional[_builtins.str]] = None,
-                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
-                 project: pulumi.Input[Optional[_builtins.float]] = None,
+                 project_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
                  start_at_task: pulumi.Input[Optional[_builtins.str]] = None,
                  survey_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  use_fact_cache: pulumi.Input[Optional[_builtins.bool]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None,
-                 webhook_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 webhook_service: pulumi.Input[Optional[_builtins.str]] = None):
+                 verbosity: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering JobTemplate resources.
 
-        :param pulumi.Input[_builtins.bool] allow_simultaneous: Allow simultaneous
-        :param pulumi.Input[_builtins.bool] ask_credential_on_launch: Ask credential on launch
-        :param pulumi.Input[_builtins.bool] ask_diff_mode_on_launch: Ask diff mode on launch
-        :param pulumi.Input[_builtins.bool] ask_execution_environment_on_launch: Ask execution environment on launch
-        :param pulumi.Input[_builtins.bool] ask_forks_on_launch: Ask forks on launch
-        :param pulumi.Input[_builtins.bool] ask_instance_groups_on_launch: Ask instance groups on launch
-        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Ask inventory on launch
-        :param pulumi.Input[_builtins.bool] ask_job_slice_count_on_launch: Ask job slice count on launch
-        :param pulumi.Input[_builtins.bool] ask_job_type_on_launch: Ask job type on launch
-        :param pulumi.Input[_builtins.bool] ask_labels_on_launch: Ask labels on launch
-        :param pulumi.Input[_builtins.bool] ask_limit_on_launch: Ask limit on launch
-        :param pulumi.Input[_builtins.bool] ask_scm_branch_on_launch: Ask scm branch on launch
-        :param pulumi.Input[_builtins.bool] ask_skip_tags_on_launch: Ask skip tags on launch
-        :param pulumi.Input[_builtins.bool] ask_tags_on_launch: Ask tags on launch
-        :param pulumi.Input[_builtins.bool] ask_timeout_on_launch: Ask timeout on launch
-        :param pulumi.Input[_builtins.bool] ask_variables_on_launch: Ask variables on launch
-        :param pulumi.Input[_builtins.bool] ask_verbosity_on_launch: Ask verbosity on launch
-        :param pulumi.Input[_builtins.bool] become_enabled: Become enabled
-        :param pulumi.Input[_builtins.str] description: Optional description of this job template.
-        :param pulumi.Input[_builtins.bool] diff_mode: If enabled, textual changes made to any templated files on the host are shown in the standard output
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] extra_vars: Extra vars
-        :param pulumi.Input[_builtins.bool] force_handlers: Force handlers
-        :param pulumi.Input[_builtins.float] forks: Forks
-        :param pulumi.Input[_builtins.str] host_config_key: Host config key
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.float] job_slice_count: The number of jobs to slice into at runtime. Will cause the Job Template to launch a workflow if value is greater than 1.
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.float] job_template_id: Database ID for this job template.
-        :param pulumi.Input[_builtins.str] job_type: Job type
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this job template.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this template.
-        :param pulumi.Input[_builtins.str] playbook: Playbook
-        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: If enabled, the job template will prevent adding any inventory or organization instance groups to the list of preferred instances groups to run on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        :param pulumi.Input[_builtins.float] project: Project
-        :param pulumi.Input[_builtins.str] scm_branch: Branch to use in job run. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.str] start_at_task: Start at task
-        :param pulumi.Input[_builtins.bool] survey_enabled: Survey enabled
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.bool] use_fact_cache: If enabled, the service will act as an Ansible Fact Cache Plugin; persisting facts at the end of a playbook run to the database and caching facts for use by Ansible.
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
-        :param pulumi.Input[_builtins.float] webhook_credential: Personal Access Token for posting back the status to the service API
-        :param pulumi.Input[_builtins.str] webhook_service: Service that webhook requests will be accepted from
+        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Defaults to false. Whether to ask for inventory on launch. If set to false, <span pulumi-lang-nodejs="`inventoryId`" pulumi-lang-dotnet="`InventoryId`" pulumi-lang-go="`inventoryId`" pulumi-lang-python="`inventory_id`" pulumi-lang-yaml="`inventoryId`" pulumi-lang-java="`inventoryId`" pulumi-lang-hcl="`inventory_id`">`inventoryId`</span> must be set.
+        :param pulumi.Input[_builtins.str] description: The description of the job template.
+        :param pulumi.Input[_builtins.str] execution_environment: The selected execution environment that this playbook will be run in.
+        :param pulumi.Input[_builtins.str] extra_vars: The extra variables to associate with the job template.
+        :param pulumi.Input[_builtins.bool] force_handlers: Force handlers to run on the job template.
+        :param pulumi.Input[_builtins.float] forks: The number of forks to associate with the job template.
+        :param pulumi.Input[_builtins.str] inventory_id: The inventory ID to associate with the job template. If not set, <span pulumi-lang-nodejs="`askInventoryOnLaunch`" pulumi-lang-dotnet="`AskInventoryOnLaunch`" pulumi-lang-go="`askInventoryOnLaunch`" pulumi-lang-python="`ask_inventory_on_launch`" pulumi-lang-yaml="`askInventoryOnLaunch`" pulumi-lang-java="`askInventoryOnLaunch`" pulumi-lang-hcl="`ask_inventory_on_launch`">`askInventoryOnLaunch`</span> must be true.
+        :param pulumi.Input[_builtins.str] job_tags: The job tags to associate with the job template.
+        :param pulumi.Input[_builtins.str] job_type: Can be one of: <span pulumi-lang-nodejs="`run`" pulumi-lang-dotnet="`Run`" pulumi-lang-go="`run`" pulumi-lang-python="`run`" pulumi-lang-yaml="`run`" pulumi-lang-java="`run`" pulumi-lang-hcl="`run`">`run`</span>, <span pulumi-lang-nodejs="`check`" pulumi-lang-dotnet="`Check`" pulumi-lang-go="`check`" pulumi-lang-python="`check`" pulumi-lang-yaml="`check`" pulumi-lang-java="`check`" pulumi-lang-hcl="`check`">`check`</span>, or <span pulumi-lang-nodejs="`scan`" pulumi-lang-dotnet="`Scan`" pulumi-lang-go="`scan`" pulumi-lang-python="`scan`" pulumi-lang-yaml="`scan`" pulumi-lang-java="`scan`" pulumi-lang-hcl="`scan`">`scan`</span>
+        :param pulumi.Input[_builtins.str] limit: The limit to apply to filter hosts that run on this job template.
+        :param pulumi.Input[_builtins.str] name: The name of the job template.
+        :param pulumi.Input[_builtins.str] playbook: The playbook to associate with the job template.
+        :param pulumi.Input[_builtins.float] project_id: The project ID to associate with the job template.
+        :param pulumi.Input[_builtins.str] skip_tags: The tags to skip on the job template.
+        :param pulumi.Input[_builtins.str] start_at_task: The task to start at on the job template.
+        :param pulumi.Input[_builtins.float] timeout: The timeout to associate with the job template. Default is 0
+        :param pulumi.Input[_builtins.bool] use_fact_cache: Use the fact cache on the job template.
+        :param pulumi.Input[_builtins.float] verbosity: One of 0,1,2,3,4,5
         """
         if allow_simultaneous is not None:
             pulumi.set(__self__, "allow_simultaneous", allow_simultaneous)
@@ -820,8 +676,8 @@ class _JobTemplateState:
             pulumi.set(__self__, "ask_execution_environment_on_launch", ask_execution_environment_on_launch)
         if ask_forks_on_launch is not None:
             pulumi.set(__self__, "ask_forks_on_launch", ask_forks_on_launch)
-        if ask_instance_groups_on_launch is not None:
-            pulumi.set(__self__, "ask_instance_groups_on_launch", ask_instance_groups_on_launch)
+        if ask_instance_group_on_launch is not None:
+            pulumi.set(__self__, "ask_instance_group_on_launch", ask_instance_group_on_launch)
         if ask_inventory_on_launch is not None:
             pulumi.set(__self__, "ask_inventory_on_launch", ask_inventory_on_launch)
         if ask_job_slice_count_on_launch is not None:
@@ -846,6 +702,8 @@ class _JobTemplateState:
             pulumi.set(__self__, "ask_verbosity_on_launch", ask_verbosity_on_launch)
         if become_enabled is not None:
             pulumi.set(__self__, "become_enabled", become_enabled)
+        if custom_virtualenv is not None:
+            pulumi.set(__self__, "custom_virtualenv", custom_virtualenv)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if diff_mode is not None:
@@ -860,8 +718,8 @@ class _JobTemplateState:
             pulumi.set(__self__, "forks", forks)
         if host_config_key is not None:
             pulumi.set(__self__, "host_config_key", host_config_key)
-        if inventory is not None:
-            pulumi.set(__self__, "inventory", inventory)
+        if inventory_id is not None:
+            pulumi.set(__self__, "inventory_id", inventory_id)
         if job_slice_count is not None:
             pulumi.set(__self__, "job_slice_count", job_slice_count)
         if job_tags is not None:
@@ -874,14 +732,10 @@ class _JobTemplateState:
             pulumi.set(__self__, "limit", limit)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if organization is not None:
-            pulumi.set(__self__, "organization", organization)
         if playbook is not None:
             pulumi.set(__self__, "playbook", playbook)
-        if prevent_instance_group_fallback is not None:
-            pulumi.set(__self__, "prevent_instance_group_fallback", prevent_instance_group_fallback)
-        if project is not None:
-            pulumi.set(__self__, "project", project)
+        if project_id is not None:
+            pulumi.set(__self__, "project_id", project_id)
         if scm_branch is not None:
             pulumi.set(__self__, "scm_branch", scm_branch)
         if skip_tags is not None:
@@ -896,17 +750,10 @@ class _JobTemplateState:
             pulumi.set(__self__, "use_fact_cache", use_fact_cache)
         if verbosity is not None:
             pulumi.set(__self__, "verbosity", verbosity)
-        if webhook_credential is not None:
-            pulumi.set(__self__, "webhook_credential", webhook_credential)
-        if webhook_service is not None:
-            pulumi.set(__self__, "webhook_service", webhook_service)
 
     @_builtins.property
     @pulumi.getter(name="allowSimultaneous")
     def allow_simultaneous(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Allow simultaneous
-        """
         return pulumi.get(self, "allow_simultaneous")
 
     @allow_simultaneous.setter
@@ -916,9 +763,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askCredentialOnLaunch")
     def ask_credential_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask credential on launch
-        """
         return pulumi.get(self, "ask_credential_on_launch")
 
     @ask_credential_on_launch.setter
@@ -928,9 +772,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askDiffModeOnLaunch")
     def ask_diff_mode_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask diff mode on launch
-        """
         return pulumi.get(self, "ask_diff_mode_on_launch")
 
     @ask_diff_mode_on_launch.setter
@@ -940,9 +781,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askExecutionEnvironmentOnLaunch")
     def ask_execution_environment_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask execution environment on launch
-        """
         return pulumi.get(self, "ask_execution_environment_on_launch")
 
     @ask_execution_environment_on_launch.setter
@@ -952,9 +790,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askForksOnLaunch")
     def ask_forks_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask forks on launch
-        """
         return pulumi.get(self, "ask_forks_on_launch")
 
     @ask_forks_on_launch.setter
@@ -962,22 +797,19 @@ class _JobTemplateState:
         pulumi.set(self, "ask_forks_on_launch", value)
 
     @_builtins.property
-    @pulumi.getter(name="askInstanceGroupsOnLaunch")
-    def ask_instance_groups_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask instance groups on launch
-        """
-        return pulumi.get(self, "ask_instance_groups_on_launch")
+    @pulumi.getter(name="askInstanceGroupOnLaunch")
+    def ask_instance_group_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "ask_instance_group_on_launch")
 
-    @ask_instance_groups_on_launch.setter
-    def ask_instance_groups_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_instance_groups_on_launch", value)
+    @ask_instance_group_on_launch.setter
+    def ask_instance_group_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "ask_instance_group_on_launch", value)
 
     @_builtins.property
     @pulumi.getter(name="askInventoryOnLaunch")
     def ask_inventory_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Ask inventory on launch
+        Defaults to false. Whether to ask for inventory on launch. If set to false, <span pulumi-lang-nodejs="`inventoryId`" pulumi-lang-dotnet="`InventoryId`" pulumi-lang-go="`inventoryId`" pulumi-lang-python="`inventory_id`" pulumi-lang-yaml="`inventoryId`" pulumi-lang-java="`inventoryId`" pulumi-lang-hcl="`inventory_id`">`inventoryId`</span> must be set.
         """
         return pulumi.get(self, "ask_inventory_on_launch")
 
@@ -988,9 +820,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askJobSliceCountOnLaunch")
     def ask_job_slice_count_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask job slice count on launch
-        """
         return pulumi.get(self, "ask_job_slice_count_on_launch")
 
     @ask_job_slice_count_on_launch.setter
@@ -1000,9 +829,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askJobTypeOnLaunch")
     def ask_job_type_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask job type on launch
-        """
         return pulumi.get(self, "ask_job_type_on_launch")
 
     @ask_job_type_on_launch.setter
@@ -1012,9 +838,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askLabelsOnLaunch")
     def ask_labels_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask labels on launch
-        """
         return pulumi.get(self, "ask_labels_on_launch")
 
     @ask_labels_on_launch.setter
@@ -1024,9 +847,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askLimitOnLaunch")
     def ask_limit_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask limit on launch
-        """
         return pulumi.get(self, "ask_limit_on_launch")
 
     @ask_limit_on_launch.setter
@@ -1036,9 +856,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askScmBranchOnLaunch")
     def ask_scm_branch_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask scm branch on launch
-        """
         return pulumi.get(self, "ask_scm_branch_on_launch")
 
     @ask_scm_branch_on_launch.setter
@@ -1048,9 +865,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askSkipTagsOnLaunch")
     def ask_skip_tags_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask skip tags on launch
-        """
         return pulumi.get(self, "ask_skip_tags_on_launch")
 
     @ask_skip_tags_on_launch.setter
@@ -1060,9 +874,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askTagsOnLaunch")
     def ask_tags_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask tags on launch
-        """
         return pulumi.get(self, "ask_tags_on_launch")
 
     @ask_tags_on_launch.setter
@@ -1072,9 +883,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askTimeoutOnLaunch")
     def ask_timeout_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask timeout on launch
-        """
         return pulumi.get(self, "ask_timeout_on_launch")
 
     @ask_timeout_on_launch.setter
@@ -1084,9 +892,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askVariablesOnLaunch")
     def ask_variables_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask variables on launch
-        """
         return pulumi.get(self, "ask_variables_on_launch")
 
     @ask_variables_on_launch.setter
@@ -1096,9 +901,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askVerbosityOnLaunch")
     def ask_verbosity_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask verbosity on launch
-        """
         return pulumi.get(self, "ask_verbosity_on_launch")
 
     @ask_verbosity_on_launch.setter
@@ -1108,9 +910,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="becomeEnabled")
     def become_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Become enabled
-        """
         return pulumi.get(self, "become_enabled")
 
     @become_enabled.setter
@@ -1118,10 +917,19 @@ class _JobTemplateState:
         pulumi.set(self, "become_enabled", value)
 
     @_builtins.property
+    @pulumi.getter(name="customVirtualenv")
+    def custom_virtualenv(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "custom_virtualenv")
+
+    @custom_virtualenv.setter
+    def custom_virtualenv(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "custom_virtualenv", value)
+
+    @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this job template.
+        The description of the job template.
         """
         return pulumi.get(self, "description")
 
@@ -1132,9 +940,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="diffMode")
     def diff_mode(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        If enabled, textual changes made to any templated files on the host are shown in the standard output
-        """
         return pulumi.get(self, "diff_mode")
 
     @diff_mode.setter
@@ -1143,21 +948,21 @@ class _JobTemplateState:
 
     @_builtins.property
     @pulumi.getter(name="executionEnvironment")
-    def execution_environment(self) -> pulumi.Input[Optional[_builtins.float]]:
+    def execution_environment(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The container image to be used for execution.
+        The selected execution environment that this playbook will be run in.
         """
         return pulumi.get(self, "execution_environment")
 
     @execution_environment.setter
-    def execution_environment(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def execution_environment(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "execution_environment", value)
 
     @_builtins.property
     @pulumi.getter(name="extraVars")
     def extra_vars(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Extra vars
+        The extra variables to associate with the job template.
         """
         return pulumi.get(self, "extra_vars")
 
@@ -1169,7 +974,7 @@ class _JobTemplateState:
     @pulumi.getter(name="forceHandlers")
     def force_handlers(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Force handlers
+        Force handlers to run on the job template.
         """
         return pulumi.get(self, "force_handlers")
 
@@ -1181,7 +986,7 @@ class _JobTemplateState:
     @pulumi.getter
     def forks(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Forks
+        The number of forks to associate with the job template.
         """
         return pulumi.get(self, "forks")
 
@@ -1192,9 +997,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="hostConfigKey")
     def host_config_key(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Host config key
-        """
         return pulumi.get(self, "host_config_key")
 
     @host_config_key.setter
@@ -1202,23 +1004,20 @@ class _JobTemplateState:
         pulumi.set(self, "host_config_key", value)
 
     @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Inventory
+        The inventory ID to associate with the job template. If not set, <span pulumi-lang-nodejs="`askInventoryOnLaunch`" pulumi-lang-dotnet="`AskInventoryOnLaunch`" pulumi-lang-go="`askInventoryOnLaunch`" pulumi-lang-python="`ask_inventory_on_launch`" pulumi-lang-yaml="`askInventoryOnLaunch`" pulumi-lang-java="`askInventoryOnLaunch`" pulumi-lang-hcl="`ask_inventory_on_launch`">`askInventoryOnLaunch`</span> must be true.
         """
-        return pulumi.get(self, "inventory")
+        return pulumi.get(self, "inventory_id")
 
-    @inventory.setter
-    def inventory(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "inventory", value)
+    @inventory_id.setter
+    def inventory_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "inventory_id", value)
 
     @_builtins.property
     @pulumi.getter(name="jobSliceCount")
     def job_slice_count(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The number of jobs to slice into at runtime. Will cause the Job Template to launch a workflow if value is greater than 1.
-        """
         return pulumi.get(self, "job_slice_count")
 
     @job_slice_count.setter
@@ -1229,7 +1028,7 @@ class _JobTemplateState:
     @pulumi.getter(name="jobTags")
     def job_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Job tags
+        The job tags to associate with the job template.
         """
         return pulumi.get(self, "job_tags")
 
@@ -1239,21 +1038,18 @@ class _JobTemplateState:
 
     @_builtins.property
     @pulumi.getter(name="jobTemplateId")
-    def job_template_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this job template.
-        """
+    def job_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "job_template_id")
 
     @job_template_id.setter
-    def job_template_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def job_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "job_template_id", value)
 
     @_builtins.property
     @pulumi.getter(name="jobType")
     def job_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Job type
+        Can be one of: <span pulumi-lang-nodejs="`run`" pulumi-lang-dotnet="`Run`" pulumi-lang-go="`run`" pulumi-lang-python="`run`" pulumi-lang-yaml="`run`" pulumi-lang-java="`run`" pulumi-lang-hcl="`run`">`run`</span>, <span pulumi-lang-nodejs="`check`" pulumi-lang-dotnet="`Check`" pulumi-lang-go="`check`" pulumi-lang-python="`check`" pulumi-lang-yaml="`check`" pulumi-lang-java="`check`" pulumi-lang-hcl="`check`">`check`</span>, or <span pulumi-lang-nodejs="`scan`" pulumi-lang-dotnet="`Scan`" pulumi-lang-go="`scan`" pulumi-lang-python="`scan`" pulumi-lang-yaml="`scan`" pulumi-lang-java="`scan`" pulumi-lang-hcl="`scan`">`scan`</span>
         """
         return pulumi.get(self, "job_type")
 
@@ -1265,7 +1061,7 @@ class _JobTemplateState:
     @pulumi.getter
     def limit(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Limit
+        The limit to apply to filter hosts that run on this job template.
         """
         return pulumi.get(self, "limit")
 
@@ -1277,7 +1073,7 @@ class _JobTemplateState:
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this job template.
+        The name of the job template.
         """
         return pulumi.get(self, "name")
 
@@ -1287,21 +1083,9 @@ class _JobTemplateState:
 
     @_builtins.property
     @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The organization used to determine access to this template.
-        """
-        return pulumi.get(self, "organization")
-
-    @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization", value)
-
-    @_builtins.property
-    @pulumi.getter
     def playbook(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Playbook
+        The playbook to associate with the job template.
         """
         return pulumi.get(self, "playbook")
 
@@ -1310,35 +1094,20 @@ class _JobTemplateState:
         pulumi.set(self, "playbook", value)
 
     @_builtins.property
-    @pulumi.getter(name="preventInstanceGroupFallback")
-    def prevent_instance_group_fallback(self) -> pulumi.Input[Optional[_builtins.bool]]:
+    @pulumi.getter(name="projectId")
+    def project_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        If enabled, the job template will prevent adding any inventory or organization instance groups to the list of preferred instances groups to run on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
+        The project ID to associate with the job template.
         """
-        return pulumi.get(self, "prevent_instance_group_fallback")
+        return pulumi.get(self, "project_id")
 
-    @prevent_instance_group_fallback.setter
-    def prevent_instance_group_fallback(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "prevent_instance_group_fallback", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def project(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Project
-        """
-        return pulumi.get(self, "project")
-
-    @project.setter
-    def project(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "project", value)
+    @project_id.setter
+    def project_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "project_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scmBranch")
     def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Branch to use in job run. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        """
         return pulumi.get(self, "scm_branch")
 
     @scm_branch.setter
@@ -1349,7 +1118,7 @@ class _JobTemplateState:
     @pulumi.getter(name="skipTags")
     def skip_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Skip tags
+        The tags to skip on the job template.
         """
         return pulumi.get(self, "skip_tags")
 
@@ -1361,7 +1130,7 @@ class _JobTemplateState:
     @pulumi.getter(name="startAtTask")
     def start_at_task(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Start at task
+        The task to start at on the job template.
         """
         return pulumi.get(self, "start_at_task")
 
@@ -1372,9 +1141,6 @@ class _JobTemplateState:
     @_builtins.property
     @pulumi.getter(name="surveyEnabled")
     def survey_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Survey enabled
-        """
         return pulumi.get(self, "survey_enabled")
 
     @survey_enabled.setter
@@ -1385,7 +1151,7 @@ class _JobTemplateState:
     @pulumi.getter
     def timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        The amount of time (in seconds) to run before the task is canceled.
+        The timeout to associate with the job template. Default is 0
         """
         return pulumi.get(self, "timeout")
 
@@ -1397,7 +1163,7 @@ class _JobTemplateState:
     @pulumi.getter(name="useFactCache")
     def use_fact_cache(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        If enabled, the service will act as an Ansible Fact Cache Plugin; persisting facts at the end of a playbook run to the database and caching facts for use by Ansible.
+        Use the fact cache on the job template.
         """
         return pulumi.get(self, "use_fact_cache")
 
@@ -1407,39 +1173,15 @@ class _JobTemplateState:
 
     @_builtins.property
     @pulumi.getter
-    def verbosity(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def verbosity(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Verbosity
+        One of 0,1,2,3,4,5
         """
         return pulumi.get(self, "verbosity")
 
     @verbosity.setter
-    def verbosity(self, value: pulumi.Input[Optional[_builtins.str]]):
+    def verbosity(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "verbosity", value)
-
-    @_builtins.property
-    @pulumi.getter(name="webhookCredential")
-    def webhook_credential(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Personal Access Token for posting back the status to the service API
-        """
-        return pulumi.get(self, "webhook_credential")
-
-    @webhook_credential.setter
-    def webhook_credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "webhook_credential", value)
-
-    @_builtins.property
-    @pulumi.getter(name="webhookService")
-    def webhook_service(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Service that webhook requests will be accepted from
-        """
-        return pulumi.get(self, "webhook_service")
-
-    @webhook_service.setter
-    def webhook_service(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "webhook_service", value)
 
 
 @pulumi.type_token("awx:index/jobTemplate:JobTemplate")
@@ -1453,7 +1195,7 @@ class JobTemplate(pulumi.CustomResource):
                  ask_diff_mode_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_execution_environment_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_forks_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_instance_groups_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_instance_group_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_slice_count_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_type_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -1466,86 +1208,60 @@ class JobTemplate(pulumi.CustomResource):
                  ask_variables_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_verbosity_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  become_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 custom_virtualenv: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  diff_mode: pulumi.Input[Optional[_builtins.bool]] = None,
-                 execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
+                 execution_environment: pulumi.Input[Optional[_builtins.str]] = None,
                  extra_vars: pulumi.Input[Optional[_builtins.str]] = None,
                  force_handlers: pulumi.Input[Optional[_builtins.bool]] = None,
                  forks: pulumi.Input[Optional[_builtins.float]] = None,
                  host_config_key: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  job_slice_count: pulumi.Input[Optional[_builtins.float]] = None,
                  job_tags: pulumi.Input[Optional[_builtins.str]] = None,
+                 job_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  job_type: pulumi.Input[Optional[_builtins.str]] = None,
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  playbook: pulumi.Input[Optional[_builtins.str]] = None,
-                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
-                 project: pulumi.Input[Optional[_builtins.float]] = None,
+                 project_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
                  start_at_task: pulumi.Input[Optional[_builtins.str]] = None,
                  survey_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  use_fact_cache: pulumi.Input[Optional[_builtins.bool]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None,
-                 webhook_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 webhook_service: pulumi.Input[Optional[_builtins.str]] = None,
+                 verbosity: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a JobTemplate resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.bool] allow_simultaneous: Allow simultaneous
-        :param pulumi.Input[_builtins.bool] ask_credential_on_launch: Ask credential on launch
-        :param pulumi.Input[_builtins.bool] ask_diff_mode_on_launch: Ask diff mode on launch
-        :param pulumi.Input[_builtins.bool] ask_execution_environment_on_launch: Ask execution environment on launch
-        :param pulumi.Input[_builtins.bool] ask_forks_on_launch: Ask forks on launch
-        :param pulumi.Input[_builtins.bool] ask_instance_groups_on_launch: Ask instance groups on launch
-        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Ask inventory on launch
-        :param pulumi.Input[_builtins.bool] ask_job_slice_count_on_launch: Ask job slice count on launch
-        :param pulumi.Input[_builtins.bool] ask_job_type_on_launch: Ask job type on launch
-        :param pulumi.Input[_builtins.bool] ask_labels_on_launch: Ask labels on launch
-        :param pulumi.Input[_builtins.bool] ask_limit_on_launch: Ask limit on launch
-        :param pulumi.Input[_builtins.bool] ask_scm_branch_on_launch: Ask scm branch on launch
-        :param pulumi.Input[_builtins.bool] ask_skip_tags_on_launch: Ask skip tags on launch
-        :param pulumi.Input[_builtins.bool] ask_tags_on_launch: Ask tags on launch
-        :param pulumi.Input[_builtins.bool] ask_timeout_on_launch: Ask timeout on launch
-        :param pulumi.Input[_builtins.bool] ask_variables_on_launch: Ask variables on launch
-        :param pulumi.Input[_builtins.bool] ask_verbosity_on_launch: Ask verbosity on launch
-        :param pulumi.Input[_builtins.bool] become_enabled: Become enabled
-        :param pulumi.Input[_builtins.str] description: Optional description of this job template.
-        :param pulumi.Input[_builtins.bool] diff_mode: If enabled, textual changes made to any templated files on the host are shown in the standard output
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] extra_vars: Extra vars
-        :param pulumi.Input[_builtins.bool] force_handlers: Force handlers
-        :param pulumi.Input[_builtins.float] forks: Forks
-        :param pulumi.Input[_builtins.str] host_config_key: Host config key
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.float] job_slice_count: The number of jobs to slice into at runtime. Will cause the Job Template to launch a workflow if value is greater than 1.
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.str] job_type: Job type
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this job template.
-        :param pulumi.Input[_builtins.str] playbook: Playbook
-        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: If enabled, the job template will prevent adding any inventory or organization instance groups to the list of preferred instances groups to run on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        :param pulumi.Input[_builtins.float] project: Project
-        :param pulumi.Input[_builtins.str] scm_branch: Branch to use in job run. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.str] start_at_task: Start at task
-        :param pulumi.Input[_builtins.bool] survey_enabled: Survey enabled
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.bool] use_fact_cache: If enabled, the service will act as an Ansible Fact Cache Plugin; persisting facts at the end of a playbook run to the database and caching facts for use by Ansible.
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
-        :param pulumi.Input[_builtins.float] webhook_credential: Personal Access Token for posting back the status to the service API
-        :param pulumi.Input[_builtins.str] webhook_service: Service that webhook requests will be accepted from
+        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Defaults to false. Whether to ask for inventory on launch. If set to false, <span pulumi-lang-nodejs="`inventoryId`" pulumi-lang-dotnet="`InventoryId`" pulumi-lang-go="`inventoryId`" pulumi-lang-python="`inventory_id`" pulumi-lang-yaml="`inventoryId`" pulumi-lang-java="`inventoryId`" pulumi-lang-hcl="`inventory_id`">`inventoryId`</span> must be set.
+        :param pulumi.Input[_builtins.str] description: The description of the job template.
+        :param pulumi.Input[_builtins.str] execution_environment: The selected execution environment that this playbook will be run in.
+        :param pulumi.Input[_builtins.str] extra_vars: The extra variables to associate with the job template.
+        :param pulumi.Input[_builtins.bool] force_handlers: Force handlers to run on the job template.
+        :param pulumi.Input[_builtins.float] forks: The number of forks to associate with the job template.
+        :param pulumi.Input[_builtins.str] inventory_id: The inventory ID to associate with the job template. If not set, <span pulumi-lang-nodejs="`askInventoryOnLaunch`" pulumi-lang-dotnet="`AskInventoryOnLaunch`" pulumi-lang-go="`askInventoryOnLaunch`" pulumi-lang-python="`ask_inventory_on_launch`" pulumi-lang-yaml="`askInventoryOnLaunch`" pulumi-lang-java="`askInventoryOnLaunch`" pulumi-lang-hcl="`ask_inventory_on_launch`">`askInventoryOnLaunch`</span> must be true.
+        :param pulumi.Input[_builtins.str] job_tags: The job tags to associate with the job template.
+        :param pulumi.Input[_builtins.str] job_type: Can be one of: <span pulumi-lang-nodejs="`run`" pulumi-lang-dotnet="`Run`" pulumi-lang-go="`run`" pulumi-lang-python="`run`" pulumi-lang-yaml="`run`" pulumi-lang-java="`run`" pulumi-lang-hcl="`run`">`run`</span>, <span pulumi-lang-nodejs="`check`" pulumi-lang-dotnet="`Check`" pulumi-lang-go="`check`" pulumi-lang-python="`check`" pulumi-lang-yaml="`check`" pulumi-lang-java="`check`" pulumi-lang-hcl="`check`">`check`</span>, or <span pulumi-lang-nodejs="`scan`" pulumi-lang-dotnet="`Scan`" pulumi-lang-go="`scan`" pulumi-lang-python="`scan`" pulumi-lang-yaml="`scan`" pulumi-lang-java="`scan`" pulumi-lang-hcl="`scan`">`scan`</span>
+        :param pulumi.Input[_builtins.str] limit: The limit to apply to filter hosts that run on this job template.
+        :param pulumi.Input[_builtins.str] name: The name of the job template.
+        :param pulumi.Input[_builtins.str] playbook: The playbook to associate with the job template.
+        :param pulumi.Input[_builtins.float] project_id: The project ID to associate with the job template.
+        :param pulumi.Input[_builtins.str] skip_tags: The tags to skip on the job template.
+        :param pulumi.Input[_builtins.str] start_at_task: The task to start at on the job template.
+        :param pulumi.Input[_builtins.float] timeout: The timeout to associate with the job template. Default is 0
+        :param pulumi.Input[_builtins.bool] use_fact_cache: Use the fact cache on the job template.
+        :param pulumi.Input[_builtins.float] verbosity: One of 0,1,2,3,4,5
         """
         ...
     @overload
     def __init__(__self__,
                  resource_name: str,
-                 args: Optional[JobTemplateArgs] = None,
+                 args: JobTemplateArgs,
                  opts: Optional[pulumi.ResourceOptions] = None):
         """
         Create a JobTemplate resource with the given unique name, props, and options.
@@ -1570,7 +1286,7 @@ class JobTemplate(pulumi.CustomResource):
                  ask_diff_mode_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_execution_environment_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_forks_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_instance_groups_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_instance_group_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_slice_count_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_type_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -1583,31 +1299,30 @@ class JobTemplate(pulumi.CustomResource):
                  ask_variables_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_verbosity_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  become_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 custom_virtualenv: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  diff_mode: pulumi.Input[Optional[_builtins.bool]] = None,
-                 execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
+                 execution_environment: pulumi.Input[Optional[_builtins.str]] = None,
                  extra_vars: pulumi.Input[Optional[_builtins.str]] = None,
                  force_handlers: pulumi.Input[Optional[_builtins.bool]] = None,
                  forks: pulumi.Input[Optional[_builtins.float]] = None,
                  host_config_key: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  job_slice_count: pulumi.Input[Optional[_builtins.float]] = None,
                  job_tags: pulumi.Input[Optional[_builtins.str]] = None,
+                 job_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  job_type: pulumi.Input[Optional[_builtins.str]] = None,
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  playbook: pulumi.Input[Optional[_builtins.str]] = None,
-                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
-                 project: pulumi.Input[Optional[_builtins.float]] = None,
+                 project_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
                  start_at_task: pulumi.Input[Optional[_builtins.str]] = None,
                  survey_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  use_fact_cache: pulumi.Input[Optional[_builtins.bool]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None,
-                 webhook_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 webhook_service: pulumi.Input[Optional[_builtins.str]] = None,
+                 verbosity: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -1622,7 +1337,7 @@ class JobTemplate(pulumi.CustomResource):
             __props__.__dict__["ask_diff_mode_on_launch"] = ask_diff_mode_on_launch
             __props__.__dict__["ask_execution_environment_on_launch"] = ask_execution_environment_on_launch
             __props__.__dict__["ask_forks_on_launch"] = ask_forks_on_launch
-            __props__.__dict__["ask_instance_groups_on_launch"] = ask_instance_groups_on_launch
+            __props__.__dict__["ask_instance_group_on_launch"] = ask_instance_group_on_launch
             __props__.__dict__["ask_inventory_on_launch"] = ask_inventory_on_launch
             __props__.__dict__["ask_job_slice_count_on_launch"] = ask_job_slice_count_on_launch
             __props__.__dict__["ask_job_type_on_launch"] = ask_job_type_on_launch
@@ -1635,6 +1350,7 @@ class JobTemplate(pulumi.CustomResource):
             __props__.__dict__["ask_variables_on_launch"] = ask_variables_on_launch
             __props__.__dict__["ask_verbosity_on_launch"] = ask_verbosity_on_launch
             __props__.__dict__["become_enabled"] = become_enabled
+            __props__.__dict__["custom_virtualenv"] = custom_virtualenv
             __props__.__dict__["description"] = description
             __props__.__dict__["diff_mode"] = diff_mode
             __props__.__dict__["execution_environment"] = execution_environment
@@ -1642,15 +1358,19 @@ class JobTemplate(pulumi.CustomResource):
             __props__.__dict__["force_handlers"] = force_handlers
             __props__.__dict__["forks"] = forks
             __props__.__dict__["host_config_key"] = host_config_key
-            __props__.__dict__["inventory"] = inventory
+            __props__.__dict__["inventory_id"] = inventory_id
             __props__.__dict__["job_slice_count"] = job_slice_count
             __props__.__dict__["job_tags"] = job_tags
+            __props__.__dict__["job_template_id"] = job_template_id
+            if job_type is None and not opts.urn:
+                raise TypeError("Missing required property 'job_type'")
             __props__.__dict__["job_type"] = job_type
             __props__.__dict__["limit"] = limit
             __props__.__dict__["name"] = name
             __props__.__dict__["playbook"] = playbook
-            __props__.__dict__["prevent_instance_group_fallback"] = prevent_instance_group_fallback
-            __props__.__dict__["project"] = project
+            if project_id is None and not opts.urn:
+                raise TypeError("Missing required property 'project_id'")
+            __props__.__dict__["project_id"] = project_id
             __props__.__dict__["scm_branch"] = scm_branch
             __props__.__dict__["skip_tags"] = skip_tags
             __props__.__dict__["start_at_task"] = start_at_task
@@ -1658,10 +1378,6 @@ class JobTemplate(pulumi.CustomResource):
             __props__.__dict__["timeout"] = timeout
             __props__.__dict__["use_fact_cache"] = use_fact_cache
             __props__.__dict__["verbosity"] = verbosity
-            __props__.__dict__["webhook_credential"] = webhook_credential
-            __props__.__dict__["webhook_service"] = webhook_service
-            __props__.__dict__["job_template_id"] = None
-            __props__.__dict__["organization"] = None
         super(JobTemplate, __self__).__init__(
             'awx:index/jobTemplate:JobTemplate',
             resource_name,
@@ -1678,7 +1394,7 @@ class JobTemplate(pulumi.CustomResource):
             ask_diff_mode_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_execution_environment_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_forks_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-            ask_instance_groups_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+            ask_instance_group_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_job_slice_count_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_job_type_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -1691,33 +1407,30 @@ class JobTemplate(pulumi.CustomResource):
             ask_variables_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_verbosity_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             become_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+            custom_virtualenv: pulumi.Input[Optional[_builtins.str]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
             diff_mode: pulumi.Input[Optional[_builtins.bool]] = None,
-            execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
+            execution_environment: pulumi.Input[Optional[_builtins.str]] = None,
             extra_vars: pulumi.Input[Optional[_builtins.str]] = None,
             force_handlers: pulumi.Input[Optional[_builtins.bool]] = None,
             forks: pulumi.Input[Optional[_builtins.float]] = None,
             host_config_key: pulumi.Input[Optional[_builtins.str]] = None,
-            inventory: pulumi.Input[Optional[_builtins.float]] = None,
+            inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
             job_slice_count: pulumi.Input[Optional[_builtins.float]] = None,
             job_tags: pulumi.Input[Optional[_builtins.str]] = None,
-            job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
+            job_template_id: pulumi.Input[Optional[_builtins.str]] = None,
             job_type: pulumi.Input[Optional[_builtins.str]] = None,
             limit: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            organization: pulumi.Input[Optional[_builtins.float]] = None,
             playbook: pulumi.Input[Optional[_builtins.str]] = None,
-            prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
-            project: pulumi.Input[Optional[_builtins.float]] = None,
+            project_id: pulumi.Input[Optional[_builtins.float]] = None,
             scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
             skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
             start_at_task: pulumi.Input[Optional[_builtins.str]] = None,
             survey_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
             timeout: pulumi.Input[Optional[_builtins.float]] = None,
             use_fact_cache: pulumi.Input[Optional[_builtins.bool]] = None,
-            verbosity: pulumi.Input[Optional[_builtins.str]] = None,
-            webhook_credential: pulumi.Input[Optional[_builtins.float]] = None,
-            webhook_service: pulumi.Input[Optional[_builtins.str]] = None) -> 'JobTemplate':
+            verbosity: pulumi.Input[Optional[_builtins.float]] = None) -> 'JobTemplate':
         """
         Get an existing JobTemplate resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -1725,51 +1438,24 @@ class JobTemplate(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.bool] allow_simultaneous: Allow simultaneous
-        :param pulumi.Input[_builtins.bool] ask_credential_on_launch: Ask credential on launch
-        :param pulumi.Input[_builtins.bool] ask_diff_mode_on_launch: Ask diff mode on launch
-        :param pulumi.Input[_builtins.bool] ask_execution_environment_on_launch: Ask execution environment on launch
-        :param pulumi.Input[_builtins.bool] ask_forks_on_launch: Ask forks on launch
-        :param pulumi.Input[_builtins.bool] ask_instance_groups_on_launch: Ask instance groups on launch
-        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Ask inventory on launch
-        :param pulumi.Input[_builtins.bool] ask_job_slice_count_on_launch: Ask job slice count on launch
-        :param pulumi.Input[_builtins.bool] ask_job_type_on_launch: Ask job type on launch
-        :param pulumi.Input[_builtins.bool] ask_labels_on_launch: Ask labels on launch
-        :param pulumi.Input[_builtins.bool] ask_limit_on_launch: Ask limit on launch
-        :param pulumi.Input[_builtins.bool] ask_scm_branch_on_launch: Ask scm branch on launch
-        :param pulumi.Input[_builtins.bool] ask_skip_tags_on_launch: Ask skip tags on launch
-        :param pulumi.Input[_builtins.bool] ask_tags_on_launch: Ask tags on launch
-        :param pulumi.Input[_builtins.bool] ask_timeout_on_launch: Ask timeout on launch
-        :param pulumi.Input[_builtins.bool] ask_variables_on_launch: Ask variables on launch
-        :param pulumi.Input[_builtins.bool] ask_verbosity_on_launch: Ask verbosity on launch
-        :param pulumi.Input[_builtins.bool] become_enabled: Become enabled
-        :param pulumi.Input[_builtins.str] description: Optional description of this job template.
-        :param pulumi.Input[_builtins.bool] diff_mode: If enabled, textual changes made to any templated files on the host are shown in the standard output
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] extra_vars: Extra vars
-        :param pulumi.Input[_builtins.bool] force_handlers: Force handlers
-        :param pulumi.Input[_builtins.float] forks: Forks
-        :param pulumi.Input[_builtins.str] host_config_key: Host config key
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.float] job_slice_count: The number of jobs to slice into at runtime. Will cause the Job Template to launch a workflow if value is greater than 1.
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.float] job_template_id: Database ID for this job template.
-        :param pulumi.Input[_builtins.str] job_type: Job type
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this job template.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this template.
-        :param pulumi.Input[_builtins.str] playbook: Playbook
-        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: If enabled, the job template will prevent adding any inventory or organization instance groups to the list of preferred instances groups to run on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        :param pulumi.Input[_builtins.float] project: Project
-        :param pulumi.Input[_builtins.str] scm_branch: Branch to use in job run. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.str] start_at_task: Start at task
-        :param pulumi.Input[_builtins.bool] survey_enabled: Survey enabled
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.bool] use_fact_cache: If enabled, the service will act as an Ansible Fact Cache Plugin; persisting facts at the end of a playbook run to the database and caching facts for use by Ansible.
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
-        :param pulumi.Input[_builtins.float] webhook_credential: Personal Access Token for posting back the status to the service API
-        :param pulumi.Input[_builtins.str] webhook_service: Service that webhook requests will be accepted from
+        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Defaults to false. Whether to ask for inventory on launch. If set to false, <span pulumi-lang-nodejs="`inventoryId`" pulumi-lang-dotnet="`InventoryId`" pulumi-lang-go="`inventoryId`" pulumi-lang-python="`inventory_id`" pulumi-lang-yaml="`inventoryId`" pulumi-lang-java="`inventoryId`" pulumi-lang-hcl="`inventory_id`">`inventoryId`</span> must be set.
+        :param pulumi.Input[_builtins.str] description: The description of the job template.
+        :param pulumi.Input[_builtins.str] execution_environment: The selected execution environment that this playbook will be run in.
+        :param pulumi.Input[_builtins.str] extra_vars: The extra variables to associate with the job template.
+        :param pulumi.Input[_builtins.bool] force_handlers: Force handlers to run on the job template.
+        :param pulumi.Input[_builtins.float] forks: The number of forks to associate with the job template.
+        :param pulumi.Input[_builtins.str] inventory_id: The inventory ID to associate with the job template. If not set, <span pulumi-lang-nodejs="`askInventoryOnLaunch`" pulumi-lang-dotnet="`AskInventoryOnLaunch`" pulumi-lang-go="`askInventoryOnLaunch`" pulumi-lang-python="`ask_inventory_on_launch`" pulumi-lang-yaml="`askInventoryOnLaunch`" pulumi-lang-java="`askInventoryOnLaunch`" pulumi-lang-hcl="`ask_inventory_on_launch`">`askInventoryOnLaunch`</span> must be true.
+        :param pulumi.Input[_builtins.str] job_tags: The job tags to associate with the job template.
+        :param pulumi.Input[_builtins.str] job_type: Can be one of: <span pulumi-lang-nodejs="`run`" pulumi-lang-dotnet="`Run`" pulumi-lang-go="`run`" pulumi-lang-python="`run`" pulumi-lang-yaml="`run`" pulumi-lang-java="`run`" pulumi-lang-hcl="`run`">`run`</span>, <span pulumi-lang-nodejs="`check`" pulumi-lang-dotnet="`Check`" pulumi-lang-go="`check`" pulumi-lang-python="`check`" pulumi-lang-yaml="`check`" pulumi-lang-java="`check`" pulumi-lang-hcl="`check`">`check`</span>, or <span pulumi-lang-nodejs="`scan`" pulumi-lang-dotnet="`Scan`" pulumi-lang-go="`scan`" pulumi-lang-python="`scan`" pulumi-lang-yaml="`scan`" pulumi-lang-java="`scan`" pulumi-lang-hcl="`scan`">`scan`</span>
+        :param pulumi.Input[_builtins.str] limit: The limit to apply to filter hosts that run on this job template.
+        :param pulumi.Input[_builtins.str] name: The name of the job template.
+        :param pulumi.Input[_builtins.str] playbook: The playbook to associate with the job template.
+        :param pulumi.Input[_builtins.float] project_id: The project ID to associate with the job template.
+        :param pulumi.Input[_builtins.str] skip_tags: The tags to skip on the job template.
+        :param pulumi.Input[_builtins.str] start_at_task: The task to start at on the job template.
+        :param pulumi.Input[_builtins.float] timeout: The timeout to associate with the job template. Default is 0
+        :param pulumi.Input[_builtins.bool] use_fact_cache: Use the fact cache on the job template.
+        :param pulumi.Input[_builtins.float] verbosity: One of 0,1,2,3,4,5
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -1780,7 +1466,7 @@ class JobTemplate(pulumi.CustomResource):
         __props__.__dict__["ask_diff_mode_on_launch"] = ask_diff_mode_on_launch
         __props__.__dict__["ask_execution_environment_on_launch"] = ask_execution_environment_on_launch
         __props__.__dict__["ask_forks_on_launch"] = ask_forks_on_launch
-        __props__.__dict__["ask_instance_groups_on_launch"] = ask_instance_groups_on_launch
+        __props__.__dict__["ask_instance_group_on_launch"] = ask_instance_group_on_launch
         __props__.__dict__["ask_inventory_on_launch"] = ask_inventory_on_launch
         __props__.__dict__["ask_job_slice_count_on_launch"] = ask_job_slice_count_on_launch
         __props__.__dict__["ask_job_type_on_launch"] = ask_job_type_on_launch
@@ -1793,6 +1479,7 @@ class JobTemplate(pulumi.CustomResource):
         __props__.__dict__["ask_variables_on_launch"] = ask_variables_on_launch
         __props__.__dict__["ask_verbosity_on_launch"] = ask_verbosity_on_launch
         __props__.__dict__["become_enabled"] = become_enabled
+        __props__.__dict__["custom_virtualenv"] = custom_virtualenv
         __props__.__dict__["description"] = description
         __props__.__dict__["diff_mode"] = diff_mode
         __props__.__dict__["execution_environment"] = execution_environment
@@ -1800,17 +1487,15 @@ class JobTemplate(pulumi.CustomResource):
         __props__.__dict__["force_handlers"] = force_handlers
         __props__.__dict__["forks"] = forks
         __props__.__dict__["host_config_key"] = host_config_key
-        __props__.__dict__["inventory"] = inventory
+        __props__.__dict__["inventory_id"] = inventory_id
         __props__.__dict__["job_slice_count"] = job_slice_count
         __props__.__dict__["job_tags"] = job_tags
         __props__.__dict__["job_template_id"] = job_template_id
         __props__.__dict__["job_type"] = job_type
         __props__.__dict__["limit"] = limit
         __props__.__dict__["name"] = name
-        __props__.__dict__["organization"] = organization
         __props__.__dict__["playbook"] = playbook
-        __props__.__dict__["prevent_instance_group_fallback"] = prevent_instance_group_fallback
-        __props__.__dict__["project"] = project
+        __props__.__dict__["project_id"] = project_id
         __props__.__dict__["scm_branch"] = scm_branch
         __props__.__dict__["skip_tags"] = skip_tags
         __props__.__dict__["start_at_task"] = start_at_task
@@ -1818,255 +1503,195 @@ class JobTemplate(pulumi.CustomResource):
         __props__.__dict__["timeout"] = timeout
         __props__.__dict__["use_fact_cache"] = use_fact_cache
         __props__.__dict__["verbosity"] = verbosity
-        __props__.__dict__["webhook_credential"] = webhook_credential
-        __props__.__dict__["webhook_service"] = webhook_service
         return JobTemplate(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter(name="allowSimultaneous")
-    def allow_simultaneous(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Allow simultaneous
-        """
+    def allow_simultaneous(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "allow_simultaneous")
 
     @_builtins.property
     @pulumi.getter(name="askCredentialOnLaunch")
-    def ask_credential_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask credential on launch
-        """
+    def ask_credential_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_credential_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askDiffModeOnLaunch")
-    def ask_diff_mode_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask diff mode on launch
-        """
+    def ask_diff_mode_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_diff_mode_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askExecutionEnvironmentOnLaunch")
-    def ask_execution_environment_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask execution environment on launch
-        """
+    def ask_execution_environment_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_execution_environment_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askForksOnLaunch")
-    def ask_forks_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask forks on launch
-        """
+    def ask_forks_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_forks_on_launch")
 
     @_builtins.property
-    @pulumi.getter(name="askInstanceGroupsOnLaunch")
-    def ask_instance_groups_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask instance groups on launch
-        """
-        return pulumi.get(self, "ask_instance_groups_on_launch")
+    @pulumi.getter(name="askInstanceGroupOnLaunch")
+    def ask_instance_group_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
+        return pulumi.get(self, "ask_instance_group_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askInventoryOnLaunch")
-    def ask_inventory_on_launch(self) -> pulumi.Output[_builtins.bool]:
+    def ask_inventory_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        Ask inventory on launch
+        Defaults to false. Whether to ask for inventory on launch. If set to false, <span pulumi-lang-nodejs="`inventoryId`" pulumi-lang-dotnet="`InventoryId`" pulumi-lang-go="`inventoryId`" pulumi-lang-python="`inventory_id`" pulumi-lang-yaml="`inventoryId`" pulumi-lang-java="`inventoryId`" pulumi-lang-hcl="`inventory_id`">`inventoryId`</span> must be set.
         """
         return pulumi.get(self, "ask_inventory_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askJobSliceCountOnLaunch")
-    def ask_job_slice_count_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask job slice count on launch
-        """
+    def ask_job_slice_count_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_job_slice_count_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askJobTypeOnLaunch")
-    def ask_job_type_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask job type on launch
-        """
+    def ask_job_type_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_job_type_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askLabelsOnLaunch")
-    def ask_labels_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask labels on launch
-        """
+    def ask_labels_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_labels_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askLimitOnLaunch")
-    def ask_limit_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask limit on launch
-        """
+    def ask_limit_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_limit_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askScmBranchOnLaunch")
-    def ask_scm_branch_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask scm branch on launch
-        """
+    def ask_scm_branch_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_scm_branch_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askSkipTagsOnLaunch")
-    def ask_skip_tags_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask skip tags on launch
-        """
+    def ask_skip_tags_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_skip_tags_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askTagsOnLaunch")
-    def ask_tags_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask tags on launch
-        """
+    def ask_tags_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_tags_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askTimeoutOnLaunch")
-    def ask_timeout_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask timeout on launch
-        """
+    def ask_timeout_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_timeout_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askVariablesOnLaunch")
-    def ask_variables_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask variables on launch
-        """
+    def ask_variables_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_variables_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askVerbosityOnLaunch")
-    def ask_verbosity_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask verbosity on launch
-        """
+    def ask_verbosity_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_verbosity_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="becomeEnabled")
-    def become_enabled(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Become enabled
-        """
+    def become_enabled(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "become_enabled")
 
     @_builtins.property
+    @pulumi.getter(name="customVirtualenv")
+    def custom_virtualenv(self) -> pulumi.Output[Optional[_builtins.str]]:
+        return pulumi.get(self, "custom_virtualenv")
+
+    @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Optional description of this job template.
+        The description of the job template.
         """
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter(name="diffMode")
-    def diff_mode(self) -> pulumi.Output[_builtins.bool]:
-        """
-        If enabled, textual changes made to any templated files on the host are shown in the standard output
-        """
+    def diff_mode(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "diff_mode")
 
     @_builtins.property
     @pulumi.getter(name="executionEnvironment")
-    def execution_environment(self) -> pulumi.Output[_builtins.float]:
+    def execution_environment(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The container image to be used for execution.
+        The selected execution environment that this playbook will be run in.
         """
         return pulumi.get(self, "execution_environment")
 
     @_builtins.property
     @pulumi.getter(name="extraVars")
-    def extra_vars(self) -> pulumi.Output[_builtins.str]:
+    def extra_vars(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Extra vars
+        The extra variables to associate with the job template.
         """
         return pulumi.get(self, "extra_vars")
 
     @_builtins.property
     @pulumi.getter(name="forceHandlers")
-    def force_handlers(self) -> pulumi.Output[_builtins.bool]:
+    def force_handlers(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        Force handlers
+        Force handlers to run on the job template.
         """
         return pulumi.get(self, "force_handlers")
 
     @_builtins.property
     @pulumi.getter
-    def forks(self) -> pulumi.Output[_builtins.float]:
+    def forks(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        Forks
+        The number of forks to associate with the job template.
         """
         return pulumi.get(self, "forks")
 
     @_builtins.property
     @pulumi.getter(name="hostConfigKey")
-    def host_config_key(self) -> pulumi.Output[_builtins.str]:
-        """
-        Host config key
-        """
+    def host_config_key(self) -> pulumi.Output[Optional[_builtins.str]]:
         return pulumi.get(self, "host_config_key")
 
     @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Inventory
+        The inventory ID to associate with the job template. If not set, <span pulumi-lang-nodejs="`askInventoryOnLaunch`" pulumi-lang-dotnet="`AskInventoryOnLaunch`" pulumi-lang-go="`askInventoryOnLaunch`" pulumi-lang-python="`ask_inventory_on_launch`" pulumi-lang-yaml="`askInventoryOnLaunch`" pulumi-lang-java="`askInventoryOnLaunch`" pulumi-lang-hcl="`ask_inventory_on_launch`">`askInventoryOnLaunch`</span> must be true.
         """
-        return pulumi.get(self, "inventory")
+        return pulumi.get(self, "inventory_id")
 
     @_builtins.property
     @pulumi.getter(name="jobSliceCount")
-    def job_slice_count(self) -> pulumi.Output[_builtins.float]:
-        """
-        The number of jobs to slice into at runtime. Will cause the Job Template to launch a workflow if value is greater than 1.
-        """
+    def job_slice_count(self) -> pulumi.Output[Optional[_builtins.float]]:
         return pulumi.get(self, "job_slice_count")
 
     @_builtins.property
     @pulumi.getter(name="jobTags")
-    def job_tags(self) -> pulumi.Output[_builtins.str]:
+    def job_tags(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Job tags
+        The job tags to associate with the job template.
         """
         return pulumi.get(self, "job_tags")
 
     @_builtins.property
     @pulumi.getter(name="jobTemplateId")
-    def job_template_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this job template.
-        """
+    def job_template_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "job_template_id")
 
     @_builtins.property
     @pulumi.getter(name="jobType")
     def job_type(self) -> pulumi.Output[_builtins.str]:
         """
-        Job type
+        Can be one of: <span pulumi-lang-nodejs="`run`" pulumi-lang-dotnet="`Run`" pulumi-lang-go="`run`" pulumi-lang-python="`run`" pulumi-lang-yaml="`run`" pulumi-lang-java="`run`" pulumi-lang-hcl="`run`">`run`</span>, <span pulumi-lang-nodejs="`check`" pulumi-lang-dotnet="`Check`" pulumi-lang-go="`check`" pulumi-lang-python="`check`" pulumi-lang-yaml="`check`" pulumi-lang-java="`check`" pulumi-lang-hcl="`check`">`check`</span>, or <span pulumi-lang-nodejs="`scan`" pulumi-lang-dotnet="`Scan`" pulumi-lang-go="`scan`" pulumi-lang-python="`scan`" pulumi-lang-yaml="`scan`" pulumi-lang-java="`scan`" pulumi-lang-hcl="`scan`">`scan`</span>
         """
         return pulumi.get(self, "job_type")
 
     @_builtins.property
     @pulumi.getter
-    def limit(self) -> pulumi.Output[_builtins.str]:
+    def limit(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Limit
+        The limit to apply to filter hosts that run on this job template.
         """
         return pulumi.get(self, "limit")
 
@@ -2074,111 +1699,73 @@ class JobTemplate(pulumi.CustomResource):
     @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this job template.
+        The name of the job template.
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def organization(self) -> pulumi.Output[_builtins.float]:
+    def playbook(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The organization used to determine access to this template.
-        """
-        return pulumi.get(self, "organization")
-
-    @_builtins.property
-    @pulumi.getter
-    def playbook(self) -> pulumi.Output[_builtins.str]:
-        """
-        Playbook
+        The playbook to associate with the job template.
         """
         return pulumi.get(self, "playbook")
 
     @_builtins.property
-    @pulumi.getter(name="preventInstanceGroupFallback")
-    def prevent_instance_group_fallback(self) -> pulumi.Output[_builtins.bool]:
+    @pulumi.getter(name="projectId")
+    def project_id(self) -> pulumi.Output[_builtins.float]:
         """
-        If enabled, the job template will prevent adding any inventory or organization instance groups to the list of preferred instances groups to run on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
+        The project ID to associate with the job template.
         """
-        return pulumi.get(self, "prevent_instance_group_fallback")
-
-    @_builtins.property
-    @pulumi.getter
-    def project(self) -> pulumi.Output[_builtins.float]:
-        """
-        Project
-        """
-        return pulumi.get(self, "project")
+        return pulumi.get(self, "project_id")
 
     @_builtins.property
     @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> pulumi.Output[_builtins.str]:
-        """
-        Branch to use in job run. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        """
+    def scm_branch(self) -> pulumi.Output[Optional[_builtins.str]]:
         return pulumi.get(self, "scm_branch")
 
     @_builtins.property
     @pulumi.getter(name="skipTags")
-    def skip_tags(self) -> pulumi.Output[_builtins.str]:
+    def skip_tags(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Skip tags
+        The tags to skip on the job template.
         """
         return pulumi.get(self, "skip_tags")
 
     @_builtins.property
     @pulumi.getter(name="startAtTask")
-    def start_at_task(self) -> pulumi.Output[_builtins.str]:
+    def start_at_task(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Start at task
+        The task to start at on the job template.
         """
         return pulumi.get(self, "start_at_task")
 
     @_builtins.property
     @pulumi.getter(name="surveyEnabled")
-    def survey_enabled(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Survey enabled
-        """
+    def survey_enabled(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "survey_enabled")
 
     @_builtins.property
     @pulumi.getter
-    def timeout(self) -> pulumi.Output[_builtins.float]:
+    def timeout(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        The amount of time (in seconds) to run before the task is canceled.
+        The timeout to associate with the job template. Default is 0
         """
         return pulumi.get(self, "timeout")
 
     @_builtins.property
     @pulumi.getter(name="useFactCache")
-    def use_fact_cache(self) -> pulumi.Output[_builtins.bool]:
+    def use_fact_cache(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        If enabled, the service will act as an Ansible Fact Cache Plugin; persisting facts at the end of a playbook run to the database and caching facts for use by Ansible.
+        Use the fact cache on the job template.
         """
         return pulumi.get(self, "use_fact_cache")
 
     @_builtins.property
     @pulumi.getter
-    def verbosity(self) -> pulumi.Output[_builtins.str]:
+    def verbosity(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        Verbosity
+        One of 0,1,2,3,4,5
         """
         return pulumi.get(self, "verbosity")
-
-    @_builtins.property
-    @pulumi.getter(name="webhookCredential")
-    def webhook_credential(self) -> pulumi.Output[_builtins.float]:
-        """
-        Personal Access Token for posting back the status to the service API
-        """
-        return pulumi.get(self, "webhook_credential")
-
-    @_builtins.property
-    @pulumi.getter(name="webhookService")
-    def webhook_service(self) -> pulumi.Output[_builtins.str]:
-        """
-        Service that webhook requests will be accepted from
-        """
-        return pulumi.get(self, "webhook_service")
 

@@ -26,7 +26,7 @@ class GetCredentialTypeResult:
     """
     A collection of values returned by getCredentialType.
     """
-    def __init__(__self__, description=None, id=None, injectors=None, inputs=None, kind=None, managed=None, name=None, namespace=None):
+    def __init__(__self__, description=None, id=None, injectors=None, inputs=None, kind=None, name=None):
         if description and not isinstance(description, str):
             raise TypeError("Expected argument 'description' to be a str")
         pulumi.set(__self__, "description", description)
@@ -42,15 +42,9 @@ class GetCredentialTypeResult:
         if kind and not isinstance(kind, str):
             raise TypeError("Expected argument 'kind' to be a str")
         pulumi.set(__self__, "kind", kind)
-        if managed and not isinstance(managed, bool):
-            raise TypeError("Expected argument 'managed' to be a bool")
-        pulumi.set(__self__, "managed", managed)
         if name and not isinstance(name, str):
             raise TypeError("Expected argument 'name' to be a str")
         pulumi.set(__self__, "name", name)
-        if namespace and not isinstance(namespace, str):
-            raise TypeError("Expected argument 'namespace' to be a str")
-        pulumi.set(__self__, "namespace", namespace)
 
     @_builtins.property
     @pulumi.getter
@@ -79,18 +73,8 @@ class GetCredentialTypeResult:
 
     @_builtins.property
     @pulumi.getter
-    def managed(self) -> _builtins.bool:
-        return pulumi.get(self, "managed")
-
-    @_builtins.property
-    @pulumi.getter
     def name(self) -> _builtins.str:
         return pulumi.get(self, "name")
-
-    @_builtins.property
-    @pulumi.getter
-    def namespace(self) -> _builtins.str:
-        return pulumi.get(self, "namespace")
 
 
 class AwaitableGetCredentialTypeResult(GetCredentialTypeResult):
@@ -104,20 +88,16 @@ class AwaitableGetCredentialTypeResult(GetCredentialTypeResult):
             injectors=self.injectors,
             inputs=self.inputs,
             kind=self.kind,
-            managed=self.managed,
-            name=self.name,
-            namespace=self.namespace)
+            name=self.name)
 
 
 def get_credential_type(id: Optional[_builtins.float] = None,
-                        name: Optional[_builtins.str] = None,
                         opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetCredentialTypeResult:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['id'] = id
-    __args__['name'] = name
     opts = pulumi.InvokeOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke('awx:index/getCredentialType:getCredentialType', __args__, opts=opts, typ=GetCredentialTypeResult, package_ref=_utilities.get_package()).value
 
@@ -127,18 +107,14 @@ def get_credential_type(id: Optional[_builtins.float] = None,
         injectors=pulumi.get(__ret__, 'injectors'),
         inputs=pulumi.get(__ret__, 'inputs'),
         kind=pulumi.get(__ret__, 'kind'),
-        managed=pulumi.get(__ret__, 'managed'),
-        name=pulumi.get(__ret__, 'name'),
-        namespace=pulumi.get(__ret__, 'namespace'))
-def get_credential_type_output(id: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
-                               name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+        name=pulumi.get(__ret__, 'name'))
+def get_credential_type_output(id: pulumi.Input[Optional[_builtins.float]] = None,
                                opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetCredentialTypeResult]:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['id'] = id
-    __args__['name'] = name
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('awx:index/getCredentialType:getCredentialType', __args__, opts=opts, typ=GetCredentialTypeResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetCredentialTypeResult(
@@ -147,6 +123,4 @@ def get_credential_type_output(id: pulumi.Input[Optional[Optional[_builtins.floa
         injectors=pulumi.get(__response__, 'injectors'),
         inputs=pulumi.get(__response__, 'inputs'),
         kind=pulumi.get(__response__, 'kind'),
-        managed=pulumi.get(__response__, 'managed'),
-        name=pulumi.get(__response__, 'name'),
-        namespace=pulumi.get(__response__, 'namespace')))
+        name=pulumi.get(__response__, 'name')))

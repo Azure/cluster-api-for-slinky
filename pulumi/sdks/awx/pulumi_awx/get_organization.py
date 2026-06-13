@@ -26,42 +26,18 @@ class GetOrganizationResult:
     """
     A collection of values returned by getOrganization.
     """
-    def __init__(__self__, default_environment=None, description=None, id=None, max_hosts=None, name=None):
-        if default_environment and not isinstance(default_environment, float):
-            raise TypeError("Expected argument 'default_environment' to be a float")
-        pulumi.set(__self__, "default_environment", default_environment)
-        if description and not isinstance(description, str):
-            raise TypeError("Expected argument 'description' to be a str")
-        pulumi.set(__self__, "description", description)
+    def __init__(__self__, id=None, name=None):
         if id and not isinstance(id, float):
             raise TypeError("Expected argument 'id' to be a float")
         pulumi.set(__self__, "id", id)
-        if max_hosts and not isinstance(max_hosts, float):
-            raise TypeError("Expected argument 'max_hosts' to be a float")
-        pulumi.set(__self__, "max_hosts", max_hosts)
         if name and not isinstance(name, str):
             raise TypeError("Expected argument 'name' to be a str")
         pulumi.set(__self__, "name", name)
 
     @_builtins.property
-    @pulumi.getter(name="defaultEnvironment")
-    def default_environment(self) -> _builtins.float:
-        return pulumi.get(self, "default_environment")
-
-    @_builtins.property
-    @pulumi.getter
-    def description(self) -> _builtins.str:
-        return pulumi.get(self, "description")
-
-    @_builtins.property
     @pulumi.getter
     def id(self) -> _builtins.float:
         return pulumi.get(self, "id")
-
-    @_builtins.property
-    @pulumi.getter(name="maxHosts")
-    def max_hosts(self) -> _builtins.float:
-        return pulumi.get(self, "max_hosts")
 
     @_builtins.property
     @pulumi.getter
@@ -75,10 +51,7 @@ class AwaitableGetOrganizationResult(GetOrganizationResult):
         if False:
             yield self
         return GetOrganizationResult(
-            default_environment=self.default_environment,
-            description=self.description,
             id=self.id,
-            max_hosts=self.max_hosts,
             name=self.name)
 
 
@@ -95,10 +68,7 @@ def get_organization(id: Optional[_builtins.float] = None,
     __ret__ = pulumi.runtime.invoke('awx:index/getOrganization:getOrganization', __args__, opts=opts, typ=GetOrganizationResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetOrganizationResult(
-        default_environment=pulumi.get(__ret__, 'default_environment'),
-        description=pulumi.get(__ret__, 'description'),
         id=pulumi.get(__ret__, 'id'),
-        max_hosts=pulumi.get(__ret__, 'max_hosts'),
         name=pulumi.get(__ret__, 'name'))
 def get_organization_output(id: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
                             name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
@@ -112,8 +82,5 @@ def get_organization_output(id: pulumi.Input[Optional[Optional[_builtins.float]]
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('awx:index/getOrganization:getOrganization', __args__, opts=opts, typ=GetOrganizationResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetOrganizationResult(
-        default_environment=pulumi.get(__response__, 'default_environment'),
-        description=pulumi.get(__response__, 'description'),
         id=pulumi.get(__response__, 'id'),
-        max_hosts=pulumi.get(__response__, 'max_hosts'),
         name=pulumi.get(__response__, 'name')))

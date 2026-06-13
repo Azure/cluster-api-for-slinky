@@ -20,22 +20,25 @@ __all__ = ['CredentialInputSourceArgs', 'CredentialInputSource']
 class CredentialInputSourceArgs:
     def __init__(__self__, *,
                  input_field_name: pulumi.Input[_builtins.str],
-                 source_credential: pulumi.Input[_builtins.float],
-                 target_credential: pulumi.Input[_builtins.float],
+                 source: pulumi.Input[_builtins.float],
+                 target: pulumi.Input[_builtins.float],
+                 credential_input_source_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 metadata: pulumi.Input[Optional[_builtins.str]] = None):
+                 metadata: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None):
         """
         The set of arguments for constructing a CredentialInputSource resource.
 
-        :param pulumi.Input[_builtins.str] input_field_name: Input field name
-        :param pulumi.Input[_builtins.float] source_credential: Source credential
-        :param pulumi.Input[_builtins.float] target_credential: Target credential
-        :param pulumi.Input[_builtins.str] description: Optional description of this credential input source.
-        :param pulumi.Input[_builtins.str] metadata: Metadata
+        :param pulumi.Input[_builtins.str] input_field_name: Name of the input field
+        :param pulumi.Input[_builtins.float] source: ID of the source credential
+        :param pulumi.Input[_builtins.float] target: ID of the target credential
+        :param pulumi.Input[_builtins.str] description: Description of the input source
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] metadata: Metadata for the input source
         """
         pulumi.set(__self__, "input_field_name", input_field_name)
-        pulumi.set(__self__, "source_credential", source_credential)
-        pulumi.set(__self__, "target_credential", target_credential)
+        pulumi.set(__self__, "source", source)
+        pulumi.set(__self__, "target", target)
+        if credential_input_source_id is not None:
+            pulumi.set(__self__, "credential_input_source_id", credential_input_source_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if metadata is not None:
@@ -45,7 +48,7 @@ class CredentialInputSourceArgs:
     @pulumi.getter(name="inputFieldName")
     def input_field_name(self) -> pulumi.Input[_builtins.str]:
         """
-        Input field name
+        Name of the input field
         """
         return pulumi.get(self, "input_field_name")
 
@@ -54,34 +57,43 @@ class CredentialInputSourceArgs:
         pulumi.set(self, "input_field_name", value)
 
     @_builtins.property
-    @pulumi.getter(name="sourceCredential")
-    def source_credential(self) -> pulumi.Input[_builtins.float]:
+    @pulumi.getter
+    def source(self) -> pulumi.Input[_builtins.float]:
         """
-        Source credential
+        ID of the source credential
         """
-        return pulumi.get(self, "source_credential")
+        return pulumi.get(self, "source")
 
-    @source_credential.setter
-    def source_credential(self, value: pulumi.Input[_builtins.float]):
-        pulumi.set(self, "source_credential", value)
+    @source.setter
+    def source(self, value: pulumi.Input[_builtins.float]):
+        pulumi.set(self, "source", value)
 
     @_builtins.property
-    @pulumi.getter(name="targetCredential")
-    def target_credential(self) -> pulumi.Input[_builtins.float]:
+    @pulumi.getter
+    def target(self) -> pulumi.Input[_builtins.float]:
         """
-        Target credential
+        ID of the target credential
         """
-        return pulumi.get(self, "target_credential")
+        return pulumi.get(self, "target")
 
-    @target_credential.setter
-    def target_credential(self, value: pulumi.Input[_builtins.float]):
-        pulumi.set(self, "target_credential", value)
+    @target.setter
+    def target(self, value: pulumi.Input[_builtins.float]):
+        pulumi.set(self, "target", value)
+
+    @_builtins.property
+    @pulumi.getter(name="credentialInputSourceId")
+    def credential_input_source_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "credential_input_source_id")
+
+    @credential_input_source_id.setter
+    def credential_input_source_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "credential_input_source_id", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this credential input source.
+        Description of the input source
         """
         return pulumi.get(self, "description")
 
@@ -91,35 +103,34 @@ class CredentialInputSourceArgs:
 
     @_builtins.property
     @pulumi.getter
-    def metadata(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def metadata(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
         """
-        Metadata
+        Metadata for the input source
         """
         return pulumi.get(self, "metadata")
 
     @metadata.setter
-    def metadata(self, value: pulumi.Input[Optional[_builtins.str]]):
+    def metadata(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "metadata", value)
 
 
 @pulumi.input_type
 class _CredentialInputSourceState:
     def __init__(__self__, *,
-                 credential_input_source_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_input_source_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  input_field_name: pulumi.Input[Optional[_builtins.str]] = None,
-                 metadata: pulumi.Input[Optional[_builtins.str]] = None,
-                 source_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 target_credential: pulumi.Input[Optional[_builtins.float]] = None):
+                 metadata: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 source: pulumi.Input[Optional[_builtins.float]] = None,
+                 target: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering CredentialInputSource resources.
 
-        :param pulumi.Input[_builtins.float] credential_input_source_id: Database ID for this credential input source.
-        :param pulumi.Input[_builtins.str] description: Optional description of this credential input source.
-        :param pulumi.Input[_builtins.str] input_field_name: Input field name
-        :param pulumi.Input[_builtins.str] metadata: Metadata
-        :param pulumi.Input[_builtins.float] source_credential: Source credential
-        :param pulumi.Input[_builtins.float] target_credential: Target credential
+        :param pulumi.Input[_builtins.str] description: Description of the input source
+        :param pulumi.Input[_builtins.str] input_field_name: Name of the input field
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] metadata: Metadata for the input source
+        :param pulumi.Input[_builtins.float] source: ID of the source credential
+        :param pulumi.Input[_builtins.float] target: ID of the target credential
         """
         if credential_input_source_id is not None:
             pulumi.set(__self__, "credential_input_source_id", credential_input_source_id)
@@ -129,28 +140,25 @@ class _CredentialInputSourceState:
             pulumi.set(__self__, "input_field_name", input_field_name)
         if metadata is not None:
             pulumi.set(__self__, "metadata", metadata)
-        if source_credential is not None:
-            pulumi.set(__self__, "source_credential", source_credential)
-        if target_credential is not None:
-            pulumi.set(__self__, "target_credential", target_credential)
+        if source is not None:
+            pulumi.set(__self__, "source", source)
+        if target is not None:
+            pulumi.set(__self__, "target", target)
 
     @_builtins.property
     @pulumi.getter(name="credentialInputSourceId")
-    def credential_input_source_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this credential input source.
-        """
+    def credential_input_source_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "credential_input_source_id")
 
     @credential_input_source_id.setter
-    def credential_input_source_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def credential_input_source_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "credential_input_source_id", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this credential input source.
+        Description of the input source
         """
         return pulumi.get(self, "description")
 
@@ -162,7 +170,7 @@ class _CredentialInputSourceState:
     @pulumi.getter(name="inputFieldName")
     def input_field_name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Input field name
+        Name of the input field
         """
         return pulumi.get(self, "input_field_name")
 
@@ -172,39 +180,39 @@ class _CredentialInputSourceState:
 
     @_builtins.property
     @pulumi.getter
-    def metadata(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def metadata(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
         """
-        Metadata
+        Metadata for the input source
         """
         return pulumi.get(self, "metadata")
 
     @metadata.setter
-    def metadata(self, value: pulumi.Input[Optional[_builtins.str]]):
+    def metadata(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "metadata", value)
 
     @_builtins.property
-    @pulumi.getter(name="sourceCredential")
-    def source_credential(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter
+    def source(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Source credential
+        ID of the source credential
         """
-        return pulumi.get(self, "source_credential")
+        return pulumi.get(self, "source")
 
-    @source_credential.setter
-    def source_credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "source_credential", value)
+    @source.setter
+    def source(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "source", value)
 
     @_builtins.property
-    @pulumi.getter(name="targetCredential")
-    def target_credential(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter
+    def target(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Target credential
+        ID of the target credential
         """
-        return pulumi.get(self, "target_credential")
+        return pulumi.get(self, "target")
 
-    @target_credential.setter
-    def target_credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "target_credential", value)
+    @target.setter
+    def target(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "target", value)
 
 
 @pulumi.type_token("awx:index/credentialInputSource:CredentialInputSource")
@@ -213,22 +221,23 @@ class CredentialInputSource(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
+                 credential_input_source_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  input_field_name: pulumi.Input[Optional[_builtins.str]] = None,
-                 metadata: pulumi.Input[Optional[_builtins.str]] = None,
-                 source_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 target_credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 metadata: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 source: pulumi.Input[Optional[_builtins.float]] = None,
+                 target: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a CredentialInputSource resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] description: Optional description of this credential input source.
-        :param pulumi.Input[_builtins.str] input_field_name: Input field name
-        :param pulumi.Input[_builtins.str] metadata: Metadata
-        :param pulumi.Input[_builtins.float] source_credential: Source credential
-        :param pulumi.Input[_builtins.float] target_credential: Target credential
+        :param pulumi.Input[_builtins.str] description: Description of the input source
+        :param pulumi.Input[_builtins.str] input_field_name: Name of the input field
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] metadata: Metadata for the input source
+        :param pulumi.Input[_builtins.float] source: ID of the source credential
+        :param pulumi.Input[_builtins.float] target: ID of the target credential
         """
         ...
     @overload
@@ -254,11 +263,12 @@ class CredentialInputSource(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
+                 credential_input_source_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  input_field_name: pulumi.Input[Optional[_builtins.str]] = None,
-                 metadata: pulumi.Input[Optional[_builtins.str]] = None,
-                 source_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 target_credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 metadata: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 source: pulumi.Input[Optional[_builtins.float]] = None,
+                 target: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -268,18 +278,18 @@ class CredentialInputSource(pulumi.CustomResource):
                 raise TypeError('__props__ is only valid when passed in combination with a valid opts.id to get an existing resource')
             __props__ = CredentialInputSourceArgs.__new__(CredentialInputSourceArgs)
 
+            __props__.__dict__["credential_input_source_id"] = credential_input_source_id
             __props__.__dict__["description"] = description
             if input_field_name is None and not opts.urn:
                 raise TypeError("Missing required property 'input_field_name'")
             __props__.__dict__["input_field_name"] = input_field_name
             __props__.__dict__["metadata"] = metadata
-            if source_credential is None and not opts.urn:
-                raise TypeError("Missing required property 'source_credential'")
-            __props__.__dict__["source_credential"] = source_credential
-            if target_credential is None and not opts.urn:
-                raise TypeError("Missing required property 'target_credential'")
-            __props__.__dict__["target_credential"] = target_credential
-            __props__.__dict__["credential_input_source_id"] = None
+            if source is None and not opts.urn:
+                raise TypeError("Missing required property 'source'")
+            __props__.__dict__["source"] = source
+            if target is None and not opts.urn:
+                raise TypeError("Missing required property 'target'")
+            __props__.__dict__["target"] = target
         super(CredentialInputSource, __self__).__init__(
             'awx:index/credentialInputSource:CredentialInputSource',
             resource_name,
@@ -291,12 +301,12 @@ class CredentialInputSource(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            credential_input_source_id: pulumi.Input[Optional[_builtins.float]] = None,
+            credential_input_source_id: pulumi.Input[Optional[_builtins.str]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
             input_field_name: pulumi.Input[Optional[_builtins.str]] = None,
-            metadata: pulumi.Input[Optional[_builtins.str]] = None,
-            source_credential: pulumi.Input[Optional[_builtins.float]] = None,
-            target_credential: pulumi.Input[Optional[_builtins.float]] = None) -> 'CredentialInputSource':
+            metadata: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+            source: pulumi.Input[Optional[_builtins.float]] = None,
+            target: pulumi.Input[Optional[_builtins.float]] = None) -> 'CredentialInputSource':
         """
         Get an existing CredentialInputSource resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -304,12 +314,11 @@ class CredentialInputSource(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.float] credential_input_source_id: Database ID for this credential input source.
-        :param pulumi.Input[_builtins.str] description: Optional description of this credential input source.
-        :param pulumi.Input[_builtins.str] input_field_name: Input field name
-        :param pulumi.Input[_builtins.str] metadata: Metadata
-        :param pulumi.Input[_builtins.float] source_credential: Source credential
-        :param pulumi.Input[_builtins.float] target_credential: Target credential
+        :param pulumi.Input[_builtins.str] description: Description of the input source
+        :param pulumi.Input[_builtins.str] input_field_name: Name of the input field
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] metadata: Metadata for the input source
+        :param pulumi.Input[_builtins.float] source: ID of the source credential
+        :param pulumi.Input[_builtins.float] target: ID of the target credential
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -319,23 +328,20 @@ class CredentialInputSource(pulumi.CustomResource):
         __props__.__dict__["description"] = description
         __props__.__dict__["input_field_name"] = input_field_name
         __props__.__dict__["metadata"] = metadata
-        __props__.__dict__["source_credential"] = source_credential
-        __props__.__dict__["target_credential"] = target_credential
+        __props__.__dict__["source"] = source
+        __props__.__dict__["target"] = target
         return CredentialInputSource(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter(name="credentialInputSourceId")
-    def credential_input_source_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this credential input source.
-        """
+    def credential_input_source_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "credential_input_source_id")
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Optional description of this credential input source.
+        Description of the input source
         """
         return pulumi.get(self, "description")
 
@@ -343,31 +349,31 @@ class CredentialInputSource(pulumi.CustomResource):
     @pulumi.getter(name="inputFieldName")
     def input_field_name(self) -> pulumi.Output[_builtins.str]:
         """
-        Input field name
+        Name of the input field
         """
         return pulumi.get(self, "input_field_name")
 
     @_builtins.property
     @pulumi.getter
-    def metadata(self) -> pulumi.Output[_builtins.str]:
+    def metadata(self) -> pulumi.Output[Optional[Mapping[str, _builtins.str]]]:
         """
-        Metadata
+        Metadata for the input source
         """
         return pulumi.get(self, "metadata")
 
     @_builtins.property
-    @pulumi.getter(name="sourceCredential")
-    def source_credential(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter
+    def source(self) -> pulumi.Output[_builtins.float]:
         """
-        Source credential
+        ID of the source credential
         """
-        return pulumi.get(self, "source_credential")
+        return pulumi.get(self, "source")
 
     @_builtins.property
-    @pulumi.getter(name="targetCredential")
-    def target_credential(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter
+    def target(self) -> pulumi.Output[_builtins.float]:
         """
-        Target credential
+        ID of the target credential
         """
-        return pulumi.get(self, "target_credential")
+        return pulumi.get(self, "target")
 

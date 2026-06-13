@@ -26,84 +26,13 @@ class GetProjectResult:
     """
     A collection of values returned by getProject.
     """
-    def __init__(__self__, allow_override=None, credential=None, default_environment=None, description=None, id=None, local_path=None, name=None, organization=None, scm_branch=None, scm_clean=None, scm_delete_on_update=None, scm_refspec=None, scm_track_submodules=None, scm_type=None, scm_update_cache_timeout=None, scm_update_on_launch=None, scm_url=None, signature_validation_credential=None, timeout=None):
-        if allow_override and not isinstance(allow_override, bool):
-            raise TypeError("Expected argument 'allow_override' to be a bool")
-        pulumi.set(__self__, "allow_override", allow_override)
-        if credential and not isinstance(credential, float):
-            raise TypeError("Expected argument 'credential' to be a float")
-        pulumi.set(__self__, "credential", credential)
-        if default_environment and not isinstance(default_environment, float):
-            raise TypeError("Expected argument 'default_environment' to be a float")
-        pulumi.set(__self__, "default_environment", default_environment)
-        if description and not isinstance(description, str):
-            raise TypeError("Expected argument 'description' to be a str")
-        pulumi.set(__self__, "description", description)
+    def __init__(__self__, id=None, name=None):
         if id and not isinstance(id, float):
             raise TypeError("Expected argument 'id' to be a float")
         pulumi.set(__self__, "id", id)
-        if local_path and not isinstance(local_path, str):
-            raise TypeError("Expected argument 'local_path' to be a str")
-        pulumi.set(__self__, "local_path", local_path)
         if name and not isinstance(name, str):
             raise TypeError("Expected argument 'name' to be a str")
         pulumi.set(__self__, "name", name)
-        if organization and not isinstance(organization, float):
-            raise TypeError("Expected argument 'organization' to be a float")
-        pulumi.set(__self__, "organization", organization)
-        if scm_branch and not isinstance(scm_branch, str):
-            raise TypeError("Expected argument 'scm_branch' to be a str")
-        pulumi.set(__self__, "scm_branch", scm_branch)
-        if scm_clean and not isinstance(scm_clean, bool):
-            raise TypeError("Expected argument 'scm_clean' to be a bool")
-        pulumi.set(__self__, "scm_clean", scm_clean)
-        if scm_delete_on_update and not isinstance(scm_delete_on_update, bool):
-            raise TypeError("Expected argument 'scm_delete_on_update' to be a bool")
-        pulumi.set(__self__, "scm_delete_on_update", scm_delete_on_update)
-        if scm_refspec and not isinstance(scm_refspec, str):
-            raise TypeError("Expected argument 'scm_refspec' to be a str")
-        pulumi.set(__self__, "scm_refspec", scm_refspec)
-        if scm_track_submodules and not isinstance(scm_track_submodules, bool):
-            raise TypeError("Expected argument 'scm_track_submodules' to be a bool")
-        pulumi.set(__self__, "scm_track_submodules", scm_track_submodules)
-        if scm_type and not isinstance(scm_type, str):
-            raise TypeError("Expected argument 'scm_type' to be a str")
-        pulumi.set(__self__, "scm_type", scm_type)
-        if scm_update_cache_timeout and not isinstance(scm_update_cache_timeout, float):
-            raise TypeError("Expected argument 'scm_update_cache_timeout' to be a float")
-        pulumi.set(__self__, "scm_update_cache_timeout", scm_update_cache_timeout)
-        if scm_update_on_launch and not isinstance(scm_update_on_launch, bool):
-            raise TypeError("Expected argument 'scm_update_on_launch' to be a bool")
-        pulumi.set(__self__, "scm_update_on_launch", scm_update_on_launch)
-        if scm_url and not isinstance(scm_url, str):
-            raise TypeError("Expected argument 'scm_url' to be a str")
-        pulumi.set(__self__, "scm_url", scm_url)
-        if signature_validation_credential and not isinstance(signature_validation_credential, float):
-            raise TypeError("Expected argument 'signature_validation_credential' to be a float")
-        pulumi.set(__self__, "signature_validation_credential", signature_validation_credential)
-        if timeout and not isinstance(timeout, float):
-            raise TypeError("Expected argument 'timeout' to be a float")
-        pulumi.set(__self__, "timeout", timeout)
-
-    @_builtins.property
-    @pulumi.getter(name="allowOverride")
-    def allow_override(self) -> _builtins.bool:
-        return pulumi.get(self, "allow_override")
-
-    @_builtins.property
-    @pulumi.getter
-    def credential(self) -> _builtins.float:
-        return pulumi.get(self, "credential")
-
-    @_builtins.property
-    @pulumi.getter(name="defaultEnvironment")
-    def default_environment(self) -> _builtins.float:
-        return pulumi.get(self, "default_environment")
-
-    @_builtins.property
-    @pulumi.getter
-    def description(self) -> _builtins.str:
-        return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
@@ -111,74 +40,9 @@ class GetProjectResult:
         return pulumi.get(self, "id")
 
     @_builtins.property
-    @pulumi.getter(name="localPath")
-    def local_path(self) -> _builtins.str:
-        return pulumi.get(self, "local_path")
-
-    @_builtins.property
     @pulumi.getter
     def name(self) -> _builtins.str:
         return pulumi.get(self, "name")
-
-    @_builtins.property
-    @pulumi.getter
-    def organization(self) -> _builtins.float:
-        return pulumi.get(self, "organization")
-
-    @_builtins.property
-    @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> _builtins.str:
-        return pulumi.get(self, "scm_branch")
-
-    @_builtins.property
-    @pulumi.getter(name="scmClean")
-    def scm_clean(self) -> _builtins.bool:
-        return pulumi.get(self, "scm_clean")
-
-    @_builtins.property
-    @pulumi.getter(name="scmDeleteOnUpdate")
-    def scm_delete_on_update(self) -> _builtins.bool:
-        return pulumi.get(self, "scm_delete_on_update")
-
-    @_builtins.property
-    @pulumi.getter(name="scmRefspec")
-    def scm_refspec(self) -> _builtins.str:
-        return pulumi.get(self, "scm_refspec")
-
-    @_builtins.property
-    @pulumi.getter(name="scmTrackSubmodules")
-    def scm_track_submodules(self) -> _builtins.bool:
-        return pulumi.get(self, "scm_track_submodules")
-
-    @_builtins.property
-    @pulumi.getter(name="scmType")
-    def scm_type(self) -> _builtins.str:
-        return pulumi.get(self, "scm_type")
-
-    @_builtins.property
-    @pulumi.getter(name="scmUpdateCacheTimeout")
-    def scm_update_cache_timeout(self) -> _builtins.float:
-        return pulumi.get(self, "scm_update_cache_timeout")
-
-    @_builtins.property
-    @pulumi.getter(name="scmUpdateOnLaunch")
-    def scm_update_on_launch(self) -> _builtins.bool:
-        return pulumi.get(self, "scm_update_on_launch")
-
-    @_builtins.property
-    @pulumi.getter(name="scmUrl")
-    def scm_url(self) -> _builtins.str:
-        return pulumi.get(self, "scm_url")
-
-    @_builtins.property
-    @pulumi.getter(name="signatureValidationCredential")
-    def signature_validation_credential(self) -> _builtins.float:
-        return pulumi.get(self, "signature_validation_credential")
-
-    @_builtins.property
-    @pulumi.getter
-    def timeout(self) -> _builtins.float:
-        return pulumi.get(self, "timeout")
 
 
 class AwaitableGetProjectResult(GetProjectResult):
@@ -187,83 +51,36 @@ class AwaitableGetProjectResult(GetProjectResult):
         if False:
             yield self
         return GetProjectResult(
-            allow_override=self.allow_override,
-            credential=self.credential,
-            default_environment=self.default_environment,
-            description=self.description,
             id=self.id,
-            local_path=self.local_path,
-            name=self.name,
-            organization=self.organization,
-            scm_branch=self.scm_branch,
-            scm_clean=self.scm_clean,
-            scm_delete_on_update=self.scm_delete_on_update,
-            scm_refspec=self.scm_refspec,
-            scm_track_submodules=self.scm_track_submodules,
-            scm_type=self.scm_type,
-            scm_update_cache_timeout=self.scm_update_cache_timeout,
-            scm_update_on_launch=self.scm_update_on_launch,
-            scm_url=self.scm_url,
-            signature_validation_credential=self.signature_validation_credential,
-            timeout=self.timeout)
+            name=self.name)
 
 
 def get_project(id: Optional[_builtins.float] = None,
+                name: Optional[_builtins.str] = None,
                 opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetProjectResult:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['id'] = id
+    __args__['name'] = name
     opts = pulumi.InvokeOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke('awx:index/getProject:getProject', __args__, opts=opts, typ=GetProjectResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetProjectResult(
-        allow_override=pulumi.get(__ret__, 'allow_override'),
-        credential=pulumi.get(__ret__, 'credential'),
-        default_environment=pulumi.get(__ret__, 'default_environment'),
-        description=pulumi.get(__ret__, 'description'),
         id=pulumi.get(__ret__, 'id'),
-        local_path=pulumi.get(__ret__, 'local_path'),
-        name=pulumi.get(__ret__, 'name'),
-        organization=pulumi.get(__ret__, 'organization'),
-        scm_branch=pulumi.get(__ret__, 'scm_branch'),
-        scm_clean=pulumi.get(__ret__, 'scm_clean'),
-        scm_delete_on_update=pulumi.get(__ret__, 'scm_delete_on_update'),
-        scm_refspec=pulumi.get(__ret__, 'scm_refspec'),
-        scm_track_submodules=pulumi.get(__ret__, 'scm_track_submodules'),
-        scm_type=pulumi.get(__ret__, 'scm_type'),
-        scm_update_cache_timeout=pulumi.get(__ret__, 'scm_update_cache_timeout'),
-        scm_update_on_launch=pulumi.get(__ret__, 'scm_update_on_launch'),
-        scm_url=pulumi.get(__ret__, 'scm_url'),
-        signature_validation_credential=pulumi.get(__ret__, 'signature_validation_credential'),
-        timeout=pulumi.get(__ret__, 'timeout'))
+        name=pulumi.get(__ret__, 'name'))
 def get_project_output(id: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
+                       name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                        opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetProjectResult]:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['id'] = id
+    __args__['name'] = name
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('awx:index/getProject:getProject', __args__, opts=opts, typ=GetProjectResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetProjectResult(
-        allow_override=pulumi.get(__response__, 'allow_override'),
-        credential=pulumi.get(__response__, 'credential'),
-        default_environment=pulumi.get(__response__, 'default_environment'),
-        description=pulumi.get(__response__, 'description'),
         id=pulumi.get(__response__, 'id'),
-        local_path=pulumi.get(__response__, 'local_path'),
-        name=pulumi.get(__response__, 'name'),
-        organization=pulumi.get(__response__, 'organization'),
-        scm_branch=pulumi.get(__response__, 'scm_branch'),
-        scm_clean=pulumi.get(__response__, 'scm_clean'),
-        scm_delete_on_update=pulumi.get(__response__, 'scm_delete_on_update'),
-        scm_refspec=pulumi.get(__response__, 'scm_refspec'),
-        scm_track_submodules=pulumi.get(__response__, 'scm_track_submodules'),
-        scm_type=pulumi.get(__response__, 'scm_type'),
-        scm_update_cache_timeout=pulumi.get(__response__, 'scm_update_cache_timeout'),
-        scm_update_on_launch=pulumi.get(__response__, 'scm_update_on_launch'),
-        scm_url=pulumi.get(__response__, 'scm_url'),
-        signature_validation_credential=pulumi.get(__response__, 'signature_validation_credential'),
-        timeout=pulumi.get(__response__, 'timeout')))
+        name=pulumi.get(__response__, 'name')))

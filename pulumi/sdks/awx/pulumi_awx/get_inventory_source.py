@@ -26,10 +26,10 @@ class GetInventorySourceResult:
     """
     A collection of values returned by getInventorySource.
     """
-    def __init__(__self__, credential=None, description=None, enabled_value=None, enabled_var=None, execution_environment=None, host_filter=None, id=None, inventory=None, limit=None, name=None, overwrite=None, overwrite_vars=None, scm_branch=None, source=None, source_path=None, source_project=None, source_vars=None, timeout=None, update_cache_timeout=None, update_on_launch=None, verbosity=None):
-        if credential and not isinstance(credential, float):
-            raise TypeError("Expected argument 'credential' to be a float")
-        pulumi.set(__self__, "credential", credential)
+    def __init__(__self__, credential_id=None, description=None, enabled_value=None, enabled_var=None, execution_environment=None, host_filter=None, id=None, inventory_id=None, inventory_source_id=None, name=None, overwrite=None, overwrite_vars=None, source=None, source_path=None, source_project_id=None, source_vars=None, update_cache_timeout=None, update_on_launch=None, verbosity=None):
+        if credential_id and not isinstance(credential_id, float):
+            raise TypeError("Expected argument 'credential_id' to be a float")
+        pulumi.set(__self__, "credential_id", credential_id)
         if description and not isinstance(description, str):
             raise TypeError("Expected argument 'description' to be a str")
         pulumi.set(__self__, "description", description)
@@ -45,15 +45,15 @@ class GetInventorySourceResult:
         if host_filter and not isinstance(host_filter, str):
             raise TypeError("Expected argument 'host_filter' to be a str")
         pulumi.set(__self__, "host_filter", host_filter)
-        if id and not isinstance(id, float):
-            raise TypeError("Expected argument 'id' to be a float")
+        if id and not isinstance(id, str):
+            raise TypeError("Expected argument 'id' to be a str")
         pulumi.set(__self__, "id", id)
-        if inventory and not isinstance(inventory, float):
-            raise TypeError("Expected argument 'inventory' to be a float")
-        pulumi.set(__self__, "inventory", inventory)
-        if limit and not isinstance(limit, str):
-            raise TypeError("Expected argument 'limit' to be a str")
-        pulumi.set(__self__, "limit", limit)
+        if inventory_id and not isinstance(inventory_id, float):
+            raise TypeError("Expected argument 'inventory_id' to be a float")
+        pulumi.set(__self__, "inventory_id", inventory_id)
+        if inventory_source_id and not isinstance(inventory_source_id, float):
+            raise TypeError("Expected argument 'inventory_source_id' to be a float")
+        pulumi.set(__self__, "inventory_source_id", inventory_source_id)
         if name and not isinstance(name, str):
             raise TypeError("Expected argument 'name' to be a str")
         pulumi.set(__self__, "name", name)
@@ -63,38 +63,32 @@ class GetInventorySourceResult:
         if overwrite_vars and not isinstance(overwrite_vars, bool):
             raise TypeError("Expected argument 'overwrite_vars' to be a bool")
         pulumi.set(__self__, "overwrite_vars", overwrite_vars)
-        if scm_branch and not isinstance(scm_branch, str):
-            raise TypeError("Expected argument 'scm_branch' to be a str")
-        pulumi.set(__self__, "scm_branch", scm_branch)
         if source and not isinstance(source, str):
             raise TypeError("Expected argument 'source' to be a str")
         pulumi.set(__self__, "source", source)
         if source_path and not isinstance(source_path, str):
             raise TypeError("Expected argument 'source_path' to be a str")
         pulumi.set(__self__, "source_path", source_path)
-        if source_project and not isinstance(source_project, float):
-            raise TypeError("Expected argument 'source_project' to be a float")
-        pulumi.set(__self__, "source_project", source_project)
+        if source_project_id and not isinstance(source_project_id, float):
+            raise TypeError("Expected argument 'source_project_id' to be a float")
+        pulumi.set(__self__, "source_project_id", source_project_id)
         if source_vars and not isinstance(source_vars, str):
             raise TypeError("Expected argument 'source_vars' to be a str")
         pulumi.set(__self__, "source_vars", source_vars)
-        if timeout and not isinstance(timeout, float):
-            raise TypeError("Expected argument 'timeout' to be a float")
-        pulumi.set(__self__, "timeout", timeout)
         if update_cache_timeout and not isinstance(update_cache_timeout, float):
             raise TypeError("Expected argument 'update_cache_timeout' to be a float")
         pulumi.set(__self__, "update_cache_timeout", update_cache_timeout)
         if update_on_launch and not isinstance(update_on_launch, bool):
             raise TypeError("Expected argument 'update_on_launch' to be a bool")
         pulumi.set(__self__, "update_on_launch", update_on_launch)
-        if verbosity and not isinstance(verbosity, str):
-            raise TypeError("Expected argument 'verbosity' to be a str")
+        if verbosity and not isinstance(verbosity, float):
+            raise TypeError("Expected argument 'verbosity' to be a float")
         pulumi.set(__self__, "verbosity", verbosity)
 
     @_builtins.property
-    @pulumi.getter
-    def credential(self) -> _builtins.float:
-        return pulumi.get(self, "credential")
+    @pulumi.getter(name="credentialId")
+    def credential_id(self) -> _builtins.float:
+        return pulumi.get(self, "credential_id")
 
     @_builtins.property
     @pulumi.getter
@@ -118,24 +112,23 @@ class GetInventorySourceResult:
 
     @_builtins.property
     @pulumi.getter(name="hostFilter")
-    @_utilities.deprecated("""Deprecated""")
     def host_filter(self) -> _builtins.str:
         return pulumi.get(self, "host_filter")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.float:
+    def id(self) -> _builtins.str:
         return pulumi.get(self, "id")
 
     @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> _builtins.float:
-        return pulumi.get(self, "inventory")
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> _builtins.float:
+        return pulumi.get(self, "inventory_id")
 
     @_builtins.property
-    @pulumi.getter
-    def limit(self) -> _builtins.str:
-        return pulumi.get(self, "limit")
+    @pulumi.getter(name="inventorySourceId")
+    def inventory_source_id(self) -> _builtins.float:
+        return pulumi.get(self, "inventory_source_id")
 
     @_builtins.property
     @pulumi.getter
@@ -153,11 +146,6 @@ class GetInventorySourceResult:
         return pulumi.get(self, "overwrite_vars")
 
     @_builtins.property
-    @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> _builtins.str:
-        return pulumi.get(self, "scm_branch")
-
-    @_builtins.property
     @pulumi.getter
     def source(self) -> _builtins.str:
         return pulumi.get(self, "source")
@@ -168,19 +156,14 @@ class GetInventorySourceResult:
         return pulumi.get(self, "source_path")
 
     @_builtins.property
-    @pulumi.getter(name="sourceProject")
-    def source_project(self) -> _builtins.float:
-        return pulumi.get(self, "source_project")
+    @pulumi.getter(name="sourceProjectId")
+    def source_project_id(self) -> _builtins.float:
+        return pulumi.get(self, "source_project_id")
 
     @_builtins.property
     @pulumi.getter(name="sourceVars")
     def source_vars(self) -> _builtins.str:
         return pulumi.get(self, "source_vars")
-
-    @_builtins.property
-    @pulumi.getter
-    def timeout(self) -> _builtins.float:
-        return pulumi.get(self, "timeout")
 
     @_builtins.property
     @pulumi.getter(name="updateCacheTimeout")
@@ -194,7 +177,7 @@ class GetInventorySourceResult:
 
     @_builtins.property
     @pulumi.getter
-    def verbosity(self) -> _builtins.str:
+    def verbosity(self) -> _builtins.float:
         return pulumi.get(self, "verbosity")
 
 
@@ -204,93 +187,87 @@ class AwaitableGetInventorySourceResult(GetInventorySourceResult):
         if False:
             yield self
         return GetInventorySourceResult(
-            credential=self.credential,
+            credential_id=self.credential_id,
             description=self.description,
             enabled_value=self.enabled_value,
             enabled_var=self.enabled_var,
             execution_environment=self.execution_environment,
             host_filter=self.host_filter,
             id=self.id,
-            inventory=self.inventory,
-            limit=self.limit,
+            inventory_id=self.inventory_id,
+            inventory_source_id=self.inventory_source_id,
             name=self.name,
             overwrite=self.overwrite,
             overwrite_vars=self.overwrite_vars,
-            scm_branch=self.scm_branch,
             source=self.source,
             source_path=self.source_path,
-            source_project=self.source_project,
+            source_project_id=self.source_project_id,
             source_vars=self.source_vars,
-            timeout=self.timeout,
             update_cache_timeout=self.update_cache_timeout,
             update_on_launch=self.update_on_launch,
             verbosity=self.verbosity)
 
 
-def get_inventory_source(id: Optional[_builtins.float] = None,
-                         name: Optional[_builtins.str] = None,
+def get_inventory_source(id: Optional[_builtins.str] = None,
+                         inventory_source_id: Optional[_builtins.float] = None,
                          opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetInventorySourceResult:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['id'] = id
-    __args__['name'] = name
+    __args__['inventorySourceId'] = inventory_source_id
     opts = pulumi.InvokeOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke('awx:index/getInventorySource:getInventorySource', __args__, opts=opts, typ=GetInventorySourceResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetInventorySourceResult(
-        credential=pulumi.get(__ret__, 'credential'),
+        credential_id=pulumi.get(__ret__, 'credential_id'),
         description=pulumi.get(__ret__, 'description'),
         enabled_value=pulumi.get(__ret__, 'enabled_value'),
         enabled_var=pulumi.get(__ret__, 'enabled_var'),
         execution_environment=pulumi.get(__ret__, 'execution_environment'),
         host_filter=pulumi.get(__ret__, 'host_filter'),
         id=pulumi.get(__ret__, 'id'),
-        inventory=pulumi.get(__ret__, 'inventory'),
-        limit=pulumi.get(__ret__, 'limit'),
+        inventory_id=pulumi.get(__ret__, 'inventory_id'),
+        inventory_source_id=pulumi.get(__ret__, 'inventory_source_id'),
         name=pulumi.get(__ret__, 'name'),
         overwrite=pulumi.get(__ret__, 'overwrite'),
         overwrite_vars=pulumi.get(__ret__, 'overwrite_vars'),
-        scm_branch=pulumi.get(__ret__, 'scm_branch'),
         source=pulumi.get(__ret__, 'source'),
         source_path=pulumi.get(__ret__, 'source_path'),
-        source_project=pulumi.get(__ret__, 'source_project'),
+        source_project_id=pulumi.get(__ret__, 'source_project_id'),
         source_vars=pulumi.get(__ret__, 'source_vars'),
-        timeout=pulumi.get(__ret__, 'timeout'),
         update_cache_timeout=pulumi.get(__ret__, 'update_cache_timeout'),
         update_on_launch=pulumi.get(__ret__, 'update_on_launch'),
         verbosity=pulumi.get(__ret__, 'verbosity'))
-def get_inventory_source_output(id: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
-                                name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+def get_inventory_source_output(id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                                inventory_source_id: pulumi.Input[Optional[_builtins.float]] = None,
                                 opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetInventorySourceResult]:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['id'] = id
-    __args__['name'] = name
+    __args__['inventorySourceId'] = inventory_source_id
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('awx:index/getInventorySource:getInventorySource', __args__, opts=opts, typ=GetInventorySourceResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetInventorySourceResult(
-        credential=pulumi.get(__response__, 'credential'),
+        credential_id=pulumi.get(__response__, 'credential_id'),
         description=pulumi.get(__response__, 'description'),
         enabled_value=pulumi.get(__response__, 'enabled_value'),
         enabled_var=pulumi.get(__response__, 'enabled_var'),
         execution_environment=pulumi.get(__response__, 'execution_environment'),
         host_filter=pulumi.get(__response__, 'host_filter'),
         id=pulumi.get(__response__, 'id'),
-        inventory=pulumi.get(__response__, 'inventory'),
-        limit=pulumi.get(__response__, 'limit'),
+        inventory_id=pulumi.get(__response__, 'inventory_id'),
+        inventory_source_id=pulumi.get(__response__, 'inventory_source_id'),
         name=pulumi.get(__response__, 'name'),
         overwrite=pulumi.get(__response__, 'overwrite'),
         overwrite_vars=pulumi.get(__response__, 'overwrite_vars'),
-        scm_branch=pulumi.get(__response__, 'scm_branch'),
         source=pulumi.get(__response__, 'source'),
         source_path=pulumi.get(__response__, 'source_path'),
-        source_project=pulumi.get(__response__, 'source_project'),
+        source_project_id=pulumi.get(__response__, 'source_project_id'),
         source_vars=pulumi.get(__response__, 'source_vars'),
-        timeout=pulumi.get(__response__, 'timeout'),
         update_cache_timeout=pulumi.get(__response__, 'update_cache_timeout'),
         update_on_launch=pulumi.get(__response__, 'update_on_launch'),
         verbosity=pulumi.get(__response__, 'verbosity')))

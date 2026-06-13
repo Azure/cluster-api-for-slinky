@@ -18,6 +18,7 @@ import os
 import shlex
 import subprocess
 import tempfile
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Optional
@@ -30,6 +31,19 @@ from pulumi.dynamic import (
     ReadResult,
     Resource,
     ResourceProvider,
+)
+
+
+_PUSH_RETRY_TIMEOUT_SECONDS = 180
+_PUSH_RETRY_INTERVAL_SECONDS = 5
+_TRANSIENT_SSH_ERRORS = (
+    "kex_exchange_identification",
+    "Connection reset",
+    "Connection refused",
+    "Connection timed out",
+    "Connection closed",
+    "No route to host",
+    "Operation timed out",
 )
 
 
@@ -89,7 +103,10 @@ class _GitSyncProvider(ResourceProvider):
         host_public_key = str(props["ssh_host_public_key"]).strip()
         return f"{parsed.hostname} {host_public_key}\n"
 
-    def _push(self, props: dict) -> None:
+    def _is_transient_push_error(self, stderr: str) -> bool:
+        return any(error in stderr for error in _TRANSIENT_SSH_ERRORS)
+
+    def _push_once(self, props: dict) -> None:
         private_key = str(props["ssh_private_key"])
         with (
             self._temp_file(private_key, 0o600) as key_path,
@@ -129,6 +146,23 @@ class _GitSyncProvider(ResourceProvider):
                 stderr=subprocess.PIPE,
                 text=True,
             )
+
+    def _push(self, props: dict) -> None:
+        deadline = time.monotonic() + _PUSH_RETRY_TIMEOUT_SECONDS
+        last_error: subprocess.CalledProcessError | None = None
+
+        while True:
+            try:
+                self._push_once(props)
+                return
+            except subprocess.CalledProcessError as exc:
+                stderr = exc.stderr or ""
+                if not self._is_transient_push_error(stderr):
+                    raise
+                last_error = exc
+                if time.monotonic() >= deadline:
+                    raise last_error
+                time.sleep(_PUSH_RETRY_INTERVAL_SECONDS)
 
     def create(self, props: dict) -> CreateResult:
         head = _git_head_sha(props["source_dir"])

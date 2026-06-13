@@ -26,55 +26,19 @@ class GetInstanceGroupResult:
     """
     A collection of values returned by getInstanceGroup.
     """
-    def __init__(__self__, capacity=None, consumed_capacity=None, credential=None, id=None, instances=None, is_container_group=None, jobs_running=None, jobs_total=None, max_concurrent_jobs=None, max_forks=None, name=None, percent_capacity_remaining=None, pod_spec_override=None, policy_instance_list=None, policy_instance_minimum=None, policy_instance_percentage=None):
+    def __init__(__self__, capacity=None, id=None, is_container_group=None, name=None):
         if capacity and not isinstance(capacity, float):
             raise TypeError("Expected argument 'capacity' to be a float")
         pulumi.set(__self__, "capacity", capacity)
-        if consumed_capacity and not isinstance(consumed_capacity, float):
-            raise TypeError("Expected argument 'consumed_capacity' to be a float")
-        pulumi.set(__self__, "consumed_capacity", consumed_capacity)
-        if credential and not isinstance(credential, float):
-            raise TypeError("Expected argument 'credential' to be a float")
-        pulumi.set(__self__, "credential", credential)
-        if id and not isinstance(id, float):
-            raise TypeError("Expected argument 'id' to be a float")
+        if id and not isinstance(id, str):
+            raise TypeError("Expected argument 'id' to be a str")
         pulumi.set(__self__, "id", id)
-        if instances and not isinstance(instances, float):
-            raise TypeError("Expected argument 'instances' to be a float")
-        pulumi.set(__self__, "instances", instances)
         if is_container_group and not isinstance(is_container_group, bool):
             raise TypeError("Expected argument 'is_container_group' to be a bool")
         pulumi.set(__self__, "is_container_group", is_container_group)
-        if jobs_running and not isinstance(jobs_running, float):
-            raise TypeError("Expected argument 'jobs_running' to be a float")
-        pulumi.set(__self__, "jobs_running", jobs_running)
-        if jobs_total and not isinstance(jobs_total, float):
-            raise TypeError("Expected argument 'jobs_total' to be a float")
-        pulumi.set(__self__, "jobs_total", jobs_total)
-        if max_concurrent_jobs and not isinstance(max_concurrent_jobs, float):
-            raise TypeError("Expected argument 'max_concurrent_jobs' to be a float")
-        pulumi.set(__self__, "max_concurrent_jobs", max_concurrent_jobs)
-        if max_forks and not isinstance(max_forks, float):
-            raise TypeError("Expected argument 'max_forks' to be a float")
-        pulumi.set(__self__, "max_forks", max_forks)
         if name and not isinstance(name, str):
             raise TypeError("Expected argument 'name' to be a str")
         pulumi.set(__self__, "name", name)
-        if percent_capacity_remaining and not isinstance(percent_capacity_remaining, float):
-            raise TypeError("Expected argument 'percent_capacity_remaining' to be a float")
-        pulumi.set(__self__, "percent_capacity_remaining", percent_capacity_remaining)
-        if pod_spec_override and not isinstance(pod_spec_override, str):
-            raise TypeError("Expected argument 'pod_spec_override' to be a str")
-        pulumi.set(__self__, "pod_spec_override", pod_spec_override)
-        if policy_instance_list and not isinstance(policy_instance_list, str):
-            raise TypeError("Expected argument 'policy_instance_list' to be a str")
-        pulumi.set(__self__, "policy_instance_list", policy_instance_list)
-        if policy_instance_minimum and not isinstance(policy_instance_minimum, float):
-            raise TypeError("Expected argument 'policy_instance_minimum' to be a float")
-        pulumi.set(__self__, "policy_instance_minimum", policy_instance_minimum)
-        if policy_instance_percentage and not isinstance(policy_instance_percentage, float):
-            raise TypeError("Expected argument 'policy_instance_percentage' to be a float")
-        pulumi.set(__self__, "policy_instance_percentage", policy_instance_percentage)
 
     @_builtins.property
     @pulumi.getter
@@ -82,24 +46,9 @@ class GetInstanceGroupResult:
         return pulumi.get(self, "capacity")
 
     @_builtins.property
-    @pulumi.getter(name="consumedCapacity")
-    def consumed_capacity(self) -> _builtins.float:
-        return pulumi.get(self, "consumed_capacity")
-
-    @_builtins.property
     @pulumi.getter
-    def credential(self) -> _builtins.float:
-        return pulumi.get(self, "credential")
-
-    @_builtins.property
-    @pulumi.getter
-    def id(self) -> _builtins.float:
+    def id(self) -> _builtins.str:
         return pulumi.get(self, "id")
-
-    @_builtins.property
-    @pulumi.getter
-    def instances(self) -> _builtins.float:
-        return pulumi.get(self, "instances")
 
     @_builtins.property
     @pulumi.getter(name="isContainerGroup")
@@ -107,54 +56,9 @@ class GetInstanceGroupResult:
         return pulumi.get(self, "is_container_group")
 
     @_builtins.property
-    @pulumi.getter(name="jobsRunning")
-    def jobs_running(self) -> _builtins.float:
-        return pulumi.get(self, "jobs_running")
-
-    @_builtins.property
-    @pulumi.getter(name="jobsTotal")
-    def jobs_total(self) -> _builtins.float:
-        return pulumi.get(self, "jobs_total")
-
-    @_builtins.property
-    @pulumi.getter(name="maxConcurrentJobs")
-    def max_concurrent_jobs(self) -> _builtins.float:
-        return pulumi.get(self, "max_concurrent_jobs")
-
-    @_builtins.property
-    @pulumi.getter(name="maxForks")
-    def max_forks(self) -> _builtins.float:
-        return pulumi.get(self, "max_forks")
-
-    @_builtins.property
     @pulumi.getter
     def name(self) -> _builtins.str:
         return pulumi.get(self, "name")
-
-    @_builtins.property
-    @pulumi.getter(name="percentCapacityRemaining")
-    def percent_capacity_remaining(self) -> _builtins.float:
-        return pulumi.get(self, "percent_capacity_remaining")
-
-    @_builtins.property
-    @pulumi.getter(name="podSpecOverride")
-    def pod_spec_override(self) -> _builtins.str:
-        return pulumi.get(self, "pod_spec_override")
-
-    @_builtins.property
-    @pulumi.getter(name="policyInstanceList")
-    def policy_instance_list(self) -> _builtins.str:
-        return pulumi.get(self, "policy_instance_list")
-
-    @_builtins.property
-    @pulumi.getter(name="policyInstanceMinimum")
-    def policy_instance_minimum(self) -> _builtins.float:
-        return pulumi.get(self, "policy_instance_minimum")
-
-    @_builtins.property
-    @pulumi.getter(name="policyInstancePercentage")
-    def policy_instance_percentage(self) -> _builtins.float:
-        return pulumi.get(self, "policy_instance_percentage")
 
 
 class AwaitableGetInstanceGroupResult(GetInstanceGroupResult):
@@ -164,24 +68,12 @@ class AwaitableGetInstanceGroupResult(GetInstanceGroupResult):
             yield self
         return GetInstanceGroupResult(
             capacity=self.capacity,
-            consumed_capacity=self.consumed_capacity,
-            credential=self.credential,
             id=self.id,
-            instances=self.instances,
             is_container_group=self.is_container_group,
-            jobs_running=self.jobs_running,
-            jobs_total=self.jobs_total,
-            max_concurrent_jobs=self.max_concurrent_jobs,
-            max_forks=self.max_forks,
-            name=self.name,
-            percent_capacity_remaining=self.percent_capacity_remaining,
-            pod_spec_override=self.pod_spec_override,
-            policy_instance_list=self.policy_instance_list,
-            policy_instance_minimum=self.policy_instance_minimum,
-            policy_instance_percentage=self.policy_instance_percentage)
+            name=self.name)
 
 
-def get_instance_group(id: Optional[_builtins.float] = None,
+def get_instance_group(id: Optional[_builtins.str] = None,
                        name: Optional[_builtins.str] = None,
                        opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetInstanceGroupResult:
     """
@@ -195,23 +87,11 @@ def get_instance_group(id: Optional[_builtins.float] = None,
 
     return AwaitableGetInstanceGroupResult(
         capacity=pulumi.get(__ret__, 'capacity'),
-        consumed_capacity=pulumi.get(__ret__, 'consumed_capacity'),
-        credential=pulumi.get(__ret__, 'credential'),
         id=pulumi.get(__ret__, 'id'),
-        instances=pulumi.get(__ret__, 'instances'),
         is_container_group=pulumi.get(__ret__, 'is_container_group'),
-        jobs_running=pulumi.get(__ret__, 'jobs_running'),
-        jobs_total=pulumi.get(__ret__, 'jobs_total'),
-        max_concurrent_jobs=pulumi.get(__ret__, 'max_concurrent_jobs'),
-        max_forks=pulumi.get(__ret__, 'max_forks'),
-        name=pulumi.get(__ret__, 'name'),
-        percent_capacity_remaining=pulumi.get(__ret__, 'percent_capacity_remaining'),
-        pod_spec_override=pulumi.get(__ret__, 'pod_spec_override'),
-        policy_instance_list=pulumi.get(__ret__, 'policy_instance_list'),
-        policy_instance_minimum=pulumi.get(__ret__, 'policy_instance_minimum'),
-        policy_instance_percentage=pulumi.get(__ret__, 'policy_instance_percentage'))
-def get_instance_group_output(id: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
-                              name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+        name=pulumi.get(__ret__, 'name'))
+def get_instance_group_output(id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
+                              name: pulumi.Input[Optional[_builtins.str]] = None,
                               opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetInstanceGroupResult]:
     """
     Use this data source to access information about an existing resource.
@@ -223,18 +103,6 @@ def get_instance_group_output(id: pulumi.Input[Optional[Optional[_builtins.float
     __ret__ = pulumi.runtime.invoke_output('awx:index/getInstanceGroup:getInstanceGroup', __args__, opts=opts, typ=GetInstanceGroupResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetInstanceGroupResult(
         capacity=pulumi.get(__response__, 'capacity'),
-        consumed_capacity=pulumi.get(__response__, 'consumed_capacity'),
-        credential=pulumi.get(__response__, 'credential'),
         id=pulumi.get(__response__, 'id'),
-        instances=pulumi.get(__response__, 'instances'),
         is_container_group=pulumi.get(__response__, 'is_container_group'),
-        jobs_running=pulumi.get(__response__, 'jobs_running'),
-        jobs_total=pulumi.get(__response__, 'jobs_total'),
-        max_concurrent_jobs=pulumi.get(__response__, 'max_concurrent_jobs'),
-        max_forks=pulumi.get(__response__, 'max_forks'),
-        name=pulumi.get(__response__, 'name'),
-        percent_capacity_remaining=pulumi.get(__response__, 'percent_capacity_remaining'),
-        pod_spec_override=pulumi.get(__response__, 'pod_spec_override'),
-        policy_instance_list=pulumi.get(__response__, 'policy_instance_list'),
-        policy_instance_minimum=pulumi.get(__response__, 'policy_instance_minimum'),
-        policy_instance_percentage=pulumi.get(__response__, 'policy_instance_percentage')))
+        name=pulumi.get(__response__, 'name')))

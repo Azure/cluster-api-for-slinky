@@ -19,55 +19,81 @@ __all__ = ['CredentialArgs', 'Credential']
 @pulumi.input_type
 class CredentialArgs:
     def __init__(__self__, *,
-                 credential_type: pulumi.Input[_builtins.float],
+                 credential_type_id: pulumi.Input[_builtins.float],
+                 inputs: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
+                 organization_id: pulumi.Input[_builtins.float],
+                 credential_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 inputs: pulumi.Input[Optional[_builtins.str]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
-                 team: pulumi.Input[Optional[_builtins.float]] = None,
-                 user: pulumi.Input[Optional[_builtins.float]] = None):
+                 name: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Credential resource.
 
-        :param pulumi.Input[_builtins.float] credential_type: Specify the type of credential you want to create. Refer to the documentation for details on each type.
-        :param pulumi.Input[_builtins.str] description: Optional description of this credential.
-        :param pulumi.Input[_builtins.str] inputs: Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        :param pulumi.Input[_builtins.str] name: Name of this credential.
-        :param pulumi.Input[_builtins.float] organization: Inherit permissions from organization roles. If provided on creation, do not give either user or team.
-        :param pulumi.Input[_builtins.float] team: Write-only field used to add team to owner role. If provided, do not give either user or organization. Only valid for creation.
-        :param pulumi.Input[_builtins.float] user: Write-only field used to add user to owner role. If provided, do not give either team or organization. Only valid for creation.
+        :param pulumi.Input[_builtins.float] credential_type_id: Specify the type of credential you want to create. Refer to the Ansible Tower documentation for details on each type
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] inputs: The inputs to be created with the credential.
+        :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to
+        :param pulumi.Input[_builtins.str] description: The description of the credential
+        :param pulumi.Input[_builtins.str] name: The name of the credential
         """
-        pulumi.set(__self__, "credential_type", credential_type)
+        pulumi.set(__self__, "credential_type_id", credential_type_id)
+        pulumi.set(__self__, "inputs", inputs)
+        pulumi.set(__self__, "organization_id", organization_id)
+        if credential_id is not None:
+            pulumi.set(__self__, "credential_id", credential_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
-        if inputs is not None:
-            pulumi.set(__self__, "inputs", inputs)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if organization is not None:
-            pulumi.set(__self__, "organization", organization)
-        if team is not None:
-            pulumi.set(__self__, "team", team)
-        if user is not None:
-            pulumi.set(__self__, "user", user)
 
     @_builtins.property
-    @pulumi.getter(name="credentialType")
-    def credential_type(self) -> pulumi.Input[_builtins.float]:
+    @pulumi.getter(name="credentialTypeId")
+    def credential_type_id(self) -> pulumi.Input[_builtins.float]:
         """
-        Specify the type of credential you want to create. Refer to the documentation for details on each type.
+        Specify the type of credential you want to create. Refer to the Ansible Tower documentation for details on each type
         """
-        return pulumi.get(self, "credential_type")
+        return pulumi.get(self, "credential_type_id")
 
-    @credential_type.setter
-    def credential_type(self, value: pulumi.Input[_builtins.float]):
-        pulumi.set(self, "credential_type", value)
+    @credential_type_id.setter
+    def credential_type_id(self, value: pulumi.Input[_builtins.float]):
+        pulumi.set(self, "credential_type_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def inputs(self) -> pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]:
+        """
+        The inputs to be created with the credential.
+        """
+        return pulumi.get(self, "inputs")
+
+    @inputs.setter
+    def inputs(self, value: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]):
+        pulumi.set(self, "inputs", value)
+
+    @_builtins.property
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[_builtins.float]:
+        """
+        The organization ID that the credential belongs to
+        """
+        return pulumi.get(self, "organization_id")
+
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[_builtins.float]):
+        pulumi.set(self, "organization_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="credentialId")
+    def credential_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "credential_id")
+
+    @credential_id.setter
+    def credential_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "credential_id", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this credential.
+        The description of the credential
         """
         return pulumi.get(self, "description")
 
@@ -77,162 +103,74 @@ class CredentialArgs:
 
     @_builtins.property
     @pulumi.getter
-    def inputs(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        """
-        return pulumi.get(self, "inputs")
-
-    @inputs.setter
-    def inputs(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "inputs", value)
-
-    @_builtins.property
-    @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this credential.
+        The name of the credential
         """
         return pulumi.get(self, "name")
 
     @name.setter
     def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Inherit permissions from organization roles. If provided on creation, do not give either user or team.
-        """
-        return pulumi.get(self, "organization")
-
-    @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def team(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Write-only field used to add team to owner role. If provided, do not give either user or organization. Only valid for creation.
-        """
-        return pulumi.get(self, "team")
-
-    @team.setter
-    def team(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "team", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def user(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Write-only field used to add user to owner role. If provided, do not give either team or organization. Only valid for creation.
-        """
-        return pulumi.get(self, "user")
-
-    @user.setter
-    def user(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "user", value)
 
 
 @pulumi.input_type
 class _CredentialState:
     def __init__(__self__, *,
-                 cloud: pulumi.Input[Optional[_builtins.bool]] = None,
-                 credential_id: pulumi.Input[Optional[_builtins.float]] = None,
-                 credential_type: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 credential_type_id: pulumi.Input[Optional[_builtins.float]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 inputs: pulumi.Input[Optional[_builtins.str]] = None,
-                 kind: pulumi.Input[Optional[_builtins.str]] = None,
-                 kubernetes: pulumi.Input[Optional[_builtins.bool]] = None,
-                 managed: pulumi.Input[Optional[_builtins.bool]] = None,
+                 inputs: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
-                 team: pulumi.Input[Optional[_builtins.float]] = None,
-                 user: pulumi.Input[Optional[_builtins.float]] = None):
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering Credential resources.
 
-        :param pulumi.Input[_builtins.bool] cloud: Cloud
-        :param pulumi.Input[_builtins.float] credential_id: Database ID for this credential.
-        :param pulumi.Input[_builtins.float] credential_type: Specify the type of credential you want to create. Refer to the documentation for details on each type.
-        :param pulumi.Input[_builtins.str] description: Optional description of this credential.
-        :param pulumi.Input[_builtins.str] inputs: Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        :param pulumi.Input[_builtins.str] kind: Kind
-        :param pulumi.Input[_builtins.bool] kubernetes: Kubernetes
-        :param pulumi.Input[_builtins.bool] managed: Managed
-        :param pulumi.Input[_builtins.str] name: Name of this credential.
-        :param pulumi.Input[_builtins.float] organization: Inherit permissions from organization roles. If provided on creation, do not give either user or team.
-        :param pulumi.Input[_builtins.float] team: Write-only field used to add team to owner role. If provided, do not give either user or organization. Only valid for creation.
-        :param pulumi.Input[_builtins.float] user: Write-only field used to add user to owner role. If provided, do not give either team or organization. Only valid for creation.
+        :param pulumi.Input[_builtins.float] credential_type_id: Specify the type of credential you want to create. Refer to the Ansible Tower documentation for details on each type
+        :param pulumi.Input[_builtins.str] description: The description of the credential
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] inputs: The inputs to be created with the credential.
+        :param pulumi.Input[_builtins.str] name: The name of the credential
+        :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to
         """
-        if cloud is not None:
-            pulumi.set(__self__, "cloud", cloud)
         if credential_id is not None:
             pulumi.set(__self__, "credential_id", credential_id)
-        if credential_type is not None:
-            pulumi.set(__self__, "credential_type", credential_type)
+        if credential_type_id is not None:
+            pulumi.set(__self__, "credential_type_id", credential_type_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if inputs is not None:
             pulumi.set(__self__, "inputs", inputs)
-        if kind is not None:
-            pulumi.set(__self__, "kind", kind)
-        if kubernetes is not None:
-            pulumi.set(__self__, "kubernetes", kubernetes)
-        if managed is not None:
-            pulumi.set(__self__, "managed", managed)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if organization is not None:
-            pulumi.set(__self__, "organization", organization)
-        if team is not None:
-            pulumi.set(__self__, "team", team)
-        if user is not None:
-            pulumi.set(__self__, "user", user)
-
-    @_builtins.property
-    @pulumi.getter
-    def cloud(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Cloud
-        """
-        return pulumi.get(self, "cloud")
-
-    @cloud.setter
-    def cloud(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "cloud", value)
+        if organization_id is not None:
+            pulumi.set(__self__, "organization_id", organization_id)
 
     @_builtins.property
     @pulumi.getter(name="credentialId")
-    def credential_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this credential.
-        """
+    def credential_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "credential_id")
 
     @credential_id.setter
-    def credential_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def credential_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "credential_id", value)
 
     @_builtins.property
-    @pulumi.getter(name="credentialType")
-    def credential_type(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="credentialTypeId")
+    def credential_type_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Specify the type of credential you want to create. Refer to the documentation for details on each type.
+        Specify the type of credential you want to create. Refer to the Ansible Tower documentation for details on each type
         """
-        return pulumi.get(self, "credential_type")
+        return pulumi.get(self, "credential_type_id")
 
-    @credential_type.setter
-    def credential_type(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "credential_type", value)
+    @credential_type_id.setter
+    def credential_type_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "credential_type_id", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this credential.
+        The description of the credential
         """
         return pulumi.get(self, "description")
 
@@ -242,57 +180,21 @@ class _CredentialState:
 
     @_builtins.property
     @pulumi.getter
-    def inputs(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def inputs(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
         """
-        Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
+        The inputs to be created with the credential.
         """
         return pulumi.get(self, "inputs")
 
     @inputs.setter
-    def inputs(self, value: pulumi.Input[Optional[_builtins.str]]):
+    def inputs(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "inputs", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Kind
-        """
-        return pulumi.get(self, "kind")
-
-    @kind.setter
-    def kind(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "kind", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def kubernetes(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Kubernetes
-        """
-        return pulumi.get(self, "kubernetes")
-
-    @kubernetes.setter
-    def kubernetes(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "kubernetes", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def managed(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Managed
-        """
-        return pulumi.get(self, "managed")
-
-    @managed.setter
-    def managed(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "managed", value)
 
     @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this credential.
+        The name of the credential
         """
         return pulumi.get(self, "name")
 
@@ -301,40 +203,16 @@ class _CredentialState:
         pulumi.set(self, "name", value)
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Inherit permissions from organization roles. If provided on creation, do not give either user or team.
+        The organization ID that the credential belongs to
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
 
-    @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def team(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Write-only field used to add team to owner role. If provided, do not give either user or organization. Only valid for creation.
-        """
-        return pulumi.get(self, "team")
-
-    @team.setter
-    def team(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "team", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def user(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Write-only field used to add user to owner role. If provided, do not give either team or organization. Only valid for creation.
-        """
-        return pulumi.get(self, "user")
-
-    @user.setter
-    def user(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "user", value)
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "organization_id", value)
 
 
 @pulumi.type_token("awx:index/credential:Credential")
@@ -343,26 +221,23 @@ class Credential(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 credential_type: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 credential_type_id: pulumi.Input[Optional[_builtins.float]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 inputs: pulumi.Input[Optional[_builtins.str]] = None,
+                 inputs: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
-                 team: pulumi.Input[Optional[_builtins.float]] = None,
-                 user: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a Credential resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.float] credential_type: Specify the type of credential you want to create. Refer to the documentation for details on each type.
-        :param pulumi.Input[_builtins.str] description: Optional description of this credential.
-        :param pulumi.Input[_builtins.str] inputs: Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        :param pulumi.Input[_builtins.str] name: Name of this credential.
-        :param pulumi.Input[_builtins.float] organization: Inherit permissions from organization roles. If provided on creation, do not give either user or team.
-        :param pulumi.Input[_builtins.float] team: Write-only field used to add team to owner role. If provided, do not give either user or organization. Only valid for creation.
-        :param pulumi.Input[_builtins.float] user: Write-only field used to add user to owner role. If provided, do not give either team or organization. Only valid for creation.
+        :param pulumi.Input[_builtins.float] credential_type_id: Specify the type of credential you want to create. Refer to the Ansible Tower documentation for details on each type
+        :param pulumi.Input[_builtins.str] description: The description of the credential
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] inputs: The inputs to be created with the credential.
+        :param pulumi.Input[_builtins.str] name: The name of the credential
+        :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to
         """
         ...
     @overload
@@ -388,13 +263,12 @@ class Credential(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 credential_type: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 credential_type_id: pulumi.Input[Optional[_builtins.float]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 inputs: pulumi.Input[Optional[_builtins.str]] = None,
+                 inputs: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
-                 team: pulumi.Input[Optional[_builtins.float]] = None,
-                 user: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -404,20 +278,20 @@ class Credential(pulumi.CustomResource):
                 raise TypeError('__props__ is only valid when passed in combination with a valid opts.id to get an existing resource')
             __props__ = CredentialArgs.__new__(CredentialArgs)
 
-            if credential_type is None and not opts.urn:
-                raise TypeError("Missing required property 'credential_type'")
-            __props__.__dict__["credential_type"] = credential_type
+            __props__.__dict__["credential_id"] = credential_id
+            if credential_type_id is None and not opts.urn:
+                raise TypeError("Missing required property 'credential_type_id'")
+            __props__.__dict__["credential_type_id"] = credential_type_id
             __props__.__dict__["description"] = description
-            __props__.__dict__["inputs"] = inputs
+            if inputs is None and not opts.urn:
+                raise TypeError("Missing required property 'inputs'")
+            __props__.__dict__["inputs"] = None if inputs is None else pulumi.Output.secret(inputs)
             __props__.__dict__["name"] = name
-            __props__.__dict__["organization"] = organization
-            __props__.__dict__["team"] = team
-            __props__.__dict__["user"] = user
-            __props__.__dict__["cloud"] = None
-            __props__.__dict__["credential_id"] = None
-            __props__.__dict__["kind"] = None
-            __props__.__dict__["kubernetes"] = None
-            __props__.__dict__["managed"] = None
+            if organization_id is None and not opts.urn:
+                raise TypeError("Missing required property 'organization_id'")
+            __props__.__dict__["organization_id"] = organization_id
+        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["inputs"])
+        opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(Credential, __self__).__init__(
             'awx:index/credential:Credential',
             resource_name,
@@ -429,18 +303,12 @@ class Credential(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            cloud: pulumi.Input[Optional[_builtins.bool]] = None,
-            credential_id: pulumi.Input[Optional[_builtins.float]] = None,
-            credential_type: pulumi.Input[Optional[_builtins.float]] = None,
+            credential_id: pulumi.Input[Optional[_builtins.str]] = None,
+            credential_type_id: pulumi.Input[Optional[_builtins.float]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
-            inputs: pulumi.Input[Optional[_builtins.str]] = None,
-            kind: pulumi.Input[Optional[_builtins.str]] = None,
-            kubernetes: pulumi.Input[Optional[_builtins.bool]] = None,
-            managed: pulumi.Input[Optional[_builtins.bool]] = None,
+            inputs: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            organization: pulumi.Input[Optional[_builtins.float]] = None,
-            team: pulumi.Input[Optional[_builtins.float]] = None,
-            user: pulumi.Input[Optional[_builtins.float]] = None) -> 'Credential':
+            organization_id: pulumi.Input[Optional[_builtins.float]] = None) -> 'Credential':
         """
         Get an existing Credential resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -448,130 +316,66 @@ class Credential(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.bool] cloud: Cloud
-        :param pulumi.Input[_builtins.float] credential_id: Database ID for this credential.
-        :param pulumi.Input[_builtins.float] credential_type: Specify the type of credential you want to create. Refer to the documentation for details on each type.
-        :param pulumi.Input[_builtins.str] description: Optional description of this credential.
-        :param pulumi.Input[_builtins.str] inputs: Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
-        :param pulumi.Input[_builtins.str] kind: Kind
-        :param pulumi.Input[_builtins.bool] kubernetes: Kubernetes
-        :param pulumi.Input[_builtins.bool] managed: Managed
-        :param pulumi.Input[_builtins.str] name: Name of this credential.
-        :param pulumi.Input[_builtins.float] organization: Inherit permissions from organization roles. If provided on creation, do not give either user or team.
-        :param pulumi.Input[_builtins.float] team: Write-only field used to add team to owner role. If provided, do not give either user or organization. Only valid for creation.
-        :param pulumi.Input[_builtins.float] user: Write-only field used to add user to owner role. If provided, do not give either team or organization. Only valid for creation.
+        :param pulumi.Input[_builtins.float] credential_type_id: Specify the type of credential you want to create. Refer to the Ansible Tower documentation for details on each type
+        :param pulumi.Input[_builtins.str] description: The description of the credential
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] inputs: The inputs to be created with the credential.
+        :param pulumi.Input[_builtins.str] name: The name of the credential
+        :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
         __props__ = _CredentialState.__new__(_CredentialState)
 
-        __props__.__dict__["cloud"] = cloud
         __props__.__dict__["credential_id"] = credential_id
-        __props__.__dict__["credential_type"] = credential_type
+        __props__.__dict__["credential_type_id"] = credential_type_id
         __props__.__dict__["description"] = description
         __props__.__dict__["inputs"] = inputs
-        __props__.__dict__["kind"] = kind
-        __props__.__dict__["kubernetes"] = kubernetes
-        __props__.__dict__["managed"] = managed
         __props__.__dict__["name"] = name
-        __props__.__dict__["organization"] = organization
-        __props__.__dict__["team"] = team
-        __props__.__dict__["user"] = user
+        __props__.__dict__["organization_id"] = organization_id
         return Credential(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
-    @pulumi.getter
-    def cloud(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Cloud
-        """
-        return pulumi.get(self, "cloud")
-
-    @_builtins.property
     @pulumi.getter(name="credentialId")
-    def credential_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this credential.
-        """
+    def credential_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "credential_id")
 
     @_builtins.property
-    @pulumi.getter(name="credentialType")
-    def credential_type(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="credentialTypeId")
+    def credential_type_id(self) -> pulumi.Output[_builtins.float]:
         """
-        Specify the type of credential you want to create. Refer to the documentation for details on each type.
+        Specify the type of credential you want to create. Refer to the Ansible Tower documentation for details on each type
         """
-        return pulumi.get(self, "credential_type")
+        return pulumi.get(self, "credential_type_id")
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Optional description of this credential.
+        The description of the credential
         """
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def inputs(self) -> pulumi.Output[_builtins.str]:
+    def inputs(self) -> pulumi.Output[Mapping[str, _builtins.str]]:
         """
-        Enter inputs using either JSON or YAML syntax. Refer to the documentation for example syntax.
+        The inputs to be created with the credential.
         """
         return pulumi.get(self, "inputs")
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> pulumi.Output[_builtins.str]:
-        """
-        Kind
-        """
-        return pulumi.get(self, "kind")
-
-    @_builtins.property
-    @pulumi.getter
-    def kubernetes(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Kubernetes
-        """
-        return pulumi.get(self, "kubernetes")
-
-    @_builtins.property
-    @pulumi.getter
-    def managed(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Managed
-        """
-        return pulumi.get(self, "managed")
-
-    @_builtins.property
-    @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this credential.
+        The name of the credential
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Output[_builtins.float]:
         """
-        Inherit permissions from organization roles. If provided on creation, do not give either user or team.
+        The organization ID that the credential belongs to
         """
-        return pulumi.get(self, "organization")
-
-    @_builtins.property
-    @pulumi.getter
-    def team(self) -> pulumi.Output[_builtins.float]:
-        """
-        Write-only field used to add team to owner role. If provided, do not give either user or organization. Only valid for creation.
-        """
-        return pulumi.get(self, "team")
-
-    @_builtins.property
-    @pulumi.getter
-    def user(self) -> pulumi.Output[_builtins.float]:
-        """
-        Write-only field used to add user to owner role. If provided, do not give either team or organization. Only valid for creation.
-        """
-        return pulumi.get(self, "user")
+        return pulumi.get(self, "organization_id")
 

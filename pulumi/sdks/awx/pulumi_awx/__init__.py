@@ -6,106 +6,83 @@ import builtins as _builtins
 from . import _utilities
 import typing
 # Export this package's modules as members:
-from .ad_hoc_command import *
-from .application import *
-from .constructed_inventories import *
 from .credential import *
-from .credential_aws import *
+from .credential_azure_key_vault import *
+from .credential_container_registry import *
+from .credential_galaxy import *
+from .credential_gitlab import *
+from .credential_google_compute_engine import *
 from .credential_input_source import *
+from .credential_machine import *
+from .credential_scm import *
 from .credential_type import *
+from .credential_vault import *
 from .execution_environment import *
-from .get_ad_hoc_command import *
-from .get_application import *
-from .get_constructed_inventories import *
-from .get_constructed_inventories_object_roles import *
 from .get_credential import *
-from .get_credential_aws import *
-from .get_credential_input_source import *
-from .get_credential_object_roles import *
+from .get_credential_azure_key_vault import *
+from .get_credential_machine import *
+from .get_credential_role import *
+from .get_credential_scm import *
 from .get_credential_type import *
+from .get_credential_vault import *
+from .get_credentials import *
 from .get_execution_environment import *
-from .get_group import *
-from .get_host import *
-from .get_host_object_roles import *
 from .get_instance_group import *
-from .get_instance_group_object_roles import *
 from .get_inventory import *
-from .get_inventory_object_roles import *
+from .get_inventory_group import *
+from .get_inventory_role import *
 from .get_inventory_source import *
 from .get_job_template import *
-from .get_job_template_object_roles import *
-from .get_label import *
-from .get_me import *
+from .get_job_template_role import *
 from .get_notification_template import *
 from .get_organization import *
-from .get_organization_object_roles import *
+from .get_organization_role import *
+from .get_organizations import *
 from .get_project import *
-from .get_project_object_roles import *
+from .get_project_role import *
 from .get_schedule import *
-from .get_settings_auth_azuread_oauth2 import *
-from .get_settings_auth_github import *
-from .get_settings_auth_github_enterprise import *
-from .get_settings_auth_github_enterprise_org import *
-from .get_settings_auth_github_enterprise_team import *
-from .get_settings_auth_github_org import *
-from .get_settings_auth_github_team import *
-from .get_settings_auth_google_oauth2 import *
-from .get_settings_auth_ldap import *
-from .get_settings_auth_saml import *
-from .get_settings_jobs import *
-from .get_settings_misc_authentication import *
-from .get_settings_misc_logging import *
-from .get_settings_misc_system import *
-from .get_settings_oidc import *
-from .get_settings_ui import *
 from .get_team import *
-from .get_team_object_roles import *
-from .get_token import *
-from .get_user import *
+from .get_team_role import *
 from .get_workflow_job_template import *
-from .get_workflow_job_template_object_roles import *
-from .group import *
+from .get_workflow_job_template_role import *
 from .host import *
-from .host_associate_group import *
 from .instance_group import *
 from .inventory import *
+from .inventory_group import *
+from .inventory_instance_groups import *
 from .inventory_source import *
 from .job_template import *
-from .job_template_associate_credential import *
-from .job_template_associate_instance_group import *
-from .job_template_associate_notification_template import *
+from .job_template_credential import *
+from .job_template_instance_groups import *
+from .job_template_launch import *
+from .job_template_notification_template_approvals import *
+from .job_template_notification_template_error import *
+from .job_template_notification_template_started import *
+from .job_template_notification_template_success import *
 from .job_template_survey_spec import *
-from .label import *
 from .notification_template import *
 from .organization import *
-from .organization_associate_galaxy_credential import *
-from .organization_associate_instance_group import *
+from .organization_galaxy_credential import *
+from .organization_instance_groups import *
 from .project import *
 from .provider import *
 from .schedule import *
-from .settings_auth_azuread_oauth2 import *
-from .settings_auth_github import *
-from .settings_auth_github_enterprise import *
-from .settings_auth_github_enterprise_org import *
-from .settings_auth_github_enterprise_team import *
-from .settings_auth_github_org import *
-from .settings_auth_github_team import *
-from .settings_auth_google_oauth2 import *
-from .settings_auth_ldap import *
-from .settings_auth_saml import *
-from .settings_jobs import *
-from .settings_misc_authentication import *
-from .settings_misc_logging import *
-from .settings_misc_system import *
-from .settings_oidc import *
-from .settings_ui import *
+from .setting import *
+from .settings_ldap_team_map import *
 from .team import *
-from .team_associate_role import *
-from .token import *
 from .user import *
-from .user_associate_role import *
 from .workflow_job_template import *
-from .workflow_job_template_associate_notification_template import *
+from .workflow_job_template_node import *
+from .workflow_job_template_node_always import *
+from .workflow_job_template_node_credential import *
+from .workflow_job_template_node_failure import *
+from .workflow_job_template_node_link import *
+from .workflow_job_template_node_success import *
+from .workflow_job_template_notification_template_approvals import *
+from .workflow_job_template_notification_template_error import *
+from .workflow_job_template_notification_template_started import *
+from .workflow_job_template_notification_template_success import *
+from .workflow_job_template_schedule import *
 from .workflow_job_template_survey_spec import *
 from ._inputs import *
 from . import outputs
@@ -122,30 +99,6 @@ _utilities.register(
 [
  {
   "pkg": "awx",
-  "mod": "index/adHocCommand",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/adHocCommand:AdHocCommand": "AdHocCommand"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/application",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/application:Application": "Application"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/constructedInventories",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/constructedInventories:ConstructedInventories": "ConstructedInventories"
-  }
- },
- {
-  "pkg": "awx",
   "mod": "index/credential",
   "fqn": "pulumi_awx",
   "classes": {
@@ -154,10 +107,42 @@ _utilities.register(
  },
  {
   "pkg": "awx",
-  "mod": "index/credentialAws",
+  "mod": "index/credentialAzureKeyVault",
   "fqn": "pulumi_awx",
   "classes": {
-   "awx:index/credentialAws:CredentialAws": "CredentialAws"
+   "awx:index/credentialAzureKeyVault:CredentialAzureKeyVault": "CredentialAzureKeyVault"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/credentialContainerRegistry",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/credentialContainerRegistry:CredentialContainerRegistry": "CredentialContainerRegistry"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/credentialGalaxy",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/credentialGalaxy:CredentialGalaxy": "CredentialGalaxy"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/credentialGitlab",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/credentialGitlab:CredentialGitlab": "CredentialGitlab"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/credentialGoogleComputeEngine",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/credentialGoogleComputeEngine:CredentialGoogleComputeEngine": "CredentialGoogleComputeEngine"
   }
  },
  {
@@ -170,10 +155,34 @@ _utilities.register(
  },
  {
   "pkg": "awx",
+  "mod": "index/credentialMachine",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/credentialMachine:CredentialMachine": "CredentialMachine"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/credentialScm",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/credentialScm:CredentialScm": "CredentialScm"
+  }
+ },
+ {
+  "pkg": "awx",
   "mod": "index/credentialType",
   "fqn": "pulumi_awx",
   "classes": {
    "awx:index/credentialType:CredentialType": "CredentialType"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/credentialVault",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/credentialVault:CredentialVault": "CredentialVault"
   }
  },
  {
@@ -186,26 +195,10 @@ _utilities.register(
  },
  {
   "pkg": "awx",
-  "mod": "index/group",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/group:Group": "Group"
-  }
- },
- {
-  "pkg": "awx",
   "mod": "index/host",
   "fqn": "pulumi_awx",
   "classes": {
    "awx:index/host:Host": "Host"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/hostAssociateGroup",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/hostAssociateGroup:HostAssociateGroup": "HostAssociateGroup"
   }
  },
  {
@@ -226,6 +219,22 @@ _utilities.register(
  },
  {
   "pkg": "awx",
+  "mod": "index/inventoryGroup",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/inventoryGroup:InventoryGroup": "InventoryGroup"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/inventoryInstanceGroups",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/inventoryInstanceGroups:InventoryInstanceGroups": "InventoryInstanceGroups"
+  }
+ },
+ {
+  "pkg": "awx",
   "mod": "index/inventorySource",
   "fqn": "pulumi_awx",
   "classes": {
@@ -242,26 +251,58 @@ _utilities.register(
  },
  {
   "pkg": "awx",
-  "mod": "index/jobTemplateAssociateCredential",
+  "mod": "index/jobTemplateCredential",
   "fqn": "pulumi_awx",
   "classes": {
-   "awx:index/jobTemplateAssociateCredential:JobTemplateAssociateCredential": "JobTemplateAssociateCredential"
+   "awx:index/jobTemplateCredential:JobTemplateCredential": "JobTemplateCredential"
   }
  },
  {
   "pkg": "awx",
-  "mod": "index/jobTemplateAssociateInstanceGroup",
+  "mod": "index/jobTemplateInstanceGroups",
   "fqn": "pulumi_awx",
   "classes": {
-   "awx:index/jobTemplateAssociateInstanceGroup:JobTemplateAssociateInstanceGroup": "JobTemplateAssociateInstanceGroup"
+   "awx:index/jobTemplateInstanceGroups:JobTemplateInstanceGroups": "JobTemplateInstanceGroups"
   }
  },
  {
   "pkg": "awx",
-  "mod": "index/jobTemplateAssociateNotificationTemplate",
+  "mod": "index/jobTemplateLaunch",
   "fqn": "pulumi_awx",
   "classes": {
-   "awx:index/jobTemplateAssociateNotificationTemplate:JobTemplateAssociateNotificationTemplate": "JobTemplateAssociateNotificationTemplate"
+   "awx:index/jobTemplateLaunch:JobTemplateLaunch": "JobTemplateLaunch"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/jobTemplateNotificationTemplateApprovals",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/jobTemplateNotificationTemplateApprovals:JobTemplateNotificationTemplateApprovals": "JobTemplateNotificationTemplateApprovals"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/jobTemplateNotificationTemplateError",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/jobTemplateNotificationTemplateError:JobTemplateNotificationTemplateError": "JobTemplateNotificationTemplateError"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/jobTemplateNotificationTemplateStarted",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/jobTemplateNotificationTemplateStarted:JobTemplateNotificationTemplateStarted": "JobTemplateNotificationTemplateStarted"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/jobTemplateNotificationTemplateSuccess",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/jobTemplateNotificationTemplateSuccess:JobTemplateNotificationTemplateSuccess": "JobTemplateNotificationTemplateSuccess"
   }
  },
  {
@@ -270,14 +311,6 @@ _utilities.register(
   "fqn": "pulumi_awx",
   "classes": {
    "awx:index/jobTemplateSurveySpec:JobTemplateSurveySpec": "JobTemplateSurveySpec"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/label",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/label:Label": "Label"
   }
  },
  {
@@ -298,18 +331,18 @@ _utilities.register(
  },
  {
   "pkg": "awx",
-  "mod": "index/organizationAssociateGalaxyCredential",
+  "mod": "index/organizationGalaxyCredential",
   "fqn": "pulumi_awx",
   "classes": {
-   "awx:index/organizationAssociateGalaxyCredential:OrganizationAssociateGalaxyCredential": "OrganizationAssociateGalaxyCredential"
+   "awx:index/organizationGalaxyCredential:OrganizationGalaxyCredential": "OrganizationGalaxyCredential"
   }
  },
  {
   "pkg": "awx",
-  "mod": "index/organizationAssociateInstanceGroup",
+  "mod": "index/organizationInstanceGroups",
   "fqn": "pulumi_awx",
   "classes": {
-   "awx:index/organizationAssociateInstanceGroup:OrganizationAssociateInstanceGroup": "OrganizationAssociateInstanceGroup"
+   "awx:index/organizationInstanceGroups:OrganizationInstanceGroups": "OrganizationInstanceGroups"
   }
  },
  {
@@ -330,130 +363,18 @@ _utilities.register(
  },
  {
   "pkg": "awx",
-  "mod": "index/settingsAuthAzureadOauth2",
+  "mod": "index/setting",
   "fqn": "pulumi_awx",
   "classes": {
-   "awx:index/settingsAuthAzureadOauth2:SettingsAuthAzureadOauth2": "SettingsAuthAzureadOauth2"
+   "awx:index/setting:Setting": "Setting"
   }
  },
  {
   "pkg": "awx",
-  "mod": "index/settingsAuthGithub",
+  "mod": "index/settingsLdapTeamMap",
   "fqn": "pulumi_awx",
   "classes": {
-   "awx:index/settingsAuthGithub:SettingsAuthGithub": "SettingsAuthGithub"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsAuthGithubEnterprise",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsAuthGithubEnterprise:SettingsAuthGithubEnterprise": "SettingsAuthGithubEnterprise"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsAuthGithubEnterpriseOrg",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsAuthGithubEnterpriseOrg:SettingsAuthGithubEnterpriseOrg": "SettingsAuthGithubEnterpriseOrg"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsAuthGithubEnterpriseTeam",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsAuthGithubEnterpriseTeam:SettingsAuthGithubEnterpriseTeam": "SettingsAuthGithubEnterpriseTeam"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsAuthGithubOrg",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsAuthGithubOrg:SettingsAuthGithubOrg": "SettingsAuthGithubOrg"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsAuthGithubTeam",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsAuthGithubTeam:SettingsAuthGithubTeam": "SettingsAuthGithubTeam"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsAuthGoogleOauth2",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsAuthGoogleOauth2:SettingsAuthGoogleOauth2": "SettingsAuthGoogleOauth2"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsAuthLdap",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsAuthLdap:SettingsAuthLdap": "SettingsAuthLdap"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsAuthSaml",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsAuthSaml:SettingsAuthSaml": "SettingsAuthSaml"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsJobs",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsJobs:SettingsJobs": "SettingsJobs"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsMiscAuthentication",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsMiscAuthentication:SettingsMiscAuthentication": "SettingsMiscAuthentication"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsMiscLogging",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsMiscLogging:SettingsMiscLogging": "SettingsMiscLogging"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsMiscSystem",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsMiscSystem:SettingsMiscSystem": "SettingsMiscSystem"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsOidc",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsOidc:SettingsOidc": "SettingsOidc"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/settingsUi",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/settingsUi:SettingsUi": "SettingsUi"
+   "awx:index/settingsLdapTeamMap:SettingsLdapTeamMap": "SettingsLdapTeamMap"
   }
  },
  {
@@ -466,34 +387,10 @@ _utilities.register(
  },
  {
   "pkg": "awx",
-  "mod": "index/teamAssociateRole",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/teamAssociateRole:TeamAssociateRole": "TeamAssociateRole"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/token",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/token:Token": "Token"
-  }
- },
- {
-  "pkg": "awx",
   "mod": "index/user",
   "fqn": "pulumi_awx",
   "classes": {
    "awx:index/user:User": "User"
-  }
- },
- {
-  "pkg": "awx",
-  "mod": "index/userAssociateRole",
-  "fqn": "pulumi_awx",
-  "classes": {
-   "awx:index/userAssociateRole:UserAssociateRole": "UserAssociateRole"
   }
  },
  {
@@ -506,10 +403,90 @@ _utilities.register(
  },
  {
   "pkg": "awx",
-  "mod": "index/workflowJobTemplateAssociateNotificationTemplate",
+  "mod": "index/workflowJobTemplateNode",
   "fqn": "pulumi_awx",
   "classes": {
-   "awx:index/workflowJobTemplateAssociateNotificationTemplate:WorkflowJobTemplateAssociateNotificationTemplate": "WorkflowJobTemplateAssociateNotificationTemplate"
+   "awx:index/workflowJobTemplateNode:WorkflowJobTemplateNode": "WorkflowJobTemplateNode"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/workflowJobTemplateNodeAlways",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/workflowJobTemplateNodeAlways:WorkflowJobTemplateNodeAlways": "WorkflowJobTemplateNodeAlways"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/workflowJobTemplateNodeCredential",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/workflowJobTemplateNodeCredential:WorkflowJobTemplateNodeCredential": "WorkflowJobTemplateNodeCredential"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/workflowJobTemplateNodeFailure",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/workflowJobTemplateNodeFailure:WorkflowJobTemplateNodeFailure": "WorkflowJobTemplateNodeFailure"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/workflowJobTemplateNodeLink",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/workflowJobTemplateNodeLink:WorkflowJobTemplateNodeLink": "WorkflowJobTemplateNodeLink"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/workflowJobTemplateNodeSuccess",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/workflowJobTemplateNodeSuccess:WorkflowJobTemplateNodeSuccess": "WorkflowJobTemplateNodeSuccess"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/workflowJobTemplateNotificationTemplateApprovals",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/workflowJobTemplateNotificationTemplateApprovals:WorkflowJobTemplateNotificationTemplateApprovals": "WorkflowJobTemplateNotificationTemplateApprovals"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/workflowJobTemplateNotificationTemplateError",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/workflowJobTemplateNotificationTemplateError:WorkflowJobTemplateNotificationTemplateError": "WorkflowJobTemplateNotificationTemplateError"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/workflowJobTemplateNotificationTemplateStarted",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/workflowJobTemplateNotificationTemplateStarted:WorkflowJobTemplateNotificationTemplateStarted": "WorkflowJobTemplateNotificationTemplateStarted"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/workflowJobTemplateNotificationTemplateSuccess",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/workflowJobTemplateNotificationTemplateSuccess:WorkflowJobTemplateNotificationTemplateSuccess": "WorkflowJobTemplateNotificationTemplateSuccess"
+  }
+ },
+ {
+  "pkg": "awx",
+  "mod": "index/workflowJobTemplateSchedule",
+  "fqn": "pulumi_awx",
+  "classes": {
+   "awx:index/workflowJobTemplateSchedule:WorkflowJobTemplateSchedule": "WorkflowJobTemplateSchedule"
   }
  },
  {

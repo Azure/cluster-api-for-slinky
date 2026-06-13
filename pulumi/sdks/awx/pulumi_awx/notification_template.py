@@ -13,6 +13,8 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import NotRequired, TypedDict, TypeAlias
 from . import _utilities
+from . import outputs
+from ._inputs import *
 
 __all__ = ['NotificationTemplateArgs', 'NotificationTemplate']
 
@@ -20,23 +22,24 @@ __all__ = ['NotificationTemplateArgs', 'NotificationTemplate']
 class NotificationTemplateArgs:
     def __init__(__self__, *,
                  notification_type: pulumi.Input[_builtins.str],
-                 organization: pulumi.Input[_builtins.float],
+                 organization_id: pulumi.Input[_builtins.str],
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 messages: pulumi.Input[Optional[_builtins.str]] = None,
+                 messages: pulumi.Input[Optional[Sequence[pulumi.Input['NotificationTemplateMessageArgs']]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 notification_configuration: pulumi.Input[Optional[_builtins.str]] = None):
+                 notification_configuration: pulumi.Input[Optional['NotificationTemplateNotificationConfigurationArgs']] = None,
+                 notification_template_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a NotificationTemplate resource.
 
-        :param pulumi.Input[_builtins.str] notification_type: Notification type
-        :param pulumi.Input[_builtins.float] organization: Organization
-        :param pulumi.Input[_builtins.str] description: Optional description of this notification template.
-        :param pulumi.Input[_builtins.str] messages: Optional custom messages for notification template.
-        :param pulumi.Input[_builtins.str] name: Name of this notification template.
-        :param pulumi.Input[_builtins.str] notification_configuration: Notification configuration
+        :param pulumi.Input[_builtins.str] notification_type: The type of notification template.
+        :param pulumi.Input[_builtins.str] organization_id: The organization ID to associate with the notification template.
+        :param pulumi.Input[_builtins.str] description: The description of the notification template.
+        :param pulumi.Input[Sequence[pulumi.Input['NotificationTemplateMessageArgs']]] messages: The description of the notification template. Options are <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`success`" pulumi-lang-dotnet="`Success`" pulumi-lang-go="`success`" pulumi-lang-python="`success`" pulumi-lang-yaml="`success`" pulumi-lang-java="`success`" pulumi-lang-hcl="`success`">`success`</span>, <span pulumi-lang-nodejs="`error`" pulumi-lang-dotnet="`Error`" pulumi-lang-go="`error`" pulumi-lang-python="`error`" pulumi-lang-yaml="`error`" pulumi-lang-java="`error`" pulumi-lang-hcl="`error`">`error`</span>.
+        :param pulumi.Input[_builtins.str] name: The name of the notification template.
+        :param pulumi.Input['NotificationTemplateNotificationConfigurationArgs'] notification_configuration: Notification configuration settings based on the notification type.
         """
         pulumi.set(__self__, "notification_type", notification_type)
-        pulumi.set(__self__, "organization", organization)
+        pulumi.set(__self__, "organization_id", organization_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if messages is not None:
@@ -45,12 +48,14 @@ class NotificationTemplateArgs:
             pulumi.set(__self__, "name", name)
         if notification_configuration is not None:
             pulumi.set(__self__, "notification_configuration", notification_configuration)
+        if notification_template_id is not None:
+            pulumi.set(__self__, "notification_template_id", notification_template_id)
 
     @_builtins.property
     @pulumi.getter(name="notificationType")
     def notification_type(self) -> pulumi.Input[_builtins.str]:
         """
-        Notification type
+        The type of notification template.
         """
         return pulumi.get(self, "notification_type")
 
@@ -59,22 +64,22 @@ class NotificationTemplateArgs:
         pulumi.set(self, "notification_type", value)
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[_builtins.float]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[_builtins.str]:
         """
-        Organization
+        The organization ID to associate with the notification template.
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
 
-    @organization.setter
-    def organization(self, value: pulumi.Input[_builtins.float]):
-        pulumi.set(self, "organization", value)
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "organization_id", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this notification template.
+        The description of the notification template.
         """
         return pulumi.get(self, "description")
 
@@ -84,21 +89,21 @@ class NotificationTemplateArgs:
 
     @_builtins.property
     @pulumi.getter
-    def messages(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def messages(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['NotificationTemplateMessageArgs']]]]:
         """
-        Optional custom messages for notification template.
+        The description of the notification template. Options are <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`success`" pulumi-lang-dotnet="`Success`" pulumi-lang-go="`success`" pulumi-lang-python="`success`" pulumi-lang-yaml="`success`" pulumi-lang-java="`success`" pulumi-lang-hcl="`success`">`success`</span>, <span pulumi-lang-nodejs="`error`" pulumi-lang-dotnet="`Error`" pulumi-lang-go="`error`" pulumi-lang-python="`error`" pulumi-lang-yaml="`error`" pulumi-lang-java="`error`" pulumi-lang-hcl="`error`">`error`</span>.
         """
         return pulumi.get(self, "messages")
 
     @messages.setter
-    def messages(self, value: pulumi.Input[Optional[_builtins.str]]):
+    def messages(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['NotificationTemplateMessageArgs']]]]):
         pulumi.set(self, "messages", value)
 
     @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this notification template.
+        The name of the notification template.
         """
         return pulumi.get(self, "name")
 
@@ -108,37 +113,45 @@ class NotificationTemplateArgs:
 
     @_builtins.property
     @pulumi.getter(name="notificationConfiguration")
-    def notification_configuration(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def notification_configuration(self) -> pulumi.Input[Optional['NotificationTemplateNotificationConfigurationArgs']]:
         """
-        Notification configuration
+        Notification configuration settings based on the notification type.
         """
         return pulumi.get(self, "notification_configuration")
 
     @notification_configuration.setter
-    def notification_configuration(self, value: pulumi.Input[Optional[_builtins.str]]):
+    def notification_configuration(self, value: pulumi.Input[Optional['NotificationTemplateNotificationConfigurationArgs']]):
         pulumi.set(self, "notification_configuration", value)
+
+    @_builtins.property
+    @pulumi.getter(name="notificationTemplateId")
+    def notification_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "notification_template_id")
+
+    @notification_template_id.setter
+    def notification_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "notification_template_id", value)
 
 
 @pulumi.input_type
 class _NotificationTemplateState:
     def __init__(__self__, *,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 messages: pulumi.Input[Optional[_builtins.str]] = None,
+                 messages: pulumi.Input[Optional[Sequence[pulumi.Input['NotificationTemplateMessageArgs']]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 notification_configuration: pulumi.Input[Optional[_builtins.str]] = None,
-                 notification_template_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 notification_configuration: pulumi.Input[Optional['NotificationTemplateNotificationConfigurationArgs']] = None,
+                 notification_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  notification_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None):
+                 organization_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering NotificationTemplate resources.
 
-        :param pulumi.Input[_builtins.str] description: Optional description of this notification template.
-        :param pulumi.Input[_builtins.str] messages: Optional custom messages for notification template.
-        :param pulumi.Input[_builtins.str] name: Name of this notification template.
-        :param pulumi.Input[_builtins.str] notification_configuration: Notification configuration
-        :param pulumi.Input[_builtins.float] notification_template_id: Database ID for this notification template.
-        :param pulumi.Input[_builtins.str] notification_type: Notification type
-        :param pulumi.Input[_builtins.float] organization: Organization
+        :param pulumi.Input[_builtins.str] description: The description of the notification template.
+        :param pulumi.Input[Sequence[pulumi.Input['NotificationTemplateMessageArgs']]] messages: The description of the notification template. Options are <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`success`" pulumi-lang-dotnet="`Success`" pulumi-lang-go="`success`" pulumi-lang-python="`success`" pulumi-lang-yaml="`success`" pulumi-lang-java="`success`" pulumi-lang-hcl="`success`">`success`</span>, <span pulumi-lang-nodejs="`error`" pulumi-lang-dotnet="`Error`" pulumi-lang-go="`error`" pulumi-lang-python="`error`" pulumi-lang-yaml="`error`" pulumi-lang-java="`error`" pulumi-lang-hcl="`error`">`error`</span>.
+        :param pulumi.Input[_builtins.str] name: The name of the notification template.
+        :param pulumi.Input['NotificationTemplateNotificationConfigurationArgs'] notification_configuration: Notification configuration settings based on the notification type.
+        :param pulumi.Input[_builtins.str] notification_type: The type of notification template.
+        :param pulumi.Input[_builtins.str] organization_id: The organization ID to associate with the notification template.
         """
         if description is not None:
             pulumi.set(__self__, "description", description)
@@ -152,14 +165,14 @@ class _NotificationTemplateState:
             pulumi.set(__self__, "notification_template_id", notification_template_id)
         if notification_type is not None:
             pulumi.set(__self__, "notification_type", notification_type)
-        if organization is not None:
-            pulumi.set(__self__, "organization", organization)
+        if organization_id is not None:
+            pulumi.set(__self__, "organization_id", organization_id)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this notification template.
+        The description of the notification template.
         """
         return pulumi.get(self, "description")
 
@@ -169,21 +182,21 @@ class _NotificationTemplateState:
 
     @_builtins.property
     @pulumi.getter
-    def messages(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def messages(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['NotificationTemplateMessageArgs']]]]:
         """
-        Optional custom messages for notification template.
+        The description of the notification template. Options are <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`success`" pulumi-lang-dotnet="`Success`" pulumi-lang-go="`success`" pulumi-lang-python="`success`" pulumi-lang-yaml="`success`" pulumi-lang-java="`success`" pulumi-lang-hcl="`success`">`success`</span>, <span pulumi-lang-nodejs="`error`" pulumi-lang-dotnet="`Error`" pulumi-lang-go="`error`" pulumi-lang-python="`error`" pulumi-lang-yaml="`error`" pulumi-lang-java="`error`" pulumi-lang-hcl="`error`">`error`</span>.
         """
         return pulumi.get(self, "messages")
 
     @messages.setter
-    def messages(self, value: pulumi.Input[Optional[_builtins.str]]):
+    def messages(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['NotificationTemplateMessageArgs']]]]):
         pulumi.set(self, "messages", value)
 
     @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this notification template.
+        The name of the notification template.
         """
         return pulumi.get(self, "name")
 
@@ -193,33 +206,30 @@ class _NotificationTemplateState:
 
     @_builtins.property
     @pulumi.getter(name="notificationConfiguration")
-    def notification_configuration(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def notification_configuration(self) -> pulumi.Input[Optional['NotificationTemplateNotificationConfigurationArgs']]:
         """
-        Notification configuration
+        Notification configuration settings based on the notification type.
         """
         return pulumi.get(self, "notification_configuration")
 
     @notification_configuration.setter
-    def notification_configuration(self, value: pulumi.Input[Optional[_builtins.str]]):
+    def notification_configuration(self, value: pulumi.Input[Optional['NotificationTemplateNotificationConfigurationArgs']]):
         pulumi.set(self, "notification_configuration", value)
 
     @_builtins.property
     @pulumi.getter(name="notificationTemplateId")
-    def notification_template_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this notification template.
-        """
+    def notification_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "notification_template_id")
 
     @notification_template_id.setter
-    def notification_template_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def notification_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "notification_template_id", value)
 
     @_builtins.property
     @pulumi.getter(name="notificationType")
     def notification_type(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Notification type
+        The type of notification template.
         """
         return pulumi.get(self, "notification_type")
 
@@ -228,16 +238,16 @@ class _NotificationTemplateState:
         pulumi.set(self, "notification_type", value)
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Organization
+        The organization ID to associate with the notification template.
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
 
-    @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization", value)
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "organization_id", value)
 
 
 @pulumi.type_token("awx:index/notificationTemplate:NotificationTemplate")
@@ -247,23 +257,24 @@ class NotificationTemplate(pulumi.CustomResource):
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 messages: pulumi.Input[Optional[_builtins.str]] = None,
+                 messages: pulumi.Input[Optional[Sequence[pulumi.Input[Union['NotificationTemplateMessageArgs', 'NotificationTemplateMessageArgsDict']]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 notification_configuration: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_configuration: pulumi.Input[Optional[Union['NotificationTemplateNotificationConfigurationArgs', 'NotificationTemplateNotificationConfigurationArgsDict']]] = None,
+                 notification_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  notification_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a NotificationTemplate resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] description: Optional description of this notification template.
-        :param pulumi.Input[_builtins.str] messages: Optional custom messages for notification template.
-        :param pulumi.Input[_builtins.str] name: Name of this notification template.
-        :param pulumi.Input[_builtins.str] notification_configuration: Notification configuration
-        :param pulumi.Input[_builtins.str] notification_type: Notification type
-        :param pulumi.Input[_builtins.float] organization: Organization
+        :param pulumi.Input[_builtins.str] description: The description of the notification template.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['NotificationTemplateMessageArgs', 'NotificationTemplateMessageArgsDict']]]] messages: The description of the notification template. Options are <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`success`" pulumi-lang-dotnet="`Success`" pulumi-lang-go="`success`" pulumi-lang-python="`success`" pulumi-lang-yaml="`success`" pulumi-lang-java="`success`" pulumi-lang-hcl="`success`">`success`</span>, <span pulumi-lang-nodejs="`error`" pulumi-lang-dotnet="`Error`" pulumi-lang-go="`error`" pulumi-lang-python="`error`" pulumi-lang-yaml="`error`" pulumi-lang-java="`error`" pulumi-lang-hcl="`error`">`error`</span>.
+        :param pulumi.Input[_builtins.str] name: The name of the notification template.
+        :param pulumi.Input[Union['NotificationTemplateNotificationConfigurationArgs', 'NotificationTemplateNotificationConfigurationArgsDict']] notification_configuration: Notification configuration settings based on the notification type.
+        :param pulumi.Input[_builtins.str] notification_type: The type of notification template.
+        :param pulumi.Input[_builtins.str] organization_id: The organization ID to associate with the notification template.
         """
         ...
     @overload
@@ -290,11 +301,12 @@ class NotificationTemplate(pulumi.CustomResource):
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 messages: pulumi.Input[Optional[_builtins.str]] = None,
+                 messages: pulumi.Input[Optional[Sequence[pulumi.Input[Union['NotificationTemplateMessageArgs', 'NotificationTemplateMessageArgsDict']]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 notification_configuration: pulumi.Input[Optional[_builtins.str]] = None,
+                 notification_configuration: pulumi.Input[Optional[Union['NotificationTemplateNotificationConfigurationArgs', 'NotificationTemplateNotificationConfigurationArgsDict']]] = None,
+                 notification_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  notification_type: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -308,13 +320,13 @@ class NotificationTemplate(pulumi.CustomResource):
             __props__.__dict__["messages"] = messages
             __props__.__dict__["name"] = name
             __props__.__dict__["notification_configuration"] = notification_configuration
+            __props__.__dict__["notification_template_id"] = notification_template_id
             if notification_type is None and not opts.urn:
                 raise TypeError("Missing required property 'notification_type'")
             __props__.__dict__["notification_type"] = notification_type
-            if organization is None and not opts.urn:
-                raise TypeError("Missing required property 'organization'")
-            __props__.__dict__["organization"] = organization
-            __props__.__dict__["notification_template_id"] = None
+            if organization_id is None and not opts.urn:
+                raise TypeError("Missing required property 'organization_id'")
+            __props__.__dict__["organization_id"] = organization_id
         super(NotificationTemplate, __self__).__init__(
             'awx:index/notificationTemplate:NotificationTemplate',
             resource_name,
@@ -327,12 +339,12 @@ class NotificationTemplate(pulumi.CustomResource):
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
-            messages: pulumi.Input[Optional[_builtins.str]] = None,
+            messages: pulumi.Input[Optional[Sequence[pulumi.Input[Union['NotificationTemplateMessageArgs', 'NotificationTemplateMessageArgsDict']]]]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            notification_configuration: pulumi.Input[Optional[_builtins.str]] = None,
-            notification_template_id: pulumi.Input[Optional[_builtins.float]] = None,
+            notification_configuration: pulumi.Input[Optional[Union['NotificationTemplateNotificationConfigurationArgs', 'NotificationTemplateNotificationConfigurationArgsDict']]] = None,
+            notification_template_id: pulumi.Input[Optional[_builtins.str]] = None,
             notification_type: pulumi.Input[Optional[_builtins.str]] = None,
-            organization: pulumi.Input[Optional[_builtins.float]] = None) -> 'NotificationTemplate':
+            organization_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'NotificationTemplate':
         """
         Get an existing NotificationTemplate resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -340,13 +352,12 @@ class NotificationTemplate(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] description: Optional description of this notification template.
-        :param pulumi.Input[_builtins.str] messages: Optional custom messages for notification template.
-        :param pulumi.Input[_builtins.str] name: Name of this notification template.
-        :param pulumi.Input[_builtins.str] notification_configuration: Notification configuration
-        :param pulumi.Input[_builtins.float] notification_template_id: Database ID for this notification template.
-        :param pulumi.Input[_builtins.str] notification_type: Notification type
-        :param pulumi.Input[_builtins.float] organization: Organization
+        :param pulumi.Input[_builtins.str] description: The description of the notification template.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['NotificationTemplateMessageArgs', 'NotificationTemplateMessageArgsDict']]]] messages: The description of the notification template. Options are <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`success`" pulumi-lang-dotnet="`Success`" pulumi-lang-go="`success`" pulumi-lang-python="`success`" pulumi-lang-yaml="`success`" pulumi-lang-java="`success`" pulumi-lang-hcl="`success`">`success`</span>, <span pulumi-lang-nodejs="`error`" pulumi-lang-dotnet="`Error`" pulumi-lang-go="`error`" pulumi-lang-python="`error`" pulumi-lang-yaml="`error`" pulumi-lang-java="`error`" pulumi-lang-hcl="`error`">`error`</span>.
+        :param pulumi.Input[_builtins.str] name: The name of the notification template.
+        :param pulumi.Input[Union['NotificationTemplateNotificationConfigurationArgs', 'NotificationTemplateNotificationConfigurationArgsDict']] notification_configuration: Notification configuration settings based on the notification type.
+        :param pulumi.Input[_builtins.str] notification_type: The type of notification template.
+        :param pulumi.Input[_builtins.str] organization_id: The organization ID to associate with the notification template.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -358,22 +369,22 @@ class NotificationTemplate(pulumi.CustomResource):
         __props__.__dict__["notification_configuration"] = notification_configuration
         __props__.__dict__["notification_template_id"] = notification_template_id
         __props__.__dict__["notification_type"] = notification_type
-        __props__.__dict__["organization"] = organization
+        __props__.__dict__["organization_id"] = organization_id
         return NotificationTemplate(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Optional description of this notification template.
+        The description of the notification template.
         """
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def messages(self) -> pulumi.Output[_builtins.str]:
+    def messages(self) -> pulumi.Output[Optional[Sequence['outputs.NotificationTemplateMessage']]]:
         """
-        Optional custom messages for notification template.
+        The description of the notification template. Options are <span pulumi-lang-nodejs="`started`" pulumi-lang-dotnet="`Started`" pulumi-lang-go="`started`" pulumi-lang-python="`started`" pulumi-lang-yaml="`started`" pulumi-lang-java="`started`" pulumi-lang-hcl="`started`">`started`</span>, <span pulumi-lang-nodejs="`success`" pulumi-lang-dotnet="`Success`" pulumi-lang-go="`success`" pulumi-lang-python="`success`" pulumi-lang-yaml="`success`" pulumi-lang-java="`success`" pulumi-lang-hcl="`success`">`success`</span>, <span pulumi-lang-nodejs="`error`" pulumi-lang-dotnet="`Error`" pulumi-lang-go="`error`" pulumi-lang-python="`error`" pulumi-lang-yaml="`error`" pulumi-lang-java="`error`" pulumi-lang-hcl="`error`">`error`</span>.
         """
         return pulumi.get(self, "messages")
 
@@ -381,39 +392,36 @@ class NotificationTemplate(pulumi.CustomResource):
     @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this notification template.
+        The name of the notification template.
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter(name="notificationConfiguration")
-    def notification_configuration(self) -> pulumi.Output[_builtins.str]:
+    def notification_configuration(self) -> pulumi.Output[Optional['outputs.NotificationTemplateNotificationConfiguration']]:
         """
-        Notification configuration
+        Notification configuration settings based on the notification type.
         """
         return pulumi.get(self, "notification_configuration")
 
     @_builtins.property
     @pulumi.getter(name="notificationTemplateId")
-    def notification_template_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this notification template.
-        """
+    def notification_template_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "notification_template_id")
 
     @_builtins.property
     @pulumi.getter(name="notificationType")
     def notification_type(self) -> pulumi.Output[_builtins.str]:
         """
-        Notification type
+        The type of notification template.
         """
         return pulumi.get(self, "notification_type")
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Output[_builtins.str]:
         """
-        Organization
+        The organization ID to associate with the notification template.
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
 

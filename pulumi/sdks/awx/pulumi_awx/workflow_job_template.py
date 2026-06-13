@@ -21,415 +21,55 @@ class WorkflowJobTemplateArgs:
     def __init__(__self__, *,
                  allow_simultaneous: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_labels_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_limit_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_scm_branch_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_skip_tags_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_tags_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_variables_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 extra_vars: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_tags: pulumi.Input[Optional[_builtins.str]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
-                 skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
                  survey_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-                 webhook_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 webhook_service: pulumi.Input[Optional[_builtins.str]] = None):
+                 variables: pulumi.Input[Optional[_builtins.str]] = None,
+                 webhook_credential: pulumi.Input[Optional[_builtins.str]] = None,
+                 webhook_service: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_job_template_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a WorkflowJobTemplate resource.
 
-        :param pulumi.Input[_builtins.bool] allow_simultaneous: Allow simultaneous
-        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Ask inventory on launch
-        :param pulumi.Input[_builtins.bool] ask_labels_on_launch: Ask labels on launch
-        :param pulumi.Input[_builtins.bool] ask_limit_on_launch: Ask limit on launch
-        :param pulumi.Input[_builtins.bool] ask_scm_branch_on_launch: Ask scm branch on launch
-        :param pulumi.Input[_builtins.bool] ask_skip_tags_on_launch: Ask skip tags on launch
-        :param pulumi.Input[_builtins.bool] ask_tags_on_launch: Ask tags on launch
-        :param pulumi.Input[_builtins.bool] ask_variables_on_launch: Ask variables on launch
         :param pulumi.Input[_builtins.str] description: Optional description of this workflow job template.
-        :param pulumi.Input[_builtins.str] extra_vars: Extra vars
-        :param pulumi.Input[_builtins.float] inventory: Inventory applied as a prompt, assuming job template prompts for inventory
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this workflow job template.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this template.
-        :param pulumi.Input[_builtins.str] scm_branch: Scm branch
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.bool] survey_enabled: Survey enabled
-        :param pulumi.Input[_builtins.float] webhook_credential: Personal Access Token for posting back the status to the service API
-        :param pulumi.Input[_builtins.str] webhook_service: Service that webhook requests will be accepted from
+        :param pulumi.Input[_builtins.str] inventory_id: Inventory applied as a prompt, assuming job template prompts for inventory. (id, default=``)
+        :param pulumi.Input[_builtins.str] name: Name of this workflow job template. (string, required)
+        :param pulumi.Input[_builtins.float] organization_id: The organization used to determine access to this template. (id, default=``)
+        :param pulumi.Input[_builtins.str] variables: Extra variables used by Ansible in YAML or JSON format. (string, default=``)
         """
         if allow_simultaneous is not None:
             pulumi.set(__self__, "allow_simultaneous", allow_simultaneous)
         if ask_inventory_on_launch is not None:
             pulumi.set(__self__, "ask_inventory_on_launch", ask_inventory_on_launch)
-        if ask_labels_on_launch is not None:
-            pulumi.set(__self__, "ask_labels_on_launch", ask_labels_on_launch)
         if ask_limit_on_launch is not None:
             pulumi.set(__self__, "ask_limit_on_launch", ask_limit_on_launch)
         if ask_scm_branch_on_launch is not None:
             pulumi.set(__self__, "ask_scm_branch_on_launch", ask_scm_branch_on_launch)
-        if ask_skip_tags_on_launch is not None:
-            pulumi.set(__self__, "ask_skip_tags_on_launch", ask_skip_tags_on_launch)
-        if ask_tags_on_launch is not None:
-            pulumi.set(__self__, "ask_tags_on_launch", ask_tags_on_launch)
         if ask_variables_on_launch is not None:
             pulumi.set(__self__, "ask_variables_on_launch", ask_variables_on_launch)
         if description is not None:
             pulumi.set(__self__, "description", description)
-        if extra_vars is not None:
-            pulumi.set(__self__, "extra_vars", extra_vars)
-        if inventory is not None:
-            pulumi.set(__self__, "inventory", inventory)
-        if job_tags is not None:
-            pulumi.set(__self__, "job_tags", job_tags)
+        if inventory_id is not None:
+            pulumi.set(__self__, "inventory_id", inventory_id)
         if limit is not None:
             pulumi.set(__self__, "limit", limit)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if organization is not None:
-            pulumi.set(__self__, "organization", organization)
+        if organization_id is not None:
+            pulumi.set(__self__, "organization_id", organization_id)
         if scm_branch is not None:
             pulumi.set(__self__, "scm_branch", scm_branch)
-        if skip_tags is not None:
-            pulumi.set(__self__, "skip_tags", skip_tags)
         if survey_enabled is not None:
             pulumi.set(__self__, "survey_enabled", survey_enabled)
-        if webhook_credential is not None:
-            pulumi.set(__self__, "webhook_credential", webhook_credential)
-        if webhook_service is not None:
-            pulumi.set(__self__, "webhook_service", webhook_service)
-
-    @_builtins.property
-    @pulumi.getter(name="allowSimultaneous")
-    def allow_simultaneous(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Allow simultaneous
-        """
-        return pulumi.get(self, "allow_simultaneous")
-
-    @allow_simultaneous.setter
-    def allow_simultaneous(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "allow_simultaneous", value)
-
-    @_builtins.property
-    @pulumi.getter(name="askInventoryOnLaunch")
-    def ask_inventory_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask inventory on launch
-        """
-        return pulumi.get(self, "ask_inventory_on_launch")
-
-    @ask_inventory_on_launch.setter
-    def ask_inventory_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_inventory_on_launch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="askLabelsOnLaunch")
-    def ask_labels_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask labels on launch
-        """
-        return pulumi.get(self, "ask_labels_on_launch")
-
-    @ask_labels_on_launch.setter
-    def ask_labels_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_labels_on_launch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="askLimitOnLaunch")
-    def ask_limit_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask limit on launch
-        """
-        return pulumi.get(self, "ask_limit_on_launch")
-
-    @ask_limit_on_launch.setter
-    def ask_limit_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_limit_on_launch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="askScmBranchOnLaunch")
-    def ask_scm_branch_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask scm branch on launch
-        """
-        return pulumi.get(self, "ask_scm_branch_on_launch")
-
-    @ask_scm_branch_on_launch.setter
-    def ask_scm_branch_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_scm_branch_on_launch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="askSkipTagsOnLaunch")
-    def ask_skip_tags_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask skip tags on launch
-        """
-        return pulumi.get(self, "ask_skip_tags_on_launch")
-
-    @ask_skip_tags_on_launch.setter
-    def ask_skip_tags_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_skip_tags_on_launch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="askTagsOnLaunch")
-    def ask_tags_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask tags on launch
-        """
-        return pulumi.get(self, "ask_tags_on_launch")
-
-    @ask_tags_on_launch.setter
-    def ask_tags_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_tags_on_launch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="askVariablesOnLaunch")
-    def ask_variables_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask variables on launch
-        """
-        return pulumi.get(self, "ask_variables_on_launch")
-
-    @ask_variables_on_launch.setter
-    def ask_variables_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_variables_on_launch", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Optional description of this workflow job template.
-        """
-        return pulumi.get(self, "description")
-
-    @description.setter
-    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "description", value)
-
-    @_builtins.property
-    @pulumi.getter(name="extraVars")
-    def extra_vars(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Extra vars
-        """
-        return pulumi.get(self, "extra_vars")
-
-    @extra_vars.setter
-    def extra_vars(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "extra_vars", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Inventory applied as a prompt, assuming job template prompts for inventory
-        """
-        return pulumi.get(self, "inventory")
-
-    @inventory.setter
-    def inventory(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "inventory", value)
-
-    @_builtins.property
-    @pulumi.getter(name="jobTags")
-    def job_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Job tags
-        """
-        return pulumi.get(self, "job_tags")
-
-    @job_tags.setter
-    def job_tags(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "job_tags", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def limit(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Limit
-        """
-        return pulumi.get(self, "limit")
-
-    @limit.setter
-    def limit(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "limit", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Name of this workflow job template.
-        """
-        return pulumi.get(self, "name")
-
-    @name.setter
-    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "name", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The organization used to determine access to this template.
-        """
-        return pulumi.get(self, "organization")
-
-    @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization", value)
-
-    @_builtins.property
-    @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Scm branch
-        """
-        return pulumi.get(self, "scm_branch")
-
-    @scm_branch.setter
-    def scm_branch(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "scm_branch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="skipTags")
-    def skip_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Skip tags
-        """
-        return pulumi.get(self, "skip_tags")
-
-    @skip_tags.setter
-    def skip_tags(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "skip_tags", value)
-
-    @_builtins.property
-    @pulumi.getter(name="surveyEnabled")
-    def survey_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Survey enabled
-        """
-        return pulumi.get(self, "survey_enabled")
-
-    @survey_enabled.setter
-    def survey_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "survey_enabled", value)
-
-    @_builtins.property
-    @pulumi.getter(name="webhookCredential")
-    def webhook_credential(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Personal Access Token for posting back the status to the service API
-        """
-        return pulumi.get(self, "webhook_credential")
-
-    @webhook_credential.setter
-    def webhook_credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "webhook_credential", value)
-
-    @_builtins.property
-    @pulumi.getter(name="webhookService")
-    def webhook_service(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Service that webhook requests will be accepted from
-        """
-        return pulumi.get(self, "webhook_service")
-
-    @webhook_service.setter
-    def webhook_service(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "webhook_service", value)
-
-
-@pulumi.input_type
-class _WorkflowJobTemplateState:
-    def __init__(__self__, *,
-                 allow_simultaneous: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_labels_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_limit_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_scm_branch_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_skip_tags_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_tags_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_variables_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 description: pulumi.Input[Optional[_builtins.str]] = None,
-                 extra_vars: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 limit: pulumi.Input[Optional[_builtins.str]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
-                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
-                 skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
-                 survey_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-                 webhook_credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 webhook_service: pulumi.Input[Optional[_builtins.str]] = None,
-                 workflow_job_template_id: pulumi.Input[Optional[_builtins.float]] = None):
-        """
-        Input properties used for looking up and filtering WorkflowJobTemplate resources.
-
-        :param pulumi.Input[_builtins.bool] allow_simultaneous: Allow simultaneous
-        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Ask inventory on launch
-        :param pulumi.Input[_builtins.bool] ask_labels_on_launch: Ask labels on launch
-        :param pulumi.Input[_builtins.bool] ask_limit_on_launch: Ask limit on launch
-        :param pulumi.Input[_builtins.bool] ask_scm_branch_on_launch: Ask scm branch on launch
-        :param pulumi.Input[_builtins.bool] ask_skip_tags_on_launch: Ask skip tags on launch
-        :param pulumi.Input[_builtins.bool] ask_tags_on_launch: Ask tags on launch
-        :param pulumi.Input[_builtins.bool] ask_variables_on_launch: Ask variables on launch
-        :param pulumi.Input[_builtins.str] description: Optional description of this workflow job template.
-        :param pulumi.Input[_builtins.str] extra_vars: Extra vars
-        :param pulumi.Input[_builtins.float] inventory: Inventory applied as a prompt, assuming job template prompts for inventory
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this workflow job template.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this template.
-        :param pulumi.Input[_builtins.str] scm_branch: Scm branch
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.bool] survey_enabled: Survey enabled
-        :param pulumi.Input[_builtins.float] webhook_credential: Personal Access Token for posting back the status to the service API
-        :param pulumi.Input[_builtins.str] webhook_service: Service that webhook requests will be accepted from
-        :param pulumi.Input[_builtins.float] workflow_job_template_id: Database ID for this workflow job template.
-        """
-        if allow_simultaneous is not None:
-            pulumi.set(__self__, "allow_simultaneous", allow_simultaneous)
-        if ask_inventory_on_launch is not None:
-            pulumi.set(__self__, "ask_inventory_on_launch", ask_inventory_on_launch)
-        if ask_labels_on_launch is not None:
-            pulumi.set(__self__, "ask_labels_on_launch", ask_labels_on_launch)
-        if ask_limit_on_launch is not None:
-            pulumi.set(__self__, "ask_limit_on_launch", ask_limit_on_launch)
-        if ask_scm_branch_on_launch is not None:
-            pulumi.set(__self__, "ask_scm_branch_on_launch", ask_scm_branch_on_launch)
-        if ask_skip_tags_on_launch is not None:
-            pulumi.set(__self__, "ask_skip_tags_on_launch", ask_skip_tags_on_launch)
-        if ask_tags_on_launch is not None:
-            pulumi.set(__self__, "ask_tags_on_launch", ask_tags_on_launch)
-        if ask_variables_on_launch is not None:
-            pulumi.set(__self__, "ask_variables_on_launch", ask_variables_on_launch)
-        if description is not None:
-            pulumi.set(__self__, "description", description)
-        if extra_vars is not None:
-            pulumi.set(__self__, "extra_vars", extra_vars)
-        if inventory is not None:
-            pulumi.set(__self__, "inventory", inventory)
-        if job_tags is not None:
-            pulumi.set(__self__, "job_tags", job_tags)
-        if limit is not None:
-            pulumi.set(__self__, "limit", limit)
-        if name is not None:
-            pulumi.set(__self__, "name", name)
-        if organization is not None:
-            pulumi.set(__self__, "organization", organization)
-        if scm_branch is not None:
-            pulumi.set(__self__, "scm_branch", scm_branch)
-        if skip_tags is not None:
-            pulumi.set(__self__, "skip_tags", skip_tags)
-        if survey_enabled is not None:
-            pulumi.set(__self__, "survey_enabled", survey_enabled)
+        if variables is not None:
+            pulumi.set(__self__, "variables", variables)
         if webhook_credential is not None:
             pulumi.set(__self__, "webhook_credential", webhook_credential)
         if webhook_service is not None:
@@ -440,9 +80,6 @@ class _WorkflowJobTemplateState:
     @_builtins.property
     @pulumi.getter(name="allowSimultaneous")
     def allow_simultaneous(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Allow simultaneous
-        """
         return pulumi.get(self, "allow_simultaneous")
 
     @allow_simultaneous.setter
@@ -452,9 +89,6 @@ class _WorkflowJobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askInventoryOnLaunch")
     def ask_inventory_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask inventory on launch
-        """
         return pulumi.get(self, "ask_inventory_on_launch")
 
     @ask_inventory_on_launch.setter
@@ -462,23 +96,8 @@ class _WorkflowJobTemplateState:
         pulumi.set(self, "ask_inventory_on_launch", value)
 
     @_builtins.property
-    @pulumi.getter(name="askLabelsOnLaunch")
-    def ask_labels_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask labels on launch
-        """
-        return pulumi.get(self, "ask_labels_on_launch")
-
-    @ask_labels_on_launch.setter
-    def ask_labels_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_labels_on_launch", value)
-
-    @_builtins.property
     @pulumi.getter(name="askLimitOnLaunch")
     def ask_limit_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask limit on launch
-        """
         return pulumi.get(self, "ask_limit_on_launch")
 
     @ask_limit_on_launch.setter
@@ -488,9 +107,6 @@ class _WorkflowJobTemplateState:
     @_builtins.property
     @pulumi.getter(name="askScmBranchOnLaunch")
     def ask_scm_branch_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask scm branch on launch
-        """
         return pulumi.get(self, "ask_scm_branch_on_launch")
 
     @ask_scm_branch_on_launch.setter
@@ -498,35 +114,8 @@ class _WorkflowJobTemplateState:
         pulumi.set(self, "ask_scm_branch_on_launch", value)
 
     @_builtins.property
-    @pulumi.getter(name="askSkipTagsOnLaunch")
-    def ask_skip_tags_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask skip tags on launch
-        """
-        return pulumi.get(self, "ask_skip_tags_on_launch")
-
-    @ask_skip_tags_on_launch.setter
-    def ask_skip_tags_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_skip_tags_on_launch", value)
-
-    @_builtins.property
-    @pulumi.getter(name="askTagsOnLaunch")
-    def ask_tags_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask tags on launch
-        """
-        return pulumi.get(self, "ask_tags_on_launch")
-
-    @ask_tags_on_launch.setter
-    def ask_tags_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_tags_on_launch", value)
-
-    @_builtins.property
     @pulumi.getter(name="askVariablesOnLaunch")
     def ask_variables_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Ask variables on launch
-        """
         return pulumi.get(self, "ask_variables_on_launch")
 
     @ask_variables_on_launch.setter
@@ -546,47 +135,20 @@ class _WorkflowJobTemplateState:
         pulumi.set(self, "description", value)
 
     @_builtins.property
-    @pulumi.getter(name="extraVars")
-    def extra_vars(self) -> pulumi.Input[Optional[_builtins.str]]:
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Extra vars
+        Inventory applied as a prompt, assuming job template prompts for inventory. (id, default=``)
         """
-        return pulumi.get(self, "extra_vars")
+        return pulumi.get(self, "inventory_id")
 
-    @extra_vars.setter
-    def extra_vars(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "extra_vars", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Inventory applied as a prompt, assuming job template prompts for inventory
-        """
-        return pulumi.get(self, "inventory")
-
-    @inventory.setter
-    def inventory(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "inventory", value)
-
-    @_builtins.property
-    @pulumi.getter(name="jobTags")
-    def job_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Job tags
-        """
-        return pulumi.get(self, "job_tags")
-
-    @job_tags.setter
-    def job_tags(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "job_tags", value)
+    @inventory_id.setter
+    def inventory_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "inventory_id", value)
 
     @_builtins.property
     @pulumi.getter
     def limit(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Limit
-        """
         return pulumi.get(self, "limit")
 
     @limit.setter
@@ -597,7 +159,7 @@ class _WorkflowJobTemplateState:
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this workflow job template.
+        Name of this workflow job template. (string, required)
         """
         return pulumi.get(self, "name")
 
@@ -606,23 +168,20 @@ class _WorkflowJobTemplateState:
         pulumi.set(self, "name", value)
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        The organization used to determine access to this template.
+        The organization used to determine access to this template. (id, default=``)
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
 
-    @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization", value)
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "organization_id", value)
 
     @_builtins.property
     @pulumi.getter(name="scmBranch")
     def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Scm branch
-        """
         return pulumi.get(self, "scm_branch")
 
     @scm_branch.setter
@@ -630,23 +189,8 @@ class _WorkflowJobTemplateState:
         pulumi.set(self, "scm_branch", value)
 
     @_builtins.property
-    @pulumi.getter(name="skipTags")
-    def skip_tags(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Skip tags
-        """
-        return pulumi.get(self, "skip_tags")
-
-    @skip_tags.setter
-    def skip_tags(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "skip_tags", value)
-
-    @_builtins.property
     @pulumi.getter(name="surveyEnabled")
     def survey_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Survey enabled
-        """
         return pulumi.get(self, "survey_enabled")
 
     @survey_enabled.setter
@@ -654,23 +198,29 @@ class _WorkflowJobTemplateState:
         pulumi.set(self, "survey_enabled", value)
 
     @_builtins.property
+    @pulumi.getter
+    def variables(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Extra variables used by Ansible in YAML or JSON format. (string, default=``)
+        """
+        return pulumi.get(self, "variables")
+
+    @variables.setter
+    def variables(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "variables", value)
+
+    @_builtins.property
     @pulumi.getter(name="webhookCredential")
-    def webhook_credential(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Personal Access Token for posting back the status to the service API
-        """
+    def webhook_credential(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "webhook_credential")
 
     @webhook_credential.setter
-    def webhook_credential(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def webhook_credential(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "webhook_credential", value)
 
     @_builtins.property
     @pulumi.getter(name="webhookService")
     def webhook_service(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Service that webhook requests will be accepted from
-        """
         return pulumi.get(self, "webhook_service")
 
     @webhook_service.setter
@@ -679,14 +229,232 @@ class _WorkflowJobTemplateState:
 
     @_builtins.property
     @pulumi.getter(name="workflowJobTemplateId")
-    def workflow_job_template_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this workflow job template.
-        """
+    def workflow_job_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "workflow_job_template_id")
 
     @workflow_job_template_id.setter
-    def workflow_job_template_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def workflow_job_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "workflow_job_template_id", value)
+
+
+@pulumi.input_type
+class _WorkflowJobTemplateState:
+    def __init__(__self__, *,
+                 allow_simultaneous: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_limit_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_scm_branch_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_variables_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 limit: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
+                 survey_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 variables: pulumi.Input[Optional[_builtins.str]] = None,
+                 webhook_credential: pulumi.Input[Optional[_builtins.str]] = None,
+                 webhook_service: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_job_template_id: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        Input properties used for looking up and filtering WorkflowJobTemplate resources.
+
+        :param pulumi.Input[_builtins.str] description: Optional description of this workflow job template.
+        :param pulumi.Input[_builtins.str] inventory_id: Inventory applied as a prompt, assuming job template prompts for inventory. (id, default=``)
+        :param pulumi.Input[_builtins.str] name: Name of this workflow job template. (string, required)
+        :param pulumi.Input[_builtins.float] organization_id: The organization used to determine access to this template. (id, default=``)
+        :param pulumi.Input[_builtins.str] variables: Extra variables used by Ansible in YAML or JSON format. (string, default=``)
+        """
+        if allow_simultaneous is not None:
+            pulumi.set(__self__, "allow_simultaneous", allow_simultaneous)
+        if ask_inventory_on_launch is not None:
+            pulumi.set(__self__, "ask_inventory_on_launch", ask_inventory_on_launch)
+        if ask_limit_on_launch is not None:
+            pulumi.set(__self__, "ask_limit_on_launch", ask_limit_on_launch)
+        if ask_scm_branch_on_launch is not None:
+            pulumi.set(__self__, "ask_scm_branch_on_launch", ask_scm_branch_on_launch)
+        if ask_variables_on_launch is not None:
+            pulumi.set(__self__, "ask_variables_on_launch", ask_variables_on_launch)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if inventory_id is not None:
+            pulumi.set(__self__, "inventory_id", inventory_id)
+        if limit is not None:
+            pulumi.set(__self__, "limit", limit)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if organization_id is not None:
+            pulumi.set(__self__, "organization_id", organization_id)
+        if scm_branch is not None:
+            pulumi.set(__self__, "scm_branch", scm_branch)
+        if survey_enabled is not None:
+            pulumi.set(__self__, "survey_enabled", survey_enabled)
+        if variables is not None:
+            pulumi.set(__self__, "variables", variables)
+        if webhook_credential is not None:
+            pulumi.set(__self__, "webhook_credential", webhook_credential)
+        if webhook_service is not None:
+            pulumi.set(__self__, "webhook_service", webhook_service)
+        if workflow_job_template_id is not None:
+            pulumi.set(__self__, "workflow_job_template_id", workflow_job_template_id)
+
+    @_builtins.property
+    @pulumi.getter(name="allowSimultaneous")
+    def allow_simultaneous(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "allow_simultaneous")
+
+    @allow_simultaneous.setter
+    def allow_simultaneous(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "allow_simultaneous", value)
+
+    @_builtins.property
+    @pulumi.getter(name="askInventoryOnLaunch")
+    def ask_inventory_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "ask_inventory_on_launch")
+
+    @ask_inventory_on_launch.setter
+    def ask_inventory_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "ask_inventory_on_launch", value)
+
+    @_builtins.property
+    @pulumi.getter(name="askLimitOnLaunch")
+    def ask_limit_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "ask_limit_on_launch")
+
+    @ask_limit_on_launch.setter
+    def ask_limit_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "ask_limit_on_launch", value)
+
+    @_builtins.property
+    @pulumi.getter(name="askScmBranchOnLaunch")
+    def ask_scm_branch_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "ask_scm_branch_on_launch")
+
+    @ask_scm_branch_on_launch.setter
+    def ask_scm_branch_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "ask_scm_branch_on_launch", value)
+
+    @_builtins.property
+    @pulumi.getter(name="askVariablesOnLaunch")
+    def ask_variables_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "ask_variables_on_launch")
+
+    @ask_variables_on_launch.setter
+    def ask_variables_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "ask_variables_on_launch", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Optional description of this workflow job template.
+        """
+        return pulumi.get(self, "description")
+
+    @description.setter
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "description", value)
+
+    @_builtins.property
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Inventory applied as a prompt, assuming job template prompts for inventory. (id, default=``)
+        """
+        return pulumi.get(self, "inventory_id")
+
+    @inventory_id.setter
+    def inventory_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "inventory_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def limit(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "limit")
+
+    @limit.setter
+    def limit(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "limit", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Name of this workflow job template. (string, required)
+        """
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "name", value)
+
+    @_builtins.property
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        The organization used to determine access to this template. (id, default=``)
+        """
+        return pulumi.get(self, "organization_id")
+
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "organization_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="scmBranch")
+    def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "scm_branch")
+
+    @scm_branch.setter
+    def scm_branch(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "scm_branch", value)
+
+    @_builtins.property
+    @pulumi.getter(name="surveyEnabled")
+    def survey_enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "survey_enabled")
+
+    @survey_enabled.setter
+    def survey_enabled(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "survey_enabled", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def variables(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Extra variables used by Ansible in YAML or JSON format. (string, default=``)
+        """
+        return pulumi.get(self, "variables")
+
+    @variables.setter
+    def variables(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "variables", value)
+
+    @_builtins.property
+    @pulumi.getter(name="webhookCredential")
+    def webhook_credential(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "webhook_credential")
+
+    @webhook_credential.setter
+    def webhook_credential(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "webhook_credential", value)
+
+    @_builtins.property
+    @pulumi.getter(name="webhookService")
+    def webhook_service(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "webhook_service")
+
+    @webhook_service.setter
+    def webhook_service(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "webhook_service", value)
+
+    @_builtins.property
+    @pulumi.getter(name="workflowJobTemplateId")
+    def workflow_job_template_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "workflow_job_template_id")
+
+    @workflow_job_template_id.setter
+    def workflow_job_template_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "workflow_job_template_id", value)
 
 
@@ -698,50 +466,31 @@ class WorkflowJobTemplate(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  allow_simultaneous: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_labels_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_limit_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_scm_branch_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_skip_tags_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_tags_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_variables_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 extra_vars: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_tags: pulumi.Input[Optional[_builtins.str]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
-                 skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
                  survey_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-                 webhook_credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 variables: pulumi.Input[Optional[_builtins.str]] = None,
+                 webhook_credential: pulumi.Input[Optional[_builtins.str]] = None,
                  webhook_service: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_job_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a WorkflowJobTemplate resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.bool] allow_simultaneous: Allow simultaneous
-        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Ask inventory on launch
-        :param pulumi.Input[_builtins.bool] ask_labels_on_launch: Ask labels on launch
-        :param pulumi.Input[_builtins.bool] ask_limit_on_launch: Ask limit on launch
-        :param pulumi.Input[_builtins.bool] ask_scm_branch_on_launch: Ask scm branch on launch
-        :param pulumi.Input[_builtins.bool] ask_skip_tags_on_launch: Ask skip tags on launch
-        :param pulumi.Input[_builtins.bool] ask_tags_on_launch: Ask tags on launch
-        :param pulumi.Input[_builtins.bool] ask_variables_on_launch: Ask variables on launch
         :param pulumi.Input[_builtins.str] description: Optional description of this workflow job template.
-        :param pulumi.Input[_builtins.str] extra_vars: Extra vars
-        :param pulumi.Input[_builtins.float] inventory: Inventory applied as a prompt, assuming job template prompts for inventory
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this workflow job template.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this template.
-        :param pulumi.Input[_builtins.str] scm_branch: Scm branch
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.bool] survey_enabled: Survey enabled
-        :param pulumi.Input[_builtins.float] webhook_credential: Personal Access Token for posting back the status to the service API
-        :param pulumi.Input[_builtins.str] webhook_service: Service that webhook requests will be accepted from
+        :param pulumi.Input[_builtins.str] inventory_id: Inventory applied as a prompt, assuming job template prompts for inventory. (id, default=``)
+        :param pulumi.Input[_builtins.str] name: Name of this workflow job template. (string, required)
+        :param pulumi.Input[_builtins.float] organization_id: The organization used to determine access to this template. (id, default=``)
+        :param pulumi.Input[_builtins.str] variables: Extra variables used by Ansible in YAML or JSON format. (string, default=``)
         """
         ...
     @overload
@@ -769,24 +518,20 @@ class WorkflowJobTemplate(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  allow_simultaneous: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_labels_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_limit_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_scm_branch_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_skip_tags_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_tags_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_variables_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 extra_vars: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 job_tags: pulumi.Input[Optional[_builtins.str]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
-                 skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
                  survey_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-                 webhook_credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 variables: pulumi.Input[Optional[_builtins.str]] = None,
+                 webhook_credential: pulumi.Input[Optional[_builtins.str]] = None,
                  webhook_service: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_job_template_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -798,25 +543,20 @@ class WorkflowJobTemplate(pulumi.CustomResource):
 
             __props__.__dict__["allow_simultaneous"] = allow_simultaneous
             __props__.__dict__["ask_inventory_on_launch"] = ask_inventory_on_launch
-            __props__.__dict__["ask_labels_on_launch"] = ask_labels_on_launch
             __props__.__dict__["ask_limit_on_launch"] = ask_limit_on_launch
             __props__.__dict__["ask_scm_branch_on_launch"] = ask_scm_branch_on_launch
-            __props__.__dict__["ask_skip_tags_on_launch"] = ask_skip_tags_on_launch
-            __props__.__dict__["ask_tags_on_launch"] = ask_tags_on_launch
             __props__.__dict__["ask_variables_on_launch"] = ask_variables_on_launch
             __props__.__dict__["description"] = description
-            __props__.__dict__["extra_vars"] = extra_vars
-            __props__.__dict__["inventory"] = inventory
-            __props__.__dict__["job_tags"] = job_tags
+            __props__.__dict__["inventory_id"] = inventory_id
             __props__.__dict__["limit"] = limit
             __props__.__dict__["name"] = name
-            __props__.__dict__["organization"] = organization
+            __props__.__dict__["organization_id"] = organization_id
             __props__.__dict__["scm_branch"] = scm_branch
-            __props__.__dict__["skip_tags"] = skip_tags
             __props__.__dict__["survey_enabled"] = survey_enabled
+            __props__.__dict__["variables"] = variables
             __props__.__dict__["webhook_credential"] = webhook_credential
             __props__.__dict__["webhook_service"] = webhook_service
-            __props__.__dict__["workflow_job_template_id"] = None
+            __props__.__dict__["workflow_job_template_id"] = workflow_job_template_id
         super(WorkflowJobTemplate, __self__).__init__(
             'awx:index/workflowJobTemplate:WorkflowJobTemplate',
             resource_name,
@@ -830,25 +570,20 @@ class WorkflowJobTemplate(pulumi.CustomResource):
             opts: Optional[pulumi.ResourceOptions] = None,
             allow_simultaneous: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-            ask_labels_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_limit_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_scm_branch_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-            ask_skip_tags_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-            ask_tags_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_variables_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
-            extra_vars: pulumi.Input[Optional[_builtins.str]] = None,
-            inventory: pulumi.Input[Optional[_builtins.float]] = None,
-            job_tags: pulumi.Input[Optional[_builtins.str]] = None,
+            inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
             limit: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            organization: pulumi.Input[Optional[_builtins.float]] = None,
+            organization_id: pulumi.Input[Optional[_builtins.float]] = None,
             scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
-            skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
             survey_enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-            webhook_credential: pulumi.Input[Optional[_builtins.float]] = None,
+            variables: pulumi.Input[Optional[_builtins.str]] = None,
+            webhook_credential: pulumi.Input[Optional[_builtins.str]] = None,
             webhook_service: pulumi.Input[Optional[_builtins.str]] = None,
-            workflow_job_template_id: pulumi.Input[Optional[_builtins.float]] = None) -> 'WorkflowJobTemplate':
+            workflow_job_template_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'WorkflowJobTemplate':
         """
         Get an existing WorkflowJobTemplate resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -856,27 +591,11 @@ class WorkflowJobTemplate(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.bool] allow_simultaneous: Allow simultaneous
-        :param pulumi.Input[_builtins.bool] ask_inventory_on_launch: Ask inventory on launch
-        :param pulumi.Input[_builtins.bool] ask_labels_on_launch: Ask labels on launch
-        :param pulumi.Input[_builtins.bool] ask_limit_on_launch: Ask limit on launch
-        :param pulumi.Input[_builtins.bool] ask_scm_branch_on_launch: Ask scm branch on launch
-        :param pulumi.Input[_builtins.bool] ask_skip_tags_on_launch: Ask skip tags on launch
-        :param pulumi.Input[_builtins.bool] ask_tags_on_launch: Ask tags on launch
-        :param pulumi.Input[_builtins.bool] ask_variables_on_launch: Ask variables on launch
         :param pulumi.Input[_builtins.str] description: Optional description of this workflow job template.
-        :param pulumi.Input[_builtins.str] extra_vars: Extra vars
-        :param pulumi.Input[_builtins.float] inventory: Inventory applied as a prompt, assuming job template prompts for inventory
-        :param pulumi.Input[_builtins.str] job_tags: Job tags
-        :param pulumi.Input[_builtins.str] limit: Limit
-        :param pulumi.Input[_builtins.str] name: Name of this workflow job template.
-        :param pulumi.Input[_builtins.float] organization: The organization used to determine access to this template.
-        :param pulumi.Input[_builtins.str] scm_branch: Scm branch
-        :param pulumi.Input[_builtins.str] skip_tags: Skip tags
-        :param pulumi.Input[_builtins.bool] survey_enabled: Survey enabled
-        :param pulumi.Input[_builtins.float] webhook_credential: Personal Access Token for posting back the status to the service API
-        :param pulumi.Input[_builtins.str] webhook_service: Service that webhook requests will be accepted from
-        :param pulumi.Input[_builtins.float] workflow_job_template_id: Database ID for this workflow job template.
+        :param pulumi.Input[_builtins.str] inventory_id: Inventory applied as a prompt, assuming job template prompts for inventory. (id, default=``)
+        :param pulumi.Input[_builtins.str] name: Name of this workflow job template. (string, required)
+        :param pulumi.Input[_builtins.float] organization_id: The organization used to determine access to this template. (id, default=``)
+        :param pulumi.Input[_builtins.str] variables: Extra variables used by Ansible in YAML or JSON format. (string, default=``)
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -884,22 +603,17 @@ class WorkflowJobTemplate(pulumi.CustomResource):
 
         __props__.__dict__["allow_simultaneous"] = allow_simultaneous
         __props__.__dict__["ask_inventory_on_launch"] = ask_inventory_on_launch
-        __props__.__dict__["ask_labels_on_launch"] = ask_labels_on_launch
         __props__.__dict__["ask_limit_on_launch"] = ask_limit_on_launch
         __props__.__dict__["ask_scm_branch_on_launch"] = ask_scm_branch_on_launch
-        __props__.__dict__["ask_skip_tags_on_launch"] = ask_skip_tags_on_launch
-        __props__.__dict__["ask_tags_on_launch"] = ask_tags_on_launch
         __props__.__dict__["ask_variables_on_launch"] = ask_variables_on_launch
         __props__.__dict__["description"] = description
-        __props__.__dict__["extra_vars"] = extra_vars
-        __props__.__dict__["inventory"] = inventory
-        __props__.__dict__["job_tags"] = job_tags
+        __props__.__dict__["inventory_id"] = inventory_id
         __props__.__dict__["limit"] = limit
         __props__.__dict__["name"] = name
-        __props__.__dict__["organization"] = organization
+        __props__.__dict__["organization_id"] = organization_id
         __props__.__dict__["scm_branch"] = scm_branch
-        __props__.__dict__["skip_tags"] = skip_tags
         __props__.__dict__["survey_enabled"] = survey_enabled
+        __props__.__dict__["variables"] = variables
         __props__.__dict__["webhook_credential"] = webhook_credential
         __props__.__dict__["webhook_service"] = webhook_service
         __props__.__dict__["workflow_job_template_id"] = workflow_job_template_id
@@ -907,169 +621,96 @@ class WorkflowJobTemplate(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="allowSimultaneous")
-    def allow_simultaneous(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Allow simultaneous
-        """
+    def allow_simultaneous(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "allow_simultaneous")
 
     @_builtins.property
     @pulumi.getter(name="askInventoryOnLaunch")
-    def ask_inventory_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask inventory on launch
-        """
+    def ask_inventory_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_inventory_on_launch")
 
     @_builtins.property
-    @pulumi.getter(name="askLabelsOnLaunch")
-    def ask_labels_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask labels on launch
-        """
-        return pulumi.get(self, "ask_labels_on_launch")
-
-    @_builtins.property
     @pulumi.getter(name="askLimitOnLaunch")
-    def ask_limit_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask limit on launch
-        """
+    def ask_limit_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_limit_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askScmBranchOnLaunch")
-    def ask_scm_branch_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask scm branch on launch
-        """
+    def ask_scm_branch_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_scm_branch_on_launch")
 
     @_builtins.property
-    @pulumi.getter(name="askSkipTagsOnLaunch")
-    def ask_skip_tags_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask skip tags on launch
-        """
-        return pulumi.get(self, "ask_skip_tags_on_launch")
-
-    @_builtins.property
-    @pulumi.getter(name="askTagsOnLaunch")
-    def ask_tags_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask tags on launch
-        """
-        return pulumi.get(self, "ask_tags_on_launch")
-
-    @_builtins.property
     @pulumi.getter(name="askVariablesOnLaunch")
-    def ask_variables_on_launch(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Ask variables on launch
-        """
+    def ask_variables_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "ask_variables_on_launch")
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         Optional description of this workflow job template.
         """
         return pulumi.get(self, "description")
 
     @_builtins.property
-    @pulumi.getter(name="extraVars")
-    def extra_vars(self) -> pulumi.Output[_builtins.str]:
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Extra vars
+        Inventory applied as a prompt, assuming job template prompts for inventory. (id, default=``)
         """
-        return pulumi.get(self, "extra_vars")
+        return pulumi.get(self, "inventory_id")
 
     @_builtins.property
     @pulumi.getter
-    def inventory(self) -> pulumi.Output[_builtins.float]:
-        """
-        Inventory applied as a prompt, assuming job template prompts for inventory
-        """
-        return pulumi.get(self, "inventory")
-
-    @_builtins.property
-    @pulumi.getter(name="jobTags")
-    def job_tags(self) -> pulumi.Output[_builtins.str]:
-        """
-        Job tags
-        """
-        return pulumi.get(self, "job_tags")
-
-    @_builtins.property
-    @pulumi.getter
-    def limit(self) -> pulumi.Output[_builtins.str]:
-        """
-        Limit
-        """
+    def limit(self) -> pulumi.Output[Optional[_builtins.str]]:
         return pulumi.get(self, "limit")
 
     @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this workflow job template.
+        Name of this workflow job template. (string, required)
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        The organization used to determine access to this template.
+        The organization used to determine access to this template. (id, default=``)
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
 
     @_builtins.property
     @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> pulumi.Output[_builtins.str]:
-        """
-        Scm branch
-        """
+    def scm_branch(self) -> pulumi.Output[Optional[_builtins.str]]:
         return pulumi.get(self, "scm_branch")
 
     @_builtins.property
-    @pulumi.getter(name="skipTags")
-    def skip_tags(self) -> pulumi.Output[_builtins.str]:
-        """
-        Skip tags
-        """
-        return pulumi.get(self, "skip_tags")
-
-    @_builtins.property
     @pulumi.getter(name="surveyEnabled")
-    def survey_enabled(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Survey enabled
-        """
+    def survey_enabled(self) -> pulumi.Output[Optional[_builtins.bool]]:
         return pulumi.get(self, "survey_enabled")
 
     @_builtins.property
+    @pulumi.getter
+    def variables(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        Extra variables used by Ansible in YAML or JSON format. (string, default=``)
+        """
+        return pulumi.get(self, "variables")
+
+    @_builtins.property
     @pulumi.getter(name="webhookCredential")
-    def webhook_credential(self) -> pulumi.Output[_builtins.float]:
-        """
-        Personal Access Token for posting back the status to the service API
-        """
+    def webhook_credential(self) -> pulumi.Output[Optional[_builtins.str]]:
         return pulumi.get(self, "webhook_credential")
 
     @_builtins.property
     @pulumi.getter(name="webhookService")
-    def webhook_service(self) -> pulumi.Output[_builtins.str]:
-        """
-        Service that webhook requests will be accepted from
-        """
+    def webhook_service(self) -> pulumi.Output[Optional[_builtins.str]]:
         return pulumi.get(self, "webhook_service")
 
     @_builtins.property
     @pulumi.getter(name="workflowJobTemplateId")
-    def workflow_job_template_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this workflow job template.
-        """
+    def workflow_job_template_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "workflow_job_template_id")
 

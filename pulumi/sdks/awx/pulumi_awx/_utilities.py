@@ -325,7 +325,7 @@ def get_plugin_download_url():
 	return None
 
 def get_version():
-    return "24.6.1-2"
+    return "1.8.0"
 
 _package_lock = asyncio.Lock()
 _package_ref = ...
@@ -339,7 +339,7 @@ async def get_package():
 					parameterization = resource_pb2.Parameterization(
 						name="awx",
 						version=get_version(),
-						value=base64.b64decode("eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkudGVycmFmb3JtLmlvL2lsaWphbXQvYXd4IiwidmVyc2lvbiI6IjI0LjYuMS0yIn19"),
+						value=base64.b64decode("eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkudGVycmFmb3JtLmlvL2pvc2gtc2lsdmFzL2F3eCIsInZlcnNpb24iOiIxLjguMCJ9fQ=="),
 					)
 					registerPackageResponse = monitor.RegisterPackage(
 						resource_pb2.RegisterPackageRequest(

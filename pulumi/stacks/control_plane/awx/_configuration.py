@@ -44,6 +44,16 @@ _CAPI_NAMESPACE = "default"
 _NODE_TYPE_LABEL = "slinky.slurm.net/node-type"
 _CONTROLLER_NODE_TYPE = "controller"
 _COMPUTE_NODE_TYPE = "compute"
+_SOURCE_CONTROL_CREDENTIAL_TYPE_ID = 2
+_KUBERNETES_CREDENTIAL_TYPE_ID = 17
+
+
+def _resource_id_as_float(resource: pulumi.CustomResource) -> Output[float]:
+    return resource.id.apply(lambda value: float(value))
+
+
+def _resource_id_as_string(resource: pulumi.CustomResource) -> Output[str]:
+    return resource.id.apply(str)
 
 
 def _required_mapping(value: object, path: str) -> Mapping[str, object]:
@@ -80,11 +90,8 @@ def project_name_from_scm_url(scm_url: str) -> str:
     return repo.removesuffix(".git") or "gitops"
 
 
-def source_control_credential_inputs(*, ssh_key_data: str) -> str:
-    return json.dumps(
-        {"ssh_key_data": ssh_key_data},
-        sort_keys=True,
-    )
+def source_control_credential_inputs(*, ssh_key_data: str) -> dict[str, str]:
+    return {"ssh_key_data": ssh_key_data}
 
 
 def management_kubernetes_credential_inputs(
@@ -92,16 +99,13 @@ def management_kubernetes_credential_inputs(
     host: str,
     bearer_token: str,
     ssl_ca_cert: str,
-) -> str:
-    return json.dumps(
-        {
-            "bearer_token": bearer_token,
-            "host": host,
-            "ssl_ca_cert": ssl_ca_cert,
-            "verify_ssl": True,
-        },
-        sort_keys=True,
-    )
+) -> dict[str, str]:
+    return {
+        "bearer_token": bearer_token,
+        "host": host,
+        "ssl_ca_cert": ssl_ca_cert,
+        "verify_ssl": "true",
+    }
 
 
 def injectable_kubernetes_credential_type_inputs() -> str:
@@ -234,13 +238,9 @@ class AWXConfiguration(pulumi.ComponentResource):
             opts=ResourceOptions(parent=self, provider=awx_provider),
         )
 
-        source_control_type = awx.get_credential_type_output(
-            name=_SOURCE_CONTROL_CREDENTIAL_TYPE,
-            opts=pulumi.InvokeOutputOptions(
-                provider=awx_provider,
-                depends_on=[organization],
-            ),
-        )
+        organization_id = _resource_id_as_float(organization)
+        organization_id_string = _resource_id_as_string(organization)
+
         scm_credential_inputs = Output.secret(
             ssh_key_data.apply(
                 lambda value: source_control_credential_inputs(ssh_key_data=value)
@@ -250,8 +250,8 @@ class AWXConfiguration(pulumi.ComponentResource):
             f"{name}-scm-credential",
             name=AWX_SCM_CREDENTIAL_NAME,
             description="Shared GitOps repository credential for AWX projects",
-            credential_type=source_control_type.id,
-            organization=organization.organization_id,
+            credential_type_id=_SOURCE_CONTROL_CREDENTIAL_TYPE_ID,
+            organization_id=organization_id,
             inputs=scm_credential_inputs,
             opts=ResourceOptions(
                 parent=self,
@@ -354,13 +354,6 @@ class AWXConfiguration(pulumi.ComponentResource):
             ),
         )
 
-        kubernetes_credential_type = awx.get_credential_type_output(
-            name=_KUBERNETES_CREDENTIAL_TYPE,
-            opts=pulumi.InvokeOutputOptions(
-                provider=awx_provider,
-                depends_on=[organization],
-            ),
-        )
         management_token = Output.secret(
             management_reader_token.data.apply(
                 lambda data: decode_secret_data_value(data, _SERVICE_ACCOUNT_TOKEN_KEY)
@@ -384,8 +377,8 @@ class AWXConfiguration(pulumi.ComponentResource):
             f"{name}-management-kubernetes-credential",
             name=AWX_MANAGEMENT_KUBERNETES_CREDENTIAL_NAME,
             description="Read-only management-cluster Kubernetes API credential",
-            credential_type=kubernetes_credential_type.id,
-            organization=organization.organization_id,
+            credential_type_id=_KUBERNETES_CREDENTIAL_TYPE_ID,
+            organization_id=organization_id,
             inputs=management_kubernetes_inputs,
             opts=ResourceOptions(
                 parent=self,
@@ -418,8 +411,10 @@ class AWXConfiguration(pulumi.ComponentResource):
                 "Read-only management-cluster Kubernetes API credential for "
                 "AWX execution environments"
             ),
-            credential_type=injectable_kubernetes_credential_type.credential_type_id,
-            organization=organization.organization_id,
+            credential_type_id=_resource_id_as_float(
+                injectable_kubernetes_credential_type
+            ),
+            organization_id=organization_id,
             inputs=management_kubernetes_inputs,
             opts=ResourceOptions(
                 parent=self,
@@ -432,20 +427,13 @@ class AWXConfiguration(pulumi.ComponentResource):
             f"{name}-project",
             name=project_name,
             description="Shared GitOps project containing AWX inventory and playbooks",
-            organization=organization.organization_id,
-            credential=scm_credential.credential_id,
+            organization_id=organization_id,
+            scm_credential_id=_resource_id_as_float(scm_credential),
             scm_type="git",
             scm_url=scm_url,
             scm_branch=scm_branch,
             scm_clean=True,
             scm_update_on_launch=True,
-            # TODO: Re-enable once pulumi_awx/terraform-provider-awx reliably
-            # parses ProjectUpdate wait responses. With this set, AWX synced
-            # the project successfully but the provider failed the Pulumi
-            # create while parsing the sync response, leaving an orphaned
-            # Project outside Pulumi state.
-            # wait_for_sync=True,
-            timeout=300,
             opts=ResourceOptions(
                 parent=self,
                 provider=awx_provider,
@@ -457,7 +445,7 @@ class AWXConfiguration(pulumi.ComponentResource):
             api_url=provider_config.api_url,
             username=provider_config.admin_user,
             password=provider_config.admin_password,
-            project_id=project.project_id,
+            project_id=_resource_id_as_float(project),
             expected_revision=flux_source.status.apply(flux_artifact_revision_sha),
             opts=ResourceOptions(parent=self, depends_on=[project]),
         )
@@ -474,7 +462,7 @@ class AWXConfiguration(pulumi.ComponentResource):
             f"{name}-dynamic-inventory",
             name=AWX_DYNAMIC_INVENTORY_NAME,
             description="Dynamic inventory for CAPI/Slinky workload clusters",
-            organization=organization.organization_id,
+            organization_id=organization_id_string,
             variables=dynamic_inventory_variables(),
             opts=ResourceOptions(
                 parent=self,
@@ -486,17 +474,16 @@ class AWXConfiguration(pulumi.ComponentResource):
             f"{name}-dynamic-inventory-source",
             name=AWX_DYNAMIC_INVENTORY_SOURCE_NAME,
             description="CAPI/Slinky dynamic inventory discovered from the management cluster",
-            inventory=dynamic_inventory.inventory_id,
-            credential=injectable_kubernetes_credential.credential_id,
+            inventory_id=_resource_id_as_float(dynamic_inventory),
+            credential_id=_resource_id_as_float(injectable_kubernetes_credential),
             source="scm",
-            source_project=project.project_id,
+            source_project_id=_resource_id_as_float(project),
             source_path=_DYNAMIC_INVENTORY_PATH,
             execution_environment=execution_environment.id,
             source_vars=dynamic_inventory_variables(),
             overwrite=True,
             overwrite_vars=True,
             update_on_launch=True,
-            timeout=300,
             opts=ResourceOptions(
                 parent=self,
                 provider=awx_provider,
@@ -507,10 +494,12 @@ class AWXConfiguration(pulumi.ComponentResource):
             f"{name}-cluster-state-job-template",
             name=AWX_CLUSTER_STATE_JOB_TEMPLATE_NAME,
             description="Collect management-cluster CAPI state for Slinky workload clusters",
-            inventory=dynamic_inventory.inventory_id,
-            project=project.project_id,
+            inventory_id=_resource_id_as_string(dynamic_inventory),
+            project_id=_resource_id_as_float(project),
             playbook=_CLUSTER_STATE_PLAYBOOK_PATH,
-            execution_environment=execution_environment.id,
+            execution_environment=execution_environment.id.apply(
+                lambda value: str(int(value))
+            ),
             job_type="run",
             ask_variables_on_launch=True,
             allow_simultaneous=True,
@@ -521,10 +510,10 @@ class AWXConfiguration(pulumi.ComponentResource):
                 depends_on=[dynamic_inventory_source, project_sync],
             ),
         )
-        awx.JobTemplateAssociateCredential(
+        awx.JobTemplateCredential(
             f"{name}-cluster-state-kubernetes-credential",
-            credential_id=injectable_kubernetes_credential.credential_id,
-            job_template_id=cluster_state_job_template.job_template_id,
+            credential_id=_resource_id_as_float(injectable_kubernetes_credential),
+            job_template_id=_resource_id_as_float(cluster_state_job_template),
             opts=ResourceOptions(
                 parent=self,
                 provider=awx_provider,
@@ -532,25 +521,29 @@ class AWXConfiguration(pulumi.ComponentResource):
             ),
         )
 
-        self.organization_id = organization.organization_id
+        self.organization_id = organization_id
         self.organization_name = organization.name
-        self.scm_credential_id = scm_credential.credential_id
+        self.scm_credential_id = _resource_id_as_float(scm_credential)
         self.scm_credential_name = scm_credential.name
         self.management_kubernetes_credential_id = (
-            management_kubernetes_credential.credential_id
+            _resource_id_as_float(management_kubernetes_credential)
         )
         self.management_kubernetes_credential_name = management_kubernetes_credential.name
         self.injectable_kubernetes_credential_id = (
-            injectable_kubernetes_credential.credential_id
+            _resource_id_as_float(injectable_kubernetes_credential)
         )
         self.injectable_kubernetes_credential_name = injectable_kubernetes_credential.name
-        self.dynamic_inventory_id = dynamic_inventory.inventory_id
+        self.dynamic_inventory_id = _resource_id_as_float(dynamic_inventory)
         self.dynamic_inventory_name = dynamic_inventory.name
-        self.dynamic_inventory_source_id = dynamic_inventory_source.inventory_source_id
+        self.dynamic_inventory_source_id = _resource_id_as_float(
+            dynamic_inventory_source
+        )
         self.dynamic_inventory_source_name = dynamic_inventory_source.name
-        self.cluster_state_job_template_id = cluster_state_job_template.job_template_id
+        self.cluster_state_job_template_id = _resource_id_as_float(
+            cluster_state_job_template
+        )
         self.cluster_state_job_template_name = cluster_state_job_template.name
-        self.project_id = project.project_id
+        self.project_id = _resource_id_as_float(project)
         self.project_name = project.name
 
         self.register_outputs(

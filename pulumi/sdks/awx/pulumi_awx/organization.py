@@ -19,93 +19,23 @@ __all__ = ['OrganizationArgs', 'Organization']
 @pulumi.input_type
 class OrganizationArgs:
     def __init__(__self__, *,
-                 default_environment: pulumi.Input[Optional[_builtins.float]] = None,
-                 description: pulumi.Input[Optional[_builtins.str]] = None,
-                 max_hosts: pulumi.Input[Optional[_builtins.float]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None):
-        """
-        The set of arguments for constructing a Organization resource.
-
-        :param pulumi.Input[_builtins.float] default_environment: The default execution environment for jobs run by this organization.
-        :param pulumi.Input[_builtins.str] description: Optional description of this organization.
-        :param pulumi.Input[_builtins.float] max_hosts: Maximum number of hosts allowed to be managed by this organization.
-        :param pulumi.Input[_builtins.str] name: Name of this organization.
-        """
-        if default_environment is not None:
-            pulumi.set(__self__, "default_environment", default_environment)
-        if description is not None:
-            pulumi.set(__self__, "description", description)
-        if max_hosts is not None:
-            pulumi.set(__self__, "max_hosts", max_hosts)
-        if name is not None:
-            pulumi.set(__self__, "name", name)
-
-    @_builtins.property
-    @pulumi.getter(name="defaultEnvironment")
-    def default_environment(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The default execution environment for jobs run by this organization.
-        """
-        return pulumi.get(self, "default_environment")
-
-    @default_environment.setter
-    def default_environment(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "default_environment", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Optional description of this organization.
-        """
-        return pulumi.get(self, "description")
-
-    @description.setter
-    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "description", value)
-
-    @_builtins.property
-    @pulumi.getter(name="maxHosts")
-    def max_hosts(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Maximum number of hosts allowed to be managed by this organization.
-        """
-        return pulumi.get(self, "max_hosts")
-
-    @max_hosts.setter
-    def max_hosts(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "max_hosts", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Name of this organization.
-        """
-        return pulumi.get(self, "name")
-
-    @name.setter
-    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "name", value)
-
-
-@pulumi.input_type
-class _OrganizationState:
-    def __init__(__self__, *,
-                 default_environment: pulumi.Input[Optional[_builtins.float]] = None,
+                 custom_virtualenv: pulumi.Input[Optional[_builtins.str]] = None,
+                 default_environment: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  max_hosts: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization_id: pulumi.Input[Optional[_builtins.float]] = None):
+                 organization_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
-        Input properties used for looking up and filtering Organization resources.
+        The set of arguments for constructing a Organization resource.
 
-        :param pulumi.Input[_builtins.float] default_environment: The default execution environment for jobs run by this organization.
-        :param pulumi.Input[_builtins.str] description: Optional description of this organization.
-        :param pulumi.Input[_builtins.float] max_hosts: Maximum number of hosts allowed to be managed by this organization.
-        :param pulumi.Input[_builtins.str] name: Name of this organization.
-        :param pulumi.Input[_builtins.float] organization_id: Database ID for this organization.
+        :param pulumi.Input[_builtins.str] custom_virtualenv: Local absolute file path containing a custom Python virtualenv to use
+        :param pulumi.Input[_builtins.str] default_environment: The default execution environment for jobs run by this organization.
+        :param pulumi.Input[_builtins.str] description: The description of the organization
+        :param pulumi.Input[_builtins.float] max_hosts: Maximum number of hosts allowed to be managed by this organization
+        :param pulumi.Input[_builtins.str] name: The name of the organization
         """
+        if custom_virtualenv is not None:
+            pulumi.set(__self__, "custom_virtualenv", custom_virtualenv)
         if default_environment is not None:
             pulumi.set(__self__, "default_environment", default_environment)
         if description is not None:
@@ -118,22 +48,34 @@ class _OrganizationState:
             pulumi.set(__self__, "organization_id", organization_id)
 
     @_builtins.property
+    @pulumi.getter(name="customVirtualenv")
+    def custom_virtualenv(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Local absolute file path containing a custom Python virtualenv to use
+        """
+        return pulumi.get(self, "custom_virtualenv")
+
+    @custom_virtualenv.setter
+    def custom_virtualenv(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "custom_virtualenv", value)
+
+    @_builtins.property
     @pulumi.getter(name="defaultEnvironment")
-    def default_environment(self) -> pulumi.Input[Optional[_builtins.float]]:
+    def default_environment(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The default execution environment for jobs run by this organization.
         """
         return pulumi.get(self, "default_environment")
 
     @default_environment.setter
-    def default_environment(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def default_environment(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "default_environment", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this organization.
+        The description of the organization
         """
         return pulumi.get(self, "description")
 
@@ -145,7 +87,7 @@ class _OrganizationState:
     @pulumi.getter(name="maxHosts")
     def max_hosts(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Maximum number of hosts allowed to be managed by this organization.
+        Maximum number of hosts allowed to be managed by this organization
         """
         return pulumi.get(self, "max_hosts")
 
@@ -157,7 +99,7 @@ class _OrganizationState:
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this organization.
+        The name of the organization
         """
         return pulumi.get(self, "name")
 
@@ -167,14 +109,112 @@ class _OrganizationState:
 
     @_builtins.property
     @pulumi.getter(name="organizationId")
-    def organization_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this organization.
-        """
+    def organization_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "organization_id")
 
     @organization_id.setter
-    def organization_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def organization_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "organization_id", value)
+
+
+@pulumi.input_type
+class _OrganizationState:
+    def __init__(__self__, *,
+                 custom_virtualenv: pulumi.Input[Optional[_builtins.str]] = None,
+                 default_environment: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 max_hosts: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        Input properties used for looking up and filtering Organization resources.
+
+        :param pulumi.Input[_builtins.str] custom_virtualenv: Local absolute file path containing a custom Python virtualenv to use
+        :param pulumi.Input[_builtins.str] default_environment: The default execution environment for jobs run by this organization.
+        :param pulumi.Input[_builtins.str] description: The description of the organization
+        :param pulumi.Input[_builtins.float] max_hosts: Maximum number of hosts allowed to be managed by this organization
+        :param pulumi.Input[_builtins.str] name: The name of the organization
+        """
+        if custom_virtualenv is not None:
+            pulumi.set(__self__, "custom_virtualenv", custom_virtualenv)
+        if default_environment is not None:
+            pulumi.set(__self__, "default_environment", default_environment)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if max_hosts is not None:
+            pulumi.set(__self__, "max_hosts", max_hosts)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if organization_id is not None:
+            pulumi.set(__self__, "organization_id", organization_id)
+
+    @_builtins.property
+    @pulumi.getter(name="customVirtualenv")
+    def custom_virtualenv(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Local absolute file path containing a custom Python virtualenv to use
+        """
+        return pulumi.get(self, "custom_virtualenv")
+
+    @custom_virtualenv.setter
+    def custom_virtualenv(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "custom_virtualenv", value)
+
+    @_builtins.property
+    @pulumi.getter(name="defaultEnvironment")
+    def default_environment(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The default execution environment for jobs run by this organization.
+        """
+        return pulumi.get(self, "default_environment")
+
+    @default_environment.setter
+    def default_environment(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "default_environment", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The description of the organization
+        """
+        return pulumi.get(self, "description")
+
+    @description.setter
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "description", value)
+
+    @_builtins.property
+    @pulumi.getter(name="maxHosts")
+    def max_hosts(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Maximum number of hosts allowed to be managed by this organization
+        """
+        return pulumi.get(self, "max_hosts")
+
+    @max_hosts.setter
+    def max_hosts(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "max_hosts", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The name of the organization
+        """
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "name", value)
+
+    @_builtins.property
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "organization_id")
+
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "organization_id", value)
 
 
@@ -184,20 +224,23 @@ class Organization(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 default_environment: pulumi.Input[Optional[_builtins.float]] = None,
+                 custom_virtualenv: pulumi.Input[Optional[_builtins.str]] = None,
+                 default_environment: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  max_hosts: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a Organization resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.float] default_environment: The default execution environment for jobs run by this organization.
-        :param pulumi.Input[_builtins.str] description: Optional description of this organization.
-        :param pulumi.Input[_builtins.float] max_hosts: Maximum number of hosts allowed to be managed by this organization.
-        :param pulumi.Input[_builtins.str] name: Name of this organization.
+        :param pulumi.Input[_builtins.str] custom_virtualenv: Local absolute file path containing a custom Python virtualenv to use
+        :param pulumi.Input[_builtins.str] default_environment: The default execution environment for jobs run by this organization.
+        :param pulumi.Input[_builtins.str] description: The description of the organization
+        :param pulumi.Input[_builtins.float] max_hosts: Maximum number of hosts allowed to be managed by this organization
+        :param pulumi.Input[_builtins.str] name: The name of the organization
         """
         ...
     @overload
@@ -223,10 +266,12 @@ class Organization(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 default_environment: pulumi.Input[Optional[_builtins.float]] = None,
+                 custom_virtualenv: pulumi.Input[Optional[_builtins.str]] = None,
+                 default_environment: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  max_hosts: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -236,11 +281,12 @@ class Organization(pulumi.CustomResource):
                 raise TypeError('__props__ is only valid when passed in combination with a valid opts.id to get an existing resource')
             __props__ = OrganizationArgs.__new__(OrganizationArgs)
 
+            __props__.__dict__["custom_virtualenv"] = custom_virtualenv
             __props__.__dict__["default_environment"] = default_environment
             __props__.__dict__["description"] = description
             __props__.__dict__["max_hosts"] = max_hosts
             __props__.__dict__["name"] = name
-            __props__.__dict__["organization_id"] = None
+            __props__.__dict__["organization_id"] = organization_id
         super(Organization, __self__).__init__(
             'awx:index/organization:Organization',
             resource_name,
@@ -252,11 +298,12 @@ class Organization(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            default_environment: pulumi.Input[Optional[_builtins.float]] = None,
+            custom_virtualenv: pulumi.Input[Optional[_builtins.str]] = None,
+            default_environment: pulumi.Input[Optional[_builtins.str]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
             max_hosts: pulumi.Input[Optional[_builtins.float]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            organization_id: pulumi.Input[Optional[_builtins.float]] = None) -> 'Organization':
+            organization_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'Organization':
         """
         Get an existing Organization resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -264,16 +311,17 @@ class Organization(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.float] default_environment: The default execution environment for jobs run by this organization.
-        :param pulumi.Input[_builtins.str] description: Optional description of this organization.
-        :param pulumi.Input[_builtins.float] max_hosts: Maximum number of hosts allowed to be managed by this organization.
-        :param pulumi.Input[_builtins.str] name: Name of this organization.
-        :param pulumi.Input[_builtins.float] organization_id: Database ID for this organization.
+        :param pulumi.Input[_builtins.str] custom_virtualenv: Local absolute file path containing a custom Python virtualenv to use
+        :param pulumi.Input[_builtins.str] default_environment: The default execution environment for jobs run by this organization.
+        :param pulumi.Input[_builtins.str] description: The description of the organization
+        :param pulumi.Input[_builtins.float] max_hosts: Maximum number of hosts allowed to be managed by this organization
+        :param pulumi.Input[_builtins.str] name: The name of the organization
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
         __props__ = _OrganizationState.__new__(_OrganizationState)
 
+        __props__.__dict__["custom_virtualenv"] = custom_virtualenv
         __props__.__dict__["default_environment"] = default_environment
         __props__.__dict__["description"] = description
         __props__.__dict__["max_hosts"] = max_hosts
@@ -282,8 +330,16 @@ class Organization(pulumi.CustomResource):
         return Organization(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
+    @pulumi.getter(name="customVirtualenv")
+    def custom_virtualenv(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        Local absolute file path containing a custom Python virtualenv to use
+        """
+        return pulumi.get(self, "custom_virtualenv")
+
+    @_builtins.property
     @pulumi.getter(name="defaultEnvironment")
-    def default_environment(self) -> pulumi.Output[_builtins.float]:
+    def default_environment(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         The default execution environment for jobs run by this organization.
         """
@@ -291,17 +347,17 @@ class Organization(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Optional description of this organization.
+        The description of the organization
         """
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter(name="maxHosts")
-    def max_hosts(self) -> pulumi.Output[_builtins.float]:
+    def max_hosts(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        Maximum number of hosts allowed to be managed by this organization.
+        Maximum number of hosts allowed to be managed by this organization
         """
         return pulumi.get(self, "max_hosts")
 
@@ -309,15 +365,12 @@ class Organization(pulumi.CustomResource):
     @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this organization.
+        The name of the organization
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter(name="organizationId")
-    def organization_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this organization.
-        """
+    def organization_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "organization_id")
 

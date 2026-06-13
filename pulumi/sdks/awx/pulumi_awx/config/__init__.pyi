@@ -14,28 +14,31 @@ else:
     from typing_extensions import NotRequired, TypedDict, TypeAlias
 from .. import _utilities
 
-hostname: Optional[str]
+caPem: Optional[str]
 """
-The AWX Host that we connect to. (defaults to TOWER_HOST/AWX_HOST env variable if set)
+Path to a CA Certificate in PEM format to be used to verify the server
+"""
+
+caPemValue: Optional[str]
+"""
+CA Certificate value in PEM format to be used to verify the server
+"""
+
+hostname: Optional[str]
+
+httpHeaders: Optional[str]
+"""
+Optional. HTTP headers mapping keys to values used for accessing the AWX Api.
+"""
+
+insecure: Optional[bool]
+"""
+Disable SSL verification of API calls
 """
 
 password: Optional[str]
-"""
-The password to connect to the AWX host. (defaults to TOWER_PASSWORD/AWX_PASSWORD env variable if set) [must be used with username]
-"""
 
 token: Optional[str]
-"""
-The token to use to connect to the AWX host. (defaults to TOWER_AUTH_TOKEN/AWX_AUTH_TOKEN env variable if set) [conflicts with username/password]
-"""
 
 username: Optional[str]
-"""
-The username to connect to the AWX host. (defaults to TOWER_USERNAME/AWX_USERNAME env variable if set) [must be used with password]
-"""
-
-verifySsl: Optional[bool]
-"""
-If you are using a self signed certificate this should be set to false (defaults to TOWER_VERIFY_SSL/VERIFY_SSL env variable if set) [default is true]
-"""
 

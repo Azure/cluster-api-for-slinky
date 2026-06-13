@@ -19,55 +19,54 @@ __all__ = ['InventoryArgs', 'Inventory']
 @pulumi.input_type
 class InventoryArgs:
     def __init__(__self__, *,
-                 organization: pulumi.Input[_builtins.float],
+                 organization_id: pulumi.Input[_builtins.str],
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  host_filter: pulumi.Input[Optional[_builtins.str]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Inventory resource.
 
-        :param pulumi.Input[_builtins.float] organization: Organization containing this inventory.
-        :param pulumi.Input[_builtins.str] description: Optional description of this inventory.
-        :param pulumi.Input[_builtins.str] host_filter: Filter that will be applied to the hosts of this inventory.
-        :param pulumi.Input[_builtins.str] kind: Kind of inventory being represented.
-        :param pulumi.Input[_builtins.str] name: Name of this inventory.
-        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: If enabled, the inventory will prevent adding any organization instance groups to the list of preferred instances groups to run associated job templates on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        :param pulumi.Input[_builtins.str] variables: Inventory variables in JSON format
+        :param pulumi.Input[_builtins.str] organization_id: The organization id of the inventory
+        :param pulumi.Input[_builtins.str] description: The description of the inventory
+        :param pulumi.Input[_builtins.str] host_filter: The host filter of the inventory
+        :param pulumi.Input[_builtins.str] kind: The kind of the inventory
+        :param pulumi.Input[_builtins.str] name: The name of the inventory
+        :param pulumi.Input[_builtins.str] variables: The variables of the inventory
         """
-        pulumi.set(__self__, "organization", organization)
+        pulumi.set(__self__, "organization_id", organization_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if host_filter is not None:
             pulumi.set(__self__, "host_filter", host_filter)
+        if inventory_id is not None:
+            pulumi.set(__self__, "inventory_id", inventory_id)
         if kind is not None:
             pulumi.set(__self__, "kind", kind)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if prevent_instance_group_fallback is not None:
-            pulumi.set(__self__, "prevent_instance_group_fallback", prevent_instance_group_fallback)
         if variables is not None:
             pulumi.set(__self__, "variables", variables)
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[_builtins.float]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[_builtins.str]:
         """
-        Organization containing this inventory.
+        The organization id of the inventory
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
 
-    @organization.setter
-    def organization(self, value: pulumi.Input[_builtins.float]):
-        pulumi.set(self, "organization", value)
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "organization_id", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this inventory.
+        The description of the inventory
         """
         return pulumi.get(self, "description")
 
@@ -79,7 +78,7 @@ class InventoryArgs:
     @pulumi.getter(name="hostFilter")
     def host_filter(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Filter that will be applied to the hosts of this inventory.
+        The host filter of the inventory
         """
         return pulumi.get(self, "host_filter")
 
@@ -88,10 +87,19 @@ class InventoryArgs:
         pulumi.set(self, "host_filter", value)
 
     @_builtins.property
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "inventory_id")
+
+    @inventory_id.setter
+    def inventory_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "inventory_id", value)
+
+    @_builtins.property
     @pulumi.getter
     def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Kind of inventory being represented.
+        The kind of the inventory
         """
         return pulumi.get(self, "kind")
 
@@ -103,7 +111,7 @@ class InventoryArgs:
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this inventory.
+        The name of the inventory
         """
         return pulumi.get(self, "name")
 
@@ -112,22 +120,10 @@ class InventoryArgs:
         pulumi.set(self, "name", value)
 
     @_builtins.property
-    @pulumi.getter(name="preventInstanceGroupFallback")
-    def prevent_instance_group_fallback(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        If enabled, the inventory will prevent adding any organization instance groups to the list of preferred instances groups to run associated job templates on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        """
-        return pulumi.get(self, "prevent_instance_group_fallback")
-
-    @prevent_instance_group_fallback.setter
-    def prevent_instance_group_fallback(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "prevent_instance_group_fallback", value)
-
-    @_builtins.property
     @pulumi.getter
     def variables(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Inventory variables in JSON format
+        The variables of the inventory
         """
         return pulumi.get(self, "variables")
 
@@ -140,86 +136,34 @@ class InventoryArgs:
 class _InventoryState:
     def __init__(__self__, *,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 has_active_failures: pulumi.Input[Optional[_builtins.bool]] = None,
-                 has_inventory_sources: pulumi.Input[Optional[_builtins.bool]] = None,
                  host_filter: pulumi.Input[Optional[_builtins.str]] = None,
-                 hosts_with_active_failures: pulumi.Input[Optional[_builtins.float]] = None,
-                 inventory_id: pulumi.Input[Optional[_builtins.float]] = None,
-                 inventory_sources_with_failures: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
-                 pending_deletion: pulumi.Input[Optional[_builtins.bool]] = None,
-                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
-                 total_groups: pulumi.Input[Optional[_builtins.float]] = None,
-                 total_hosts: pulumi.Input[Optional[_builtins.float]] = None,
-                 total_inventory_sources: pulumi.Input[Optional[_builtins.float]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.str]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering Inventory resources.
 
-        :param pulumi.Input[_builtins.str] description: Optional description of this inventory.
-        :param pulumi.Input[_builtins.bool] has_active_failures: Flag indicating whether any hosts in this inventory have failed.
-        :param pulumi.Input[_builtins.bool] has_inventory_sources: Flag indicating whether this inventory has any external inventory sources.
-        :param pulumi.Input[_builtins.str] host_filter: Filter that will be applied to the hosts of this inventory.
-        :param pulumi.Input[_builtins.float] hosts_with_active_failures: Number of hosts in this inventory with active failures.
-        :param pulumi.Input[_builtins.float] inventory_id: Database ID for this inventory.
-        :param pulumi.Input[_builtins.float] inventory_sources_with_failures: Number of external inventory sources in this inventory with failures.
-        :param pulumi.Input[_builtins.str] kind: Kind of inventory being represented.
-        :param pulumi.Input[_builtins.str] name: Name of this inventory.
-        :param pulumi.Input[_builtins.float] organization: Organization containing this inventory.
-        :param pulumi.Input[_builtins.bool] pending_deletion: Flag indicating the inventory is being deleted.
-        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: If enabled, the inventory will prevent adding any organization instance groups to the list of preferred instances groups to run associated job templates on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        :param pulumi.Input[_builtins.float] total_groups: Total number of groups in this inventory.
-        :param pulumi.Input[_builtins.float] total_hosts: Total number of hosts in this inventory.
-        :param pulumi.Input[_builtins.float] total_inventory_sources: Total number of external inventory sources configured within this inventory.
-        :param pulumi.Input[_builtins.str] variables: Inventory variables in JSON format
+        :param pulumi.Input[_builtins.str] description: The description of the inventory
+        :param pulumi.Input[_builtins.str] host_filter: The host filter of the inventory
+        :param pulumi.Input[_builtins.str] kind: The kind of the inventory
+        :param pulumi.Input[_builtins.str] name: The name of the inventory
+        :param pulumi.Input[_builtins.str] organization_id: The organization id of the inventory
+        :param pulumi.Input[_builtins.str] variables: The variables of the inventory
         """
         if description is not None:
             pulumi.set(__self__, "description", description)
-        if has_active_failures is not None:
-            warnings.warn("""Deprecated""", DeprecationWarning)
-            pulumi.log.warn("""has_active_failures is deprecated: Deprecated""")
-        if has_active_failures is not None:
-            pulumi.set(__self__, "has_active_failures", has_active_failures)
-        if has_inventory_sources is not None:
-            warnings.warn("""Deprecated""", DeprecationWarning)
-            pulumi.log.warn("""has_inventory_sources is deprecated: Deprecated""")
-        if has_inventory_sources is not None:
-            pulumi.set(__self__, "has_inventory_sources", has_inventory_sources)
         if host_filter is not None:
             pulumi.set(__self__, "host_filter", host_filter)
-        if hosts_with_active_failures is not None:
-            warnings.warn("""Deprecated""", DeprecationWarning)
-            pulumi.log.warn("""hosts_with_active_failures is deprecated: Deprecated""")
-        if hosts_with_active_failures is not None:
-            pulumi.set(__self__, "hosts_with_active_failures", hosts_with_active_failures)
         if inventory_id is not None:
             pulumi.set(__self__, "inventory_id", inventory_id)
-        if inventory_sources_with_failures is not None:
-            pulumi.set(__self__, "inventory_sources_with_failures", inventory_sources_with_failures)
         if kind is not None:
             pulumi.set(__self__, "kind", kind)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if organization is not None:
-            pulumi.set(__self__, "organization", organization)
-        if pending_deletion is not None:
-            pulumi.set(__self__, "pending_deletion", pending_deletion)
-        if prevent_instance_group_fallback is not None:
-            pulumi.set(__self__, "prevent_instance_group_fallback", prevent_instance_group_fallback)
-        if total_groups is not None:
-            warnings.warn("""Deprecated""", DeprecationWarning)
-            pulumi.log.warn("""total_groups is deprecated: Deprecated""")
-        if total_groups is not None:
-            pulumi.set(__self__, "total_groups", total_groups)
-        if total_hosts is not None:
-            warnings.warn("""Deprecated""", DeprecationWarning)
-            pulumi.log.warn("""total_hosts is deprecated: Deprecated""")
-        if total_hosts is not None:
-            pulumi.set(__self__, "total_hosts", total_hosts)
-        if total_inventory_sources is not None:
-            pulumi.set(__self__, "total_inventory_sources", total_inventory_sources)
+        if organization_id is not None:
+            pulumi.set(__self__, "organization_id", organization_id)
         if variables is not None:
             pulumi.set(__self__, "variables", variables)
 
@@ -227,7 +171,7 @@ class _InventoryState:
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this inventory.
+        The description of the inventory
         """
         return pulumi.get(self, "description")
 
@@ -236,36 +180,10 @@ class _InventoryState:
         pulumi.set(self, "description", value)
 
     @_builtins.property
-    @pulumi.getter(name="hasActiveFailures")
-    @_utilities.deprecated("""Deprecated""")
-    def has_active_failures(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Flag indicating whether any hosts in this inventory have failed.
-        """
-        return pulumi.get(self, "has_active_failures")
-
-    @has_active_failures.setter
-    def has_active_failures(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "has_active_failures", value)
-
-    @_builtins.property
-    @pulumi.getter(name="hasInventorySources")
-    @_utilities.deprecated("""Deprecated""")
-    def has_inventory_sources(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Flag indicating whether this inventory has any external inventory sources.
-        """
-        return pulumi.get(self, "has_inventory_sources")
-
-    @has_inventory_sources.setter
-    def has_inventory_sources(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "has_inventory_sources", value)
-
-    @_builtins.property
     @pulumi.getter(name="hostFilter")
     def host_filter(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Filter that will be applied to the hosts of this inventory.
+        The host filter of the inventory
         """
         return pulumi.get(self, "host_filter")
 
@@ -274,47 +192,19 @@ class _InventoryState:
         pulumi.set(self, "host_filter", value)
 
     @_builtins.property
-    @pulumi.getter(name="hostsWithActiveFailures")
-    @_utilities.deprecated("""Deprecated""")
-    def hosts_with_active_failures(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Number of hosts in this inventory with active failures.
-        """
-        return pulumi.get(self, "hosts_with_active_failures")
-
-    @hosts_with_active_failures.setter
-    def hosts_with_active_failures(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "hosts_with_active_failures", value)
-
-    @_builtins.property
     @pulumi.getter(name="inventoryId")
-    def inventory_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this inventory.
-        """
+    def inventory_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "inventory_id")
 
     @inventory_id.setter
-    def inventory_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def inventory_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "inventory_id", value)
-
-    @_builtins.property
-    @pulumi.getter(name="inventorySourcesWithFailures")
-    def inventory_sources_with_failures(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Number of external inventory sources in this inventory with failures.
-        """
-        return pulumi.get(self, "inventory_sources_with_failures")
-
-    @inventory_sources_with_failures.setter
-    def inventory_sources_with_failures(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "inventory_sources_with_failures", value)
 
     @_builtins.property
     @pulumi.getter
     def kind(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Kind of inventory being represented.
+        The kind of the inventory
         """
         return pulumi.get(self, "kind")
 
@@ -326,7 +216,7 @@ class _InventoryState:
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this inventory.
+        The name of the inventory
         """
         return pulumi.get(self, "name")
 
@@ -335,84 +225,22 @@ class _InventoryState:
         pulumi.set(self, "name", value)
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Organization containing this inventory.
+        The organization id of the inventory
         """
-        return pulumi.get(self, "organization")
+        return pulumi.get(self, "organization_id")
 
-    @organization.setter
-    def organization(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization", value)
-
-    @_builtins.property
-    @pulumi.getter(name="pendingDeletion")
-    def pending_deletion(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        Flag indicating the inventory is being deleted.
-        """
-        return pulumi.get(self, "pending_deletion")
-
-    @pending_deletion.setter
-    def pending_deletion(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "pending_deletion", value)
-
-    @_builtins.property
-    @pulumi.getter(name="preventInstanceGroupFallback")
-    def prevent_instance_group_fallback(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        If enabled, the inventory will prevent adding any organization instance groups to the list of preferred instances groups to run associated job templates on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        """
-        return pulumi.get(self, "prevent_instance_group_fallback")
-
-    @prevent_instance_group_fallback.setter
-    def prevent_instance_group_fallback(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "prevent_instance_group_fallback", value)
-
-    @_builtins.property
-    @pulumi.getter(name="totalGroups")
-    @_utilities.deprecated("""Deprecated""")
-    def total_groups(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Total number of groups in this inventory.
-        """
-        return pulumi.get(self, "total_groups")
-
-    @total_groups.setter
-    def total_groups(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "total_groups", value)
-
-    @_builtins.property
-    @pulumi.getter(name="totalHosts")
-    @_utilities.deprecated("""Deprecated""")
-    def total_hosts(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Total number of hosts in this inventory.
-        """
-        return pulumi.get(self, "total_hosts")
-
-    @total_hosts.setter
-    def total_hosts(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "total_hosts", value)
-
-    @_builtins.property
-    @pulumi.getter(name="totalInventorySources")
-    def total_inventory_sources(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Total number of external inventory sources configured within this inventory.
-        """
-        return pulumi.get(self, "total_inventory_sources")
-
-    @total_inventory_sources.setter
-    def total_inventory_sources(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "total_inventory_sources", value)
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "organization_id", value)
 
     @_builtins.property
     @pulumi.getter
     def variables(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Inventory variables in JSON format
+        The variables of the inventory
         """
         return pulumi.get(self, "variables")
 
@@ -429,10 +257,10 @@ class Inventory(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  host_filter: pulumi.Input[Optional[_builtins.str]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
-                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.str]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -440,13 +268,12 @@ class Inventory(pulumi.CustomResource):
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] description: Optional description of this inventory.
-        :param pulumi.Input[_builtins.str] host_filter: Filter that will be applied to the hosts of this inventory.
-        :param pulumi.Input[_builtins.str] kind: Kind of inventory being represented.
-        :param pulumi.Input[_builtins.str] name: Name of this inventory.
-        :param pulumi.Input[_builtins.float] organization: Organization containing this inventory.
-        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: If enabled, the inventory will prevent adding any organization instance groups to the list of preferred instances groups to run associated job templates on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        :param pulumi.Input[_builtins.str] variables: Inventory variables in JSON format
+        :param pulumi.Input[_builtins.str] description: The description of the inventory
+        :param pulumi.Input[_builtins.str] host_filter: The host filter of the inventory
+        :param pulumi.Input[_builtins.str] kind: The kind of the inventory
+        :param pulumi.Input[_builtins.str] name: The name of the inventory
+        :param pulumi.Input[_builtins.str] organization_id: The organization id of the inventory
+        :param pulumi.Input[_builtins.str] variables: The variables of the inventory
         """
         ...
     @overload
@@ -474,10 +301,10 @@ class Inventory(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  host_filter: pulumi.Input[Optional[_builtins.str]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization: pulumi.Input[Optional[_builtins.float]] = None,
-                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.str]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -490,22 +317,13 @@ class Inventory(pulumi.CustomResource):
 
             __props__.__dict__["description"] = description
             __props__.__dict__["host_filter"] = host_filter
+            __props__.__dict__["inventory_id"] = inventory_id
             __props__.__dict__["kind"] = kind
             __props__.__dict__["name"] = name
-            if organization is None and not opts.urn:
-                raise TypeError("Missing required property 'organization'")
-            __props__.__dict__["organization"] = organization
-            __props__.__dict__["prevent_instance_group_fallback"] = prevent_instance_group_fallback
+            if organization_id is None and not opts.urn:
+                raise TypeError("Missing required property 'organization_id'")
+            __props__.__dict__["organization_id"] = organization_id
             __props__.__dict__["variables"] = variables
-            __props__.__dict__["has_active_failures"] = None
-            __props__.__dict__["has_inventory_sources"] = None
-            __props__.__dict__["hosts_with_active_failures"] = None
-            __props__.__dict__["inventory_id"] = None
-            __props__.__dict__["inventory_sources_with_failures"] = None
-            __props__.__dict__["pending_deletion"] = None
-            __props__.__dict__["total_groups"] = None
-            __props__.__dict__["total_hosts"] = None
-            __props__.__dict__["total_inventory_sources"] = None
         super(Inventory, __self__).__init__(
             'awx:index/inventory:Inventory',
             resource_name,
@@ -518,20 +336,11 @@ class Inventory(pulumi.CustomResource):
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
-            has_active_failures: pulumi.Input[Optional[_builtins.bool]] = None,
-            has_inventory_sources: pulumi.Input[Optional[_builtins.bool]] = None,
             host_filter: pulumi.Input[Optional[_builtins.str]] = None,
-            hosts_with_active_failures: pulumi.Input[Optional[_builtins.float]] = None,
-            inventory_id: pulumi.Input[Optional[_builtins.float]] = None,
-            inventory_sources_with_failures: pulumi.Input[Optional[_builtins.float]] = None,
+            inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
             kind: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            organization: pulumi.Input[Optional[_builtins.float]] = None,
-            pending_deletion: pulumi.Input[Optional[_builtins.bool]] = None,
-            prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
-            total_groups: pulumi.Input[Optional[_builtins.float]] = None,
-            total_hosts: pulumi.Input[Optional[_builtins.float]] = None,
-            total_inventory_sources: pulumi.Input[Optional[_builtins.float]] = None,
+            organization_id: pulumi.Input[Optional[_builtins.str]] = None,
             variables: pulumi.Input[Optional[_builtins.str]] = None) -> 'Inventory':
         """
         Get an existing Inventory resource's state with the given name, id, and optional extra
@@ -540,109 +349,52 @@ class Inventory(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] description: Optional description of this inventory.
-        :param pulumi.Input[_builtins.bool] has_active_failures: Flag indicating whether any hosts in this inventory have failed.
-        :param pulumi.Input[_builtins.bool] has_inventory_sources: Flag indicating whether this inventory has any external inventory sources.
-        :param pulumi.Input[_builtins.str] host_filter: Filter that will be applied to the hosts of this inventory.
-        :param pulumi.Input[_builtins.float] hosts_with_active_failures: Number of hosts in this inventory with active failures.
-        :param pulumi.Input[_builtins.float] inventory_id: Database ID for this inventory.
-        :param pulumi.Input[_builtins.float] inventory_sources_with_failures: Number of external inventory sources in this inventory with failures.
-        :param pulumi.Input[_builtins.str] kind: Kind of inventory being represented.
-        :param pulumi.Input[_builtins.str] name: Name of this inventory.
-        :param pulumi.Input[_builtins.float] organization: Organization containing this inventory.
-        :param pulumi.Input[_builtins.bool] pending_deletion: Flag indicating the inventory is being deleted.
-        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: If enabled, the inventory will prevent adding any organization instance groups to the list of preferred instances groups to run associated job templates on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        :param pulumi.Input[_builtins.float] total_groups: Total number of groups in this inventory.
-        :param pulumi.Input[_builtins.float] total_hosts: Total number of hosts in this inventory.
-        :param pulumi.Input[_builtins.float] total_inventory_sources: Total number of external inventory sources configured within this inventory.
-        :param pulumi.Input[_builtins.str] variables: Inventory variables in JSON format
+        :param pulumi.Input[_builtins.str] description: The description of the inventory
+        :param pulumi.Input[_builtins.str] host_filter: The host filter of the inventory
+        :param pulumi.Input[_builtins.str] kind: The kind of the inventory
+        :param pulumi.Input[_builtins.str] name: The name of the inventory
+        :param pulumi.Input[_builtins.str] organization_id: The organization id of the inventory
+        :param pulumi.Input[_builtins.str] variables: The variables of the inventory
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
         __props__ = _InventoryState.__new__(_InventoryState)
 
         __props__.__dict__["description"] = description
-        __props__.__dict__["has_active_failures"] = has_active_failures
-        __props__.__dict__["has_inventory_sources"] = has_inventory_sources
         __props__.__dict__["host_filter"] = host_filter
-        __props__.__dict__["hosts_with_active_failures"] = hosts_with_active_failures
         __props__.__dict__["inventory_id"] = inventory_id
-        __props__.__dict__["inventory_sources_with_failures"] = inventory_sources_with_failures
         __props__.__dict__["kind"] = kind
         __props__.__dict__["name"] = name
-        __props__.__dict__["organization"] = organization
-        __props__.__dict__["pending_deletion"] = pending_deletion
-        __props__.__dict__["prevent_instance_group_fallback"] = prevent_instance_group_fallback
-        __props__.__dict__["total_groups"] = total_groups
-        __props__.__dict__["total_hosts"] = total_hosts
-        __props__.__dict__["total_inventory_sources"] = total_inventory_sources
+        __props__.__dict__["organization_id"] = organization_id
         __props__.__dict__["variables"] = variables
         return Inventory(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Optional description of this inventory.
+        The description of the inventory
         """
         return pulumi.get(self, "description")
 
     @_builtins.property
-    @pulumi.getter(name="hasActiveFailures")
-    @_utilities.deprecated("""Deprecated""")
-    def has_active_failures(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Flag indicating whether any hosts in this inventory have failed.
-        """
-        return pulumi.get(self, "has_active_failures")
-
-    @_builtins.property
-    @pulumi.getter(name="hasInventorySources")
-    @_utilities.deprecated("""Deprecated""")
-    def has_inventory_sources(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Flag indicating whether this inventory has any external inventory sources.
-        """
-        return pulumi.get(self, "has_inventory_sources")
-
-    @_builtins.property
     @pulumi.getter(name="hostFilter")
-    def host_filter(self) -> pulumi.Output[_builtins.str]:
+    def host_filter(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Filter that will be applied to the hosts of this inventory.
+        The host filter of the inventory
         """
         return pulumi.get(self, "host_filter")
 
     @_builtins.property
-    @pulumi.getter(name="hostsWithActiveFailures")
-    @_utilities.deprecated("""Deprecated""")
-    def hosts_with_active_failures(self) -> pulumi.Output[_builtins.float]:
-        """
-        Number of hosts in this inventory with active failures.
-        """
-        return pulumi.get(self, "hosts_with_active_failures")
-
-    @_builtins.property
     @pulumi.getter(name="inventoryId")
-    def inventory_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this inventory.
-        """
+    def inventory_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "inventory_id")
 
     @_builtins.property
-    @pulumi.getter(name="inventorySourcesWithFailures")
-    def inventory_sources_with_failures(self) -> pulumi.Output[_builtins.float]:
-        """
-        Number of external inventory sources in this inventory with failures.
-        """
-        return pulumi.get(self, "inventory_sources_with_failures")
-
-    @_builtins.property
     @pulumi.getter
-    def kind(self) -> pulumi.Output[_builtins.str]:
+    def kind(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Kind of inventory being represented.
+        The kind of the inventory
         """
         return pulumi.get(self, "kind")
 
@@ -650,65 +402,23 @@ class Inventory(pulumi.CustomResource):
     @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this inventory.
+        The name of the inventory
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Output[_builtins.str]:
         """
-        Organization containing this inventory.
+        The organization id of the inventory
         """
-        return pulumi.get(self, "organization")
-
-    @_builtins.property
-    @pulumi.getter(name="pendingDeletion")
-    def pending_deletion(self) -> pulumi.Output[_builtins.bool]:
-        """
-        Flag indicating the inventory is being deleted.
-        """
-        return pulumi.get(self, "pending_deletion")
-
-    @_builtins.property
-    @pulumi.getter(name="preventInstanceGroupFallback")
-    def prevent_instance_group_fallback(self) -> pulumi.Output[_builtins.bool]:
-        """
-        If enabled, the inventory will prevent adding any organization instance groups to the list of preferred instances groups to run associated job templates on.If this setting is enabled and you provided an empty list, the global instance groups will be applied.
-        """
-        return pulumi.get(self, "prevent_instance_group_fallback")
-
-    @_builtins.property
-    @pulumi.getter(name="totalGroups")
-    @_utilities.deprecated("""Deprecated""")
-    def total_groups(self) -> pulumi.Output[_builtins.float]:
-        """
-        Total number of groups in this inventory.
-        """
-        return pulumi.get(self, "total_groups")
-
-    @_builtins.property
-    @pulumi.getter(name="totalHosts")
-    @_utilities.deprecated("""Deprecated""")
-    def total_hosts(self) -> pulumi.Output[_builtins.float]:
-        """
-        Total number of hosts in this inventory.
-        """
-        return pulumi.get(self, "total_hosts")
-
-    @_builtins.property
-    @pulumi.getter(name="totalInventorySources")
-    def total_inventory_sources(self) -> pulumi.Output[_builtins.float]:
-        """
-        Total number of external inventory sources configured within this inventory.
-        """
-        return pulumi.get(self, "total_inventory_sources")
+        return pulumi.get(self, "organization_id")
 
     @_builtins.property
     @pulumi.getter
-    def variables(self) -> pulumi.Output[_builtins.str]:
+    def variables(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Inventory variables in JSON format
+        The variables of the inventory
         """
         return pulumi.get(self, "variables")
 

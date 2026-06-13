@@ -19,27 +19,34 @@ __all__ = ['HostArgs', 'Host']
 @pulumi.input_type
 class HostArgs:
     def __init__(__self__, *,
-                 inventory: pulumi.Input[_builtins.float],
+                 inventory_id: pulumi.Input[_builtins.float],
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 host_id: pulumi.Input[Optional[_builtins.str]] = None,
                  instance_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Host resource.
 
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.str] description: Optional description of this host.
-        :param pulumi.Input[_builtins.bool] enabled: Is this host online and available for running jobs?
-        :param pulumi.Input[_builtins.str] instance_id: The value used by the remote inventory source to uniquely identify the host
-        :param pulumi.Input[_builtins.str] name: Name of this host.
-        :param pulumi.Input[_builtins.str] variables: Host variables in JSON or YAML format.
+        :param pulumi.Input[_builtins.float] inventory_id: The inventory id of the host
+        :param pulumi.Input[_builtins.str] description: The description of the host
+        :param pulumi.Input[_builtins.bool] enabled: The enabled status of the host
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] group_ids: The group ids of the host
+        :param pulumi.Input[_builtins.str] instance_id: The instance id of the host
+        :param pulumi.Input[_builtins.str] name: The name of the host
+        :param pulumi.Input[_builtins.str] variables: The variables of the host
         """
-        pulumi.set(__self__, "inventory", inventory)
+        pulumi.set(__self__, "inventory_id", inventory_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if enabled is not None:
             pulumi.set(__self__, "enabled", enabled)
+        if group_ids is not None:
+            pulumi.set(__self__, "group_ids", group_ids)
+        if host_id is not None:
+            pulumi.set(__self__, "host_id", host_id)
         if instance_id is not None:
             pulumi.set(__self__, "instance_id", instance_id)
         if name is not None:
@@ -48,22 +55,22 @@ class HostArgs:
             pulumi.set(__self__, "variables", variables)
 
     @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Input[_builtins.float]:
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Input[_builtins.float]:
         """
-        Inventory
+        The inventory id of the host
         """
-        return pulumi.get(self, "inventory")
+        return pulumi.get(self, "inventory_id")
 
-    @inventory.setter
-    def inventory(self, value: pulumi.Input[_builtins.float]):
-        pulumi.set(self, "inventory", value)
+    @inventory_id.setter
+    def inventory_id(self, value: pulumi.Input[_builtins.float]):
+        pulumi.set(self, "inventory_id", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this host.
+        The description of the host
         """
         return pulumi.get(self, "description")
 
@@ -75,7 +82,7 @@ class HostArgs:
     @pulumi.getter
     def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Is this host online and available for running jobs?
+        The enabled status of the host
         """
         return pulumi.get(self, "enabled")
 
@@ -84,10 +91,31 @@ class HostArgs:
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
+    @pulumi.getter(name="groupIds")
+    def group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
+        """
+        The group ids of the host
+        """
+        return pulumi.get(self, "group_ids")
+
+    @group_ids.setter
+    def group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
+        pulumi.set(self, "group_ids", value)
+
+    @_builtins.property
+    @pulumi.getter(name="hostId")
+    def host_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "host_id")
+
+    @host_id.setter
+    def host_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "host_id", value)
+
+    @_builtins.property
     @pulumi.getter(name="instanceId")
     def instance_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The value used by the remote inventory source to uniquely identify the host
+        The instance id of the host
         """
         return pulumi.get(self, "instance_id")
 
@@ -99,7 +127,7 @@ class HostArgs:
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this host.
+        The name of the host
         """
         return pulumi.get(self, "name")
 
@@ -111,7 +139,7 @@ class HostArgs:
     @pulumi.getter
     def variables(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Host variables in JSON or YAML format.
+        The variables of the host
         """
         return pulumi.get(self, "variables")
 
@@ -125,40 +153,35 @@ class _HostState:
     def __init__(__self__, *,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-                 host_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 host_id: pulumi.Input[Optional[_builtins.str]] = None,
                  instance_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 last_job: pulumi.Input[Optional[_builtins.float]] = None,
-                 last_job_host_summary: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering Host resources.
 
-        :param pulumi.Input[_builtins.str] description: Optional description of this host.
-        :param pulumi.Input[_builtins.bool] enabled: Is this host online and available for running jobs?
-        :param pulumi.Input[_builtins.float] host_id: Database ID for this host.
-        :param pulumi.Input[_builtins.str] instance_id: The value used by the remote inventory source to uniquely identify the host
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.float] last_job: Last job
-        :param pulumi.Input[_builtins.float] last_job_host_summary: Last job host summary
-        :param pulumi.Input[_builtins.str] name: Name of this host.
-        :param pulumi.Input[_builtins.str] variables: Host variables in JSON or YAML format.
+        :param pulumi.Input[_builtins.str] description: The description of the host
+        :param pulumi.Input[_builtins.bool] enabled: The enabled status of the host
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] group_ids: The group ids of the host
+        :param pulumi.Input[_builtins.str] instance_id: The instance id of the host
+        :param pulumi.Input[_builtins.float] inventory_id: The inventory id of the host
+        :param pulumi.Input[_builtins.str] name: The name of the host
+        :param pulumi.Input[_builtins.str] variables: The variables of the host
         """
         if description is not None:
             pulumi.set(__self__, "description", description)
         if enabled is not None:
             pulumi.set(__self__, "enabled", enabled)
+        if group_ids is not None:
+            pulumi.set(__self__, "group_ids", group_ids)
         if host_id is not None:
             pulumi.set(__self__, "host_id", host_id)
         if instance_id is not None:
             pulumi.set(__self__, "instance_id", instance_id)
-        if inventory is not None:
-            pulumi.set(__self__, "inventory", inventory)
-        if last_job is not None:
-            pulumi.set(__self__, "last_job", last_job)
-        if last_job_host_summary is not None:
-            pulumi.set(__self__, "last_job_host_summary", last_job_host_summary)
+        if inventory_id is not None:
+            pulumi.set(__self__, "inventory_id", inventory_id)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if variables is not None:
@@ -168,7 +191,7 @@ class _HostState:
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this host.
+        The description of the host
         """
         return pulumi.get(self, "description")
 
@@ -180,7 +203,7 @@ class _HostState:
     @pulumi.getter
     def enabled(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Is this host online and available for running jobs?
+        The enabled status of the host
         """
         return pulumi.get(self, "enabled")
 
@@ -189,22 +212,31 @@ class _HostState:
         pulumi.set(self, "enabled", value)
 
     @_builtins.property
+    @pulumi.getter(name="groupIds")
+    def group_ids(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]:
+        """
+        The group ids of the host
+        """
+        return pulumi.get(self, "group_ids")
+
+    @group_ids.setter
+    def group_ids(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]]):
+        pulumi.set(self, "group_ids", value)
+
+    @_builtins.property
     @pulumi.getter(name="hostId")
-    def host_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this host.
-        """
+    def host_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "host_id")
 
     @host_id.setter
-    def host_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def host_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "host_id", value)
 
     @_builtins.property
     @pulumi.getter(name="instanceId")
     def instance_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The value used by the remote inventory source to uniquely identify the host
+        The instance id of the host
         """
         return pulumi.get(self, "instance_id")
 
@@ -213,46 +245,22 @@ class _HostState:
         pulumi.set(self, "instance_id", value)
 
     @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Inventory
+        The inventory id of the host
         """
-        return pulumi.get(self, "inventory")
+        return pulumi.get(self, "inventory_id")
 
-    @inventory.setter
-    def inventory(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "inventory", value)
-
-    @_builtins.property
-    @pulumi.getter(name="lastJob")
-    def last_job(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Last job
-        """
-        return pulumi.get(self, "last_job")
-
-    @last_job.setter
-    def last_job(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "last_job", value)
-
-    @_builtins.property
-    @pulumi.getter(name="lastJobHostSummary")
-    def last_job_host_summary(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Last job host summary
-        """
-        return pulumi.get(self, "last_job_host_summary")
-
-    @last_job_host_summary.setter
-    def last_job_host_summary(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "last_job_host_summary", value)
+    @inventory_id.setter
+    def inventory_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "inventory_id", value)
 
     @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this host.
+        The name of the host
         """
         return pulumi.get(self, "name")
 
@@ -264,7 +272,7 @@ class _HostState:
     @pulumi.getter
     def variables(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Host variables in JSON or YAML format.
+        The variables of the host
         """
         return pulumi.get(self, "variables")
 
@@ -281,8 +289,10 @@ class Host(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 host_id: pulumi.Input[Optional[_builtins.str]] = None,
                  instance_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
@@ -291,12 +301,13 @@ class Host(pulumi.CustomResource):
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] description: Optional description of this host.
-        :param pulumi.Input[_builtins.bool] enabled: Is this host online and available for running jobs?
-        :param pulumi.Input[_builtins.str] instance_id: The value used by the remote inventory source to uniquely identify the host
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.str] name: Name of this host.
-        :param pulumi.Input[_builtins.str] variables: Host variables in JSON or YAML format.
+        :param pulumi.Input[_builtins.str] description: The description of the host
+        :param pulumi.Input[_builtins.bool] enabled: The enabled status of the host
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] group_ids: The group ids of the host
+        :param pulumi.Input[_builtins.str] instance_id: The instance id of the host
+        :param pulumi.Input[_builtins.float] inventory_id: The inventory id of the host
+        :param pulumi.Input[_builtins.str] name: The name of the host
+        :param pulumi.Input[_builtins.str] variables: The variables of the host
         """
         ...
     @overload
@@ -324,8 +335,10 @@ class Host(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
+                 group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+                 host_id: pulumi.Input[Optional[_builtins.str]] = None,
                  instance_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
@@ -339,15 +352,14 @@ class Host(pulumi.CustomResource):
 
             __props__.__dict__["description"] = description
             __props__.__dict__["enabled"] = enabled
+            __props__.__dict__["group_ids"] = group_ids
+            __props__.__dict__["host_id"] = host_id
             __props__.__dict__["instance_id"] = instance_id
-            if inventory is None and not opts.urn:
-                raise TypeError("Missing required property 'inventory'")
-            __props__.__dict__["inventory"] = inventory
+            if inventory_id is None and not opts.urn:
+                raise TypeError("Missing required property 'inventory_id'")
+            __props__.__dict__["inventory_id"] = inventory_id
             __props__.__dict__["name"] = name
             __props__.__dict__["variables"] = variables
-            __props__.__dict__["host_id"] = None
-            __props__.__dict__["last_job"] = None
-            __props__.__dict__["last_job_host_summary"] = None
         super(Host, __self__).__init__(
             'awx:index/host:Host',
             resource_name,
@@ -361,11 +373,10 @@ class Host(pulumi.CustomResource):
             opts: Optional[pulumi.ResourceOptions] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
             enabled: pulumi.Input[Optional[_builtins.bool]] = None,
-            host_id: pulumi.Input[Optional[_builtins.float]] = None,
+            group_ids: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.float]]]] = None,
+            host_id: pulumi.Input[Optional[_builtins.str]] = None,
             instance_id: pulumi.Input[Optional[_builtins.str]] = None,
-            inventory: pulumi.Input[Optional[_builtins.float]] = None,
-            last_job: pulumi.Input[Optional[_builtins.float]] = None,
-            last_job_host_summary: pulumi.Input[Optional[_builtins.float]] = None,
+            inventory_id: pulumi.Input[Optional[_builtins.float]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
             variables: pulumi.Input[Optional[_builtins.str]] = None) -> 'Host':
         """
@@ -375,15 +386,13 @@ class Host(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] description: Optional description of this host.
-        :param pulumi.Input[_builtins.bool] enabled: Is this host online and available for running jobs?
-        :param pulumi.Input[_builtins.float] host_id: Database ID for this host.
-        :param pulumi.Input[_builtins.str] instance_id: The value used by the remote inventory source to uniquely identify the host
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.float] last_job: Last job
-        :param pulumi.Input[_builtins.float] last_job_host_summary: Last job host summary
-        :param pulumi.Input[_builtins.str] name: Name of this host.
-        :param pulumi.Input[_builtins.str] variables: Host variables in JSON or YAML format.
+        :param pulumi.Input[_builtins.str] description: The description of the host
+        :param pulumi.Input[_builtins.bool] enabled: The enabled status of the host
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.float]]] group_ids: The group ids of the host
+        :param pulumi.Input[_builtins.str] instance_id: The instance id of the host
+        :param pulumi.Input[_builtins.float] inventory_id: The inventory id of the host
+        :param pulumi.Input[_builtins.str] name: The name of the host
+        :param pulumi.Input[_builtins.str] variables: The variables of the host
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -391,84 +400,72 @@ class Host(pulumi.CustomResource):
 
         __props__.__dict__["description"] = description
         __props__.__dict__["enabled"] = enabled
+        __props__.__dict__["group_ids"] = group_ids
         __props__.__dict__["host_id"] = host_id
         __props__.__dict__["instance_id"] = instance_id
-        __props__.__dict__["inventory"] = inventory
-        __props__.__dict__["last_job"] = last_job
-        __props__.__dict__["last_job_host_summary"] = last_job_host_summary
+        __props__.__dict__["inventory_id"] = inventory_id
         __props__.__dict__["name"] = name
         __props__.__dict__["variables"] = variables
         return Host(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Optional description of this host.
+        The description of the host
         """
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def enabled(self) -> pulumi.Output[_builtins.bool]:
+    def enabled(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        Is this host online and available for running jobs?
+        The enabled status of the host
         """
         return pulumi.get(self, "enabled")
 
     @_builtins.property
+    @pulumi.getter(name="groupIds")
+    def group_ids(self) -> pulumi.Output[Optional[Sequence[_builtins.float]]]:
+        """
+        The group ids of the host
+        """
+        return pulumi.get(self, "group_ids")
+
+    @_builtins.property
     @pulumi.getter(name="hostId")
-    def host_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this host.
-        """
+    def host_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "host_id")
 
     @_builtins.property
     @pulumi.getter(name="instanceId")
-    def instance_id(self) -> pulumi.Output[_builtins.str]:
+    def instance_id(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        The value used by the remote inventory source to uniquely identify the host
+        The instance id of the host
         """
         return pulumi.get(self, "instance_id")
 
     @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Output[_builtins.float]:
         """
-        Inventory
+        The inventory id of the host
         """
-        return pulumi.get(self, "inventory")
-
-    @_builtins.property
-    @pulumi.getter(name="lastJob")
-    def last_job(self) -> pulumi.Output[_builtins.float]:
-        """
-        Last job
-        """
-        return pulumi.get(self, "last_job")
-
-    @_builtins.property
-    @pulumi.getter(name="lastJobHostSummary")
-    def last_job_host_summary(self) -> pulumi.Output[_builtins.float]:
-        """
-        Last job host summary
-        """
-        return pulumi.get(self, "last_job_host_summary")
+        return pulumi.get(self, "inventory_id")
 
     @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this host.
+        The name of the host
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def variables(self) -> pulumi.Output[_builtins.str]:
+    def variables(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Host variables in JSON or YAML format.
+        The variables of the host
         """
         return pulumi.get(self, "variables")
 

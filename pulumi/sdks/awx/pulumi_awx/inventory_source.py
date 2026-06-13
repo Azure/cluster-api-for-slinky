@@ -19,53 +19,54 @@ __all__ = ['InventorySourceArgs', 'InventorySource']
 @pulumi.input_type
 class InventorySourceArgs:
     def __init__(__self__, *,
-                 inventory: pulumi.Input[_builtins.float],
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_id: pulumi.Input[_builtins.float],
+                 credential_id: pulumi.Input[Optional[_builtins.float]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled_value: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled_var: pulumi.Input[Optional[_builtins.str]] = None,
                  execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
+                 group_by: pulumi.Input[Optional[_builtins.str]] = None,
                  host_filter: pulumi.Input[Optional[_builtins.str]] = None,
-                 limit: pulumi.Input[Optional[_builtins.str]] = None,
+                 instance_filters: pulumi.Input[Optional[_builtins.str]] = None,
+                 inventory_source_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  overwrite: pulumi.Input[Optional[_builtins.bool]] = None,
                  overwrite_vars: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  source: pulumi.Input[Optional[_builtins.str]] = None,
                  source_path: pulumi.Input[Optional[_builtins.str]] = None,
-                 source_project: pulumi.Input[Optional[_builtins.float]] = None,
+                 source_project_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 source_regions: pulumi.Input[Optional[_builtins.str]] = None,
                  source_vars: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None):
+                 verbosity: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a InventorySource resource.
 
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.float] credential: Cloud credential to use for inventory updates.
-        :param pulumi.Input[_builtins.str] description: Optional description of this inventory source.
-        :param pulumi.Input[_builtins.str] enabled_value: Only used when<span pulumi-lang-nodejs=" enabledVar " pulumi-lang-dotnet=" EnabledVar " pulumi-lang-go=" enabledVar " pulumi-lang-python=" enabled_var " pulumi-lang-yaml=" enabledVar " pulumi-lang-java=" enabledVar " pulumi-lang-hcl=" enabled_var "> enabledVar </span>is set. Value when the host is considered enabled. For example if enabled_var="status.power_state"and enabled_value=<span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span> with host variables:{   "status": {     <span pulumi-lang-nodejs=""powerState"" pulumi-lang-dotnet=""PowerState"" pulumi-lang-go=""powerState"" pulumi-lang-python=""power_state"" pulumi-lang-yaml=""powerState"" pulumi-lang-java=""powerState"" pulumi-lang-hcl=""power_state"">"powerState"</span>: <span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span>,     "created": "2020-08-04T18:13:04+00:00",     "healthy": true    },    "name": "foobar",    <span pulumi-lang-nodejs=""ipAddress"" pulumi-lang-dotnet=""IpAddress"" pulumi-lang-go=""ipAddress"" pulumi-lang-python=""ip_address"" pulumi-lang-yaml=""ipAddress"" pulumi-lang-java=""ipAddress"" pulumi-lang-hcl=""ip_address"">"ipAddress"</span>: "192.168.2.1"}The host would be marked enabled. If<span pulumi-lang-nodejs=" powerState " pulumi-lang-dotnet=" PowerState " pulumi-lang-go=" powerState " pulumi-lang-python=" power_state " pulumi-lang-yaml=" powerState " pulumi-lang-java=" powerState " pulumi-lang-hcl=" power_state "> powerState </span>where any value other than<span pulumi-lang-nodejs=" poweredOn " pulumi-lang-dotnet=" PoweredOn " pulumi-lang-go=" poweredOn " pulumi-lang-python=" powered_on " pulumi-lang-yaml=" poweredOn " pulumi-lang-java=" poweredOn " pulumi-lang-hcl=" powered_on "> poweredOn </span>then the host would be disabled when imported. If the key is not found then the host will be enabled
-        :param pulumi.Input[_builtins.str] enabled_var: Retrieve the enabled state from the given dict of host variables. The enabled variable may be specified as "foo.bar", in which case the lookup will traverse into nested dicts, equivalent to: from_dict.get("foo", {}).get("bar", default)
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] host_filter: Regex where only matching hosts will be imported.
-        :param pulumi.Input[_builtins.str] limit: Enter host, group or pattern match
-        :param pulumi.Input[_builtins.str] name: Name of this inventory source.
-        :param pulumi.Input[_builtins.bool] overwrite: Overwrite local groups and hosts from remote inventory source.
-        :param pulumi.Input[_builtins.bool] overwrite_vars: Overwrite local variables from remote inventory source.
-        :param pulumi.Input[_builtins.str] scm_branch: Inventory source SCM branch. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        :param pulumi.Input[_builtins.str] source: Source
-        :param pulumi.Input[_builtins.str] source_path: Source path
-        :param pulumi.Input[_builtins.float] source_project: Project containing inventory file used as source.
-        :param pulumi.Input[_builtins.str] source_vars: Inventory source variables in YAML or JSON format.
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.float] update_cache_timeout: Update cache timeout
-        :param pulumi.Input[_builtins.bool] update_on_launch: Update on launch
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
+        :param pulumi.Input[_builtins.float] inventory_id: The inventory to use for the inventory source.
+        :param pulumi.Input[_builtins.float] credential_id: The credential to use for the inventory source.
+        :param pulumi.Input[_builtins.str] description: The description of the inventory source.
+        :param pulumi.Input[_builtins.str] enabled_value: The value of the variable that determines if the inventory source is enabled.
+        :param pulumi.Input[_builtins.str] enabled_var: The variable that determines if the inventory source is enabled.
+        :param pulumi.Input[_builtins.float] execution_environment: The selected execution environment that this inventory will be run in.
+        :param pulumi.Input[_builtins.str] group_by: [Obsolete] The group by for the inventory source.
+        :param pulumi.Input[_builtins.str] host_filter: The host filter for the inventory source.
+        :param pulumi.Input[_builtins.str] instance_filters: [Obsolete] The instance filters for the inventory source.
+        :param pulumi.Input[_builtins.str] name: The name of the inventory source.
+        :param pulumi.Input[_builtins.bool] overwrite: Whether to overwrite the inventory source.
+        :param pulumi.Input[_builtins.bool] overwrite_vars: Whether to overwrite the inventory source variables.
+        :param pulumi.Input[_builtins.str] source: The source of the inventory source.
+        :param pulumi.Input[_builtins.str] source_path: [Obsolete] The source path for the inventory source.
+        :param pulumi.Input[_builtins.float] source_project_id: [Obsolete] The source project for the inventory source.
+        :param pulumi.Input[_builtins.str] source_regions: [Obsolete] The source regions for the inventory source.
+        :param pulumi.Input[_builtins.str] source_vars: The variables for the inventory source.
+        :param pulumi.Input[_builtins.float] update_cache_timeout: The update cache timeout for the inventory source.
+        :param pulumi.Input[_builtins.bool] update_on_launch: Whether to update the inventory source on launch.
+        :param pulumi.Input[_builtins.float] verbosity: The verbosity for the inventory source. [0,1,2,3]
         """
-        pulumi.set(__self__, "inventory", inventory)
-        if credential is not None:
-            pulumi.set(__self__, "credential", credential)
+        pulumi.set(__self__, "inventory_id", inventory_id)
+        if credential_id is not None:
+            pulumi.set(__self__, "credential_id", credential_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if enabled_value is not None:
@@ -74,31 +75,30 @@ class InventorySourceArgs:
             pulumi.set(__self__, "enabled_var", enabled_var)
         if execution_environment is not None:
             pulumi.set(__self__, "execution_environment", execution_environment)
-        if host_filter is not None:
-            warnings.warn("""Deprecated""", DeprecationWarning)
-            pulumi.log.warn("""host_filter is deprecated: Deprecated""")
+        if group_by is not None:
+            pulumi.set(__self__, "group_by", group_by)
         if host_filter is not None:
             pulumi.set(__self__, "host_filter", host_filter)
-        if limit is not None:
-            pulumi.set(__self__, "limit", limit)
+        if instance_filters is not None:
+            pulumi.set(__self__, "instance_filters", instance_filters)
+        if inventory_source_id is not None:
+            pulumi.set(__self__, "inventory_source_id", inventory_source_id)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if overwrite is not None:
             pulumi.set(__self__, "overwrite", overwrite)
         if overwrite_vars is not None:
             pulumi.set(__self__, "overwrite_vars", overwrite_vars)
-        if scm_branch is not None:
-            pulumi.set(__self__, "scm_branch", scm_branch)
         if source is not None:
             pulumi.set(__self__, "source", source)
         if source_path is not None:
             pulumi.set(__self__, "source_path", source_path)
-        if source_project is not None:
-            pulumi.set(__self__, "source_project", source_project)
+        if source_project_id is not None:
+            pulumi.set(__self__, "source_project_id", source_project_id)
+        if source_regions is not None:
+            pulumi.set(__self__, "source_regions", source_regions)
         if source_vars is not None:
             pulumi.set(__self__, "source_vars", source_vars)
-        if timeout is not None:
-            pulumi.set(__self__, "timeout", timeout)
         if update_cache_timeout is not None:
             pulumi.set(__self__, "update_cache_timeout", update_cache_timeout)
         if update_on_launch is not None:
@@ -107,34 +107,34 @@ class InventorySourceArgs:
             pulumi.set(__self__, "verbosity", verbosity)
 
     @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Input[_builtins.float]:
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Input[_builtins.float]:
         """
-        Inventory
+        The inventory to use for the inventory source.
         """
-        return pulumi.get(self, "inventory")
+        return pulumi.get(self, "inventory_id")
 
-    @inventory.setter
-    def inventory(self, value: pulumi.Input[_builtins.float]):
-        pulumi.set(self, "inventory", value)
+    @inventory_id.setter
+    def inventory_id(self, value: pulumi.Input[_builtins.float]):
+        pulumi.set(self, "inventory_id", value)
 
     @_builtins.property
-    @pulumi.getter
-    def credential(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="credentialId")
+    def credential_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Cloud credential to use for inventory updates.
+        The credential to use for the inventory source.
         """
-        return pulumi.get(self, "credential")
+        return pulumi.get(self, "credential_id")
 
-    @credential.setter
-    def credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "credential", value)
+    @credential_id.setter
+    def credential_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "credential_id", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this inventory source.
+        The description of the inventory source.
         """
         return pulumi.get(self, "description")
 
@@ -146,7 +146,7 @@ class InventorySourceArgs:
     @pulumi.getter(name="enabledValue")
     def enabled_value(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Only used when<span pulumi-lang-nodejs=" enabledVar " pulumi-lang-dotnet=" EnabledVar " pulumi-lang-go=" enabledVar " pulumi-lang-python=" enabled_var " pulumi-lang-yaml=" enabledVar " pulumi-lang-java=" enabledVar " pulumi-lang-hcl=" enabled_var "> enabledVar </span>is set. Value when the host is considered enabled. For example if enabled_var="status.power_state"and enabled_value=<span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span> with host variables:{   "status": {     <span pulumi-lang-nodejs=""powerState"" pulumi-lang-dotnet=""PowerState"" pulumi-lang-go=""powerState"" pulumi-lang-python=""power_state"" pulumi-lang-yaml=""powerState"" pulumi-lang-java=""powerState"" pulumi-lang-hcl=""power_state"">"powerState"</span>: <span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span>,     "created": "2020-08-04T18:13:04+00:00",     "healthy": true    },    "name": "foobar",    <span pulumi-lang-nodejs=""ipAddress"" pulumi-lang-dotnet=""IpAddress"" pulumi-lang-go=""ipAddress"" pulumi-lang-python=""ip_address"" pulumi-lang-yaml=""ipAddress"" pulumi-lang-java=""ipAddress"" pulumi-lang-hcl=""ip_address"">"ipAddress"</span>: "192.168.2.1"}The host would be marked enabled. If<span pulumi-lang-nodejs=" powerState " pulumi-lang-dotnet=" PowerState " pulumi-lang-go=" powerState " pulumi-lang-python=" power_state " pulumi-lang-yaml=" powerState " pulumi-lang-java=" powerState " pulumi-lang-hcl=" power_state "> powerState </span>where any value other than<span pulumi-lang-nodejs=" poweredOn " pulumi-lang-dotnet=" PoweredOn " pulumi-lang-go=" poweredOn " pulumi-lang-python=" powered_on " pulumi-lang-yaml=" poweredOn " pulumi-lang-java=" poweredOn " pulumi-lang-hcl=" powered_on "> poweredOn </span>then the host would be disabled when imported. If the key is not found then the host will be enabled
+        The value of the variable that determines if the inventory source is enabled.
         """
         return pulumi.get(self, "enabled_value")
 
@@ -158,7 +158,7 @@ class InventorySourceArgs:
     @pulumi.getter(name="enabledVar")
     def enabled_var(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Retrieve the enabled state from the given dict of host variables. The enabled variable may be specified as "foo.bar", in which case the lookup will traverse into nested dicts, equivalent to: from_dict.get("foo", {}).get("bar", default)
+        The variable that determines if the inventory source is enabled.
         """
         return pulumi.get(self, "enabled_var")
 
@@ -170,7 +170,7 @@ class InventorySourceArgs:
     @pulumi.getter(name="executionEnvironment")
     def execution_environment(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        The container image to be used for execution.
+        The selected execution environment that this inventory will be run in.
         """
         return pulumi.get(self, "execution_environment")
 
@@ -179,11 +179,22 @@ class InventorySourceArgs:
         pulumi.set(self, "execution_environment", value)
 
     @_builtins.property
+    @pulumi.getter(name="groupBy")
+    def group_by(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        [Obsolete] The group by for the inventory source.
+        """
+        return pulumi.get(self, "group_by")
+
+    @group_by.setter
+    def group_by(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "group_by", value)
+
+    @_builtins.property
     @pulumi.getter(name="hostFilter")
-    @_utilities.deprecated("""Deprecated""")
     def host_filter(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Regex where only matching hosts will be imported.
+        The host filter for the inventory source.
         """
         return pulumi.get(self, "host_filter")
 
@@ -192,22 +203,31 @@ class InventorySourceArgs:
         pulumi.set(self, "host_filter", value)
 
     @_builtins.property
-    @pulumi.getter
-    def limit(self) -> pulumi.Input[Optional[_builtins.str]]:
+    @pulumi.getter(name="instanceFilters")
+    def instance_filters(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Enter host, group or pattern match
+        [Obsolete] The instance filters for the inventory source.
         """
-        return pulumi.get(self, "limit")
+        return pulumi.get(self, "instance_filters")
 
-    @limit.setter
-    def limit(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "limit", value)
+    @instance_filters.setter
+    def instance_filters(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "instance_filters", value)
+
+    @_builtins.property
+    @pulumi.getter(name="inventorySourceId")
+    def inventory_source_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "inventory_source_id")
+
+    @inventory_source_id.setter
+    def inventory_source_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "inventory_source_id", value)
 
     @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this inventory source.
+        The name of the inventory source.
         """
         return pulumi.get(self, "name")
 
@@ -219,7 +239,7 @@ class InventorySourceArgs:
     @pulumi.getter
     def overwrite(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Overwrite local groups and hosts from remote inventory source.
+        Whether to overwrite the inventory source.
         """
         return pulumi.get(self, "overwrite")
 
@@ -231,7 +251,7 @@ class InventorySourceArgs:
     @pulumi.getter(name="overwriteVars")
     def overwrite_vars(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Overwrite local variables from remote inventory source.
+        Whether to overwrite the inventory source variables.
         """
         return pulumi.get(self, "overwrite_vars")
 
@@ -240,22 +260,10 @@ class InventorySourceArgs:
         pulumi.set(self, "overwrite_vars", value)
 
     @_builtins.property
-    @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Inventory source SCM branch. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        """
-        return pulumi.get(self, "scm_branch")
-
-    @scm_branch.setter
-    def scm_branch(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "scm_branch", value)
-
-    @_builtins.property
     @pulumi.getter
     def source(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Source
+        The source of the inventory source.
         """
         return pulumi.get(self, "source")
 
@@ -267,7 +275,7 @@ class InventorySourceArgs:
     @pulumi.getter(name="sourcePath")
     def source_path(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Source path
+        [Obsolete] The source path for the inventory source.
         """
         return pulumi.get(self, "source_path")
 
@@ -276,22 +284,34 @@ class InventorySourceArgs:
         pulumi.set(self, "source_path", value)
 
     @_builtins.property
-    @pulumi.getter(name="sourceProject")
-    def source_project(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="sourceProjectId")
+    def source_project_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Project containing inventory file used as source.
+        [Obsolete] The source project for the inventory source.
         """
-        return pulumi.get(self, "source_project")
+        return pulumi.get(self, "source_project_id")
 
-    @source_project.setter
-    def source_project(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "source_project", value)
+    @source_project_id.setter
+    def source_project_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "source_project_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sourceRegions")
+    def source_regions(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        [Obsolete] The source regions for the inventory source.
+        """
+        return pulumi.get(self, "source_regions")
+
+    @source_regions.setter
+    def source_regions(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "source_regions", value)
 
     @_builtins.property
     @pulumi.getter(name="sourceVars")
     def source_vars(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Inventory source variables in YAML or JSON format.
+        The variables for the inventory source.
         """
         return pulumi.get(self, "source_vars")
 
@@ -300,22 +320,10 @@ class InventorySourceArgs:
         pulumi.set(self, "source_vars", value)
 
     @_builtins.property
-    @pulumi.getter
-    def timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The amount of time (in seconds) to run before the task is canceled.
-        """
-        return pulumi.get(self, "timeout")
-
-    @timeout.setter
-    def timeout(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "timeout", value)
-
-    @_builtins.property
     @pulumi.getter(name="updateCacheTimeout")
     def update_cache_timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Update cache timeout
+        The update cache timeout for the inventory source.
         """
         return pulumi.get(self, "update_cache_timeout")
 
@@ -327,7 +335,7 @@ class InventorySourceArgs:
     @pulumi.getter(name="updateOnLaunch")
     def update_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Update on launch
+        Whether to update the inventory source on launch.
         """
         return pulumi.get(self, "update_on_launch")
 
@@ -337,68 +345,67 @@ class InventorySourceArgs:
 
     @_builtins.property
     @pulumi.getter
-    def verbosity(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def verbosity(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Verbosity
+        The verbosity for the inventory source. [0,1,2,3]
         """
         return pulumi.get(self, "verbosity")
 
     @verbosity.setter
-    def verbosity(self, value: pulumi.Input[Optional[_builtins.str]]):
+    def verbosity(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "verbosity", value)
 
 
 @pulumi.input_type
 class _InventorySourceState:
     def __init__(__self__, *,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_id: pulumi.Input[Optional[_builtins.float]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled_value: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled_var: pulumi.Input[Optional[_builtins.str]] = None,
                  execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
+                 group_by: pulumi.Input[Optional[_builtins.str]] = None,
                  host_filter: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 inventory_source_id: pulumi.Input[Optional[_builtins.float]] = None,
-                 limit: pulumi.Input[Optional[_builtins.str]] = None,
+                 instance_filters: pulumi.Input[Optional[_builtins.str]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_source_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  overwrite: pulumi.Input[Optional[_builtins.bool]] = None,
                  overwrite_vars: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  source: pulumi.Input[Optional[_builtins.str]] = None,
                  source_path: pulumi.Input[Optional[_builtins.str]] = None,
-                 source_project: pulumi.Input[Optional[_builtins.float]] = None,
+                 source_project_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 source_regions: pulumi.Input[Optional[_builtins.str]] = None,
                  source_vars: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None):
+                 verbosity: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering InventorySource resources.
 
-        :param pulumi.Input[_builtins.float] credential: Cloud credential to use for inventory updates.
-        :param pulumi.Input[_builtins.str] description: Optional description of this inventory source.
-        :param pulumi.Input[_builtins.str] enabled_value: Only used when<span pulumi-lang-nodejs=" enabledVar " pulumi-lang-dotnet=" EnabledVar " pulumi-lang-go=" enabledVar " pulumi-lang-python=" enabled_var " pulumi-lang-yaml=" enabledVar " pulumi-lang-java=" enabledVar " pulumi-lang-hcl=" enabled_var "> enabledVar </span>is set. Value when the host is considered enabled. For example if enabled_var="status.power_state"and enabled_value=<span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span> with host variables:{   "status": {     <span pulumi-lang-nodejs=""powerState"" pulumi-lang-dotnet=""PowerState"" pulumi-lang-go=""powerState"" pulumi-lang-python=""power_state"" pulumi-lang-yaml=""powerState"" pulumi-lang-java=""powerState"" pulumi-lang-hcl=""power_state"">"powerState"</span>: <span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span>,     "created": "2020-08-04T18:13:04+00:00",     "healthy": true    },    "name": "foobar",    <span pulumi-lang-nodejs=""ipAddress"" pulumi-lang-dotnet=""IpAddress"" pulumi-lang-go=""ipAddress"" pulumi-lang-python=""ip_address"" pulumi-lang-yaml=""ipAddress"" pulumi-lang-java=""ipAddress"" pulumi-lang-hcl=""ip_address"">"ipAddress"</span>: "192.168.2.1"}The host would be marked enabled. If<span pulumi-lang-nodejs=" powerState " pulumi-lang-dotnet=" PowerState " pulumi-lang-go=" powerState " pulumi-lang-python=" power_state " pulumi-lang-yaml=" powerState " pulumi-lang-java=" powerState " pulumi-lang-hcl=" power_state "> powerState </span>where any value other than<span pulumi-lang-nodejs=" poweredOn " pulumi-lang-dotnet=" PoweredOn " pulumi-lang-go=" poweredOn " pulumi-lang-python=" powered_on " pulumi-lang-yaml=" poweredOn " pulumi-lang-java=" poweredOn " pulumi-lang-hcl=" powered_on "> poweredOn </span>then the host would be disabled when imported. If the key is not found then the host will be enabled
-        :param pulumi.Input[_builtins.str] enabled_var: Retrieve the enabled state from the given dict of host variables. The enabled variable may be specified as "foo.bar", in which case the lookup will traverse into nested dicts, equivalent to: from_dict.get("foo", {}).get("bar", default)
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] host_filter: Regex where only matching hosts will be imported.
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.float] inventory_source_id: Database ID for this inventory source.
-        :param pulumi.Input[_builtins.str] limit: Enter host, group or pattern match
-        :param pulumi.Input[_builtins.str] name: Name of this inventory source.
-        :param pulumi.Input[_builtins.bool] overwrite: Overwrite local groups and hosts from remote inventory source.
-        :param pulumi.Input[_builtins.bool] overwrite_vars: Overwrite local variables from remote inventory source.
-        :param pulumi.Input[_builtins.str] scm_branch: Inventory source SCM branch. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        :param pulumi.Input[_builtins.str] source: Source
-        :param pulumi.Input[_builtins.str] source_path: Source path
-        :param pulumi.Input[_builtins.float] source_project: Project containing inventory file used as source.
-        :param pulumi.Input[_builtins.str] source_vars: Inventory source variables in YAML or JSON format.
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.float] update_cache_timeout: Update cache timeout
-        :param pulumi.Input[_builtins.bool] update_on_launch: Update on launch
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
+        :param pulumi.Input[_builtins.float] credential_id: The credential to use for the inventory source.
+        :param pulumi.Input[_builtins.str] description: The description of the inventory source.
+        :param pulumi.Input[_builtins.str] enabled_value: The value of the variable that determines if the inventory source is enabled.
+        :param pulumi.Input[_builtins.str] enabled_var: The variable that determines if the inventory source is enabled.
+        :param pulumi.Input[_builtins.float] execution_environment: The selected execution environment that this inventory will be run in.
+        :param pulumi.Input[_builtins.str] group_by: [Obsolete] The group by for the inventory source.
+        :param pulumi.Input[_builtins.str] host_filter: The host filter for the inventory source.
+        :param pulumi.Input[_builtins.str] instance_filters: [Obsolete] The instance filters for the inventory source.
+        :param pulumi.Input[_builtins.float] inventory_id: The inventory to use for the inventory source.
+        :param pulumi.Input[_builtins.str] name: The name of the inventory source.
+        :param pulumi.Input[_builtins.bool] overwrite: Whether to overwrite the inventory source.
+        :param pulumi.Input[_builtins.bool] overwrite_vars: Whether to overwrite the inventory source variables.
+        :param pulumi.Input[_builtins.str] source: The source of the inventory source.
+        :param pulumi.Input[_builtins.str] source_path: [Obsolete] The source path for the inventory source.
+        :param pulumi.Input[_builtins.float] source_project_id: [Obsolete] The source project for the inventory source.
+        :param pulumi.Input[_builtins.str] source_regions: [Obsolete] The source regions for the inventory source.
+        :param pulumi.Input[_builtins.str] source_vars: The variables for the inventory source.
+        :param pulumi.Input[_builtins.float] update_cache_timeout: The update cache timeout for the inventory source.
+        :param pulumi.Input[_builtins.bool] update_on_launch: Whether to update the inventory source on launch.
+        :param pulumi.Input[_builtins.float] verbosity: The verbosity for the inventory source. [0,1,2,3]
         """
-        if credential is not None:
-            pulumi.set(__self__, "credential", credential)
+        if credential_id is not None:
+            pulumi.set(__self__, "credential_id", credential_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if enabled_value is not None:
@@ -407,35 +414,32 @@ class _InventorySourceState:
             pulumi.set(__self__, "enabled_var", enabled_var)
         if execution_environment is not None:
             pulumi.set(__self__, "execution_environment", execution_environment)
-        if host_filter is not None:
-            warnings.warn("""Deprecated""", DeprecationWarning)
-            pulumi.log.warn("""host_filter is deprecated: Deprecated""")
+        if group_by is not None:
+            pulumi.set(__self__, "group_by", group_by)
         if host_filter is not None:
             pulumi.set(__self__, "host_filter", host_filter)
-        if inventory is not None:
-            pulumi.set(__self__, "inventory", inventory)
+        if instance_filters is not None:
+            pulumi.set(__self__, "instance_filters", instance_filters)
+        if inventory_id is not None:
+            pulumi.set(__self__, "inventory_id", inventory_id)
         if inventory_source_id is not None:
             pulumi.set(__self__, "inventory_source_id", inventory_source_id)
-        if limit is not None:
-            pulumi.set(__self__, "limit", limit)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if overwrite is not None:
             pulumi.set(__self__, "overwrite", overwrite)
         if overwrite_vars is not None:
             pulumi.set(__self__, "overwrite_vars", overwrite_vars)
-        if scm_branch is not None:
-            pulumi.set(__self__, "scm_branch", scm_branch)
         if source is not None:
             pulumi.set(__self__, "source", source)
         if source_path is not None:
             pulumi.set(__self__, "source_path", source_path)
-        if source_project is not None:
-            pulumi.set(__self__, "source_project", source_project)
+        if source_project_id is not None:
+            pulumi.set(__self__, "source_project_id", source_project_id)
+        if source_regions is not None:
+            pulumi.set(__self__, "source_regions", source_regions)
         if source_vars is not None:
             pulumi.set(__self__, "source_vars", source_vars)
-        if timeout is not None:
-            pulumi.set(__self__, "timeout", timeout)
         if update_cache_timeout is not None:
             pulumi.set(__self__, "update_cache_timeout", update_cache_timeout)
         if update_on_launch is not None:
@@ -444,22 +448,22 @@ class _InventorySourceState:
             pulumi.set(__self__, "verbosity", verbosity)
 
     @_builtins.property
-    @pulumi.getter
-    def credential(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="credentialId")
+    def credential_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Cloud credential to use for inventory updates.
+        The credential to use for the inventory source.
         """
-        return pulumi.get(self, "credential")
+        return pulumi.get(self, "credential_id")
 
-    @credential.setter
-    def credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "credential", value)
+    @credential_id.setter
+    def credential_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "credential_id", value)
 
     @_builtins.property
     @pulumi.getter
     def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Optional description of this inventory source.
+        The description of the inventory source.
         """
         return pulumi.get(self, "description")
 
@@ -471,7 +475,7 @@ class _InventorySourceState:
     @pulumi.getter(name="enabledValue")
     def enabled_value(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Only used when<span pulumi-lang-nodejs=" enabledVar " pulumi-lang-dotnet=" EnabledVar " pulumi-lang-go=" enabledVar " pulumi-lang-python=" enabled_var " pulumi-lang-yaml=" enabledVar " pulumi-lang-java=" enabledVar " pulumi-lang-hcl=" enabled_var "> enabledVar </span>is set. Value when the host is considered enabled. For example if enabled_var="status.power_state"and enabled_value=<span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span> with host variables:{   "status": {     <span pulumi-lang-nodejs=""powerState"" pulumi-lang-dotnet=""PowerState"" pulumi-lang-go=""powerState"" pulumi-lang-python=""power_state"" pulumi-lang-yaml=""powerState"" pulumi-lang-java=""powerState"" pulumi-lang-hcl=""power_state"">"powerState"</span>: <span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span>,     "created": "2020-08-04T18:13:04+00:00",     "healthy": true    },    "name": "foobar",    <span pulumi-lang-nodejs=""ipAddress"" pulumi-lang-dotnet=""IpAddress"" pulumi-lang-go=""ipAddress"" pulumi-lang-python=""ip_address"" pulumi-lang-yaml=""ipAddress"" pulumi-lang-java=""ipAddress"" pulumi-lang-hcl=""ip_address"">"ipAddress"</span>: "192.168.2.1"}The host would be marked enabled. If<span pulumi-lang-nodejs=" powerState " pulumi-lang-dotnet=" PowerState " pulumi-lang-go=" powerState " pulumi-lang-python=" power_state " pulumi-lang-yaml=" powerState " pulumi-lang-java=" powerState " pulumi-lang-hcl=" power_state "> powerState </span>where any value other than<span pulumi-lang-nodejs=" poweredOn " pulumi-lang-dotnet=" PoweredOn " pulumi-lang-go=" poweredOn " pulumi-lang-python=" powered_on " pulumi-lang-yaml=" poweredOn " pulumi-lang-java=" poweredOn " pulumi-lang-hcl=" powered_on "> poweredOn </span>then the host would be disabled when imported. If the key is not found then the host will be enabled
+        The value of the variable that determines if the inventory source is enabled.
         """
         return pulumi.get(self, "enabled_value")
 
@@ -483,7 +487,7 @@ class _InventorySourceState:
     @pulumi.getter(name="enabledVar")
     def enabled_var(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Retrieve the enabled state from the given dict of host variables. The enabled variable may be specified as "foo.bar", in which case the lookup will traverse into nested dicts, equivalent to: from_dict.get("foo", {}).get("bar", default)
+        The variable that determines if the inventory source is enabled.
         """
         return pulumi.get(self, "enabled_var")
 
@@ -495,7 +499,7 @@ class _InventorySourceState:
     @pulumi.getter(name="executionEnvironment")
     def execution_environment(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        The container image to be used for execution.
+        The selected execution environment that this inventory will be run in.
         """
         return pulumi.get(self, "execution_environment")
 
@@ -504,11 +508,22 @@ class _InventorySourceState:
         pulumi.set(self, "execution_environment", value)
 
     @_builtins.property
+    @pulumi.getter(name="groupBy")
+    def group_by(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        [Obsolete] The group by for the inventory source.
+        """
+        return pulumi.get(self, "group_by")
+
+    @group_by.setter
+    def group_by(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "group_by", value)
+
+    @_builtins.property
     @pulumi.getter(name="hostFilter")
-    @_utilities.deprecated("""Deprecated""")
     def host_filter(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Regex where only matching hosts will be imported.
+        The host filter for the inventory source.
         """
         return pulumi.get(self, "host_filter")
 
@@ -517,46 +532,43 @@ class _InventorySourceState:
         pulumi.set(self, "host_filter", value)
 
     @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="instanceFilters")
+    def instance_filters(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Inventory
+        [Obsolete] The instance filters for the inventory source.
         """
-        return pulumi.get(self, "inventory")
+        return pulumi.get(self, "instance_filters")
 
-    @inventory.setter
-    def inventory(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "inventory", value)
+    @instance_filters.setter
+    def instance_filters(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "instance_filters", value)
+
+    @_builtins.property
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        The inventory to use for the inventory source.
+        """
+        return pulumi.get(self, "inventory_id")
+
+    @inventory_id.setter
+    def inventory_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "inventory_id", value)
 
     @_builtins.property
     @pulumi.getter(name="inventorySourceId")
-    def inventory_source_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this inventory source.
-        """
+    def inventory_source_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "inventory_source_id")
 
     @inventory_source_id.setter
-    def inventory_source_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def inventory_source_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "inventory_source_id", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def limit(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Enter host, group or pattern match
-        """
-        return pulumi.get(self, "limit")
-
-    @limit.setter
-    def limit(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "limit", value)
 
     @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this inventory source.
+        The name of the inventory source.
         """
         return pulumi.get(self, "name")
 
@@ -568,7 +580,7 @@ class _InventorySourceState:
     @pulumi.getter
     def overwrite(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Overwrite local groups and hosts from remote inventory source.
+        Whether to overwrite the inventory source.
         """
         return pulumi.get(self, "overwrite")
 
@@ -580,7 +592,7 @@ class _InventorySourceState:
     @pulumi.getter(name="overwriteVars")
     def overwrite_vars(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Overwrite local variables from remote inventory source.
+        Whether to overwrite the inventory source variables.
         """
         return pulumi.get(self, "overwrite_vars")
 
@@ -589,22 +601,10 @@ class _InventorySourceState:
         pulumi.set(self, "overwrite_vars", value)
 
     @_builtins.property
-    @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        Inventory source SCM branch. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        """
-        return pulumi.get(self, "scm_branch")
-
-    @scm_branch.setter
-    def scm_branch(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "scm_branch", value)
-
-    @_builtins.property
     @pulumi.getter
     def source(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Source
+        The source of the inventory source.
         """
         return pulumi.get(self, "source")
 
@@ -616,7 +616,7 @@ class _InventorySourceState:
     @pulumi.getter(name="sourcePath")
     def source_path(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Source path
+        [Obsolete] The source path for the inventory source.
         """
         return pulumi.get(self, "source_path")
 
@@ -625,22 +625,34 @@ class _InventorySourceState:
         pulumi.set(self, "source_path", value)
 
     @_builtins.property
-    @pulumi.getter(name="sourceProject")
-    def source_project(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="sourceProjectId")
+    def source_project_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Project containing inventory file used as source.
+        [Obsolete] The source project for the inventory source.
         """
-        return pulumi.get(self, "source_project")
+        return pulumi.get(self, "source_project_id")
 
-    @source_project.setter
-    def source_project(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "source_project", value)
+    @source_project_id.setter
+    def source_project_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "source_project_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sourceRegions")
+    def source_regions(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        [Obsolete] The source regions for the inventory source.
+        """
+        return pulumi.get(self, "source_regions")
+
+    @source_regions.setter
+    def source_regions(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "source_regions", value)
 
     @_builtins.property
     @pulumi.getter(name="sourceVars")
     def source_vars(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Inventory source variables in YAML or JSON format.
+        The variables for the inventory source.
         """
         return pulumi.get(self, "source_vars")
 
@@ -649,22 +661,10 @@ class _InventorySourceState:
         pulumi.set(self, "source_vars", value)
 
     @_builtins.property
-    @pulumi.getter
-    def timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The amount of time (in seconds) to run before the task is canceled.
-        """
-        return pulumi.get(self, "timeout")
-
-    @timeout.setter
-    def timeout(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "timeout", value)
-
-    @_builtins.property
     @pulumi.getter(name="updateCacheTimeout")
     def update_cache_timeout(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Update cache timeout
+        The update cache timeout for the inventory source.
         """
         return pulumi.get(self, "update_cache_timeout")
 
@@ -676,7 +676,7 @@ class _InventorySourceState:
     @pulumi.getter(name="updateOnLaunch")
     def update_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Update on launch
+        Whether to update the inventory source on launch.
         """
         return pulumi.get(self, "update_on_launch")
 
@@ -686,14 +686,14 @@ class _InventorySourceState:
 
     @_builtins.property
     @pulumi.getter
-    def verbosity(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def verbosity(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Verbosity
+        The verbosity for the inventory source. [0,1,2,3]
         """
         return pulumi.get(self, "verbosity")
 
     @verbosity.setter
-    def verbosity(self, value: pulumi.Input[Optional[_builtins.str]]):
+    def verbosity(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "verbosity", value)
 
 
@@ -703,52 +703,53 @@ class InventorySource(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_id: pulumi.Input[Optional[_builtins.float]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled_value: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled_var: pulumi.Input[Optional[_builtins.str]] = None,
                  execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
+                 group_by: pulumi.Input[Optional[_builtins.str]] = None,
                  host_filter: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 limit: pulumi.Input[Optional[_builtins.str]] = None,
+                 instance_filters: pulumi.Input[Optional[_builtins.str]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_source_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  overwrite: pulumi.Input[Optional[_builtins.bool]] = None,
                  overwrite_vars: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  source: pulumi.Input[Optional[_builtins.str]] = None,
                  source_path: pulumi.Input[Optional[_builtins.str]] = None,
-                 source_project: pulumi.Input[Optional[_builtins.float]] = None,
+                 source_project_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 source_regions: pulumi.Input[Optional[_builtins.str]] = None,
                  source_vars: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None,
+                 verbosity: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a InventorySource resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.float] credential: Cloud credential to use for inventory updates.
-        :param pulumi.Input[_builtins.str] description: Optional description of this inventory source.
-        :param pulumi.Input[_builtins.str] enabled_value: Only used when<span pulumi-lang-nodejs=" enabledVar " pulumi-lang-dotnet=" EnabledVar " pulumi-lang-go=" enabledVar " pulumi-lang-python=" enabled_var " pulumi-lang-yaml=" enabledVar " pulumi-lang-java=" enabledVar " pulumi-lang-hcl=" enabled_var "> enabledVar </span>is set. Value when the host is considered enabled. For example if enabled_var="status.power_state"and enabled_value=<span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span> with host variables:{   "status": {     <span pulumi-lang-nodejs=""powerState"" pulumi-lang-dotnet=""PowerState"" pulumi-lang-go=""powerState"" pulumi-lang-python=""power_state"" pulumi-lang-yaml=""powerState"" pulumi-lang-java=""powerState"" pulumi-lang-hcl=""power_state"">"powerState"</span>: <span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span>,     "created": "2020-08-04T18:13:04+00:00",     "healthy": true    },    "name": "foobar",    <span pulumi-lang-nodejs=""ipAddress"" pulumi-lang-dotnet=""IpAddress"" pulumi-lang-go=""ipAddress"" pulumi-lang-python=""ip_address"" pulumi-lang-yaml=""ipAddress"" pulumi-lang-java=""ipAddress"" pulumi-lang-hcl=""ip_address"">"ipAddress"</span>: "192.168.2.1"}The host would be marked enabled. If<span pulumi-lang-nodejs=" powerState " pulumi-lang-dotnet=" PowerState " pulumi-lang-go=" powerState " pulumi-lang-python=" power_state " pulumi-lang-yaml=" powerState " pulumi-lang-java=" powerState " pulumi-lang-hcl=" power_state "> powerState </span>where any value other than<span pulumi-lang-nodejs=" poweredOn " pulumi-lang-dotnet=" PoweredOn " pulumi-lang-go=" poweredOn " pulumi-lang-python=" powered_on " pulumi-lang-yaml=" poweredOn " pulumi-lang-java=" poweredOn " pulumi-lang-hcl=" powered_on "> poweredOn </span>then the host would be disabled when imported. If the key is not found then the host will be enabled
-        :param pulumi.Input[_builtins.str] enabled_var: Retrieve the enabled state from the given dict of host variables. The enabled variable may be specified as "foo.bar", in which case the lookup will traverse into nested dicts, equivalent to: from_dict.get("foo", {}).get("bar", default)
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] host_filter: Regex where only matching hosts will be imported.
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.str] limit: Enter host, group or pattern match
-        :param pulumi.Input[_builtins.str] name: Name of this inventory source.
-        :param pulumi.Input[_builtins.bool] overwrite: Overwrite local groups and hosts from remote inventory source.
-        :param pulumi.Input[_builtins.bool] overwrite_vars: Overwrite local variables from remote inventory source.
-        :param pulumi.Input[_builtins.str] scm_branch: Inventory source SCM branch. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        :param pulumi.Input[_builtins.str] source: Source
-        :param pulumi.Input[_builtins.str] source_path: Source path
-        :param pulumi.Input[_builtins.float] source_project: Project containing inventory file used as source.
-        :param pulumi.Input[_builtins.str] source_vars: Inventory source variables in YAML or JSON format.
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.float] update_cache_timeout: Update cache timeout
-        :param pulumi.Input[_builtins.bool] update_on_launch: Update on launch
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
+        :param pulumi.Input[_builtins.float] credential_id: The credential to use for the inventory source.
+        :param pulumi.Input[_builtins.str] description: The description of the inventory source.
+        :param pulumi.Input[_builtins.str] enabled_value: The value of the variable that determines if the inventory source is enabled.
+        :param pulumi.Input[_builtins.str] enabled_var: The variable that determines if the inventory source is enabled.
+        :param pulumi.Input[_builtins.float] execution_environment: The selected execution environment that this inventory will be run in.
+        :param pulumi.Input[_builtins.str] group_by: [Obsolete] The group by for the inventory source.
+        :param pulumi.Input[_builtins.str] host_filter: The host filter for the inventory source.
+        :param pulumi.Input[_builtins.str] instance_filters: [Obsolete] The instance filters for the inventory source.
+        :param pulumi.Input[_builtins.float] inventory_id: The inventory to use for the inventory source.
+        :param pulumi.Input[_builtins.str] name: The name of the inventory source.
+        :param pulumi.Input[_builtins.bool] overwrite: Whether to overwrite the inventory source.
+        :param pulumi.Input[_builtins.bool] overwrite_vars: Whether to overwrite the inventory source variables.
+        :param pulumi.Input[_builtins.str] source: The source of the inventory source.
+        :param pulumi.Input[_builtins.str] source_path: [Obsolete] The source path for the inventory source.
+        :param pulumi.Input[_builtins.float] source_project_id: [Obsolete] The source project for the inventory source.
+        :param pulumi.Input[_builtins.str] source_regions: [Obsolete] The source regions for the inventory source.
+        :param pulumi.Input[_builtins.str] source_vars: The variables for the inventory source.
+        :param pulumi.Input[_builtins.float] update_cache_timeout: The update cache timeout for the inventory source.
+        :param pulumi.Input[_builtins.bool] update_on_launch: Whether to update the inventory source on launch.
+        :param pulumi.Input[_builtins.float] verbosity: The verbosity for the inventory source. [0,1,2,3]
         """
         ...
     @overload
@@ -774,26 +775,27 @@ class InventorySource(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_id: pulumi.Input[Optional[_builtins.float]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled_value: pulumi.Input[Optional[_builtins.str]] = None,
                  enabled_var: pulumi.Input[Optional[_builtins.str]] = None,
                  execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
+                 group_by: pulumi.Input[Optional[_builtins.str]] = None,
                  host_filter: pulumi.Input[Optional[_builtins.str]] = None,
-                 inventory: pulumi.Input[Optional[_builtins.float]] = None,
-                 limit: pulumi.Input[Optional[_builtins.str]] = None,
+                 instance_filters: pulumi.Input[Optional[_builtins.str]] = None,
+                 inventory_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 inventory_source_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  overwrite: pulumi.Input[Optional[_builtins.bool]] = None,
                  overwrite_vars: pulumi.Input[Optional[_builtins.bool]] = None,
-                 scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  source: pulumi.Input[Optional[_builtins.str]] = None,
                  source_path: pulumi.Input[Optional[_builtins.str]] = None,
-                 source_project: pulumi.Input[Optional[_builtins.float]] = None,
+                 source_project_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 source_regions: pulumi.Input[Optional[_builtins.str]] = None,
                  source_vars: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 verbosity: pulumi.Input[Optional[_builtins.str]] = None,
+                 verbosity: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -803,29 +805,29 @@ class InventorySource(pulumi.CustomResource):
                 raise TypeError('__props__ is only valid when passed in combination with a valid opts.id to get an existing resource')
             __props__ = InventorySourceArgs.__new__(InventorySourceArgs)
 
-            __props__.__dict__["credential"] = credential
+            __props__.__dict__["credential_id"] = credential_id
             __props__.__dict__["description"] = description
             __props__.__dict__["enabled_value"] = enabled_value
             __props__.__dict__["enabled_var"] = enabled_var
             __props__.__dict__["execution_environment"] = execution_environment
+            __props__.__dict__["group_by"] = group_by
             __props__.__dict__["host_filter"] = host_filter
-            if inventory is None and not opts.urn:
-                raise TypeError("Missing required property 'inventory'")
-            __props__.__dict__["inventory"] = inventory
-            __props__.__dict__["limit"] = limit
+            __props__.__dict__["instance_filters"] = instance_filters
+            if inventory_id is None and not opts.urn:
+                raise TypeError("Missing required property 'inventory_id'")
+            __props__.__dict__["inventory_id"] = inventory_id
+            __props__.__dict__["inventory_source_id"] = inventory_source_id
             __props__.__dict__["name"] = name
             __props__.__dict__["overwrite"] = overwrite
             __props__.__dict__["overwrite_vars"] = overwrite_vars
-            __props__.__dict__["scm_branch"] = scm_branch
             __props__.__dict__["source"] = source
             __props__.__dict__["source_path"] = source_path
-            __props__.__dict__["source_project"] = source_project
+            __props__.__dict__["source_project_id"] = source_project_id
+            __props__.__dict__["source_regions"] = source_regions
             __props__.__dict__["source_vars"] = source_vars
-            __props__.__dict__["timeout"] = timeout
             __props__.__dict__["update_cache_timeout"] = update_cache_timeout
             __props__.__dict__["update_on_launch"] = update_on_launch
             __props__.__dict__["verbosity"] = verbosity
-            __props__.__dict__["inventory_source_id"] = None
         super(InventorySource, __self__).__init__(
             'awx:index/inventorySource:InventorySource',
             resource_name,
@@ -837,27 +839,27 @@ class InventorySource(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            credential: pulumi.Input[Optional[_builtins.float]] = None,
+            credential_id: pulumi.Input[Optional[_builtins.float]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
             enabled_value: pulumi.Input[Optional[_builtins.str]] = None,
             enabled_var: pulumi.Input[Optional[_builtins.str]] = None,
             execution_environment: pulumi.Input[Optional[_builtins.float]] = None,
+            group_by: pulumi.Input[Optional[_builtins.str]] = None,
             host_filter: pulumi.Input[Optional[_builtins.str]] = None,
-            inventory: pulumi.Input[Optional[_builtins.float]] = None,
-            inventory_source_id: pulumi.Input[Optional[_builtins.float]] = None,
-            limit: pulumi.Input[Optional[_builtins.str]] = None,
+            instance_filters: pulumi.Input[Optional[_builtins.str]] = None,
+            inventory_id: pulumi.Input[Optional[_builtins.float]] = None,
+            inventory_source_id: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
             overwrite: pulumi.Input[Optional[_builtins.bool]] = None,
             overwrite_vars: pulumi.Input[Optional[_builtins.bool]] = None,
-            scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
             source: pulumi.Input[Optional[_builtins.str]] = None,
             source_path: pulumi.Input[Optional[_builtins.str]] = None,
-            source_project: pulumi.Input[Optional[_builtins.float]] = None,
+            source_project_id: pulumi.Input[Optional[_builtins.float]] = None,
+            source_regions: pulumi.Input[Optional[_builtins.str]] = None,
             source_vars: pulumi.Input[Optional[_builtins.str]] = None,
-            timeout: pulumi.Input[Optional[_builtins.float]] = None,
             update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
             update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-            verbosity: pulumi.Input[Optional[_builtins.str]] = None) -> 'InventorySource':
+            verbosity: pulumi.Input[Optional[_builtins.float]] = None) -> 'InventorySource':
         """
         Get an existing InventorySource resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -865,221 +867,216 @@ class InventorySource(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.float] credential: Cloud credential to use for inventory updates.
-        :param pulumi.Input[_builtins.str] description: Optional description of this inventory source.
-        :param pulumi.Input[_builtins.str] enabled_value: Only used when<span pulumi-lang-nodejs=" enabledVar " pulumi-lang-dotnet=" EnabledVar " pulumi-lang-go=" enabledVar " pulumi-lang-python=" enabled_var " pulumi-lang-yaml=" enabledVar " pulumi-lang-java=" enabledVar " pulumi-lang-hcl=" enabled_var "> enabledVar </span>is set. Value when the host is considered enabled. For example if enabled_var="status.power_state"and enabled_value=<span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span> with host variables:{   "status": {     <span pulumi-lang-nodejs=""powerState"" pulumi-lang-dotnet=""PowerState"" pulumi-lang-go=""powerState"" pulumi-lang-python=""power_state"" pulumi-lang-yaml=""powerState"" pulumi-lang-java=""powerState"" pulumi-lang-hcl=""power_state"">"powerState"</span>: <span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span>,     "created": "2020-08-04T18:13:04+00:00",     "healthy": true    },    "name": "foobar",    <span pulumi-lang-nodejs=""ipAddress"" pulumi-lang-dotnet=""IpAddress"" pulumi-lang-go=""ipAddress"" pulumi-lang-python=""ip_address"" pulumi-lang-yaml=""ipAddress"" pulumi-lang-java=""ipAddress"" pulumi-lang-hcl=""ip_address"">"ipAddress"</span>: "192.168.2.1"}The host would be marked enabled. If<span pulumi-lang-nodejs=" powerState " pulumi-lang-dotnet=" PowerState " pulumi-lang-go=" powerState " pulumi-lang-python=" power_state " pulumi-lang-yaml=" powerState " pulumi-lang-java=" powerState " pulumi-lang-hcl=" power_state "> powerState </span>where any value other than<span pulumi-lang-nodejs=" poweredOn " pulumi-lang-dotnet=" PoweredOn " pulumi-lang-go=" poweredOn " pulumi-lang-python=" powered_on " pulumi-lang-yaml=" poweredOn " pulumi-lang-java=" poweredOn " pulumi-lang-hcl=" powered_on "> poweredOn </span>then the host would be disabled when imported. If the key is not found then the host will be enabled
-        :param pulumi.Input[_builtins.str] enabled_var: Retrieve the enabled state from the given dict of host variables. The enabled variable may be specified as "foo.bar", in which case the lookup will traverse into nested dicts, equivalent to: from_dict.get("foo", {}).get("bar", default)
-        :param pulumi.Input[_builtins.float] execution_environment: The container image to be used for execution.
-        :param pulumi.Input[_builtins.str] host_filter: Regex where only matching hosts will be imported.
-        :param pulumi.Input[_builtins.float] inventory: Inventory
-        :param pulumi.Input[_builtins.float] inventory_source_id: Database ID for this inventory source.
-        :param pulumi.Input[_builtins.str] limit: Enter host, group or pattern match
-        :param pulumi.Input[_builtins.str] name: Name of this inventory source.
-        :param pulumi.Input[_builtins.bool] overwrite: Overwrite local groups and hosts from remote inventory source.
-        :param pulumi.Input[_builtins.bool] overwrite_vars: Overwrite local variables from remote inventory source.
-        :param pulumi.Input[_builtins.str] scm_branch: Inventory source SCM branch. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        :param pulumi.Input[_builtins.str] source: Source
-        :param pulumi.Input[_builtins.str] source_path: Source path
-        :param pulumi.Input[_builtins.float] source_project: Project containing inventory file used as source.
-        :param pulumi.Input[_builtins.str] source_vars: Inventory source variables in YAML or JSON format.
-        :param pulumi.Input[_builtins.float] timeout: The amount of time (in seconds) to run before the task is canceled.
-        :param pulumi.Input[_builtins.float] update_cache_timeout: Update cache timeout
-        :param pulumi.Input[_builtins.bool] update_on_launch: Update on launch
-        :param pulumi.Input[_builtins.str] verbosity: Verbosity
+        :param pulumi.Input[_builtins.float] credential_id: The credential to use for the inventory source.
+        :param pulumi.Input[_builtins.str] description: The description of the inventory source.
+        :param pulumi.Input[_builtins.str] enabled_value: The value of the variable that determines if the inventory source is enabled.
+        :param pulumi.Input[_builtins.str] enabled_var: The variable that determines if the inventory source is enabled.
+        :param pulumi.Input[_builtins.float] execution_environment: The selected execution environment that this inventory will be run in.
+        :param pulumi.Input[_builtins.str] group_by: [Obsolete] The group by for the inventory source.
+        :param pulumi.Input[_builtins.str] host_filter: The host filter for the inventory source.
+        :param pulumi.Input[_builtins.str] instance_filters: [Obsolete] The instance filters for the inventory source.
+        :param pulumi.Input[_builtins.float] inventory_id: The inventory to use for the inventory source.
+        :param pulumi.Input[_builtins.str] name: The name of the inventory source.
+        :param pulumi.Input[_builtins.bool] overwrite: Whether to overwrite the inventory source.
+        :param pulumi.Input[_builtins.bool] overwrite_vars: Whether to overwrite the inventory source variables.
+        :param pulumi.Input[_builtins.str] source: The source of the inventory source.
+        :param pulumi.Input[_builtins.str] source_path: [Obsolete] The source path for the inventory source.
+        :param pulumi.Input[_builtins.float] source_project_id: [Obsolete] The source project for the inventory source.
+        :param pulumi.Input[_builtins.str] source_regions: [Obsolete] The source regions for the inventory source.
+        :param pulumi.Input[_builtins.str] source_vars: The variables for the inventory source.
+        :param pulumi.Input[_builtins.float] update_cache_timeout: The update cache timeout for the inventory source.
+        :param pulumi.Input[_builtins.bool] update_on_launch: Whether to update the inventory source on launch.
+        :param pulumi.Input[_builtins.float] verbosity: The verbosity for the inventory source. [0,1,2,3]
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
         __props__ = _InventorySourceState.__new__(_InventorySourceState)
 
-        __props__.__dict__["credential"] = credential
+        __props__.__dict__["credential_id"] = credential_id
         __props__.__dict__["description"] = description
         __props__.__dict__["enabled_value"] = enabled_value
         __props__.__dict__["enabled_var"] = enabled_var
         __props__.__dict__["execution_environment"] = execution_environment
+        __props__.__dict__["group_by"] = group_by
         __props__.__dict__["host_filter"] = host_filter
-        __props__.__dict__["inventory"] = inventory
+        __props__.__dict__["instance_filters"] = instance_filters
+        __props__.__dict__["inventory_id"] = inventory_id
         __props__.__dict__["inventory_source_id"] = inventory_source_id
-        __props__.__dict__["limit"] = limit
         __props__.__dict__["name"] = name
         __props__.__dict__["overwrite"] = overwrite
         __props__.__dict__["overwrite_vars"] = overwrite_vars
-        __props__.__dict__["scm_branch"] = scm_branch
         __props__.__dict__["source"] = source
         __props__.__dict__["source_path"] = source_path
-        __props__.__dict__["source_project"] = source_project
+        __props__.__dict__["source_project_id"] = source_project_id
+        __props__.__dict__["source_regions"] = source_regions
         __props__.__dict__["source_vars"] = source_vars
-        __props__.__dict__["timeout"] = timeout
         __props__.__dict__["update_cache_timeout"] = update_cache_timeout
         __props__.__dict__["update_on_launch"] = update_on_launch
         __props__.__dict__["verbosity"] = verbosity
         return InventorySource(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
-    @pulumi.getter
-    def credential(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="credentialId")
+    def credential_id(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        Cloud credential to use for inventory updates.
+        The credential to use for the inventory source.
         """
-        return pulumi.get(self, "credential")
+        return pulumi.get(self, "credential_id")
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Optional description of this inventory source.
+        The description of the inventory source.
         """
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter(name="enabledValue")
-    def enabled_value(self) -> pulumi.Output[_builtins.str]:
+    def enabled_value(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Only used when<span pulumi-lang-nodejs=" enabledVar " pulumi-lang-dotnet=" EnabledVar " pulumi-lang-go=" enabledVar " pulumi-lang-python=" enabled_var " pulumi-lang-yaml=" enabledVar " pulumi-lang-java=" enabledVar " pulumi-lang-hcl=" enabled_var "> enabledVar </span>is set. Value when the host is considered enabled. For example if enabled_var="status.power_state"and enabled_value=<span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span> with host variables:{   "status": {     <span pulumi-lang-nodejs=""powerState"" pulumi-lang-dotnet=""PowerState"" pulumi-lang-go=""powerState"" pulumi-lang-python=""power_state"" pulumi-lang-yaml=""powerState"" pulumi-lang-java=""powerState"" pulumi-lang-hcl=""power_state"">"powerState"</span>: <span pulumi-lang-nodejs=""poweredOn"" pulumi-lang-dotnet=""PoweredOn"" pulumi-lang-go=""poweredOn"" pulumi-lang-python=""powered_on"" pulumi-lang-yaml=""poweredOn"" pulumi-lang-java=""poweredOn"" pulumi-lang-hcl=""powered_on"">"poweredOn"</span>,     "created": "2020-08-04T18:13:04+00:00",     "healthy": true    },    "name": "foobar",    <span pulumi-lang-nodejs=""ipAddress"" pulumi-lang-dotnet=""IpAddress"" pulumi-lang-go=""ipAddress"" pulumi-lang-python=""ip_address"" pulumi-lang-yaml=""ipAddress"" pulumi-lang-java=""ipAddress"" pulumi-lang-hcl=""ip_address"">"ipAddress"</span>: "192.168.2.1"}The host would be marked enabled. If<span pulumi-lang-nodejs=" powerState " pulumi-lang-dotnet=" PowerState " pulumi-lang-go=" powerState " pulumi-lang-python=" power_state " pulumi-lang-yaml=" powerState " pulumi-lang-java=" powerState " pulumi-lang-hcl=" power_state "> powerState </span>where any value other than<span pulumi-lang-nodejs=" poweredOn " pulumi-lang-dotnet=" PoweredOn " pulumi-lang-go=" poweredOn " pulumi-lang-python=" powered_on " pulumi-lang-yaml=" poweredOn " pulumi-lang-java=" poweredOn " pulumi-lang-hcl=" powered_on "> poweredOn </span>then the host would be disabled when imported. If the key is not found then the host will be enabled
+        The value of the variable that determines if the inventory source is enabled.
         """
         return pulumi.get(self, "enabled_value")
 
     @_builtins.property
     @pulumi.getter(name="enabledVar")
-    def enabled_var(self) -> pulumi.Output[_builtins.str]:
+    def enabled_var(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Retrieve the enabled state from the given dict of host variables. The enabled variable may be specified as "foo.bar", in which case the lookup will traverse into nested dicts, equivalent to: from_dict.get("foo", {}).get("bar", default)
+        The variable that determines if the inventory source is enabled.
         """
         return pulumi.get(self, "enabled_var")
 
     @_builtins.property
     @pulumi.getter(name="executionEnvironment")
-    def execution_environment(self) -> pulumi.Output[_builtins.float]:
+    def execution_environment(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        The container image to be used for execution.
+        The selected execution environment that this inventory will be run in.
         """
         return pulumi.get(self, "execution_environment")
 
     @_builtins.property
-    @pulumi.getter(name="hostFilter")
-    @_utilities.deprecated("""Deprecated""")
-    def host_filter(self) -> pulumi.Output[_builtins.str]:
+    @pulumi.getter(name="groupBy")
+    def group_by(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Regex where only matching hosts will be imported.
+        [Obsolete] The group by for the inventory source.
+        """
+        return pulumi.get(self, "group_by")
+
+    @_builtins.property
+    @pulumi.getter(name="hostFilter")
+    def host_filter(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        The host filter for the inventory source.
         """
         return pulumi.get(self, "host_filter")
 
     @_builtins.property
-    @pulumi.getter
-    def inventory(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="instanceFilters")
+    def instance_filters(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Inventory
+        [Obsolete] The instance filters for the inventory source.
         """
-        return pulumi.get(self, "inventory")
+        return pulumi.get(self, "instance_filters")
+
+    @_builtins.property
+    @pulumi.getter(name="inventoryId")
+    def inventory_id(self) -> pulumi.Output[_builtins.float]:
+        """
+        The inventory to use for the inventory source.
+        """
+        return pulumi.get(self, "inventory_id")
 
     @_builtins.property
     @pulumi.getter(name="inventorySourceId")
-    def inventory_source_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this inventory source.
-        """
+    def inventory_source_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "inventory_source_id")
-
-    @_builtins.property
-    @pulumi.getter
-    def limit(self) -> pulumi.Output[_builtins.str]:
-        """
-        Enter host, group or pattern match
-        """
-        return pulumi.get(self, "limit")
 
     @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this inventory source.
+        The name of the inventory source.
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def overwrite(self) -> pulumi.Output[_builtins.bool]:
+    def overwrite(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        Overwrite local groups and hosts from remote inventory source.
+        Whether to overwrite the inventory source.
         """
         return pulumi.get(self, "overwrite")
 
     @_builtins.property
     @pulumi.getter(name="overwriteVars")
-    def overwrite_vars(self) -> pulumi.Output[_builtins.bool]:
+    def overwrite_vars(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        Overwrite local variables from remote inventory source.
+        Whether to overwrite the inventory source variables.
         """
         return pulumi.get(self, "overwrite_vars")
 
     @_builtins.property
-    @pulumi.getter(name="scmBranch")
-    def scm_branch(self) -> pulumi.Output[_builtins.str]:
-        """
-        Inventory source SCM branch. Project default used if blank. Only allowed if project<span pulumi-lang-nodejs=" allowOverride " pulumi-lang-dotnet=" AllowOverride " pulumi-lang-go=" allowOverride " pulumi-lang-python=" allow_override " pulumi-lang-yaml=" allowOverride " pulumi-lang-java=" allowOverride " pulumi-lang-hcl=" allow_override "> allowOverride </span>field is set to true.
-        """
-        return pulumi.get(self, "scm_branch")
-
-    @_builtins.property
     @pulumi.getter
-    def source(self) -> pulumi.Output[_builtins.str]:
+    def source(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Source
+        The source of the inventory source.
         """
         return pulumi.get(self, "source")
 
     @_builtins.property
     @pulumi.getter(name="sourcePath")
-    def source_path(self) -> pulumi.Output[_builtins.str]:
+    def source_path(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Source path
+        [Obsolete] The source path for the inventory source.
         """
         return pulumi.get(self, "source_path")
 
     @_builtins.property
-    @pulumi.getter(name="sourceProject")
-    def source_project(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="sourceProjectId")
+    def source_project_id(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        Project containing inventory file used as source.
+        [Obsolete] The source project for the inventory source.
         """
-        return pulumi.get(self, "source_project")
+        return pulumi.get(self, "source_project_id")
+
+    @_builtins.property
+    @pulumi.getter(name="sourceRegions")
+    def source_regions(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        [Obsolete] The source regions for the inventory source.
+        """
+        return pulumi.get(self, "source_regions")
 
     @_builtins.property
     @pulumi.getter(name="sourceVars")
-    def source_vars(self) -> pulumi.Output[_builtins.str]:
+    def source_vars(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Inventory source variables in YAML or JSON format.
+        The variables for the inventory source.
         """
         return pulumi.get(self, "source_vars")
 
     @_builtins.property
-    @pulumi.getter
-    def timeout(self) -> pulumi.Output[_builtins.float]:
-        """
-        The amount of time (in seconds) to run before the task is canceled.
-        """
-        return pulumi.get(self, "timeout")
-
-    @_builtins.property
     @pulumi.getter(name="updateCacheTimeout")
-    def update_cache_timeout(self) -> pulumi.Output[_builtins.float]:
+    def update_cache_timeout(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        Update cache timeout
+        The update cache timeout for the inventory source.
         """
         return pulumi.get(self, "update_cache_timeout")
 
     @_builtins.property
     @pulumi.getter(name="updateOnLaunch")
-    def update_on_launch(self) -> pulumi.Output[_builtins.bool]:
+    def update_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        Update on launch
+        Whether to update the inventory source on launch.
         """
         return pulumi.get(self, "update_on_launch")
 
     @_builtins.property
     @pulumi.getter
-    def verbosity(self) -> pulumi.Output[_builtins.str]:
+    def verbosity(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        Verbosity
+        The verbosity for the inventory source. [0,1,2,3]
         """
         return pulumi.get(self, "verbosity")
 

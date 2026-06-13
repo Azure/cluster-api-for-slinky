@@ -74,7 +74,7 @@ class AWXProviderConfig(pulumi.ComponentResource):
             hostname=api_url,
             username=instance.admin_user,
             password=admin_password,
-            verify_ssl=False,
+            insecure=True,
             opts=ResourceOptions(parent=self, depends_on=[admin_password_secret]),
         )
 

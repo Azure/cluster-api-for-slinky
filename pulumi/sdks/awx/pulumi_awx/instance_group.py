@@ -19,64 +19,64 @@ __all__ = ['InstanceGroupArgs', 'InstanceGroup']
 @pulumi.input_type
 class InstanceGroupArgs:
     def __init__(__self__, *,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 instance_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  is_container_group: pulumi.Input[Optional[_builtins.bool]] = None,
-                 max_concurrent_jobs: pulumi.Input[Optional[_builtins.float]] = None,
-                 max_forks: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  pod_spec_override: pulumi.Input[Optional[_builtins.str]] = None,
-                 policy_instance_list: pulumi.Input[Optional[_builtins.str]] = None,
                  policy_instance_minimum: pulumi.Input[Optional[_builtins.float]] = None,
                  policy_instance_percentage: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a InstanceGroup resource.
 
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.bool] is_container_group: Indicates whether instances in this group are containerized.Containerized groups have a designated Openshift or Kubernetes cluster.
-        :param pulumi.Input[_builtins.float] max_concurrent_jobs: Maximum number of concurrent jobs to run on a group. When set to zero, no maximum is enforced.
-        :param pulumi.Input[_builtins.float] max_forks: Maximum number of forks to execute concurrently on a group. When set to zero, no maximum is enforced.
-        :param pulumi.Input[_builtins.str] name: Name of this instance group.
-        :param pulumi.Input[_builtins.str] pod_spec_override: Pod spec override
-        :param pulumi.Input[_builtins.str] policy_instance_list: List of exact-match Instances that will be assigned to this group
-        :param pulumi.Input[_builtins.float] policy_instance_minimum: Static minimum number of Instances that will be automatically assign to this group when new instances come online.
-        :param pulumi.Input[_builtins.float] policy_instance_percentage: Minimum percentage of all instances that will be automatically assigned to this group when new instances come online.
+        :param pulumi.Input[_builtins.str] credential_id: ID of the credential of type 'OpenShift or Kubernetes API Bearer Token' to use as remote cluster.
+        :param pulumi.Input[_builtins.bool] is_container_group: Whether the instance group is a container group.
+        :param pulumi.Input[_builtins.str] name: The name of the instance group.
+        :param pulumi.Input[_builtins.str] pod_spec_override: The pod spec override for the instance group.
+        :param pulumi.Input[_builtins.float] policy_instance_minimum: The minimum number of instances to run in the instance group.
+        :param pulumi.Input[_builtins.float] policy_instance_percentage: The percentage of instances to run in the instance group.
         """
-        if credential is not None:
-            pulumi.set(__self__, "credential", credential)
+        if credential_id is not None:
+            pulumi.set(__self__, "credential_id", credential_id)
+        if instance_group_id is not None:
+            pulumi.set(__self__, "instance_group_id", instance_group_id)
         if is_container_group is not None:
             pulumi.set(__self__, "is_container_group", is_container_group)
-        if max_concurrent_jobs is not None:
-            pulumi.set(__self__, "max_concurrent_jobs", max_concurrent_jobs)
-        if max_forks is not None:
-            pulumi.set(__self__, "max_forks", max_forks)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if pod_spec_override is not None:
             pulumi.set(__self__, "pod_spec_override", pod_spec_override)
-        if policy_instance_list is not None:
-            pulumi.set(__self__, "policy_instance_list", policy_instance_list)
         if policy_instance_minimum is not None:
             pulumi.set(__self__, "policy_instance_minimum", policy_instance_minimum)
         if policy_instance_percentage is not None:
             pulumi.set(__self__, "policy_instance_percentage", policy_instance_percentage)
 
     @_builtins.property
-    @pulumi.getter
-    def credential(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="credentialId")
+    def credential_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Credential
+        ID of the credential of type 'OpenShift or Kubernetes API Bearer Token' to use as remote cluster.
         """
-        return pulumi.get(self, "credential")
+        return pulumi.get(self, "credential_id")
 
-    @credential.setter
-    def credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "credential", value)
+    @credential_id.setter
+    def credential_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "credential_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="instanceGroupId")
+    def instance_group_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "instance_group_id")
+
+    @instance_group_id.setter
+    def instance_group_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "instance_group_id", value)
 
     @_builtins.property
     @pulumi.getter(name="isContainerGroup")
     def is_container_group(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Indicates whether instances in this group are containerized.Containerized groups have a designated Openshift or Kubernetes cluster.
+        Whether the instance group is a container group.
         """
         return pulumi.get(self, "is_container_group")
 
@@ -85,34 +85,10 @@ class InstanceGroupArgs:
         pulumi.set(self, "is_container_group", value)
 
     @_builtins.property
-    @pulumi.getter(name="maxConcurrentJobs")
-    def max_concurrent_jobs(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Maximum number of concurrent jobs to run on a group. When set to zero, no maximum is enforced.
-        """
-        return pulumi.get(self, "max_concurrent_jobs")
-
-    @max_concurrent_jobs.setter
-    def max_concurrent_jobs(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "max_concurrent_jobs", value)
-
-    @_builtins.property
-    @pulumi.getter(name="maxForks")
-    def max_forks(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Maximum number of forks to execute concurrently on a group. When set to zero, no maximum is enforced.
-        """
-        return pulumi.get(self, "max_forks")
-
-    @max_forks.setter
-    def max_forks(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "max_forks", value)
-
-    @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this instance group.
+        The name of the instance group.
         """
         return pulumi.get(self, "name")
 
@@ -124,7 +100,7 @@ class InstanceGroupArgs:
     @pulumi.getter(name="podSpecOverride")
     def pod_spec_override(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Pod spec override
+        The pod spec override for the instance group.
         """
         return pulumi.get(self, "pod_spec_override")
 
@@ -133,22 +109,10 @@ class InstanceGroupArgs:
         pulumi.set(self, "pod_spec_override", value)
 
     @_builtins.property
-    @pulumi.getter(name="policyInstanceList")
-    def policy_instance_list(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        List of exact-match Instances that will be assigned to this group
-        """
-        return pulumi.get(self, "policy_instance_list")
-
-    @policy_instance_list.setter
-    def policy_instance_list(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "policy_instance_list", value)
-
-    @_builtins.property
     @pulumi.getter(name="policyInstanceMinimum")
     def policy_instance_minimum(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Static minimum number of Instances that will be automatically assign to this group when new instances come online.
+        The minimum number of instances to run in the instance group.
         """
         return pulumi.get(self, "policy_instance_minimum")
 
@@ -160,7 +124,7 @@ class InstanceGroupArgs:
     @pulumi.getter(name="policyInstancePercentage")
     def policy_instance_percentage(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Minimum percentage of all instances that will be automatically assigned to this group when new instances come online.
+        The percentage of instances to run in the instance group.
         """
         return pulumi.get(self, "policy_instance_percentage")
 
@@ -172,140 +136,64 @@ class InstanceGroupArgs:
 @pulumi.input_type
 class _InstanceGroupState:
     def __init__(__self__, *,
-                 capacity: pulumi.Input[Optional[_builtins.float]] = None,
-                 consumed_capacity: pulumi.Input[Optional[_builtins.float]] = None,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
-                 instance_group_id: pulumi.Input[Optional[_builtins.float]] = None,
-                 instances: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 instance_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  is_container_group: pulumi.Input[Optional[_builtins.bool]] = None,
-                 jobs_running: pulumi.Input[Optional[_builtins.float]] = None,
-                 jobs_total: pulumi.Input[Optional[_builtins.float]] = None,
-                 max_concurrent_jobs: pulumi.Input[Optional[_builtins.float]] = None,
-                 max_forks: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 percent_capacity_remaining: pulumi.Input[Optional[_builtins.float]] = None,
                  pod_spec_override: pulumi.Input[Optional[_builtins.str]] = None,
-                 policy_instance_list: pulumi.Input[Optional[_builtins.str]] = None,
                  policy_instance_minimum: pulumi.Input[Optional[_builtins.float]] = None,
                  policy_instance_percentage: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering InstanceGroup resources.
 
-        :param pulumi.Input[_builtins.float] capacity: Capacity
-        :param pulumi.Input[_builtins.float] consumed_capacity: Consumed capacity
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.float] instance_group_id: Database ID for this instance group.
-        :param pulumi.Input[_builtins.float] instances: Instances
-        :param pulumi.Input[_builtins.bool] is_container_group: Indicates whether instances in this group are containerized.Containerized groups have a designated Openshift or Kubernetes cluster.
-        :param pulumi.Input[_builtins.float] jobs_running: Jobs running
-        :param pulumi.Input[_builtins.float] jobs_total: Count of all jobs that target this instance group
-        :param pulumi.Input[_builtins.float] max_concurrent_jobs: Maximum number of concurrent jobs to run on a group. When set to zero, no maximum is enforced.
-        :param pulumi.Input[_builtins.float] max_forks: Maximum number of forks to execute concurrently on a group. When set to zero, no maximum is enforced.
-        :param pulumi.Input[_builtins.str] name: Name of this instance group.
-        :param pulumi.Input[_builtins.float] percent_capacity_remaining: Percent capacity remaining
-        :param pulumi.Input[_builtins.str] pod_spec_override: Pod spec override
-        :param pulumi.Input[_builtins.str] policy_instance_list: List of exact-match Instances that will be assigned to this group
-        :param pulumi.Input[_builtins.float] policy_instance_minimum: Static minimum number of Instances that will be automatically assign to this group when new instances come online.
-        :param pulumi.Input[_builtins.float] policy_instance_percentage: Minimum percentage of all instances that will be automatically assigned to this group when new instances come online.
+        :param pulumi.Input[_builtins.str] credential_id: ID of the credential of type 'OpenShift or Kubernetes API Bearer Token' to use as remote cluster.
+        :param pulumi.Input[_builtins.bool] is_container_group: Whether the instance group is a container group.
+        :param pulumi.Input[_builtins.str] name: The name of the instance group.
+        :param pulumi.Input[_builtins.str] pod_spec_override: The pod spec override for the instance group.
+        :param pulumi.Input[_builtins.float] policy_instance_minimum: The minimum number of instances to run in the instance group.
+        :param pulumi.Input[_builtins.float] policy_instance_percentage: The percentage of instances to run in the instance group.
         """
-        if capacity is not None:
-            pulumi.set(__self__, "capacity", capacity)
-        if consumed_capacity is not None:
-            pulumi.set(__self__, "consumed_capacity", consumed_capacity)
-        if credential is not None:
-            pulumi.set(__self__, "credential", credential)
+        if credential_id is not None:
+            pulumi.set(__self__, "credential_id", credential_id)
         if instance_group_id is not None:
             pulumi.set(__self__, "instance_group_id", instance_group_id)
-        if instances is not None:
-            pulumi.set(__self__, "instances", instances)
         if is_container_group is not None:
             pulumi.set(__self__, "is_container_group", is_container_group)
-        if jobs_running is not None:
-            pulumi.set(__self__, "jobs_running", jobs_running)
-        if jobs_total is not None:
-            pulumi.set(__self__, "jobs_total", jobs_total)
-        if max_concurrent_jobs is not None:
-            pulumi.set(__self__, "max_concurrent_jobs", max_concurrent_jobs)
-        if max_forks is not None:
-            pulumi.set(__self__, "max_forks", max_forks)
         if name is not None:
             pulumi.set(__self__, "name", name)
-        if percent_capacity_remaining is not None:
-            pulumi.set(__self__, "percent_capacity_remaining", percent_capacity_remaining)
         if pod_spec_override is not None:
             pulumi.set(__self__, "pod_spec_override", pod_spec_override)
-        if policy_instance_list is not None:
-            pulumi.set(__self__, "policy_instance_list", policy_instance_list)
         if policy_instance_minimum is not None:
             pulumi.set(__self__, "policy_instance_minimum", policy_instance_minimum)
         if policy_instance_percentage is not None:
             pulumi.set(__self__, "policy_instance_percentage", policy_instance_percentage)
 
     @_builtins.property
-    @pulumi.getter
-    def capacity(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="credentialId")
+    def credential_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Capacity
+        ID of the credential of type 'OpenShift or Kubernetes API Bearer Token' to use as remote cluster.
         """
-        return pulumi.get(self, "capacity")
+        return pulumi.get(self, "credential_id")
 
-    @capacity.setter
-    def capacity(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "capacity", value)
-
-    @_builtins.property
-    @pulumi.getter(name="consumedCapacity")
-    def consumed_capacity(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Consumed capacity
-        """
-        return pulumi.get(self, "consumed_capacity")
-
-    @consumed_capacity.setter
-    def consumed_capacity(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "consumed_capacity", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def credential(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Credential
-        """
-        return pulumi.get(self, "credential")
-
-    @credential.setter
-    def credential(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "credential", value)
+    @credential_id.setter
+    def credential_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "credential_id", value)
 
     @_builtins.property
     @pulumi.getter(name="instanceGroupId")
-    def instance_group_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Database ID for this instance group.
-        """
+    def instance_group_id(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "instance_group_id")
 
     @instance_group_id.setter
-    def instance_group_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+    def instance_group_id(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "instance_group_id", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def instances(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Instances
-        """
-        return pulumi.get(self, "instances")
-
-    @instances.setter
-    def instances(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "instances", value)
 
     @_builtins.property
     @pulumi.getter(name="isContainerGroup")
     def is_container_group(self) -> pulumi.Input[Optional[_builtins.bool]]:
         """
-        Indicates whether instances in this group are containerized.Containerized groups have a designated Openshift or Kubernetes cluster.
+        Whether the instance group is a container group.
         """
         return pulumi.get(self, "is_container_group")
 
@@ -314,58 +202,10 @@ class _InstanceGroupState:
         pulumi.set(self, "is_container_group", value)
 
     @_builtins.property
-    @pulumi.getter(name="jobsRunning")
-    def jobs_running(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Jobs running
-        """
-        return pulumi.get(self, "jobs_running")
-
-    @jobs_running.setter
-    def jobs_running(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "jobs_running", value)
-
-    @_builtins.property
-    @pulumi.getter(name="jobsTotal")
-    def jobs_total(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Count of all jobs that target this instance group
-        """
-        return pulumi.get(self, "jobs_total")
-
-    @jobs_total.setter
-    def jobs_total(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "jobs_total", value)
-
-    @_builtins.property
-    @pulumi.getter(name="maxConcurrentJobs")
-    def max_concurrent_jobs(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Maximum number of concurrent jobs to run on a group. When set to zero, no maximum is enforced.
-        """
-        return pulumi.get(self, "max_concurrent_jobs")
-
-    @max_concurrent_jobs.setter
-    def max_concurrent_jobs(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "max_concurrent_jobs", value)
-
-    @_builtins.property
-    @pulumi.getter(name="maxForks")
-    def max_forks(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Maximum number of forks to execute concurrently on a group. When set to zero, no maximum is enforced.
-        """
-        return pulumi.get(self, "max_forks")
-
-    @max_forks.setter
-    def max_forks(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "max_forks", value)
-
-    @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Name of this instance group.
+        The name of the instance group.
         """
         return pulumi.get(self, "name")
 
@@ -374,22 +214,10 @@ class _InstanceGroupState:
         pulumi.set(self, "name", value)
 
     @_builtins.property
-    @pulumi.getter(name="percentCapacityRemaining")
-    def percent_capacity_remaining(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        Percent capacity remaining
-        """
-        return pulumi.get(self, "percent_capacity_remaining")
-
-    @percent_capacity_remaining.setter
-    def percent_capacity_remaining(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "percent_capacity_remaining", value)
-
-    @_builtins.property
     @pulumi.getter(name="podSpecOverride")
     def pod_spec_override(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Pod spec override
+        The pod spec override for the instance group.
         """
         return pulumi.get(self, "pod_spec_override")
 
@@ -398,22 +226,10 @@ class _InstanceGroupState:
         pulumi.set(self, "pod_spec_override", value)
 
     @_builtins.property
-    @pulumi.getter(name="policyInstanceList")
-    def policy_instance_list(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        List of exact-match Instances that will be assigned to this group
-        """
-        return pulumi.get(self, "policy_instance_list")
-
-    @policy_instance_list.setter
-    def policy_instance_list(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "policy_instance_list", value)
-
-    @_builtins.property
     @pulumi.getter(name="policyInstanceMinimum")
     def policy_instance_minimum(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Static minimum number of Instances that will be automatically assign to this group when new instances come online.
+        The minimum number of instances to run in the instance group.
         """
         return pulumi.get(self, "policy_instance_minimum")
 
@@ -425,7 +241,7 @@ class _InstanceGroupState:
     @pulumi.getter(name="policyInstancePercentage")
     def policy_instance_percentage(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Minimum percentage of all instances that will be automatically assigned to this group when new instances come online.
+        The percentage of instances to run in the instance group.
         """
         return pulumi.get(self, "policy_instance_percentage")
 
@@ -440,13 +256,11 @@ class InstanceGroup(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 instance_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  is_container_group: pulumi.Input[Optional[_builtins.bool]] = None,
-                 max_concurrent_jobs: pulumi.Input[Optional[_builtins.float]] = None,
-                 max_forks: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  pod_spec_override: pulumi.Input[Optional[_builtins.str]] = None,
-                 policy_instance_list: pulumi.Input[Optional[_builtins.str]] = None,
                  policy_instance_minimum: pulumi.Input[Optional[_builtins.float]] = None,
                  policy_instance_percentage: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
@@ -455,15 +269,12 @@ class InstanceGroup(pulumi.CustomResource):
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.bool] is_container_group: Indicates whether instances in this group are containerized.Containerized groups have a designated Openshift or Kubernetes cluster.
-        :param pulumi.Input[_builtins.float] max_concurrent_jobs: Maximum number of concurrent jobs to run on a group. When set to zero, no maximum is enforced.
-        :param pulumi.Input[_builtins.float] max_forks: Maximum number of forks to execute concurrently on a group. When set to zero, no maximum is enforced.
-        :param pulumi.Input[_builtins.str] name: Name of this instance group.
-        :param pulumi.Input[_builtins.str] pod_spec_override: Pod spec override
-        :param pulumi.Input[_builtins.str] policy_instance_list: List of exact-match Instances that will be assigned to this group
-        :param pulumi.Input[_builtins.float] policy_instance_minimum: Static minimum number of Instances that will be automatically assign to this group when new instances come online.
-        :param pulumi.Input[_builtins.float] policy_instance_percentage: Minimum percentage of all instances that will be automatically assigned to this group when new instances come online.
+        :param pulumi.Input[_builtins.str] credential_id: ID of the credential of type 'OpenShift or Kubernetes API Bearer Token' to use as remote cluster.
+        :param pulumi.Input[_builtins.bool] is_container_group: Whether the instance group is a container group.
+        :param pulumi.Input[_builtins.str] name: The name of the instance group.
+        :param pulumi.Input[_builtins.str] pod_spec_override: The pod spec override for the instance group.
+        :param pulumi.Input[_builtins.float] policy_instance_minimum: The minimum number of instances to run in the instance group.
+        :param pulumi.Input[_builtins.float] policy_instance_percentage: The percentage of instances to run in the instance group.
         """
         ...
     @overload
@@ -489,13 +300,11 @@ class InstanceGroup(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 credential: pulumi.Input[Optional[_builtins.float]] = None,
+                 credential_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 instance_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  is_container_group: pulumi.Input[Optional[_builtins.bool]] = None,
-                 max_concurrent_jobs: pulumi.Input[Optional[_builtins.float]] = None,
-                 max_forks: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  pod_spec_override: pulumi.Input[Optional[_builtins.str]] = None,
-                 policy_instance_list: pulumi.Input[Optional[_builtins.str]] = None,
                  policy_instance_minimum: pulumi.Input[Optional[_builtins.float]] = None,
                  policy_instance_percentage: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
@@ -507,22 +316,13 @@ class InstanceGroup(pulumi.CustomResource):
                 raise TypeError('__props__ is only valid when passed in combination with a valid opts.id to get an existing resource')
             __props__ = InstanceGroupArgs.__new__(InstanceGroupArgs)
 
-            __props__.__dict__["credential"] = credential
+            __props__.__dict__["credential_id"] = credential_id
+            __props__.__dict__["instance_group_id"] = instance_group_id
             __props__.__dict__["is_container_group"] = is_container_group
-            __props__.__dict__["max_concurrent_jobs"] = max_concurrent_jobs
-            __props__.__dict__["max_forks"] = max_forks
             __props__.__dict__["name"] = name
             __props__.__dict__["pod_spec_override"] = pod_spec_override
-            __props__.__dict__["policy_instance_list"] = policy_instance_list
             __props__.__dict__["policy_instance_minimum"] = policy_instance_minimum
             __props__.__dict__["policy_instance_percentage"] = policy_instance_percentage
-            __props__.__dict__["capacity"] = None
-            __props__.__dict__["consumed_capacity"] = None
-            __props__.__dict__["instance_group_id"] = None
-            __props__.__dict__["instances"] = None
-            __props__.__dict__["jobs_running"] = None
-            __props__.__dict__["jobs_total"] = None
-            __props__.__dict__["percent_capacity_remaining"] = None
         super(InstanceGroup, __self__).__init__(
             'awx:index/instanceGroup:InstanceGroup',
             resource_name,
@@ -534,20 +334,11 @@ class InstanceGroup(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            capacity: pulumi.Input[Optional[_builtins.float]] = None,
-            consumed_capacity: pulumi.Input[Optional[_builtins.float]] = None,
-            credential: pulumi.Input[Optional[_builtins.float]] = None,
-            instance_group_id: pulumi.Input[Optional[_builtins.float]] = None,
-            instances: pulumi.Input[Optional[_builtins.float]] = None,
+            credential_id: pulumi.Input[Optional[_builtins.str]] = None,
+            instance_group_id: pulumi.Input[Optional[_builtins.str]] = None,
             is_container_group: pulumi.Input[Optional[_builtins.bool]] = None,
-            jobs_running: pulumi.Input[Optional[_builtins.float]] = None,
-            jobs_total: pulumi.Input[Optional[_builtins.float]] = None,
-            max_concurrent_jobs: pulumi.Input[Optional[_builtins.float]] = None,
-            max_forks: pulumi.Input[Optional[_builtins.float]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            percent_capacity_remaining: pulumi.Input[Optional[_builtins.float]] = None,
             pod_spec_override: pulumi.Input[Optional[_builtins.str]] = None,
-            policy_instance_list: pulumi.Input[Optional[_builtins.str]] = None,
             policy_instance_minimum: pulumi.Input[Optional[_builtins.float]] = None,
             policy_instance_percentage: pulumi.Input[Optional[_builtins.float]] = None) -> 'InstanceGroup':
         """
@@ -557,170 +348,76 @@ class InstanceGroup(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.float] capacity: Capacity
-        :param pulumi.Input[_builtins.float] consumed_capacity: Consumed capacity
-        :param pulumi.Input[_builtins.float] credential: Credential
-        :param pulumi.Input[_builtins.float] instance_group_id: Database ID for this instance group.
-        :param pulumi.Input[_builtins.float] instances: Instances
-        :param pulumi.Input[_builtins.bool] is_container_group: Indicates whether instances in this group are containerized.Containerized groups have a designated Openshift or Kubernetes cluster.
-        :param pulumi.Input[_builtins.float] jobs_running: Jobs running
-        :param pulumi.Input[_builtins.float] jobs_total: Count of all jobs that target this instance group
-        :param pulumi.Input[_builtins.float] max_concurrent_jobs: Maximum number of concurrent jobs to run on a group. When set to zero, no maximum is enforced.
-        :param pulumi.Input[_builtins.float] max_forks: Maximum number of forks to execute concurrently on a group. When set to zero, no maximum is enforced.
-        :param pulumi.Input[_builtins.str] name: Name of this instance group.
-        :param pulumi.Input[_builtins.float] percent_capacity_remaining: Percent capacity remaining
-        :param pulumi.Input[_builtins.str] pod_spec_override: Pod spec override
-        :param pulumi.Input[_builtins.str] policy_instance_list: List of exact-match Instances that will be assigned to this group
-        :param pulumi.Input[_builtins.float] policy_instance_minimum: Static minimum number of Instances that will be automatically assign to this group when new instances come online.
-        :param pulumi.Input[_builtins.float] policy_instance_percentage: Minimum percentage of all instances that will be automatically assigned to this group when new instances come online.
+        :param pulumi.Input[_builtins.str] credential_id: ID of the credential of type 'OpenShift or Kubernetes API Bearer Token' to use as remote cluster.
+        :param pulumi.Input[_builtins.bool] is_container_group: Whether the instance group is a container group.
+        :param pulumi.Input[_builtins.str] name: The name of the instance group.
+        :param pulumi.Input[_builtins.str] pod_spec_override: The pod spec override for the instance group.
+        :param pulumi.Input[_builtins.float] policy_instance_minimum: The minimum number of instances to run in the instance group.
+        :param pulumi.Input[_builtins.float] policy_instance_percentage: The percentage of instances to run in the instance group.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
         __props__ = _InstanceGroupState.__new__(_InstanceGroupState)
 
-        __props__.__dict__["capacity"] = capacity
-        __props__.__dict__["consumed_capacity"] = consumed_capacity
-        __props__.__dict__["credential"] = credential
+        __props__.__dict__["credential_id"] = credential_id
         __props__.__dict__["instance_group_id"] = instance_group_id
-        __props__.__dict__["instances"] = instances
         __props__.__dict__["is_container_group"] = is_container_group
-        __props__.__dict__["jobs_running"] = jobs_running
-        __props__.__dict__["jobs_total"] = jobs_total
-        __props__.__dict__["max_concurrent_jobs"] = max_concurrent_jobs
-        __props__.__dict__["max_forks"] = max_forks
         __props__.__dict__["name"] = name
-        __props__.__dict__["percent_capacity_remaining"] = percent_capacity_remaining
         __props__.__dict__["pod_spec_override"] = pod_spec_override
-        __props__.__dict__["policy_instance_list"] = policy_instance_list
         __props__.__dict__["policy_instance_minimum"] = policy_instance_minimum
         __props__.__dict__["policy_instance_percentage"] = policy_instance_percentage
         return InstanceGroup(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
-    @pulumi.getter
-    def capacity(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="credentialId")
+    def credential_id(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Capacity
+        ID of the credential of type 'OpenShift or Kubernetes API Bearer Token' to use as remote cluster.
         """
-        return pulumi.get(self, "capacity")
-
-    @_builtins.property
-    @pulumi.getter(name="consumedCapacity")
-    def consumed_capacity(self) -> pulumi.Output[_builtins.float]:
-        """
-        Consumed capacity
-        """
-        return pulumi.get(self, "consumed_capacity")
-
-    @_builtins.property
-    @pulumi.getter
-    def credential(self) -> pulumi.Output[_builtins.float]:
-        """
-        Credential
-        """
-        return pulumi.get(self, "credential")
+        return pulumi.get(self, "credential_id")
 
     @_builtins.property
     @pulumi.getter(name="instanceGroupId")
-    def instance_group_id(self) -> pulumi.Output[_builtins.float]:
-        """
-        Database ID for this instance group.
-        """
+    def instance_group_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "instance_group_id")
 
     @_builtins.property
-    @pulumi.getter
-    def instances(self) -> pulumi.Output[_builtins.float]:
-        """
-        Instances
-        """
-        return pulumi.get(self, "instances")
-
-    @_builtins.property
     @pulumi.getter(name="isContainerGroup")
-    def is_container_group(self) -> pulumi.Output[_builtins.bool]:
+    def is_container_group(self) -> pulumi.Output[Optional[_builtins.bool]]:
         """
-        Indicates whether instances in this group are containerized.Containerized groups have a designated Openshift or Kubernetes cluster.
+        Whether the instance group is a container group.
         """
         return pulumi.get(self, "is_container_group")
-
-    @_builtins.property
-    @pulumi.getter(name="jobsRunning")
-    def jobs_running(self) -> pulumi.Output[_builtins.float]:
-        """
-        Jobs running
-        """
-        return pulumi.get(self, "jobs_running")
-
-    @_builtins.property
-    @pulumi.getter(name="jobsTotal")
-    def jobs_total(self) -> pulumi.Output[_builtins.float]:
-        """
-        Count of all jobs that target this instance group
-        """
-        return pulumi.get(self, "jobs_total")
-
-    @_builtins.property
-    @pulumi.getter(name="maxConcurrentJobs")
-    def max_concurrent_jobs(self) -> pulumi.Output[_builtins.float]:
-        """
-        Maximum number of concurrent jobs to run on a group. When set to zero, no maximum is enforced.
-        """
-        return pulumi.get(self, "max_concurrent_jobs")
-
-    @_builtins.property
-    @pulumi.getter(name="maxForks")
-    def max_forks(self) -> pulumi.Output[_builtins.float]:
-        """
-        Maximum number of forks to execute concurrently on a group. When set to zero, no maximum is enforced.
-        """
-        return pulumi.get(self, "max_forks")
 
     @_builtins.property
     @pulumi.getter
     def name(self) -> pulumi.Output[_builtins.str]:
         """
-        Name of this instance group.
+        The name of the instance group.
         """
         return pulumi.get(self, "name")
 
     @_builtins.property
-    @pulumi.getter(name="percentCapacityRemaining")
-    def percent_capacity_remaining(self) -> pulumi.Output[_builtins.float]:
-        """
-        Percent capacity remaining
-        """
-        return pulumi.get(self, "percent_capacity_remaining")
-
-    @_builtins.property
     @pulumi.getter(name="podSpecOverride")
-    def pod_spec_override(self) -> pulumi.Output[_builtins.str]:
+    def pod_spec_override(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
-        Pod spec override
+        The pod spec override for the instance group.
         """
         return pulumi.get(self, "pod_spec_override")
 
     @_builtins.property
-    @pulumi.getter(name="policyInstanceList")
-    def policy_instance_list(self) -> pulumi.Output[_builtins.str]:
-        """
-        List of exact-match Instances that will be assigned to this group
-        """
-        return pulumi.get(self, "policy_instance_list")
-
-    @_builtins.property
     @pulumi.getter(name="policyInstanceMinimum")
-    def policy_instance_minimum(self) -> pulumi.Output[_builtins.float]:
+    def policy_instance_minimum(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        Static minimum number of Instances that will be automatically assign to this group when new instances come online.
+        The minimum number of instances to run in the instance group.
         """
         return pulumi.get(self, "policy_instance_minimum")
 
     @_builtins.property
     @pulumi.getter(name="policyInstancePercentage")
-    def policy_instance_percentage(self) -> pulumi.Output[_builtins.float]:
+    def policy_instance_percentage(self) -> pulumi.Output[Optional[_builtins.float]]:
         """
-        Minimum percentage of all instances that will be automatically assigned to this group when new instances come online.
+        The percentage of instances to run in the instance group.
         """
         return pulumi.get(self, "policy_instance_percentage")
 

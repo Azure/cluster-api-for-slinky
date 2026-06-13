@@ -13,87 +13,176 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import NotRequired, TypedDict, TypeAlias
 from . import _utilities
+from . import outputs
+from ._inputs import *
 
 __all__ = ['WorkflowJobTemplateSurveySpecArgs', 'WorkflowJobTemplateSurveySpec']
 
 @pulumi.input_type
 class WorkflowJobTemplateSurveySpecArgs:
     def __init__(__self__, *,
-                 spec: pulumi.Input[_builtins.str],
-                 workflow_job_template_id: pulumi.Input[_builtins.float]):
+                 description: pulumi.Input[_builtins.str],
+                 job_template_id: pulumi.Input[_builtins.float],
+                 specs: pulumi.Input[Sequence[pulumi.Input['WorkflowJobTemplateSurveySpecSpecArgs']]],
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 workflow_job_template_survey_spec_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a WorkflowJobTemplateSurveySpec resource.
 
-        :param pulumi.Input[_builtins.str] spec: The survey spec for this WorkflowJobTemplate.
-        :param pulumi.Input[_builtins.float] workflow_job_template_id: Database ID for this WorkflowJobTemplate.
+        :param pulumi.Input[_builtins.str] description: The description of the job template survey spec.
+        :param pulumi.Input[_builtins.float] job_template_id: The ID of the Job Template to which create the survey spec.
+        :param pulumi.Input[Sequence[pulumi.Input['WorkflowJobTemplateSurveySpecSpecArgs']]] specs: Spec of the job template survey. One block per question in the survey.
+        :param pulumi.Input[_builtins.str] name: The name of the Job Template survey spec.
         """
-        pulumi.set(__self__, "spec", spec)
-        pulumi.set(__self__, "workflow_job_template_id", workflow_job_template_id)
+        pulumi.set(__self__, "description", description)
+        pulumi.set(__self__, "job_template_id", job_template_id)
+        pulumi.set(__self__, "specs", specs)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if workflow_job_template_survey_spec_id is not None:
+            pulumi.set(__self__, "workflow_job_template_survey_spec_id", workflow_job_template_survey_spec_id)
 
     @_builtins.property
     @pulumi.getter
-    def spec(self) -> pulumi.Input[_builtins.str]:
+    def description(self) -> pulumi.Input[_builtins.str]:
         """
-        The survey spec for this WorkflowJobTemplate.
+        The description of the job template survey spec.
         """
-        return pulumi.get(self, "spec")
+        return pulumi.get(self, "description")
 
-    @spec.setter
-    def spec(self, value: pulumi.Input[_builtins.str]):
-        pulumi.set(self, "spec", value)
+    @description.setter
+    def description(self, value: pulumi.Input[_builtins.str]):
+        pulumi.set(self, "description", value)
 
     @_builtins.property
-    @pulumi.getter(name="workflowJobTemplateId")
-    def workflow_job_template_id(self) -> pulumi.Input[_builtins.float]:
+    @pulumi.getter(name="jobTemplateId")
+    def job_template_id(self) -> pulumi.Input[_builtins.float]:
         """
-        Database ID for this WorkflowJobTemplate.
+        The ID of the Job Template to which create the survey spec.
         """
-        return pulumi.get(self, "workflow_job_template_id")
+        return pulumi.get(self, "job_template_id")
 
-    @workflow_job_template_id.setter
-    def workflow_job_template_id(self, value: pulumi.Input[_builtins.float]):
-        pulumi.set(self, "workflow_job_template_id", value)
+    @job_template_id.setter
+    def job_template_id(self, value: pulumi.Input[_builtins.float]):
+        pulumi.set(self, "job_template_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def specs(self) -> pulumi.Input[Sequence[pulumi.Input['WorkflowJobTemplateSurveySpecSpecArgs']]]:
+        """
+        Spec of the job template survey. One block per question in the survey.
+        """
+        return pulumi.get(self, "specs")
+
+    @specs.setter
+    def specs(self, value: pulumi.Input[Sequence[pulumi.Input['WorkflowJobTemplateSurveySpecSpecArgs']]]):
+        pulumi.set(self, "specs", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The name of the Job Template survey spec.
+        """
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "name", value)
+
+    @_builtins.property
+    @pulumi.getter(name="workflowJobTemplateSurveySpecId")
+    def workflow_job_template_survey_spec_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "workflow_job_template_survey_spec_id")
+
+    @workflow_job_template_survey_spec_id.setter
+    def workflow_job_template_survey_spec_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "workflow_job_template_survey_spec_id", value)
 
 
 @pulumi.input_type
 class _WorkflowJobTemplateSurveySpecState:
     def __init__(__self__, *,
-                 spec: pulumi.Input[Optional[_builtins.str]] = None,
-                 workflow_job_template_id: pulumi.Input[Optional[_builtins.float]] = None):
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 specs: pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowJobTemplateSurveySpecSpecArgs']]]] = None,
+                 workflow_job_template_survey_spec_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering WorkflowJobTemplateSurveySpec resources.
 
-        :param pulumi.Input[_builtins.str] spec: The survey spec for this WorkflowJobTemplate.
-        :param pulumi.Input[_builtins.float] workflow_job_template_id: Database ID for this WorkflowJobTemplate.
+        :param pulumi.Input[_builtins.str] description: The description of the job template survey spec.
+        :param pulumi.Input[_builtins.float] job_template_id: The ID of the Job Template to which create the survey spec.
+        :param pulumi.Input[_builtins.str] name: The name of the Job Template survey spec.
+        :param pulumi.Input[Sequence[pulumi.Input['WorkflowJobTemplateSurveySpecSpecArgs']]] specs: Spec of the job template survey. One block per question in the survey.
         """
-        if spec is not None:
-            pulumi.set(__self__, "spec", spec)
-        if workflow_job_template_id is not None:
-            pulumi.set(__self__, "workflow_job_template_id", workflow_job_template_id)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if job_template_id is not None:
+            pulumi.set(__self__, "job_template_id", job_template_id)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if specs is not None:
+            pulumi.set(__self__, "specs", specs)
+        if workflow_job_template_survey_spec_id is not None:
+            pulumi.set(__self__, "workflow_job_template_survey_spec_id", workflow_job_template_survey_spec_id)
 
     @_builtins.property
     @pulumi.getter
-    def spec(self) -> pulumi.Input[Optional[_builtins.str]]:
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        The survey spec for this WorkflowJobTemplate.
+        The description of the job template survey spec.
         """
-        return pulumi.get(self, "spec")
+        return pulumi.get(self, "description")
 
-    @spec.setter
-    def spec(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "spec", value)
+    @description.setter
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "description", value)
 
     @_builtins.property
-    @pulumi.getter(name="workflowJobTemplateId")
-    def workflow_job_template_id(self) -> pulumi.Input[Optional[_builtins.float]]:
+    @pulumi.getter(name="jobTemplateId")
+    def job_template_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
-        Database ID for this WorkflowJobTemplate.
+        The ID of the Job Template to which create the survey spec.
         """
-        return pulumi.get(self, "workflow_job_template_id")
+        return pulumi.get(self, "job_template_id")
 
-    @workflow_job_template_id.setter
-    def workflow_job_template_id(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "workflow_job_template_id", value)
+    @job_template_id.setter
+    def job_template_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "job_template_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The name of the Job Template survey spec.
+        """
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "name", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def specs(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowJobTemplateSurveySpecSpecArgs']]]]:
+        """
+        Spec of the job template survey. One block per question in the survey.
+        """
+        return pulumi.get(self, "specs")
+
+    @specs.setter
+    def specs(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['WorkflowJobTemplateSurveySpecSpecArgs']]]]):
+        pulumi.set(self, "specs", value)
+
+    @_builtins.property
+    @pulumi.getter(name="workflowJobTemplateSurveySpecId")
+    def workflow_job_template_survey_spec_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "workflow_job_template_survey_spec_id")
+
+    @workflow_job_template_survey_spec_id.setter
+    def workflow_job_template_survey_spec_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "workflow_job_template_survey_spec_id", value)
 
 
 @pulumi.type_token("awx:index/workflowJobTemplateSurveySpec:WorkflowJobTemplateSurveySpec")
@@ -102,16 +191,21 @@ class WorkflowJobTemplateSurveySpec(pulumi.CustomResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 spec: pulumi.Input[Optional[_builtins.str]] = None,
-                 workflow_job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict']]]]] = None,
+                 workflow_job_template_survey_spec_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
         Create a WorkflowJobTemplateSurveySpec resource with the given unique name, props, and options.
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] spec: The survey spec for this WorkflowJobTemplate.
-        :param pulumi.Input[_builtins.float] workflow_job_template_id: Database ID for this WorkflowJobTemplate.
+        :param pulumi.Input[_builtins.str] description: The description of the job template survey spec.
+        :param pulumi.Input[_builtins.float] job_template_id: The ID of the Job Template to which create the survey spec.
+        :param pulumi.Input[_builtins.str] name: The name of the Job Template survey spec.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict']]]] specs: Spec of the job template survey. One block per question in the survey.
         """
         ...
     @overload
@@ -137,8 +231,11 @@ class WorkflowJobTemplateSurveySpec(pulumi.CustomResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
-                 spec: pulumi.Input[Optional[_builtins.str]] = None,
-                 workflow_job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict']]]]] = None,
+                 workflow_job_template_survey_spec_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -148,12 +245,17 @@ class WorkflowJobTemplateSurveySpec(pulumi.CustomResource):
                 raise TypeError('__props__ is only valid when passed in combination with a valid opts.id to get an existing resource')
             __props__ = WorkflowJobTemplateSurveySpecArgs.__new__(WorkflowJobTemplateSurveySpecArgs)
 
-            if spec is None and not opts.urn:
-                raise TypeError("Missing required property 'spec'")
-            __props__.__dict__["spec"] = spec
-            if workflow_job_template_id is None and not opts.urn:
-                raise TypeError("Missing required property 'workflow_job_template_id'")
-            __props__.__dict__["workflow_job_template_id"] = workflow_job_template_id
+            if description is None and not opts.urn:
+                raise TypeError("Missing required property 'description'")
+            __props__.__dict__["description"] = description
+            if job_template_id is None and not opts.urn:
+                raise TypeError("Missing required property 'job_template_id'")
+            __props__.__dict__["job_template_id"] = job_template_id
+            __props__.__dict__["name"] = name
+            if specs is None and not opts.urn:
+                raise TypeError("Missing required property 'specs'")
+            __props__.__dict__["specs"] = specs
+            __props__.__dict__["workflow_job_template_survey_spec_id"] = workflow_job_template_survey_spec_id
         super(WorkflowJobTemplateSurveySpec, __self__).__init__(
             'awx:index/workflowJobTemplateSurveySpec:WorkflowJobTemplateSurveySpec',
             resource_name,
@@ -165,8 +267,11 @@ class WorkflowJobTemplateSurveySpec(pulumi.CustomResource):
     def get(resource_name: str,
             id: pulumi.Input[str],
             opts: Optional[pulumi.ResourceOptions] = None,
-            spec: pulumi.Input[Optional[_builtins.str]] = None,
-            workflow_job_template_id: pulumi.Input[Optional[_builtins.float]] = None) -> 'WorkflowJobTemplateSurveySpec':
+            description: pulumi.Input[Optional[_builtins.str]] = None,
+            job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
+            name: pulumi.Input[Optional[_builtins.str]] = None,
+            specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict']]]]] = None,
+            workflow_job_template_survey_spec_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'WorkflowJobTemplateSurveySpec':
         """
         Get an existing WorkflowJobTemplateSurveySpec resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -174,30 +279,56 @@ class WorkflowJobTemplateSurveySpec(pulumi.CustomResource):
         :param str resource_name: The unique name of the resulting resource.
         :param pulumi.Input[str] id: The unique provider ID of the resource to lookup.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] spec: The survey spec for this WorkflowJobTemplate.
-        :param pulumi.Input[_builtins.float] workflow_job_template_id: Database ID for this WorkflowJobTemplate.
+        :param pulumi.Input[_builtins.str] description: The description of the job template survey spec.
+        :param pulumi.Input[_builtins.float] job_template_id: The ID of the Job Template to which create the survey spec.
+        :param pulumi.Input[_builtins.str] name: The name of the Job Template survey spec.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict']]]] specs: Spec of the job template survey. One block per question in the survey.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
         __props__ = _WorkflowJobTemplateSurveySpecState.__new__(_WorkflowJobTemplateSurveySpecState)
 
-        __props__.__dict__["spec"] = spec
-        __props__.__dict__["workflow_job_template_id"] = workflow_job_template_id
+        __props__.__dict__["description"] = description
+        __props__.__dict__["job_template_id"] = job_template_id
+        __props__.__dict__["name"] = name
+        __props__.__dict__["specs"] = specs
+        __props__.__dict__["workflow_job_template_survey_spec_id"] = workflow_job_template_survey_spec_id
         return WorkflowJobTemplateSurveySpec(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
     @pulumi.getter
-    def spec(self) -> pulumi.Output[_builtins.str]:
+    def description(self) -> pulumi.Output[_builtins.str]:
         """
-        The survey spec for this WorkflowJobTemplate.
+        The description of the job template survey spec.
         """
-        return pulumi.get(self, "spec")
+        return pulumi.get(self, "description")
 
     @_builtins.property
-    @pulumi.getter(name="workflowJobTemplateId")
-    def workflow_job_template_id(self) -> pulumi.Output[_builtins.float]:
+    @pulumi.getter(name="jobTemplateId")
+    def job_template_id(self) -> pulumi.Output[_builtins.float]:
         """
-        Database ID for this WorkflowJobTemplate.
+        The ID of the Job Template to which create the survey spec.
         """
-        return pulumi.get(self, "workflow_job_template_id")
+        return pulumi.get(self, "job_template_id")
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Output[_builtins.str]:
+        """
+        The name of the Job Template survey spec.
+        """
+        return pulumi.get(self, "name")
+
+    @_builtins.property
+    @pulumi.getter
+    def specs(self) -> pulumi.Output[Sequence['outputs.WorkflowJobTemplateSurveySpecSpec']]:
+        """
+        Spec of the job template survey. One block per question in the survey.
+        """
+        return pulumi.get(self, "specs")
+
+    @_builtins.property
+    @pulumi.getter(name="workflowJobTemplateSurveySpecId")
+    def workflow_job_template_survey_spec_id(self) -> pulumi.Output[_builtins.str]:
+        return pulumi.get(self, "workflow_job_template_survey_spec_id")
 

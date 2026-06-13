@@ -26,41 +26,13 @@ class GetExecutionEnvironmentResult:
     """
     A collection of values returned by getExecutionEnvironment.
     """
-    def __init__(__self__, credential=None, description=None, id=None, image=None, managed=None, name=None, organization=None, pull=None):
-        if credential and not isinstance(credential, float):
-            raise TypeError("Expected argument 'credential' to be a float")
-        pulumi.set(__self__, "credential", credential)
-        if description and not isinstance(description, str):
-            raise TypeError("Expected argument 'description' to be a str")
-        pulumi.set(__self__, "description", description)
+    def __init__(__self__, id=None, name=None):
         if id and not isinstance(id, float):
             raise TypeError("Expected argument 'id' to be a float")
         pulumi.set(__self__, "id", id)
-        if image and not isinstance(image, str):
-            raise TypeError("Expected argument 'image' to be a str")
-        pulumi.set(__self__, "image", image)
-        if managed and not isinstance(managed, bool):
-            raise TypeError("Expected argument 'managed' to be a bool")
-        pulumi.set(__self__, "managed", managed)
         if name and not isinstance(name, str):
             raise TypeError("Expected argument 'name' to be a str")
         pulumi.set(__self__, "name", name)
-        if organization and not isinstance(organization, float):
-            raise TypeError("Expected argument 'organization' to be a float")
-        pulumi.set(__self__, "organization", organization)
-        if pull and not isinstance(pull, str):
-            raise TypeError("Expected argument 'pull' to be a str")
-        pulumi.set(__self__, "pull", pull)
-
-    @_builtins.property
-    @pulumi.getter
-    def credential(self) -> _builtins.float:
-        return pulumi.get(self, "credential")
-
-    @_builtins.property
-    @pulumi.getter
-    def description(self) -> _builtins.str:
-        return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
@@ -69,28 +41,8 @@ class GetExecutionEnvironmentResult:
 
     @_builtins.property
     @pulumi.getter
-    def image(self) -> _builtins.str:
-        return pulumi.get(self, "image")
-
-    @_builtins.property
-    @pulumi.getter
-    def managed(self) -> _builtins.bool:
-        return pulumi.get(self, "managed")
-
-    @_builtins.property
-    @pulumi.getter
     def name(self) -> _builtins.str:
         return pulumi.get(self, "name")
-
-    @_builtins.property
-    @pulumi.getter
-    def organization(self) -> _builtins.float:
-        return pulumi.get(self, "organization")
-
-    @_builtins.property
-    @pulumi.getter
-    def pull(self) -> _builtins.str:
-        return pulumi.get(self, "pull")
 
 
 class AwaitableGetExecutionEnvironmentResult(GetExecutionEnvironmentResult):
@@ -99,14 +51,8 @@ class AwaitableGetExecutionEnvironmentResult(GetExecutionEnvironmentResult):
         if False:
             yield self
         return GetExecutionEnvironmentResult(
-            credential=self.credential,
-            description=self.description,
             id=self.id,
-            image=self.image,
-            managed=self.managed,
-            name=self.name,
-            organization=self.organization,
-            pull=self.pull)
+            name=self.name)
 
 
 def get_execution_environment(id: Optional[_builtins.float] = None,
@@ -122,14 +68,8 @@ def get_execution_environment(id: Optional[_builtins.float] = None,
     __ret__ = pulumi.runtime.invoke('awx:index/getExecutionEnvironment:getExecutionEnvironment', __args__, opts=opts, typ=GetExecutionEnvironmentResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetExecutionEnvironmentResult(
-        credential=pulumi.get(__ret__, 'credential'),
-        description=pulumi.get(__ret__, 'description'),
         id=pulumi.get(__ret__, 'id'),
-        image=pulumi.get(__ret__, 'image'),
-        managed=pulumi.get(__ret__, 'managed'),
-        name=pulumi.get(__ret__, 'name'),
-        organization=pulumi.get(__ret__, 'organization'),
-        pull=pulumi.get(__ret__, 'pull'))
+        name=pulumi.get(__ret__, 'name'))
 def get_execution_environment_output(id: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
                                      name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
                                      opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetExecutionEnvironmentResult]:
@@ -142,11 +82,5 @@ def get_execution_environment_output(id: pulumi.Input[Optional[Optional[_builtin
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('awx:index/getExecutionEnvironment:getExecutionEnvironment', __args__, opts=opts, typ=GetExecutionEnvironmentResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetExecutionEnvironmentResult(
-        credential=pulumi.get(__response__, 'credential'),
-        description=pulumi.get(__response__, 'description'),
         id=pulumi.get(__response__, 'id'),
-        image=pulumi.get(__response__, 'image'),
-        managed=pulumi.get(__response__, 'managed'),
-        name=pulumi.get(__response__, 'name'),
-        organization=pulumi.get(__response__, 'organization'),
-        pull=pulumi.get(__response__, 'pull')))
+        name=pulumi.get(__response__, 'name')))

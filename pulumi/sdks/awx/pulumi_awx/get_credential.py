@@ -26,53 +26,25 @@ class GetCredentialResult:
     """
     A collection of values returned by getCredential.
     """
-    def __init__(__self__, cloud=None, credential_type=None, description=None, id=None, inputs=None, kind=None, kubernetes=None, managed=None, name=None, organization=None, team=None, user=None):
-        if cloud and not isinstance(cloud, bool):
-            raise TypeError("Expected argument 'cloud' to be a bool")
-        pulumi.set(__self__, "cloud", cloud)
-        if credential_type and not isinstance(credential_type, float):
-            raise TypeError("Expected argument 'credential_type' to be a float")
-        pulumi.set(__self__, "credential_type", credential_type)
+    def __init__(__self__, description=None, id=None, kind=None, name=None, tower_id=None, username=None):
         if description and not isinstance(description, str):
             raise TypeError("Expected argument 'description' to be a str")
         pulumi.set(__self__, "description", description)
         if id and not isinstance(id, float):
             raise TypeError("Expected argument 'id' to be a float")
         pulumi.set(__self__, "id", id)
-        if inputs and not isinstance(inputs, str):
-            raise TypeError("Expected argument 'inputs' to be a str")
-        pulumi.set(__self__, "inputs", inputs)
         if kind and not isinstance(kind, str):
             raise TypeError("Expected argument 'kind' to be a str")
         pulumi.set(__self__, "kind", kind)
-        if kubernetes and not isinstance(kubernetes, bool):
-            raise TypeError("Expected argument 'kubernetes' to be a bool")
-        pulumi.set(__self__, "kubernetes", kubernetes)
-        if managed and not isinstance(managed, bool):
-            raise TypeError("Expected argument 'managed' to be a bool")
-        pulumi.set(__self__, "managed", managed)
         if name and not isinstance(name, str):
             raise TypeError("Expected argument 'name' to be a str")
         pulumi.set(__self__, "name", name)
-        if organization and not isinstance(organization, float):
-            raise TypeError("Expected argument 'organization' to be a float")
-        pulumi.set(__self__, "organization", organization)
-        if team and not isinstance(team, float):
-            raise TypeError("Expected argument 'team' to be a float")
-        pulumi.set(__self__, "team", team)
-        if user and not isinstance(user, float):
-            raise TypeError("Expected argument 'user' to be a float")
-        pulumi.set(__self__, "user", user)
-
-    @_builtins.property
-    @pulumi.getter
-    def cloud(self) -> _builtins.bool:
-        return pulumi.get(self, "cloud")
-
-    @_builtins.property
-    @pulumi.getter(name="credentialType")
-    def credential_type(self) -> _builtins.float:
-        return pulumi.get(self, "credential_type")
+        if tower_id and not isinstance(tower_id, float):
+            raise TypeError("Expected argument 'tower_id' to be a float")
+        pulumi.set(__self__, "tower_id", tower_id)
+        if username and not isinstance(username, str):
+            raise TypeError("Expected argument 'username' to be a str")
+        pulumi.set(__self__, "username", username)
 
     @_builtins.property
     @pulumi.getter
@@ -86,23 +58,8 @@ class GetCredentialResult:
 
     @_builtins.property
     @pulumi.getter
-    def inputs(self) -> _builtins.str:
-        return pulumi.get(self, "inputs")
-
-    @_builtins.property
-    @pulumi.getter
     def kind(self) -> _builtins.str:
         return pulumi.get(self, "kind")
-
-    @_builtins.property
-    @pulumi.getter
-    def kubernetes(self) -> _builtins.bool:
-        return pulumi.get(self, "kubernetes")
-
-    @_builtins.property
-    @pulumi.getter
-    def managed(self) -> _builtins.bool:
-        return pulumi.get(self, "managed")
 
     @_builtins.property
     @pulumi.getter
@@ -110,19 +67,14 @@ class GetCredentialResult:
         return pulumi.get(self, "name")
 
     @_builtins.property
-    @pulumi.getter
-    def organization(self) -> _builtins.float:
-        return pulumi.get(self, "organization")
+    @pulumi.getter(name="towerId")
+    def tower_id(self) -> _builtins.float:
+        return pulumi.get(self, "tower_id")
 
     @_builtins.property
     @pulumi.getter
-    def team(self) -> _builtins.float:
-        return pulumi.get(self, "team")
-
-    @_builtins.property
-    @pulumi.getter
-    def user(self) -> _builtins.float:
-        return pulumi.get(self, "user")
+    def username(self) -> _builtins.str:
+        return pulumi.get(self, "username")
 
 
 class AwaitableGetCredentialResult(GetCredentialResult):
@@ -131,74 +83,44 @@ class AwaitableGetCredentialResult(GetCredentialResult):
         if False:
             yield self
         return GetCredentialResult(
-            cloud=self.cloud,
-            credential_type=self.credential_type,
             description=self.description,
             id=self.id,
-            inputs=self.inputs,
             kind=self.kind,
-            kubernetes=self.kubernetes,
-            managed=self.managed,
             name=self.name,
-            organization=self.organization,
-            team=self.team,
-            user=self.user)
+            tower_id=self.tower_id,
+            username=self.username)
 
 
 def get_credential(id: Optional[_builtins.float] = None,
-                   name: Optional[_builtins.str] = None,
-                   team: Optional[_builtins.float] = None,
-                   user: Optional[_builtins.float] = None,
                    opts: Optional[pulumi.InvokeOptions] = None) -> AwaitableGetCredentialResult:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['id'] = id
-    __args__['name'] = name
-    __args__['team'] = team
-    __args__['user'] = user
     opts = pulumi.InvokeOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke('awx:index/getCredential:getCredential', __args__, opts=opts, typ=GetCredentialResult, package_ref=_utilities.get_package()).value
 
     return AwaitableGetCredentialResult(
-        cloud=pulumi.get(__ret__, 'cloud'),
-        credential_type=pulumi.get(__ret__, 'credential_type'),
         description=pulumi.get(__ret__, 'description'),
         id=pulumi.get(__ret__, 'id'),
-        inputs=pulumi.get(__ret__, 'inputs'),
         kind=pulumi.get(__ret__, 'kind'),
-        kubernetes=pulumi.get(__ret__, 'kubernetes'),
-        managed=pulumi.get(__ret__, 'managed'),
         name=pulumi.get(__ret__, 'name'),
-        organization=pulumi.get(__ret__, 'organization'),
-        team=pulumi.get(__ret__, 'team'),
-        user=pulumi.get(__ret__, 'user'))
-def get_credential_output(id: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
-                          name: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
-                          team: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
-                          user: pulumi.Input[Optional[Optional[_builtins.float]]] = None,
+        tower_id=pulumi.get(__ret__, 'tower_id'),
+        username=pulumi.get(__ret__, 'username'))
+def get_credential_output(id: pulumi.Input[Optional[_builtins.float]] = None,
                           opts: Optional[Union[pulumi.InvokeOptions, pulumi.InvokeOutputOptions]] = None) -> pulumi.Output[GetCredentialResult]:
     """
     Use this data source to access information about an existing resource.
     """
     __args__ = dict()
     __args__['id'] = id
-    __args__['name'] = name
-    __args__['team'] = team
-    __args__['user'] = user
     opts = pulumi.InvokeOutputOptions.merge(_utilities.get_invoke_opts_defaults(), opts)
     __ret__ = pulumi.runtime.invoke_output('awx:index/getCredential:getCredential', __args__, opts=opts, typ=GetCredentialResult, package_ref=_utilities.get_package())
     return __ret__.apply(lambda __response__: GetCredentialResult(
-        cloud=pulumi.get(__response__, 'cloud'),
-        credential_type=pulumi.get(__response__, 'credential_type'),
         description=pulumi.get(__response__, 'description'),
         id=pulumi.get(__response__, 'id'),
-        inputs=pulumi.get(__response__, 'inputs'),
         kind=pulumi.get(__response__, 'kind'),
-        kubernetes=pulumi.get(__response__, 'kubernetes'),
-        managed=pulumi.get(__response__, 'managed'),
         name=pulumi.get(__response__, 'name'),
-        organization=pulumi.get(__response__, 'organization'),
-        team=pulumi.get(__response__, 'team'),
-        user=pulumi.get(__response__, 'user')))
+        tower_id=pulumi.get(__response__, 'tower_id'),
+        username=pulumi.get(__response__, 'username')))

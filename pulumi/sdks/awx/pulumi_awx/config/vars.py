@@ -21,37 +21,46 @@ __config__ = pulumi.Config('awx')
 
 class _ExportableConfig(types.ModuleType):
     @_builtins.property
+    def ca_pem(self) -> Optional[str]:
+        """
+        Path to a CA Certificate in PEM format to be used to verify the server
+        """
+        return __config__.get('caPem')
+
+    @_builtins.property
+    def ca_pem_value(self) -> Optional[str]:
+        """
+        CA Certificate value in PEM format to be used to verify the server
+        """
+        return __config__.get('caPemValue')
+
+    @_builtins.property
     def hostname(self) -> Optional[str]:
-        """
-        The AWX Host that we connect to. (defaults to TOWER_HOST/AWX_HOST env variable if set)
-        """
         return __config__.get('hostname')
 
     @_builtins.property
+    def http_headers(self) -> Optional[str]:
+        """
+        Optional. HTTP headers mapping keys to values used for accessing the AWX Api.
+        """
+        return __config__.get('httpHeaders')
+
+    @_builtins.property
+    def insecure(self) -> Optional[bool]:
+        """
+        Disable SSL verification of API calls
+        """
+        return __config__.get_bool('insecure')
+
+    @_builtins.property
     def password(self) -> Optional[str]:
-        """
-        The password to connect to the AWX host. (defaults to TOWER_PASSWORD/AWX_PASSWORD env variable if set) [must be used with username]
-        """
         return __config__.get('password')
 
     @_builtins.property
     def token(self) -> Optional[str]:
-        """
-        The token to use to connect to the AWX host. (defaults to TOWER_AUTH_TOKEN/AWX_AUTH_TOKEN env variable if set) [conflicts with username/password]
-        """
         return __config__.get('token')
 
     @_builtins.property
     def username(self) -> Optional[str]:
-        """
-        The username to connect to the AWX host. (defaults to TOWER_USERNAME/AWX_USERNAME env variable if set) [must be used with password]
-        """
         return __config__.get('username')
-
-    @_builtins.property
-    def verify_ssl(self) -> Optional[bool]:
-        """
-        If you are using a self signed certificate this should be set to false (defaults to TOWER_VERIFY_SSL/VERIFY_SSL env variable if set) [default is true]
-        """
-        return __config__.get_bool('verifySsl')
 

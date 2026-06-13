@@ -19,37 +19,66 @@ __all__ = ['ProviderArgs', 'Provider']
 @pulumi.input_type
 class ProviderArgs:
     def __init__(__self__, *,
+                 ca_pem: pulumi.Input[Optional[_builtins.str]] = None,
+                 ca_pem_value: pulumi.Input[Optional[_builtins.str]] = None,
                  hostname: pulumi.Input[Optional[_builtins.str]] = None,
+                 http_headers: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 insecure: pulumi.Input[Optional[_builtins.bool]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
                  token: pulumi.Input[Optional[_builtins.str]] = None,
-                 username: pulumi.Input[Optional[_builtins.str]] = None,
-                 verify_ssl: pulumi.Input[Optional[_builtins.bool]] = None):
+                 username: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Provider resource.
 
-        :param pulumi.Input[_builtins.str] hostname: The AWX Host that we connect to. (defaults to TOWER_HOST/AWX_HOST env variable if set)
-        :param pulumi.Input[_builtins.str] password: The password to connect to the AWX host. (defaults to TOWER_PASSWORD/AWX_PASSWORD env variable if set) [must be used with username]
-        :param pulumi.Input[_builtins.str] token: The token to use to connect to the AWX host. (defaults to TOWER_AUTH_TOKEN/AWX_AUTH_TOKEN env variable if set) [conflicts with username/password]
-        :param pulumi.Input[_builtins.str] username: The username to connect to the AWX host. (defaults to TOWER_USERNAME/AWX_USERNAME env variable if set) [must be used with password]
-        :param pulumi.Input[_builtins.bool] verify_ssl: If you are using a self signed certificate this should be set to false (defaults to TOWER_VERIFY_SSL/VERIFY_SSL env variable if set) [default is true]
+        :param pulumi.Input[_builtins.str] ca_pem: Path to a CA Certificate in PEM format to be used to verify the server
+        :param pulumi.Input[_builtins.str] ca_pem_value: CA Certificate value in PEM format to be used to verify the server
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] http_headers: Optional. HTTP headers mapping keys to values used for accessing the AWX Api.
+        :param pulumi.Input[_builtins.bool] insecure: Disable SSL verification of API calls
         """
+        if ca_pem is not None:
+            pulumi.set(__self__, "ca_pem", ca_pem)
+        if ca_pem_value is not None:
+            pulumi.set(__self__, "ca_pem_value", ca_pem_value)
         if hostname is not None:
             pulumi.set(__self__, "hostname", hostname)
+        if http_headers is not None:
+            pulumi.set(__self__, "http_headers", http_headers)
+        if insecure is not None:
+            pulumi.set(__self__, "insecure", insecure)
         if password is not None:
             pulumi.set(__self__, "password", password)
         if token is not None:
             pulumi.set(__self__, "token", token)
         if username is not None:
             pulumi.set(__self__, "username", username)
-        if verify_ssl is not None:
-            pulumi.set(__self__, "verify_ssl", verify_ssl)
+
+    @_builtins.property
+    @pulumi.getter(name="caPem")
+    def ca_pem(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Path to a CA Certificate in PEM format to be used to verify the server
+        """
+        return pulumi.get(self, "ca_pem")
+
+    @ca_pem.setter
+    def ca_pem(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "ca_pem", value)
+
+    @_builtins.property
+    @pulumi.getter(name="caPemValue")
+    def ca_pem_value(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        CA Certificate value in PEM format to be used to verify the server
+        """
+        return pulumi.get(self, "ca_pem_value")
+
+    @ca_pem_value.setter
+    def ca_pem_value(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "ca_pem_value", value)
 
     @_builtins.property
     @pulumi.getter
     def hostname(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The AWX Host that we connect to. (defaults to TOWER_HOST/AWX_HOST env variable if set)
-        """
         return pulumi.get(self, "hostname")
 
     @hostname.setter
@@ -57,11 +86,32 @@ class ProviderArgs:
         pulumi.set(self, "hostname", value)
 
     @_builtins.property
+    @pulumi.getter(name="httpHeaders")
+    def http_headers(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        Optional. HTTP headers mapping keys to values used for accessing the AWX Api.
+        """
+        return pulumi.get(self, "http_headers")
+
+    @http_headers.setter
+    def http_headers(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "http_headers", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def insecure(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Disable SSL verification of API calls
+        """
+        return pulumi.get(self, "insecure")
+
+    @insecure.setter
+    def insecure(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "insecure", value)
+
+    @_builtins.property
     @pulumi.getter
     def password(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The password to connect to the AWX host. (defaults to TOWER_PASSWORD/AWX_PASSWORD env variable if set) [must be used with username]
-        """
         return pulumi.get(self, "password")
 
     @password.setter
@@ -71,9 +121,6 @@ class ProviderArgs:
     @_builtins.property
     @pulumi.getter
     def token(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The token to use to connect to the AWX host. (defaults to TOWER_AUTH_TOKEN/AWX_AUTH_TOKEN env variable if set) [conflicts with username/password]
-        """
         return pulumi.get(self, "token")
 
     @token.setter
@@ -83,26 +130,11 @@ class ProviderArgs:
     @_builtins.property
     @pulumi.getter
     def username(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The username to connect to the AWX host. (defaults to TOWER_USERNAME/AWX_USERNAME env variable if set) [must be used with password]
-        """
         return pulumi.get(self, "username")
 
     @username.setter
     def username(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "username", value)
-
-    @_builtins.property
-    @pulumi.getter(name="verifySsl")
-    def verify_ssl(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        """
-        If you are using a self signed certificate this should be set to false (defaults to TOWER_VERIFY_SSL/VERIFY_SSL env variable if set) [default is true]
-        """
-        return pulumi.get(self, "verify_ssl")
-
-    @verify_ssl.setter
-    def verify_ssl(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "verify_ssl", value)
 
 
 @pulumi.type_token("pulumi:providers:awx")
@@ -111,11 +143,14 @@ class Provider(pulumi.ProviderResource):
     def __init__(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
+                 ca_pem: pulumi.Input[Optional[_builtins.str]] = None,
+                 ca_pem_value: pulumi.Input[Optional[_builtins.str]] = None,
                  hostname: pulumi.Input[Optional[_builtins.str]] = None,
+                 http_headers: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 insecure: pulumi.Input[Optional[_builtins.bool]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
                  token: pulumi.Input[Optional[_builtins.str]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
-                 verify_ssl: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         """
         The provider type for the awx package. By default, resources use package-wide configuration
@@ -126,11 +161,10 @@ class Provider(pulumi.ProviderResource):
 
         :param str resource_name: The name of the resource.
         :param pulumi.ResourceOptions opts: Options for the resource.
-        :param pulumi.Input[_builtins.str] hostname: The AWX Host that we connect to. (defaults to TOWER_HOST/AWX_HOST env variable if set)
-        :param pulumi.Input[_builtins.str] password: The password to connect to the AWX host. (defaults to TOWER_PASSWORD/AWX_PASSWORD env variable if set) [must be used with username]
-        :param pulumi.Input[_builtins.str] token: The token to use to connect to the AWX host. (defaults to TOWER_AUTH_TOKEN/AWX_AUTH_TOKEN env variable if set) [conflicts with username/password]
-        :param pulumi.Input[_builtins.str] username: The username to connect to the AWX host. (defaults to TOWER_USERNAME/AWX_USERNAME env variable if set) [must be used with password]
-        :param pulumi.Input[_builtins.bool] verify_ssl: If you are using a self signed certificate this should be set to false (defaults to TOWER_VERIFY_SSL/VERIFY_SSL env variable if set) [default is true]
+        :param pulumi.Input[_builtins.str] ca_pem: Path to a CA Certificate in PEM format to be used to verify the server
+        :param pulumi.Input[_builtins.str] ca_pem_value: CA Certificate value in PEM format to be used to verify the server
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] http_headers: Optional. HTTP headers mapping keys to values used for accessing the AWX Api.
+        :param pulumi.Input[_builtins.bool] insecure: Disable SSL verification of API calls
         """
         ...
     @overload
@@ -160,11 +194,14 @@ class Provider(pulumi.ProviderResource):
     def _internal_init(__self__,
                  resource_name: str,
                  opts: Optional[pulumi.ResourceOptions] = None,
+                 ca_pem: pulumi.Input[Optional[_builtins.str]] = None,
+                 ca_pem_value: pulumi.Input[Optional[_builtins.str]] = None,
                  hostname: pulumi.Input[Optional[_builtins.str]] = None,
+                 http_headers: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 insecure: pulumi.Input[Optional[_builtins.bool]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
                  token: pulumi.Input[Optional[_builtins.str]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
-                 verify_ssl: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -174,11 +211,14 @@ class Provider(pulumi.ProviderResource):
                 raise TypeError('__props__ is only valid when passed in combination with a valid opts.id to get an existing resource')
             __props__ = ProviderArgs.__new__(ProviderArgs)
 
+            __props__.__dict__["ca_pem"] = ca_pem
+            __props__.__dict__["ca_pem_value"] = ca_pem_value
             __props__.__dict__["hostname"] = hostname
+            __props__.__dict__["http_headers"] = pulumi.Output.secret(http_headers).apply(pulumi.runtime.to_json) if http_headers is not None else None
+            __props__.__dict__["insecure"] = pulumi.Output.from_input(insecure).apply(pulumi.runtime.to_json) if insecure is not None else None
             __props__.__dict__["password"] = None if password is None else pulumi.Output.secret(password)
             __props__.__dict__["token"] = None if token is None else pulumi.Output.secret(token)
             __props__.__dict__["username"] = username
-            __props__.__dict__["verify_ssl"] = pulumi.Output.from_input(verify_ssl).apply(pulumi.runtime.to_json) if verify_ssl is not None else None
         secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["password", "token"])
         opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(Provider, __self__).__init__(
@@ -189,35 +229,39 @@ class Provider(pulumi.ProviderResource):
             package_ref=_utilities.get_package())
 
     @_builtins.property
+    @pulumi.getter(name="caPem")
+    def ca_pem(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        Path to a CA Certificate in PEM format to be used to verify the server
+        """
+        return pulumi.get(self, "ca_pem")
+
+    @_builtins.property
+    @pulumi.getter(name="caPemValue")
+    def ca_pem_value(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        CA Certificate value in PEM format to be used to verify the server
+        """
+        return pulumi.get(self, "ca_pem_value")
+
+    @_builtins.property
     @pulumi.getter
     def hostname(self) -> pulumi.Output[Optional[_builtins.str]]:
-        """
-        The AWX Host that we connect to. (defaults to TOWER_HOST/AWX_HOST env variable if set)
-        """
         return pulumi.get(self, "hostname")
 
     @_builtins.property
     @pulumi.getter
     def password(self) -> pulumi.Output[Optional[_builtins.str]]:
-        """
-        The password to connect to the AWX host. (defaults to TOWER_PASSWORD/AWX_PASSWORD env variable if set) [must be used with username]
-        """
         return pulumi.get(self, "password")
 
     @_builtins.property
     @pulumi.getter
     def token(self) -> pulumi.Output[Optional[_builtins.str]]:
-        """
-        The token to use to connect to the AWX host. (defaults to TOWER_AUTH_TOKEN/AWX_AUTH_TOKEN env variable if set) [conflicts with username/password]
-        """
         return pulumi.get(self, "token")
 
     @_builtins.property
     @pulumi.getter
     def username(self) -> pulumi.Output[Optional[_builtins.str]]:
-        """
-        The username to connect to the AWX host. (defaults to TOWER_USERNAME/AWX_USERNAME env variable if set) [must be used with password]
-        """
         return pulumi.get(self, "username")
 
     @pulumi.output_type
