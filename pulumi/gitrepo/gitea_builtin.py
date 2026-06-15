@@ -669,7 +669,19 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             opts=ResourceOptions(
                 parent=self,
                 provider=k8s_provider,
-                depends_on=[public_key_reader_binding],
+                # ``eso`` here (not just ``public_key_reader_binding``) gates
+                # SecretStore creation on the External Secrets Operator's
+                # Helm release being fully ready \u2014 not just its CRDs
+                # installed but its validating webhook reachable. Without
+                # this, the first ``pulumi up`` races the webhook and fails
+                # with one of two errors depending on host speed:
+                #   * slow host: "no matches for kind SecretStore" (CRD not
+                #     yet registered)
+                #   * fast host: "failed calling webhook ... connection
+                #     refused" (CRD present but webhook config not yet
+                #     registered by ESO cert-controller)
+                # Adapted from origin/pulumi dad0c81 by Zheyu Shen.
+                depends_on=[eso, public_key_reader_binding],
             ),
         )
         user_public_key_secret = k8s.apiextensions.CustomResource(

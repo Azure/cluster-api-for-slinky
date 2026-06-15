@@ -34,6 +34,27 @@ from pko._init_stack import INIT_PROJECT, INIT_REPO_DIR, init_stack_config
 from pko._stack_cr import StackCRSpec, build_stack_spec
 
 
+# Annotation + timeout for the single outer-owned init Stack CR.
+# pulumi-kubernetes honors ``pulumi.com/waitFor`` on CRD writes by polling
+# the named condition until it goes True; combined with the custom
+# create/update timeout below, the outer ``pulumi up`` blocks until PKO
+# reports the init stack Ready (which, for an env like ``azure``, means
+# CAPI Operator + CAPZ + ASO are all installed and the AzureClusterIdentity
+# CR has been applied). Without this gate, ``pulumi up`` returns the
+# moment the Stack CR is submitted and operators must poll for the init
+# stack themselves — brittle for CI and for our test runbook.
+#
+# 60 minutes is the dad0c81 upstream value (zheyushen). Big enough to
+# absorb a cold helm pull on a fresh kind cluster (CAPI Operator chart
+# + CAPZ + ASO controller images are ~1 GiB total); small enough that a
+# genuinely stuck reconcile fails fast.
+#
+# Adapted from origin/pulumi dad0c81 by Zheyu Shen.
+_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
+_WAIT_FOR_READY = "condition=Ready"
+_INIT_STACK_TIMEOUT = "60m"
+
+
 class PKOBootstrap(pulumi.ComponentResource):
     """Install PKO and hand off control to the inner Stack CRs.
 
@@ -62,6 +83,13 @@ class PKOBootstrap(pulumi.ComponentResource):
             component.
         opts:
             Standard Pulumi ``ResourceOptions``.
+
+    The init Stack CR is annotated with ``pulumi.com/waitFor=condition=Ready``
+    so the outer ``pulumi up`` blocks until PKO reports the init stack Ready
+    \u2014 i.e. the env-specific control-plane (CAPI Operator + CAPZ + ASO for
+    ``azure``; CAPI Operator + CAPD + AWX for ``local``) has fully rolled
+    out. Without this, ``pulumi up`` would return the moment the Stack CR
+    is submitted, leaving operators to poll separately.
 
     Outputs:
         namespace:
@@ -152,10 +180,20 @@ class PKOBootstrap(pulumi.ComponentResource):
             f"{name}-init",
             api_version="pulumi.com/v1",
             kind="Stack",
-            metadata={"namespace": PKO_NAMESPACE},
+            metadata={
+                "namespace": PKO_NAMESPACE,
+                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_READY},
+            },
             spec=init_spec,
             opts=ResourceOptions(
-                parent=self, provider=provider, depends_on=cr_deps
+                parent=self,
+                provider=provider,
+                depends_on=cr_deps,
+                custom_timeouts=pulumi.CustomTimeouts(
+                    create=_INIT_STACK_TIMEOUT,
+                    update=_INIT_STACK_TIMEOUT,
+                    delete=_INIT_STACK_TIMEOUT,
+                ),
             ),
         )
         init_stack_name = init_stack.metadata["name"]  # type: ignore[attr-defined]
