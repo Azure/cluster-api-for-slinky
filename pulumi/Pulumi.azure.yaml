@@ -1,0 +1,6 @@
+encryptionsalt: v1:0XWG7qpGR14=:v1:xTiXV2lRSRK08/aH:uSyWFK0jMA7tl5l6C8i5LONoIL7w6Q==
+config:
+  ca4s-infra:azureClientId: 5a7d5349-776d-413e-9b65-157066a60e71
+  ca4s-infra:azurePrincipalId: a86f863e-5ed4-40bc-b35c-0acdaa48ceb6
+  ca4s-infra:azureTenantId: 72f988bf-86f1-41af-91ab-2d7cd011db47
+  ca4s-infra:azureSubscriptionId: d2c9544f-4329-4642-b73d-020e7fef844f

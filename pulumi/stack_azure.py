@@ -60,26 +60,51 @@ Confirm the UAMI has the necessary role on the subscription (typically
 
 One-time setup before ``pulumi up -s azure``
 --------------------------------------------
-The three config keys this module reads must be set on the ``azure``
+The four config keys this module reads must be set on the ``azure``
 stack first. **None of them are secrets** \u2014 they're just GUIDs::
 
     pulumi stack init azure
     pulumi config set ca4s-infra:azureClientId       <uami-client-id>
+    pulumi config set ca4s-infra:azurePrincipalId    <uami-principal-id>
     pulumi config set ca4s-infra:azureTenantId       <entra-tenant-id>
     pulumi config set ca4s-infra:azureSubscriptionId <subscription-id>
     pulumi up -s azure
 
+Grab the UAMI's ``clientId`` and ``principalId`` together with::
+
+    az identity show -g <rg> -n <uami-name> \\
+        --query '{client:clientId, principal:principalId}'
+
+Optional config keys
+--------------------
+* ``ca4s-infra:azureClusterIdentityAllowedNamespaces`` \u2014 list of
+  namespace names whose workload-cluster CRs may reference the
+  AzureClusterIdentity. Unset (the default) emits the CR with
+  ``spec.allowedNamespaces: {}`` (CAPZ idiom for \"all namespaces\"),
+  which is the right default for multi-tenant Phase 2. Set this only
+  to tighten the default.
+* ``ca4s-infra:skip_imds_preflight`` \u2014 boolean. When ``true``, skip
+  the host-side IMDS check that confirms the UAMI is actually
+  attached. Useful for off-Azure ``pulumi preview`` and tests.
+
 IMDS reachability prerequisite
 ------------------------------
-For CAPZ to actually mint tokens at workload-cluster reconcile time
-(Phase 2), the CAPZ pod inside the ``kind`` mgmt cluster must be able
-to reach ``169.254.169.254``. On a standard kind-on-Azure-VM topology
-this works out of the box. See
+This module runs a host-side preflight (unless
+``skip_imds_preflight=true``) that hits
+``http://169.254.169.254/metadata/identity/oauth2/token`` and
+confirms the configured ``azureClientId`` resolves to a UAMI
+attached to this VM. That catches the two common Phase 1 failure
+modes (running off-Azure, mistyped clientId) at plan time.
+
+The preflight only proves the *language host* can hit IMDS. For CAPZ
+to actually mint tokens at workload-cluster reconcile time (Phase 2),
+the CAPZ pod inside the ``kind`` mgmt cluster must also be able to
+reach ``169.254.169.254``. On a standard kind-on-Azure-VM topology
+this works out of the box because the host VM has the link-local
+route and Docker SNATs container traffic through it. See
 :mod:`stacks.control_plane.azure._cluster_identity` for the network
-path walkthrough. If the kind CNI is ever replaced with one that
-drops link-local egress, or this stack is ever run off-Azure, the
-identity flavor will need to change to ServicePrincipal or
-WorkloadIdentity.
+path walkthrough and the failure modes to watch for if the kind CNI
+is ever replaced or this stack is ever run off-Azure.
 
 Two-management-cluster coexistence
 ----------------------------------
@@ -102,6 +127,7 @@ from gitrepo import GitOpsRepository, GitOpsWebhook
 from pko import PKOBootstrap
 from pko._flux import FluxInfrastructure
 from pko._release import PKO_NAMESPACE
+from stacks.control_plane.azure import check_uami_attached
 from stacks.control_plane.control_plane_azure import (
     build_control_plane_azure_child_config,
 )
@@ -132,16 +158,48 @@ def run() -> None:
         enable_lb_port_mapping = True
 
     gitops_provider = config.get("gitops_provider") or "gitea-builtin"
-    gitea_sync_triggers = config.get_object("gitea_sync_triggers") or {}
+    # Operator-controlled replacement inputs for the one-shot Git sync.
+    # Example:
+    #     pulumi config set --path 'gitops_sync_triggers.generation' rerun-1 -s azure
+    # Bump any key/value to force a normal non-force push without changing
+    # HEAD. ``gitea_sync_triggers`` accepted for backwards compatibility with
+    # operators that still set the old key.
+    gitops_sync_triggers = (
+        config.get_object("gitops_sync_triggers")
+        or config.get_object("gitea_sync_triggers")
+        or {}
+    )
     configured_gitops_provider_args = config.get_object("gitops_provider_args") or {}
 
-    # Azure UAMI identifiers. All three are non-sensitive GUIDs that
-    # identify the UAMI, its tenant, and its home subscription \u2014
-    # plain ``config.require()`` is the right verb (no ``--secret``
-    # needed when setting them).
+    # Azure UAMI identifiers. All four are non-sensitive GUIDs that
+    # identify the UAMI, its Entra object representation, its tenant,
+    # and its home subscription — plain ``config.require()`` is the
+    # right verb (no ``--secret`` needed when setting them).
+    #
+    # ``azurePrincipalId`` is required even though Phase 1 doesn't
+    # consume it: surfacing it as a stack output now lets Phase 2 ASO
+    # ``RoleAssignment`` / ``FederatedIdentityCredential`` CRs reference
+    # the UAMI by its Entra object ID without a config round-trip.
     azure_client_id = config.require("azureClientId")
+    azure_principal_id = config.require("azurePrincipalId")
     azure_tenant_id = config.require("azureTenantId")
     azure_subscription_id = config.require("azureSubscriptionId")
+
+    # Optional restriction on which namespaces' workload-cluster CRs may
+    # reference the AzureClusterIdentity. Unset (the default) emits
+    # ``spec.allowedNamespaces: {}`` on the CR — the CAPZ convention
+    # for "all namespaces" — which is the right default for multi-tenant
+    # Phase 2. Set this only to tighten the default.
+    azure_allowed_namespaces = config.get_object(
+        "azureClusterIdentityAllowedNamespaces"
+    )
+
+    # IMDS preflight: validate from the host that the configured UAMI
+    # is actually attached before we let the resource graph commit to a
+    # CR that CAPZ won't be able to use. Skip for off-Azure dev loops
+    # via ``pulumi config set skip_imds_preflight true -s azure``.
+    if not config.get_bool("skip_imds_preflight"):
+        check_uami_attached(azure_client_id)
 
     # ----------------------------------------------------------------------
     # Phase 1 \u2014 cluster + registry + LB controller. Identical shape to
@@ -187,7 +245,7 @@ def run() -> None:
             "flux_provider": mgmt_provider,
             "flux_infrastructure": flux,
             "pko_namespace_resource": pko_namespace,
-            "sync_triggers": gitea_sync_triggers,
+            "sync_triggers": gitops_sync_triggers,
         },
     )
 
@@ -216,8 +274,12 @@ def run() -> None:
         env=pulumi.get_stack(),
         config=build_control_plane_azure_child_config(
             client_id=azure_client_id,
+            principal_id=azure_principal_id,
             tenant_id=azure_tenant_id,
             subscription_id=azure_subscription_id,
+            allowed_namespaces=_normalize_allowed_namespaces(
+                azure_allowed_namespaces
+            ),
         ),
     )
 
@@ -244,14 +306,13 @@ def run() -> None:
     pulumi.export("gitops_url", repo.url)
     pulumi.export("gitops_url_external", repo.url_external)
     pulumi.export("gitops_default_branch", repo.default_branch)
-    pulumi.export("gitops_ssh_known_hosts", repo.ssh_known_hosts)
     pulumi.export(
         "gitops_ssh_private_key_secret_name",
-        repo.ssh_private_key_secret.metadata["name"],
+        repo.ssh_private_key_secret_name,
     )
     pulumi.export(
         "gitops_ssh_private_key_secret_namespace",
-        repo.ssh_private_key_secret.metadata["namespace"],
+        repo.ssh_private_key_secret_namespace,
     )
 
     pulumi.export("pko_namespace", pko.namespace)
@@ -263,7 +324,31 @@ def run() -> None:
 
     # Echo non-secret Azure context so ``pulumi stack output`` confirms
     # the identifiers made it through to the resource graph. None are
-    # secrets, so they're safe to surface verbatim.
+    # secrets, so they're safe to surface verbatim. principalId is
+    # included so Phase 2 ASO consumers can read it from stack state.
     pulumi.export("azure_client_id", azure_client_id)
+    pulumi.export("azure_principal_id", azure_principal_id)
     pulumi.export("azure_tenant_id", azure_tenant_id)
     pulumi.export("azure_subscription_id", azure_subscription_id)
+
+
+def _normalize_allowed_namespaces(
+    value: object | None,
+) -> list[str] | None:
+    """Coerce the ``azureClusterIdentityAllowedNamespaces`` config value.
+
+    Pulumi's ``get_object`` returns the parsed JSON value verbatim. We
+    accept ``None`` (key not set) and lists of strings. Any other shape
+    is a config typo — fail at plan time with a clear message instead
+    of letting it land in the resource graph as garbage.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item for item in value
+    ):
+        raise ValueError(
+            "azureClusterIdentityAllowedNamespaces must be a list of "
+            f"non-empty namespace names; got {value!r}"
+        )
+    return list(value)

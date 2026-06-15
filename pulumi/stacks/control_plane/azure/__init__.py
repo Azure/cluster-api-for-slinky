@@ -21,6 +21,7 @@ are where its consumers run (alongside sibling subpackages ``awx/``,
 from __future__ import annotations
 
 from ._cluster_identity import AzureClusterIdentity
+from ._imds_preflight import ImdsPreflightError, check_uami_attached
 
 
-__all__ = ["AzureClusterIdentity"]
+__all__ = ["AzureClusterIdentity", "ImdsPreflightError", "check_uami_attached"]

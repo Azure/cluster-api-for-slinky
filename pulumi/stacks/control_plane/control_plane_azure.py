@@ -48,6 +48,7 @@ Each of those lands in a subsequent phase.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -67,21 +68,41 @@ except ImportError:
 class ControlPlaneAzureSpec:
     """UAMI identifiers required to build the Azure control plane.
 
-    All three are non-sensitive GUIDs:
+    All four IDs are non-sensitive GUIDs:
 
-    * ``client_id``        \u2014 the UAMI's ``clientId`` (NOT the
+    * ``client_id``        — the UAMI's ``clientId`` (NOT the
       ``principalId``); the CAPZ controller passes this to IMDS to
       select which UAMI to mint a token for.
-    * ``tenant_id``        \u2014 the Entra tenant the UAMI lives in.
-    * ``subscription_id``  \u2014 the subscription the UAMI has role
+    * ``principal_id``     — the UAMI's ``principalId`` (a.k.a.
+      ``objectId``). Not consumed by CAPZ itself, but required when
+      Phase 2 lands ASO ``RoleAssignment``
+      / ``FederatedIdentityCredential`` CRs that must reference the
+      identity by its Entra object ID. Surface it now (instead of
+      requiring a Phase 2 re-config) so adding role assignments later
+      is a code change, not a config change.
+    * ``tenant_id``        — the Entra tenant the UAMI lives in.
+    * ``subscription_id``  — the subscription the UAMI has role
       assignments on. Not read by Phase 1; surfaced here so missing
       values fail at plan time, not deep into Phase 2 when
       ``AzureManagedControlPlane.spec.subscriptionID`` first needs it.
+
+    ``allowed_namespaces`` is an optional restriction on which
+    namespaces' workload-cluster CRs may reference the identity:
+
+    * ``None`` (the default) emits ``spec.allowedNamespaces: {}`` on
+      the CR — the CAPZ convention for "all namespaces may reference
+      this identity". Right default for multi-tenant Phase 2.
+    * A non-empty list restricts to those namespaces only.
+    * An empty list (``[]``) means "no namespace may reference this
+      identity", per the upstream CRD schema; almost never what you
+      want, but supported so the contract round-trips cleanly.
     """
 
     client_id: str
+    principal_id: str
     tenant_id: str
     subscription_id: str
+    allowed_namespaces: list[str] | None = None
 
 
 # Config keys read out of ``childConfig.azure``. The outer
@@ -91,8 +112,45 @@ class ControlPlaneAzureSpec:
 # endpoints (writer + reader) in lockstep.
 CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY = "azure"
 _CONFIG_CLIENT_ID = "clientId"
+_CONFIG_PRINCIPAL_ID = "principalId"
 _CONFIG_TENANT_ID = "tenantId"
 _CONFIG_SUBSCRIPTION_ID = "subscriptionId"
+_CONFIG_ALLOWED_NAMESPACES = "allowedNamespaces"
+
+# Azure identifiers (clientId, principalId, tenantId, subscriptionId) are
+# all GUIDs in the canonical 8-4-4-4-12 hex layout. Reject anything else
+# at plan time so typos fail loudly here instead of surfacing as a
+# confusing CAPZ "failed to acquire token" or ASO 4xx ten minutes later.
+_GUID_PATTERN = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+
+def _require_guid(field_path: str, value: object) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{field_path} must be a non-empty string")
+    if not _GUID_PATTERN.match(value):
+        raise ValueError(
+            f"{field_path} must be a GUID in 8-4-4-4-12 hex layout; got {value!r}"
+        )
+    return value
+
+
+def _parse_allowed_namespaces(
+    field_path: str, value: object | None
+) -> list[str] | None:
+    if value is None:
+        return None
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field_path} must be a list of namespace names")
+    parsed: list[str] = []
+    for index, entry in enumerate(value):
+        if not isinstance(entry, str) or not entry:
+            raise ValueError(
+                f"{field_path}[{index}] must be a non-empty string"
+            )
+        parsed.append(entry)
+    return parsed
 
 
 def parse_control_plane_azure_spec(
@@ -121,40 +179,54 @@ def parse_control_plane_azure_spec(
     fields: dict[str, str] = {}
     for config_key, field_name in (
         (_CONFIG_CLIENT_ID, "client_id"),
+        (_CONFIG_PRINCIPAL_ID, "principal_id"),
         (_CONFIG_TENANT_ID, "tenant_id"),
         (_CONFIG_SUBSCRIPTION_ID, "subscription_id"),
     ):
-        field_value = value.get(config_key)
-        if not isinstance(field_value, str) or not field_value:
-            raise ValueError(
-                f"{CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY}.{config_key} must "
-                "be a non-empty string"
-            )
-        fields[field_name] = field_value
+        fields[field_name] = _require_guid(
+            f"{CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY}.{config_key}",
+            value.get(config_key),
+        )
 
-    return ControlPlaneAzureSpec(**fields)
+    allowed_namespaces = _parse_allowed_namespaces(
+        f"{CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY}.{_CONFIG_ALLOWED_NAMESPACES}",
+        value.get(_CONFIG_ALLOWED_NAMESPACES),
+    )
+
+    return ControlPlaneAzureSpec(
+        **fields,
+        allowed_namespaces=allowed_namespaces,
+    )
 
 
 def build_control_plane_azure_child_config(
     *,
     client_id: str,
+    principal_id: str,
     tenant_id: str,
     subscription_id: str,
+    allowed_namespaces: list[str] | None = None,
 ) -> dict[str, object]:
     """Build the dict the outer stack passes via PKOBootstrap(config=...).
 
     Symmetric with :func:`parse_control_plane_azure_spec` so adding a
     field touches both sides at once. The shape is::
 
-        {CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY: {clientId, tenantId, subscriptionId}}
+        {CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY: {clientId, principalId,
+         tenantId, subscriptionId, allowedNamespaces?}}
+
+    ``allowedNamespaces`` is omitted from the dict when ``None`` so the
+    init-stack side parses back to ``None`` ("allow all" semantics).
     """
-    return {
-        CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY: {
-            _CONFIG_CLIENT_ID: client_id,
-            _CONFIG_TENANT_ID: tenant_id,
-            _CONFIG_SUBSCRIPTION_ID: subscription_id,
-        },
+    child: dict[str, object] = {
+        _CONFIG_CLIENT_ID: client_id,
+        _CONFIG_PRINCIPAL_ID: principal_id,
+        _CONFIG_TENANT_ID: tenant_id,
+        _CONFIG_SUBSCRIPTION_ID: subscription_id,
     }
+    if allowed_namespaces is not None:
+        child[_CONFIG_ALLOWED_NAMESPACES] = list(allowed_namespaces)
+    return {CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY: child}
 
 
 class ControlPlaneAzure(pulumi.ComponentResource):
@@ -188,6 +260,16 @@ class ControlPlaneAzure(pulumi.ComponentResource):
     capi_provider_namespaces: dict[str, pulumi.Output[str]]
     azure_cluster_identity_name: pulumi.Output[str]
     azure_cluster_identity_namespace: pulumi.Output[str]
+    # UAMI identifiers echoed as outputs so Phase 2 components (ASO
+    # ``RoleAssignment``, ``AzureManagedControlPlane.spec.subscriptionID``,
+    # tenant fan-out) can pull them out of stack state instead of
+    # re-reading config. principal_id is the Phase-2-critical addition:
+    # CAPZ identifies the UAMI by clientID but ASO role assignments key
+    # off the principalID (a.k.a. objectId).
+    azure_client_id: pulumi.Output[str]
+    azure_principal_id: pulumi.Output[str]
+    azure_tenant_id: pulumi.Output[str]
+    azure_subscription_id: pulumi.Output[str]
     control_plane_ready: pulumi.Output[bool]
     todo: pulumi.Output[str]
 
@@ -219,13 +301,15 @@ class ControlPlaneAzure(pulumi.ComponentResource):
         # UAMI carries no client secret \u2014 the AzureClusterIdentity CR
         # references the UAMI by its clientID, and the CAPZ controller
         # fetches tokens from IMDS at reconcile time.
+        #
+        # ``spec.allowed_namespaces=None`` (the default) emits the CR
+        # with ``spec.allowedNamespaces: {}`` (the CAPZ convention for
+        # \"allow all\"). Right default for multi-tenant Phase 2.
         azure_cluster_identity = AzureClusterIdentity(
             "cluster-identity",
             client_id=spec.client_id,
             tenant_id=spec.tenant_id,
-            # Phase 1 has no workload clusters; "default" is the namespace
-            # workload-cluster CRs would land in once Phase 2 begins.
-            allowed_namespaces=["default"],
+            allowed_namespaces=spec.allowed_namespaces,
             opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
         )
 
@@ -237,16 +321,25 @@ class ControlPlaneAzure(pulumi.ComponentResource):
         self.azure_cluster_identity_namespace = (
             azure_cluster_identity.identity_namespace
         )
-        # subscription_id is parsed/validated but unused at this layer.
-        # Reference it here so future Phase 2 AzureManagedControlPlane
-        # work has a documented hook. The underscore-assign quiets
-        # unused-var warnings without affecting behavior.
-        _ = spec.subscription_id
-        # Phase 1 is intentionally the foundation only. Flip to True
-        # once workload-cluster components + a real ``pulumi up``
-        # validation run have proved the AzureClusterIdentity works
-        # against ARM.
-        self.control_plane_ready = pulumi.Output.from_input(False)
+        # Echo the UAMI identifiers parsed off the spec. Phase 2 consumers
+        # (ASO ``RoleAssignment``, ``AzureManagedControlPlane``,
+        # tenants_azure fan-out) read them from these outputs so they
+        # don't need a second config read.
+        self.azure_client_id = pulumi.Output.from_input(spec.client_id)
+        self.azure_principal_id = pulumi.Output.from_input(spec.principal_id)
+        self.azure_tenant_id = pulumi.Output.from_input(spec.tenant_id)
+        self.azure_subscription_id = pulumi.Output.from_input(spec.subscription_id)
+        # Gate downstream "control-plane is up" consumers on the things
+        # that actually had to exist by Phase 1: the CAPI Operator
+        # rolled out (provider_version is its post-release output) and
+        # the AzureClusterIdentity CR was submitted (its identity_name
+        # output is set only after the CRD existed and the CR applied).
+        # The .apply discards both values and emits True; downstream
+        # consumers care about the dependency edge, not the payload.
+        self.control_plane_ready = pulumi.Output.all(
+            capi.provider_version,
+            azure_cluster_identity.identity_name,
+        ).apply(lambda _: True)
         self.todo = pulumi.Output.from_input(
             "Phase 1 scaffold only \u2014 add workload-cluster Azure "
             "components (AzureManagedControlPlane + MachinePool + "
@@ -263,6 +356,10 @@ class ControlPlaneAzure(pulumi.ComponentResource):
                 "azure_cluster_identity_namespace": (
                     self.azure_cluster_identity_namespace
                 ),
+                "azure_client_id": self.azure_client_id,
+                "azure_principal_id": self.azure_principal_id,
+                "azure_tenant_id": self.azure_tenant_id,
+                "azure_subscription_id": self.azure_subscription_id,
                 "control_plane_ready": self.control_plane_ready,
                 "todo": self.todo,
             }

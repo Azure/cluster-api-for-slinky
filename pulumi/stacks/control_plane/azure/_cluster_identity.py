@@ -52,19 +52,50 @@ JWKS to host, just the UAMI's clientID + tenantID in a CR.
 Networking prerequisite: IMDS reachability
 ------------------------------------------
 For this flavor to actually work at reconcile time, the CAPZ controller
-pod must be able to send HTTP to ``169.254.169.254``. On a standard
-kind-on-Azure-VM topology that works because:
+pod must be able to send HTTP to ``169.254.169.254``. The traffic path
+on a standard kind-on-Azure-VM topology is:
 
-* Pod \u2192 CNI \u2192 kind node container's network namespace.
-* kind node container \u2192 Docker bridge \u2192 host VM's network.
-* Host VM has the IMDS service at the link-local address served by the
-  Azure hypervisor; requests originate from the VM's hypervisor identity
-  regardless of which container made them.
+* CAPZ pod → kind node container's CNI (kindnet/Calico) → kind node
+  container's eth0 (Docker bridge interface).
+* kind node container → Docker bridge (``docker0`` or per-network
+  bridge) → host VM's network namespace.
+* Host VM has a link-local route for ``169.254.169.254/32`` populated
+  by the Azure VM agent at boot. The packet egresses on that route to
+  the hypervisor-served IMDS endpoint. Source IP from IMDS's view is
+  the host VM's interface IP (Docker SNATs container traffic by
+  default on Linux), so IMDS accepts the request regardless of the
+  caller's container origin.
 
-If a future setup runs the mgmt cluster off-Azure (laptop, on-prem,
-GKE), or installs a CNI that drops link-local traffic, this flavor will
-silently fail at token-acquisition time. Switch to ServicePrincipal or
-WorkloadIdentity in that case.
+Things that break this path (and the failure mode for each):
+
+* **Off-Azure host** — ``169.254.169.254`` is unreachable.
+  ``stack_azure.py``'s IMDS preflight (host-side) catches this at
+  plan time and aborts with a clear message. Set
+  ``skip_imds_preflight=true`` if you've already accepted that
+  trade-off (e.g. ``pulumi preview`` from a dev laptop).
+* **CNI that drops link-local egress** (e.g. some Cilium policies
+  with strict default-deny) — the preflight passes (host-side path is
+  fine) but the CAPZ pod fails to acquire tokens. Symptom: CAPZ
+  controller logs ``ManagedIdentityCredential: ... no available
+  identities``. Mitigation: add an explicit allow rule for
+  ``169.254.169.254/32:80`` in your CNI policy, or fall back to
+  ServicePrincipal identity.
+* **kind nodes with Docker network isolation** (``--network none`` or
+  a custom user-defined network without the default bridge) — the
+  link-local route isn't reachable from inside the container.
+  Mitigation: revert to the default kind networking, or patch the
+  CAPZ Deployment to use ``hostNetwork: true`` so it shares the kind
+  node container's network namespace directly.
+* **Off-Azure mgmt cluster** (kind on a laptop, GKE, EKS) — same as
+  above. Switch to ServicePrincipal (carries a clientSecret) or
+  WorkloadIdentity (needs an OIDC issuer Entra can reach).
+
+The host-side preflight in ``stack_azure.py`` is a *necessary but not
+sufficient* signal: if it passes, the kind nodes on the same host
+typically also work, but a CNI install between Phase 1 and the first
+workload-cluster reconcile can silently break the in-cluster path.
+When Phase 2 lands, add an in-cluster preflight Job (curl IMDS from
+inside ``capz-system``) to catch this drift.
 
 Resource ownership / reconciliation
 -----------------------------------
@@ -122,10 +153,17 @@ class AzureClusterIdentity(pulumi.ComponentResource):
                 az account show --query tenantId -o tsv
         allowed_namespaces:
             Namespaces whose workload-cluster CRs may reference this
-            identity. CAPZ enforces this list at admission time. The
-            default (``["default"]``) matches where Phase 1 will put
-            workload-cluster CRs. Pass an empty list (``[]``) to allow
-            ALL namespaces; ``None`` here means use the default.
+            identity. CAPZ admission enforces this list. ``None`` (the
+            default) emits the CR with ``spec.allowedNamespaces`` set
+            to an empty object \u2014 the CAPZ convention for \"any
+            namespace may reference this identity\" \u2014 which is the
+            right default for multi-tenant Phase 2 where each tenant
+            lands its CRs in its own namespace. Pass an explicit list
+            to restrict to those namespaces only. Note: an empty list
+            is NOT the same as ``None`` \u2014 ``[]`` means \"no namespace
+            may reference this identity\", per the upstream
+            ``AzureClusterIdentity.spec.allowedNamespaces.list``
+            schema.
         namespace:
             Namespace for the AzureClusterIdentity CR. There is no
             backing Secret to keep co-located with it for the UAMI
@@ -173,8 +211,20 @@ class AzureClusterIdentity(pulumi.ComponentResource):
             "ca4s:azure:AzureClusterIdentity", name, props={}, opts=opts
         )
 
+        # CAPZ schema for ``AzureClusterIdentity.spec.allowedNamespaces``:
+        #
+        #   * ``None`` (field absent)               \u2192 same-namespace only
+        #   * ``{}``   (empty struct)               \u2192 ALL namespaces
+        #   * ``{list: [\"a\", \"b\"]}``               \u2192 only \"a\", \"b\"
+        #
+        # We default to the empty-struct \"allow all\" form so multi-tenant
+        # Phase 2 (per-tenant namespaces) works without a Phase 1
+        # restriction needing to be relaxed later. Callers can still pass
+        # an explicit list to tighten things.
         if allowed_namespaces is None:
-            allowed_namespaces = ["default"]
+            allowed_namespaces_spec: dict[str, object] = {}
+        else:
+            allowed_namespaces_spec = {"list": allowed_namespaces}
 
         # UserAssignedMSI carries NO ``spec.clientSecret`` field \u2014 CAPZ
         # obtains tokens at runtime from IMDS at 169.254.169.254 using
@@ -193,9 +243,7 @@ class AzureClusterIdentity(pulumi.ComponentResource):
                 "type": "UserAssignedMSI",
                 "tenantID": tenant_id,
                 "clientID": client_id,
-                "allowedNamespaces": {
-                    "list": allowed_namespaces,
-                },
+                "allowedNamespaces": allowed_namespaces_spec,
             },
             opts=ResourceOptions(parent=self, provider=provider),
         )
