@@ -86,6 +86,11 @@ Optional config keys
 * ``ca4s-infra:skip_imds_preflight`` \u2014 boolean. When ``true``, skip
   the host-side IMDS check that confirms the UAMI is actually
   attached. Useful for off-Azure ``pulumi preview`` and tests.
+* ``ca4s-infra:skip_in_cluster_preflight`` \u2014 boolean. When ``true``,
+  skip the in-cluster IMDS preflight Job that ``ControlPlaneAzure``
+  schedules into ``capz-system`` after CAPZ is installed. Mirror of
+  ``skip_imds_preflight``; useful in the same off-Azure / test
+  scenarios.
 
 IMDS reachability prerequisite
 ------------------------------
@@ -96,12 +101,18 @@ confirms the configured ``azureClientId`` resolves to a UAMI
 attached to this VM. That catches the two common Phase 1 failure
 modes (running off-Azure, mistyped clientId) at plan time.
 
-The preflight only proves the *language host* can hit IMDS. For CAPZ
-to actually mint tokens at workload-cluster reconcile time (Phase 2),
-the CAPZ pod inside the ``kind`` mgmt cluster must also be able to
-reach ``169.254.169.254``. On a standard kind-on-Azure-VM topology
-this works out of the box because the host VM has the link-local
-route and Docker SNATs container traffic through it. See
+The host-side preflight only proves the *language host* can hit IMDS.
+For the in-cluster path, ``ControlPlaneAzure`` schedules a one-shot
+``IMDSPreflightJob`` into ``capz-system`` after CAPZ is installed; that
+Job carries ``pulumi.com/waitFor=condition=Complete`` so the outer
+``pulumi up`` blocks until the routing path **pod \u2192 kindnet \u2192 docker
+bridge SNAT \u2192 host route \u2192 IMDS** has been empirically verified.
+
+For CAPZ to actually mint tokens at workload-cluster reconcile time
+(Phase 2), the CAPZ pod inside the ``kind`` mgmt cluster must also
+be able to reach ``169.254.169.254``. On a standard kind-on-Azure-VM
+topology this works out of the box because the host VM has the
+link-local route and Docker SNATs container traffic through it. See
 :mod:`stacks.control_plane.azure._cluster_identity` for the network
 path walkthrough and the failure modes to watch for if the kind CNI
 is ever replaced or this stack is ever run off-Azure.
@@ -194,6 +205,16 @@ def run() -> None:
         "azureClusterIdentityAllowedNamespaces"
     )
 
+    # Skip the in-cluster IMDS preflight Job that ``ControlPlaneAzure``
+    # would otherwise schedule into ``capz-system``. Mirror of
+    # ``skip_imds_preflight`` (host-side) so an operator who opts out of
+    # the host check can also opt out of the in-cluster check — there's
+    # no point in running one without the other. Defaults to False so
+    # production paths always get both layers of verification.
+    skip_in_cluster_preflight = bool(
+        config.get_bool("skip_in_cluster_preflight")
+    )
+
     # IMDS preflight: validate from the host that the configured UAMI
     # is actually attached before we let the resource graph commit to a
     # CR that CAPZ won't be able to use. Skip for off-Azure dev loops
@@ -280,6 +301,7 @@ def run() -> None:
             allowed_namespaces=_normalize_allowed_namespaces(
                 azure_allowed_namespaces
             ),
+            skip_in_cluster_preflight=skip_in_cluster_preflight,
         ),
     )
 

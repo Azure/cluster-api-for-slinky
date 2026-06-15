@@ -169,3 +169,58 @@ def test_parse_allows_empty_allowed_namespaces_list() -> None:
 
     parsed = parse_control_plane_azure_spec(payload)
     assert parsed.allowed_namespaces == []
+
+
+def test_skip_in_cluster_preflight_defaults_to_false() -> None:
+    # ``skipInClusterPreflight`` is optional; absent in the wire shape
+    # means "run the preflight" so the safe default is False.
+    parsed = parse_control_plane_azure_spec(_full_payload())
+    assert parsed.skip_in_cluster_preflight is False
+
+
+def test_skip_in_cluster_preflight_round_trips_true() -> None:
+    built = build_control_plane_azure_child_config(
+        client_id=_CLIENT_ID,
+        principal_id=_PRINCIPAL_ID,
+        tenant_id=_TENANT_ID,
+        subscription_id=_SUBSCRIPTION_ID,
+        skip_in_cluster_preflight=True,
+    )
+
+    assert built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY] == {
+        "clientId": _CLIENT_ID,
+        "principalId": _PRINCIPAL_ID,
+        "tenantId": _TENANT_ID,
+        "subscriptionId": _SUBSCRIPTION_ID,
+        "skipInClusterPreflight": True,
+    }
+    parsed = parse_control_plane_azure_spec(
+        built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY]
+    )
+    assert parsed.skip_in_cluster_preflight is True
+
+
+def test_build_omits_skip_in_cluster_preflight_when_false() -> None:
+    # The default-False case must produce the minimal wire shape so
+    # operators can flip the flag back to "use the default" by removing
+    # the config key, not by setting it to false explicitly.
+    built = build_control_plane_azure_child_config(
+        client_id=_CLIENT_ID,
+        principal_id=_PRINCIPAL_ID,
+        tenant_id=_TENANT_ID,
+        subscription_id=_SUBSCRIPTION_ID,
+        skip_in_cluster_preflight=False,
+    )
+
+    assert "skipInClusterPreflight" not in built[
+        CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY  # type: ignore[operator]
+    ]
+
+
+def test_parse_rejects_non_bool_skip_in_cluster_preflight() -> None:
+    payload = _full_payload(skipInClusterPreflight="yes")
+
+    with pytest.raises(
+        ValueError, match=r"skipInClusterPreflight must be a boolean"
+    ):
+        parse_control_plane_azure_spec(payload)

@@ -55,11 +55,11 @@ from typing import Mapping
 import pulumi
 
 try:
-    from .azure import AzureClusterIdentity
+    from .azure import AzureClusterIdentity, IMDSPreflightJob
     from .capi import ClusterAPIOperator
     from .certmanager import CertManager
 except ImportError:
-    from azure import AzureClusterIdentity
+    from azure import AzureClusterIdentity, IMDSPreflightJob
     from capi import ClusterAPIOperator
     from certmanager import CertManager
 
@@ -103,6 +103,13 @@ class ControlPlaneAzureSpec:
     tenant_id: str
     subscription_id: str
     allowed_namespaces: list[str] | None = None
+    # When True, skip the in-cluster IMDS preflight Job that
+    # ControlPlaneAzure would otherwise schedule into capz-system.
+    # Mirror of the outer stack's ``skip_imds_preflight`` config key
+    # — there is no value in running the in-cluster check if the
+    # operator has already opted out of the host-side check. Defaults
+    # to False so production paths always get the verification.
+    skip_in_cluster_preflight: bool = False
 
 
 # Config keys read out of ``childConfig.azure``. The outer
@@ -116,6 +123,7 @@ _CONFIG_PRINCIPAL_ID = "principalId"
 _CONFIG_TENANT_ID = "tenantId"
 _CONFIG_SUBSCRIPTION_ID = "subscriptionId"
 _CONFIG_ALLOWED_NAMESPACES = "allowedNamespaces"
+_CONFIG_SKIP_IN_CLUSTER_PREFLIGHT = "skipInClusterPreflight"
 
 # Azure identifiers (clientId, principalId, tenantId, subscriptionId) are
 # all GUIDs in the canonical 8-4-4-4-12 hex layout. Reject anything else
@@ -193,9 +201,18 @@ def parse_control_plane_azure_spec(
         value.get(_CONFIG_ALLOWED_NAMESPACES),
     )
 
+    skip_field = value.get(_CONFIG_SKIP_IN_CLUSTER_PREFLIGHT)
+    if skip_field is not None and not isinstance(skip_field, bool):
+        raise ValueError(
+            f"{CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY}."
+            f"{_CONFIG_SKIP_IN_CLUSTER_PREFLIGHT} must be a boolean; "
+            f"got {type(skip_field).__name__}"
+        )
+
     return ControlPlaneAzureSpec(
         **fields,
         allowed_namespaces=allowed_namespaces,
+        skip_in_cluster_preflight=bool(skip_field),
     )
 
 
@@ -206,6 +223,7 @@ def build_control_plane_azure_child_config(
     tenant_id: str,
     subscription_id: str,
     allowed_namespaces: list[str] | None = None,
+    skip_in_cluster_preflight: bool = False,
 ) -> dict[str, object]:
     """Build the dict the outer stack passes via PKOBootstrap(config=...).
 
@@ -213,10 +231,13 @@ def build_control_plane_azure_child_config(
     field touches both sides at once. The shape is::
 
         {CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY: {clientId, principalId,
-         tenantId, subscriptionId, allowedNamespaces?}}
+         tenantId, subscriptionId, allowedNamespaces?,
+         skipInClusterPreflight?}}
 
     ``allowedNamespaces`` is omitted from the dict when ``None`` so the
     init-stack side parses back to ``None`` ("allow all" semantics).
+    ``skipInClusterPreflight`` is omitted when False so the default
+    safe-path wire shape stays minimal.
     """
     child: dict[str, object] = {
         _CONFIG_CLIENT_ID: client_id,
@@ -226,6 +247,8 @@ def build_control_plane_azure_child_config(
     }
     if allowed_namespaces is not None:
         child[_CONFIG_ALLOWED_NAMESPACES] = list(allowed_namespaces)
+    if skip_in_cluster_preflight:
+        child[_CONFIG_SKIP_IN_CLUSTER_PREFLIGHT] = True
     return {CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY: child}
 
 
@@ -260,6 +283,12 @@ class ControlPlaneAzure(pulumi.ComponentResource):
     capi_provider_namespaces: dict[str, pulumi.Output[str]]
     azure_cluster_identity_name: pulumi.Output[str]
     azure_cluster_identity_namespace: pulumi.Output[str]
+    # IMDS preflight Job outputs. ``imds_preflight_job_name`` is
+    # ``Output[str]`` when the Job was created and ``Output[None]``
+    # when ``spec.skip_in_cluster_preflight`` is True. The union type
+    # matches :class:`azure.IMDSPreflightJob`.
+    imds_preflight_job_name: pulumi.Output[str | None]
+    imds_preflight_job_namespace: pulumi.Output[str]
     # UAMI identifiers echoed as outputs so Phase 2 components (ASO
     # ``RoleAssignment``, ``AzureManagedControlPlane.spec.subscriptionID``,
     # tenant fan-out) can pull them out of stack state instead of
@@ -312,6 +341,19 @@ class ControlPlaneAzure(pulumi.ComponentResource):
             allowed_namespaces=spec.allowed_namespaces,
             opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
         )
+        # In-cluster IMDS preflight. The Job lands in ``capz-system``
+        # (which only exists after the CAPI Operator rolled out CAPZ),
+        # so it depends on ``capi`` for namespace existence. The Job
+        # carries ``pulumi.com/waitFor=condition=Complete``, meaning
+        # pulumi-kubernetes blocks on the Job's exit — a token-mint
+        # failure surfaces here as a hard stack error instead of as a
+        # silent CAPZ reconcile loop hours later.
+        imds_preflight_job = IMDSPreflightJob(
+            "imds-preflight",
+            client_id=spec.client_id,
+            skip=spec.skip_in_cluster_preflight,
+            opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
+        )
 
         self.cert_manager_namespace = cert_manager.namespace
         self.capi_operator_namespace = capi.namespace
@@ -321,6 +363,12 @@ class ControlPlaneAzure(pulumi.ComponentResource):
         self.azure_cluster_identity_namespace = (
             azure_cluster_identity.identity_namespace
         )
+        # IMDS preflight Job handles. When skip=True both are still
+        # present (job_name is Output[None]); downstream code should
+        # treat ``imds_preflight_job_name`` as advisory and rely on
+        # ``control_plane_ready`` for the actual readiness gate.
+        self.imds_preflight_job_name = imds_preflight_job.job_name
+        self.imds_preflight_job_namespace = imds_preflight_job.job_namespace
         # Echo the UAMI identifiers parsed off the spec. Phase 2 consumers
         # (ASO ``RoleAssignment``, ``AzureManagedControlPlane``,
         # tenants_azure fan-out) read them from these outputs so they
@@ -331,14 +379,21 @@ class ControlPlaneAzure(pulumi.ComponentResource):
         self.azure_subscription_id = pulumi.Output.from_input(spec.subscription_id)
         # Gate downstream "control-plane is up" consumers on the things
         # that actually had to exist by Phase 1: the CAPI Operator
-        # rolled out (provider_version is its post-release output) and
-        # the AzureClusterIdentity CR was submitted (its identity_name
-        # output is set only after the CRD existed and the CR applied).
-        # The .apply discards both values and emits True; downstream
-        # consumers care about the dependency edge, not the payload.
+        # rolled out (provider_version is its post-release output), the
+        # AzureClusterIdentity CR was submitted (its identity_name
+        # output is set only after the CRD existed and the CR applied),
+        # and the in-cluster IMDS preflight Job completed (its
+        # job_name Output is bound to the Job's metadata.name, which
+        # pulumi-kubernetes only resolves after the
+        # ``pulumi.com/waitFor=condition=Complete`` annotation lifts —
+        # i.e. after IMDS actually issued a token from inside
+        # ``capz-system``). When ``skip_in_cluster_preflight`` is True,
+        # ``job_name`` resolves to ``None`` immediately and the gate
+        # degrades to the pre-Phase-B behavior.
         self.control_plane_ready = pulumi.Output.all(
             capi.provider_version,
             azure_cluster_identity.identity_name,
+            imds_preflight_job.job_name,
         ).apply(lambda _: True)
         self.todo = pulumi.Output.from_input(
             "Phase 1 scaffold only \u2014 add workload-cluster Azure "
@@ -355,6 +410,10 @@ class ControlPlaneAzure(pulumi.ComponentResource):
                 "azure_cluster_identity_name": self.azure_cluster_identity_name,
                 "azure_cluster_identity_namespace": (
                     self.azure_cluster_identity_namespace
+                ),
+                "imds_preflight_job_name": self.imds_preflight_job_name,
+                "imds_preflight_job_namespace": (
+                    self.imds_preflight_job_namespace
                 ),
                 "azure_client_id": self.azure_client_id,
                 "azure_principal_id": self.azure_principal_id,
