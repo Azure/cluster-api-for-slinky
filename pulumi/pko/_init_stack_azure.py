@@ -4,14 +4,17 @@ Mirror of :mod:`pko._init_stack_local`. Selected by the dispatcher in
 :func:`pko._init_stack.run` when the init Stack CR's env is
 ``azure``.
 
-Phase 1 responsibility:
+Phase 2 responsibility:
 
-1. Unpack the Azure-specific child config (UAMI identifiers) that the
-   outer ``stack_azure.py`` sent down via
-   ``PKOBootstrap(config=...)``.
-2. Instantiate :class:`ControlPlaneAzure`, passing the typed spec.
-3. Instantiate :class:`TenantsAzure` (empty in Phase 1) so the output
-   shape stays consistent with :class:`pko._init_stack_local.InitStackLocal`.
+1. Unpack the Azure-specific child config the outer ``stack_azure.py``
+   sent down via ``PKOBootstrap(config=...)``: the UAMI identifiers
+   (``childConfig.azure``) and the workload-cluster placement/sizing
+   (``childConfig.azureWorkload``).
+2. Instantiate :class:`ControlPlaneAzure`, passing the typed identity spec.
+3. Instantiate :class:`TenantsAzure`, threading in the parsed workload
+   spec, the subscription ID, and the ``AzureClusterIdentity`` name +
+   namespace so the AKS control plane's ``identityRef`` resolves back to
+   the Phase 1 identity.
 """
 
 from __future__ import annotations
@@ -26,6 +29,10 @@ from stacks.control_plane.control_plane_azure import (
     parse_control_plane_azure_spec,
 )
 from stacks.workload_cluster.tenants_azure import TenantsAzure
+from stacks.workload_cluster.workload_cluster_azure_aks import (
+    AZURE_WORKLOAD_CHILD_CONFIG_KEY,
+    parse_azure_workload_spec,
+)
 
 
 class InitStackAzure(pulumi.ComponentResource):
@@ -57,6 +64,14 @@ class InitStackAzure(pulumi.ComponentResource):
         spec = parse_control_plane_azure_spec(
             inputs.child_config.get(CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY)
         )
+        # Workload-cluster placement/sizing lives in a sibling childConfig
+        # block (``azureWorkload``) owned by the workload package, kept
+        # separate from the identity block so the two contracts evolve
+        # independently. The subscription ID is NOT duplicated there — it is
+        # threaded from the identity ``spec`` below.
+        workload_spec = parse_azure_workload_spec(
+            inputs.child_config.get(AZURE_WORKLOAD_CHILD_CONFIG_KEY)
+        )
 
         control_plane = ControlPlaneAzure(
             "control-plane",
@@ -65,6 +80,10 @@ class InitStackAzure(pulumi.ComponentResource):
         )
         tenants = TenantsAzure(
             "tenants-azure",
+            workload_spec=workload_spec,
+            subscription_id=spec.subscription_id,
+            identity_name=control_plane.azure_cluster_identity_name,
+            identity_namespace=control_plane.azure_cluster_identity_namespace,
             opts=pulumi.ResourceOptions(parent=self, depends_on=[control_plane]),
         )
 

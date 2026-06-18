@@ -19,21 +19,26 @@ instantiates:
 
 * :class:`stacks.control_plane.control_plane_azure.ControlPlaneAzure`
   \u2014 cert-manager + CAPI Operator (with the azure infrastructure
-  provider that also auto-installs ASO) + a single
+  provider) + a single
   ``AzureClusterIdentity`` CR of type ``UserAssignedMSI``.
 * :class:`stacks.workload_cluster.tenants_azure.TenantsAzure` \u2014
-  empty in Phase 1.
+  provisions a single AKS managed workload cluster (Phase 2).
 
-Phase 1 deliberate scope (and what's NOT here)
-----------------------------------------------
-* No workload-cluster CRs (``AzureCluster``, ``AzureManagedControlPlane``,
-  ``MachinePool``, etc.). Those land when Phase 2 makes ``TenantsAzure``
-  non-empty.
-* No AWX, no Slurm, no autoscaling, no SSH/node customization.
-* No ResourceGroup, VNet, or any other Azure-side resource via ASO. The
-  azure infrastructure provider's controllers are installed but they
-  reconcile nothing until Phase 2 introduces workload-cluster CRs that
-  reference them.
+Phase 2 scope (and what's NOT here yet)
+---------------------------------------
+* A single AKS *managed* cluster via the CAPZ managed CR set
+  (``AzureManagedControlPlane`` / ``AzureManagedCluster`` /
+  ``AzureManagedMachinePool`` + ``Cluster`` / ``MachinePool``). AKS owns
+  its own CNI, storage, and bootstrap, so there is no Calico / kubeadm
+  wiring on the workload side.
+* No *self-managed* clusters yet (``AzureCluster`` +
+  ``KubeadmControlPlane`` + ``AzureMachineTemplate``) — that is the next
+  increment.
+* No AWX, no Slurm, no autoscaling. No day-2 on the AKS cluster yet
+  (workload kubeconfig retrieval + Slurm/Slinky install land later).
+* The ResourceGroup is NOT created here — CAPZ provisions the AKS cluster
+  into the operator-supplied ``azureResourceGroup`` (and AKS auto-creates
+  the ``MC_*`` node resource group for the VMSS-backed nodes).
 
 Identity model: UserAssignedMSI (no Secret)
 -------------------------------------------
@@ -68,6 +73,8 @@ stack first. **None of them are secrets** \u2014 they're just GUIDs::
     pulumi config set ca4s-infra:azurePrincipalId    <uami-principal-id>
     pulumi config set ca4s-infra:azureTenantId       <entra-tenant-id>
     pulumi config set ca4s-infra:azureSubscriptionId <subscription-id>
+    pulumi config set ca4s-infra:azureLocation       <region e.g. westus2>
+    pulumi config set ca4s-infra:azureResourceGroup  <existing-rg-name>
     pulumi up -s azure
 
 Grab the UAMI's ``clientId`` and ``principalId`` together with::
@@ -77,6 +84,17 @@ Grab the UAMI's ``clientId`` and ``principalId`` together with::
 
 Optional config keys
 --------------------
+* ``ca4s-infra:aksKubernetesVersion`` — AKS control-plane Kubernetes
+  version (e.g. ``v1.30.6``). Unset uses the default pinned in
+  :mod:`stacks.workload_cluster.workload_cluster_azure_aks`. VERIFY the
+  version is currently offered in ``azureLocation`` with
+  ``az aks get-versions --location <region> -o table`` — AKS rejects
+  unsupported versions and the ``waitFor=condition=Ready`` gate turns
+  that into a hard ``pulumi up`` failure.
+* ``ca4s-infra:aksNodeSku`` — VM SKU for the AKS system node pool (e.g.
+  ``Standard_D2s_v3``). Unset uses the module default.
+* ``ca4s-infra:aksNodeCount`` — integer node count for the system pool.
+  Unset uses the module default (1).
 * ``ca4s-infra:azureClusterIdentityAllowedNamespaces`` \u2014 list of
   namespace names whose workload-cluster CRs may reference the
   AzureClusterIdentity. Unset (the default) emits the CR with
@@ -130,6 +148,8 @@ both is tight on your host, ``pulumi destroy -s local`` first.
 
 from __future__ import annotations
 
+from typing import Mapping
+
 import pulumi
 import pulumi_kubernetes as k8s
 
@@ -141,6 +161,9 @@ from pko._release import PKO_NAMESPACE
 from stacks.control_plane.azure import check_uami_attached
 from stacks.control_plane.control_plane_azure import (
     build_control_plane_azure_child_config,
+)
+from stacks.workload_cluster.workload_cluster_azure_aks import (
+    build_azure_workload_child_config,
 )
 
 
@@ -188,9 +211,9 @@ def run() -> None:
     # right verb (no ``--secret`` needed when setting them).
     #
     # ``azurePrincipalId`` is required even though Phase 1 doesn't
-    # consume it: surfacing it as a stack output now lets Phase 2 ASO
-    # ``RoleAssignment`` / ``FederatedIdentityCredential`` CRs reference
-    # the UAMI by its Entra object ID without a config round-trip.
+    # consume it: surfacing it as a stack output now lets a later
+    # increment reference the UAMI by its Entra object ID without a
+    # config round-trip.
     azure_client_id = config.require("azureClientId")
     azure_principal_id = config.require("azurePrincipalId")
     azure_tenant_id = config.require("azureTenantId")
@@ -203,6 +226,30 @@ def run() -> None:
     # Phase 2. Set this only to tighten the default.
     azure_allowed_namespaces = config.get_object(
         "azureClusterIdentityAllowedNamespaces"
+    )
+
+    # Workload-cluster placement + sizing for the AKS managed cluster that
+    # TenantsAzure provisions. location + resource group are required (there
+    # is no safe default for "where to spend money"); the AKS sizing keys are
+    # optional and fall back to the defaults baked into
+    # workload_cluster_azure_aks when unset.
+    azure_location = config.require("azureLocation")
+    azure_resource_group = config.require("azureResourceGroup")
+    aks_kubernetes_version = config.get("aksKubernetesVersion")
+    aks_node_sku = config.get("aksNodeSku")
+    aks_node_count = config.get_int("aksNodeCount")
+
+    # Extra Azure tags stamped onto EACH AKS agent pool's VMSS (via
+    # AzureManagedMachinePool.spec.additionalTags). Required in this
+    # environment to satisfy the org Azure Policy that demands an ``Owner``
+    # tag on the VMs — AKS does not reliably propagate cluster-level tags
+    # to the node VMSS, so the tag is set per machine pool. Set with::
+    #
+    #     pulumi config set --path 'azureAdditionalTags.Owner' <alias> -s azure
+    #
+    # Unset (the default) emits no ``additionalTags`` on the agent pool.
+    azure_additional_tags = _normalize_additional_tags(
+        config.get_object("azureAdditionalTags")
     )
 
     # Skip the in-cluster IMDS preflight Job that ``ControlPlaneAzure``
@@ -293,16 +340,26 @@ def run() -> None:
         flux_source_name=repo.flux_source_name,
         flux_source_resource=repo.flux_source,
         env=pulumi.get_stack(),
-        config=build_control_plane_azure_child_config(
-            client_id=azure_client_id,
-            principal_id=azure_principal_id,
-            tenant_id=azure_tenant_id,
-            subscription_id=azure_subscription_id,
-            allowed_namespaces=_normalize_allowed_namespaces(
-                azure_allowed_namespaces
+        config={
+            **build_control_plane_azure_child_config(
+                client_id=azure_client_id,
+                principal_id=azure_principal_id,
+                tenant_id=azure_tenant_id,
+                subscription_id=azure_subscription_id,
+                allowed_namespaces=_normalize_allowed_namespaces(
+                    azure_allowed_namespaces
+                ),
+                skip_in_cluster_preflight=skip_in_cluster_preflight,
             ),
-            skip_in_cluster_preflight=skip_in_cluster_preflight,
-        ),
+            **build_azure_workload_child_config(
+                location=azure_location,
+                resource_group=azure_resource_group,
+                additional_tags=azure_additional_tags,
+                aks_kubernetes_version=aks_kubernetes_version,
+                aks_node_sku=aks_node_sku,
+                aks_node_count=aks_node_count,
+            ),
+        },
     )
 
     gitops_webhook = GitOpsWebhook(
@@ -347,11 +404,13 @@ def run() -> None:
     # Echo non-secret Azure context so ``pulumi stack output`` confirms
     # the identifiers made it through to the resource graph. None are
     # secrets, so they're safe to surface verbatim. principalId is
-    # included so Phase 2 ASO consumers can read it from stack state.
+    # included so a later increment can read it from stack state.
     pulumi.export("azure_client_id", azure_client_id)
     pulumi.export("azure_principal_id", azure_principal_id)
     pulumi.export("azure_tenant_id", azure_tenant_id)
     pulumi.export("azure_subscription_id", azure_subscription_id)
+    pulumi.export("azure_location", azure_location)
+    pulumi.export("azure_resource_group", azure_resource_group)
 
 
 def _normalize_allowed_namespaces(
@@ -374,3 +433,26 @@ def _normalize_allowed_namespaces(
             f"non-empty namespace names; got {value!r}"
         )
     return list(value)
+
+
+def _normalize_additional_tags(
+    value: object | None,
+) -> dict[str, str] | None:
+    """Coerce the ``azureAdditionalTags`` config value into a tag map.
+
+    Pulumi's ``get_object`` returns the parsed JSON value verbatim. We accept
+    ``None`` (key not set) and objects mapping string tag keys to string
+    values. Any other shape is a config typo — fail at plan time with a clear
+    message instead of letting it land in the resource graph as garbage.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, Mapping) or not all(
+        isinstance(key, str) and key and isinstance(tag_value, str)
+        for key, tag_value in value.items()
+    ):
+        raise ValueError(
+            "azureAdditionalTags must be an object mapping non-empty string "
+            f"tag keys to string values; got {value!r}"
+        )
+    return dict(value)

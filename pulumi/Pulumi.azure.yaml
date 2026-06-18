@@ -4,3 +4,5 @@ config:
   ca4s-infra:azurePrincipalId: a86f863e-5ed4-40bc-b35c-0acdaa48ceb6
   ca4s-infra:azureTenantId: 72f988bf-86f1-41af-91ab-2d7cd011db47
   ca4s-infra:azureSubscriptionId: d2c9544f-4329-4642-b73d-020e7fef844f
+  ca4s-infra:azureLocation: westus2
+  ca4s-infra:azureResourceGroup: rg-capz-mi-dev2
