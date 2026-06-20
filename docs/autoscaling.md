@@ -1,16 +1,16 @@
 # Autoscaling: From Slurm Jobs to CAPD Nodes
 
-This document explains the intended end-to-end autoscaling pipeline that
-dynamically provisions Kubernetes (CAPD) nodes in response to pending Slurm
-jobs. The Pulumi local stack currently owns the Cluster Autoscaler side of the
-pipeline; workload-driven NodeSet scaling remains future work.
+This document explains the end-to-end autoscaling pipeline that dynamically
+provisions Kubernetes (CAPD) nodes in response to pending Slurm jobs. The
+Pulumi local stack owns both the KEDA NodeSet scaler in the workload cluster
+and the Cluster Autoscaler in the management cluster.
 
 ## High-Level Flow
 
 ```
 Slurm pending jobs
   → Prometheus scrapes slurmctld metrics
-    → KEDA or a future controller scales the NodeSet (slurmd pod count)
+    → KEDA scales the NodeSet (slurmd pod count)
       → Unschedulable slurmd pods appear
         → Cluster Autoscaler scales the compute MachineDeployment
           → CAPD creates new Docker "nodes"
@@ -36,34 +36,35 @@ This is the number of Slurm jobs waiting for compute resources.
 
 ### 2. KEDA ScaledObject → NodeSet Replicas
 
-The intended KEDA integration watches the pending-jobs metric and maps it to the
-replica count of a Slinky **NodeSet**:
+Pulumi installs KEDA in the workload cluster and creates a `ScaledObject` that
+watches the pending-jobs metric and maps it to the replica count of a Slinky
+**NodeSet**:
 
 ```yaml
 spec:
   scaleTargetRef:
     apiVersion: slinky.slurm.net/v1beta1
     kind: NodeSet
-    name: slurm-worker-slinky
+    name: <slurm-release>-worker-compute
   minReplicaCount: 1
   maxReplicaCount: 10
   triggers:
   - type: prometheus
     metadata:
-      query: slurm_partition_jobs_pending{partition="all"}
+      query: sum(slurm_partition_jobs_pending{partition="all"})
       threshold: '1'
       activationThreshold: '1'
 ```
 
-When at least one job is pending, the scaler increases the NodeSet replica
+When at least one job is pending, KEDA increases the NodeSet replica
 count. Each replica becomes one `slurmd` pod, essentially one Slurm compute
-node. When pending jobs drop to zero, the scaler reduces replicas back to its
+node. When pending jobs drop to zero, KEDA reduces replicas back to its
 configured minimum.
 
 ### 3. Unschedulable Pods → Cluster Autoscaler → MachineDeployment
 
 Because of the **anti-affinity** rule (see below), each slurmd pod requires
-its own dedicated Kubernetes node. When the scaler requests more NodeSet
+its own dedicated Kubernetes node. When KEDA requests more NodeSet
 replicas than there are available compute nodes, the new pods become
 *unschedulable*.
 
@@ -228,7 +229,7 @@ This enforces two constraints:
 The anti-affinity rule is what *bridges* KEDA scaling to infrastructure
 scaling:
 
-1. The scaler increases the NodeSet to N replicas (N slurmd pods requested).
+1. KEDA increases the NodeSet to N replicas (N slurmd pods requested).
 2. If only M < N compute nodes exist, the remaining N − M pods are
    **unschedulable** — the scheduler cannot place two slurmd pods on the
    same node.

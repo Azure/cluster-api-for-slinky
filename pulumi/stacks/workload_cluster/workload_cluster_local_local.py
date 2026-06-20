@@ -96,6 +96,17 @@ _PROMETHEUS_CHART_NAME = "kube-prometheus-stack"
 _PROMETHEUS_CHART_VERSION = "86.2.2"
 _PROMETHEUS_NAMESPACE = "prometheus"
 
+_KEDA_CHART_REPO = "https://kedacore.github.io/charts"
+_KEDA_CHART_NAME = "keda"
+_KEDA_CHART_VERSION = "2.20.1"
+_KEDA_NAMESPACE = "keda"
+_KEDA_SCALED_OBJECT_API_VERSION = "keda.sh/v1alpha1"
+_SLURM_NODESET_API_VERSION = "slinky.slurm.net/v1beta1"
+_SLURM_PENDING_JOBS_QUERY = (
+    'sum(slurm_partition_jobs_pending{partition="all"})'
+)
+_PROMETHEUS_PORT = 9090
+
 _SLINKY_CHART_OCI_PREFIX = "oci://ghcr.io/slinkyproject/charts"
 _SLINKY_CHART_VERSION = "1.1.1"
 _SLINKY_OPERATOR_CRDS_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator-crds"
@@ -403,6 +414,77 @@ def _cluster_autoscaler_values(
             "v": 4,
             "scale-down-unneeded-time": "2m",
         },
+    }
+
+
+def _keda_namespace(instance: str) -> str:
+    return _resource_name(instance, "keda")
+
+
+def _keda_release_name(instance: str) -> str:
+    return _resource_name(instance, "keda")
+
+
+def _keda_scaled_object_name(instance: str, worker_name: str) -> str:
+    return _resource_name(instance, f"{worker_name}-nodeset-scaler")
+
+
+def _slurm_nodeset_name(slurm_release_name: str, worker_name: str) -> str:
+    return f"{slurm_release_name}-worker-{worker_name}"
+
+
+def _prometheus_service_name(prometheus_release_name: str) -> str:
+    return f"{prometheus_release_name}-kube-p-prometheus"
+
+
+def _prometheus_server_address(prometheus_release_name: str) -> str:
+    return (
+        f"http://{_prometheus_service_name(prometheus_release_name)}."
+        f"{_PROMETHEUS_NAMESPACE}.svc.cluster.local:{_PROMETHEUS_PORT}"
+    )
+
+
+def _keda_values() -> dict[str, object]:
+    controller_node_selector = {_NODE_TYPE_LABEL: _CONTROLLER_NODE_TYPE}
+    controller_tolerations = _controller_tolerations()
+    component_placement = {
+        "nodeSelector": controller_node_selector,
+        "tolerations": controller_tolerations,
+    }
+    return {
+        **component_placement,
+        "metricsServer": component_placement,
+        "webhooks": component_placement,
+    }
+
+
+def _keda_scaled_object_spec(
+    *,
+    node_set_name: pulumi.Input[str],
+    min_replicas: int,
+    max_replicas: int,
+    prometheus_server_address: pulumi.Input[str],
+) -> dict[str, object]:
+    return {
+        "scaleTargetRef": {
+            "apiVersion": _SLURM_NODESET_API_VERSION,
+            "kind": "NodeSet",
+            "name": node_set_name,
+        },
+        "minReplicaCount": min_replicas,
+        "maxReplicaCount": max_replicas,
+        "triggers": [
+            {
+                "type": "prometheus",
+                "metadata": {
+                    "serverAddress": prometheus_server_address,
+                    "query": _SLURM_PENDING_JOBS_QUERY,
+                    "threshold": "1",
+                    "activationThreshold": "1",
+                    "unsafeSsl": "true",
+                },
+            }
+        ],
     }
 
 
@@ -1034,6 +1116,124 @@ class ClusterAPIAutoscaler(pulumi.ComponentResource):
         )
 
 
+class KEDANodeSetScaler(pulumi.ComponentResource):
+    """KEDA ScaledObjects that translate Slurm queue depth into NodeSet replicas."""
+
+    namespace: pulumi.Output[str]
+    release_name: pulumi.Output[str]
+    scaled_object_names: pulumi.Output[list[str]]
+    status: pulumi.Output[Any]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        instance: str,
+        prometheus_release_name: pulumi.Input[str],
+        slurm_release_name: pulumi.Input[str],
+        autoscaled_workers: tuple[WorkerClassSpec, ...],
+        provider: k8s.Provider,
+        depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            "ca4s:workload:KEDANodeSetScaler",
+            name,
+            props={},
+            opts=opts,
+        )
+
+        if not autoscaled_workers:
+            raise ValueError(
+                "KEDANodeSetScaler requires at least one autoscaled worker"
+            )
+
+        namespace_name = _keda_namespace(instance)
+        release_name = _keda_release_name(instance)
+        prometheus_server_address = pulumi.Output.from_input(
+            prometheus_release_name
+        ).apply(_prometheus_server_address)
+
+        def child_options(
+            *,
+            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+            delete_before_replace: bool | None = None,
+        ) -> pulumi.ResourceOptions:
+            return pulumi.ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=depends_on,
+                delete_before_replace=delete_before_replace,
+            )
+
+        namespace = k8s.core.v1.Namespace(
+            "namespace",
+            metadata={"name": namespace_name},
+            opts=child_options(depends_on=depends_on),
+        )
+        release = k8s.helm.v3.Release(
+            "release",
+            chart=_KEDA_CHART_NAME,
+            name=release_name,
+            version=_KEDA_CHART_VERSION,
+            repository_opts={"repo": _KEDA_CHART_REPO},
+            namespace=namespace_name,
+            cleanup_on_fail=True,
+            atomic=True,
+            wait_for_jobs=True,
+            timeout=600,
+            values=_keda_values(),
+            opts=child_options(
+                depends_on=[namespace],
+                delete_before_replace=True,
+            ),
+        )
+
+        scaled_object_names: list[str] = []
+        for worker in autoscaled_workers:
+            scaled_object_name = _keda_scaled_object_name(instance, worker.name)
+            scaled_object_names.append(scaled_object_name)
+            node_set_name = pulumi.Output.from_input(slurm_release_name).apply(
+                lambda resolved_release_name, worker_name=worker.name: _slurm_nodeset_name(
+                    resolved_release_name,
+                    worker_name,
+                )
+            )
+            k8s.apiextensions.CustomResource(
+                f"{worker.name}-scaled-object",
+                api_version=_KEDA_SCALED_OBJECT_API_VERSION,
+                kind="ScaledObject",
+                metadata={
+                    "name": scaled_object_name,
+                    "namespace": _SLURM_NAMESPACE,
+                },
+                spec=_keda_scaled_object_spec(
+                    node_set_name=node_set_name,
+                    min_replicas=int(
+                        worker.annotations[_AUTOSCALER_MIN_ANNOTATION]
+                    ),
+                    max_replicas=int(
+                        worker.annotations[_AUTOSCALER_MAX_ANNOTATION]
+                    ),
+                    prometheus_server_address=prometheus_server_address,
+                ),
+                opts=child_options(depends_on=[release, *(depends_on or [])]),
+            )
+
+        self.namespace = pulumi.Output.from_input(namespace_name)
+        self.release_name = pulumi.Output.from_input(release_name)
+        self.scaled_object_names = pulumi.Output.from_input(scaled_object_names)
+        self.status = release.status
+        self.register_outputs(
+            {
+                "namespace": self.namespace,
+                "release_name": self.release_name,
+                "scaled_object_names": self.scaled_object_names,
+                "status": self.status,
+            }
+        )
+
+
 class WorkerClass(pulumi.ComponentResource):
     machine_deployment_name: pulumi.Output[str]
 
@@ -1269,6 +1469,9 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
     worker_machine_deployments: list[pulumi.Output[str]]
     cluster_autoscaler_namespace: pulumi.Output[str | None]
     cluster_autoscaler_status: pulumi.Output[Any]
+    keda_namespace: pulumi.Output[str | None]
+    keda_scaled_object_names: pulumi.Output[list[str]]
+    keda_status: pulumi.Output[Any]
     prometheus_namespace: pulumi.Output[str]
     prometheus_status: pulumi.Output[Any]
     calico_operator_chart_version: pulumi.Output[str]
@@ -1712,6 +1915,18 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 retain_on_delete=True,
             ),
         )
+        keda: KEDANodeSetScaler | None = None
+        if autoscaled_workers:
+            keda = KEDANodeSetScaler(
+                "keda-nodeset-scaler",
+                instance=instance,
+                prometheus_release_name=prometheus.status.name,
+                slurm_release_name=slurm_release.status.name,
+                autoscaled_workers=autoscaled_workers,
+                provider=workload_provider,
+                depends_on=[prometheus, slurm_release],
+                opts=child_options(provider=workload_provider),
+            )
 
         self.cluster_class = pulumi.Output.from_input(_CLUSTER_CLASS)
         self.cluster_instance = pulumi.Output.from_input(instance)
@@ -1725,6 +1940,15 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
         self.cluster_autoscaler_status = pulumi.Output.from_input(
             cluster_autoscaler.status if cluster_autoscaler is not None else None
         )
+        self.keda_namespace = pulumi.Output.from_input(
+            keda.namespace if keda is not None else None
+        )
+        self.keda_scaled_object_names = pulumi.Output.from_input(
+            keda.scaled_object_names if keda is not None else []
+        )
+        self.keda_status = pulumi.Output.from_input(
+            keda.status if keda is not None else None
+        )
         self.prometheus_namespace = pulumi.Output.from_input(_PROMETHEUS_NAMESPACE)
         self.prometheus_status = prometheus.status
         self.calico_operator_chart_version = pulumi.Output.from_input(
@@ -1736,6 +1960,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             workload_kubeconfig_secret.metadata["name"],  # type: ignore[index]
             calico_operator.status,
             self.cluster_autoscaler_status,
+            self.keda_status,
             prometheus.status,
             slurm_operator.status,
             slurm_release.status,
@@ -1754,6 +1979,10 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 "worker_machine_deployments": self.worker_machine_deployments,
                 "cluster_autoscaler_namespace": self.cluster_autoscaler_namespace,
                 "cluster_autoscaler_status": self.cluster_autoscaler_status,
+                "keda_chart_version": _KEDA_CHART_VERSION,
+                "keda_namespace": self.keda_namespace,
+                "keda_scaled_object_names": self.keda_scaled_object_names,
+                "keda_status": self.keda_status,
                 "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
                 "prometheus_namespace": self.prometheus_namespace,
                 "prometheus_status": self.prometheus_status,

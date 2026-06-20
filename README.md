@@ -148,7 +148,7 @@ creates the local developer environment in dependency order:
 5. Control-plane services: CAPI Operator, cert-manager, AWX Operator, AWX
    instance, and AWX API configuration.
 6. A local CAPD workload cluster with local-path storage, Calico, workload
-   cert-manager, kube-prometheus-stack, Slinky operator, and Slurm.
+    cert-manager, kube-prometheus-stack, KEDA, Slinky operator, and Slurm.
 
 The old root-level AWX, CAPI quickstart, Helm values, and setup manifests have
 been removed. The supported local path is Pulumi/PKO.
@@ -282,7 +282,8 @@ The local stack is split into a few cooperating components:
   cluster. CAPD turns those CAPI resources into local Docker-backed Kubernetes
   nodes.
 - **Workload services**: the workload cluster installs Calico, local-path
-  storage, cert-manager, kube-prometheus-stack, the Slinky operator, and Slurm.
+  storage, cert-manager, kube-prometheus-stack, KEDA, the Slinky operator, and
+  Slurm.
 - **AWX**: AWX is managed by the control-plane stack. Pulumi creates the AWX
   organization, GitOps source-control credential, project-sync fence, management
   Kubernetes credential type, dynamic CAPI/Slinky inventory source, and the

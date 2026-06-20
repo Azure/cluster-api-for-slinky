@@ -70,8 +70,8 @@ digraph autoscaling {
       slurmctld [label="slurmctld pod", fillcolor="#F5FAFF", color="#175CD3", group="head"];
       metrics [label="slurmctld\nmetrics", fillcolor="#ECFDF3", color="#027A48", group="head"];
       prometheus [label="Prometheus", fillcolor="#ECFDF3", color="#027A48", group="head"];
-      scaler [label="KEDA / future\nscaler pod", fillcolor="#ECFDF3", color="#027A48", group="head"];
-      nodeset [label="NodeSet CR\nslurm-worker-slinky", fillcolor="#FFEDD5", color="#B54708", group="head"];
+      scaler [label="KEDA\nScaledObject", fillcolor="#ECFDF3", color="#027A48", group="head"];
+      nodeset [label="NodeSet CR\nworker-compute", fillcolor="#FFEDD5", color="#B54708", group="head"];
 
       slurmctld -> metrics [label="exports", color="#027A48", fontcolor="#027A48", constraint=false];
       metrics -> prometheus [label="scraped by", color="#027A48", fontcolor="#027A48", constraint=false];
