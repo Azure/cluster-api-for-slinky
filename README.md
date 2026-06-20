@@ -154,9 +154,10 @@ The old root-level AWX, CAPI quickstart, Helm values, and setup manifests have
 been removed. The supported local path is Pulumi/PKO.
 
 ```bash
-cd pulumi
+pushd pulumi
 pulumi stack init local        # first time only; creates Pulumi.local.yaml
 pulumi up -s local --yes
+popd
 ```
 
 The outer `pulumi up` waits for the PKO init stack to finish reconciliation.
@@ -192,6 +193,7 @@ Optional troubleshooting snippets:
 Extract the CAPD workload-cluster kubeconfig from the management cluster:
 
 ```bash
+# set passphrase with PULUMI_CONFIG_PASSPHRASE or PULUMI_CONFIG_PASSPHRASE_FILE first
 MGMT_CONTEXT=$(pulumi -C pulumi stack output context -s local)
 WORKLOAD_CLUSTER=$(kubectl --context "$MGMT_CONTEXT" -n default \
   get cluster -o jsonpath='{.items[0].metadata.name}')
@@ -206,7 +208,8 @@ Find the Slurm login pod and verify access:
 
 ```bash
 LOGIN_POD=$(kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm \
-  get endpoints slurm-login-slinky -o jsonpath='{.subsets[0].addresses[0].targetRef.name}')
+  get pod -l app.kubernetes.io/component=login,app.kubernetes.io/name=login,app.kubernetes.io/part-of=slurm \
+  -o jsonpath='{.items[0].metadata.name}')
 kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec -it "$LOGIN_POD" -- sinfo
 ```
 
@@ -222,7 +225,7 @@ kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm cp scripts/sleep-exclusive.
 kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm cp scripts/slurm_load_generator.sh "$LOGIN_POD:/root/slurm_load_generator.sh"
 kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec "$LOGIN_POD" -- chmod +x /root/slurm_load_generator.sh
 LOAD_PID=$(kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec "$LOGIN_POD" -- \
-  sh -lc 'nohup env MIN_RATE=8 MAX_RATE=8 RATE_ADJUST_INTERVAL_MINUTES=1 /root/slurm_load_generator.sh >/root/slurm_load_generator.log 2>&1 & echo $!')
+  sh -lc 'nohup env MIN_RATE=8 MAX_RATE=8 RATE_ADJUST_INTERVAL_MINUTES=1 JOB_SCRIPT=/root/sleep-exclusive.slurm /root/slurm_load_generator.sh >/root/slurm_load_generator.log 2>&1 & echo $!')
 ```
 
 Watch Slurm nodes come and go:
@@ -230,6 +233,29 @@ Watch Slurm nodes come and go:
 ```bash
 watch -n 10 "kubectl --kubeconfig '$WORKLOAD_KUBECONFIG' -n slurm exec '$LOGIN_POD' -- sinfo"
 ```
+
+Port-forward Grafana and print its admin credentials:
+
+```bash
+GRAFANA_SVC=$(kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n prometheus \
+  get svc -l app.kubernetes.io/name=grafana \
+  -o jsonpath='{.items[0].metadata.name}')
+GRAFANA_SECRET=$(kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n prometheus \
+  get secret -l app.kubernetes.io/name=grafana \
+  -o jsonpath='{.items[0].metadata.name}')
+
+printf 'username: '
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n prometheus \
+  get secret "$GRAFANA_SECRET" -o jsonpath='{.data.admin-user}' | base64 -d ; echo
+printf 'password: '
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n prometheus \
+  get secret "$GRAFANA_SECRET" -o jsonpath='{.data.admin-password}' | base64 -d ; echo
+
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n prometheus \
+  port-forward "svc/$GRAFANA_SVC" 3000:80
+```
+
+Then browse to `http://localhost:3000`.
 
 Stop the load generator after the watch:
 
