@@ -36,6 +36,8 @@ from pko._stack_cr import StackCRSpec, build_stack_spec
 
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_READY = "condition=Ready"
+_DELETION_PROPAGATION_ANNOTATION = "pulumi.com/deletionPropagationPolicy"
+_DELETE_ORPHAN = "Orphan"
 _INIT_STACK_TIMEOUT = "60m"
 
 
@@ -162,7 +164,17 @@ class PKOBootstrap(pulumi.ComponentResource):
             kind="Stack",
             metadata={
                 "namespace": PKO_NAMESPACE,
-                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_READY},
+                "annotations": {
+                    _WAIT_FOR_ANNOTATION: _WAIT_FOR_READY,
+                    # PKO's Stack finalizer runs ``pulumi destroy`` through the
+                    # generated Workspace pod. Foreground cascading deletion can
+                    # delete that Workspace/pod first, interrupting destroy with
+                    # "^C received; cancelling" and leaving the Stack stuck on
+                    # finalizers (pulumi-kubernetes-operator/#1181).
+                    # Orphan propagation keeps PKO's Workspace alive long enough
+                    # for ``destroyOnFinalize`` to finish its own cleanup path.
+                    _DELETION_PROPAGATION_ANNOTATION: _DELETE_ORPHAN,
+                },
             },
             spec=init_spec,
             opts=ResourceOptions(
