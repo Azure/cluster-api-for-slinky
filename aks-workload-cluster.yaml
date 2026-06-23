@@ -1,0 +1,147 @@
+# =============================================================================
+# AKS workload cluster — CAPZ "managed" CR set (classic AzureManaged* API).
+# =============================================================================
+#
+# Declarative, idempotent manifest for the AKS validation phase. You write the
+# desired state here; the CAPZ controllers in the management cluster reconcile
+# it into real Azure resources (an AKS cluster + its node VMSS). Re-applying is
+# a no-op once reconciled (`kubectl apply` server-side merges).
+#
+# Apply on the MANAGEMENT kind cluster (where CAPI/CAPZ run):
+#
+#     kubectl --context kind-mgmt-<hex> apply -f aks-workload-cluster.yaml
+#
+# Watch it provision:
+#
+#     kubectl get cluster,azuremanagedcontrolplane,azuremanagedmachinepool \
+#         -n default -w
+#     az aks show -g rg-capz-mi-dev2 -n caps-aks --query provisioningState -o tsv
+#
+# -----------------------------------------------------------------------------
+# PREREQUISITE — AzureClusterIdentity (already created by the Phase-1 control
+# plane; this manifest only REFERENCES it, it does not redefine it):
+#
+#     kubectl get azureclusteridentity -n default cluster-identity
+#
+# It must be type UserAssignedMSI, pointing at the UAMI attached to THIS VM, so
+# CAPZ can mint tokens via IMDS (169.254.169.254). If it is missing, the
+# AzureManagedControlPlane below will fail to reconcile.
+#
+# -----------------------------------------------------------------------------
+# VMSS orchestration: UNIFORM (the AKS default for these pools). VMSS Flex is
+# intentionally NOT used here — it is deferred to the self-managed cluster
+# phase. Do not add a Flex/VirtualMachines agent-pool type to this manifest.
+#
+# -----------------------------------------------------------------------------
+# AZURE POLICY FIX (Owner tag): the org policy requires an "Owner" tag on the
+# parent RESOURCE GROUP of the node VMSS — i.e. the auto-created node RG
+# MC_<rg>_<cluster>_<location>. The decisive lever is additionalTags on the
+# AzureManagedControlPlane below: AKS propagates a cluster's tags to its node
+# resource group, which satisfies the policy so the node VMSS can be created.
+# (additionalTags on the AzureManagedMachinePool tags the VMSS itself — useful
+# for VMSS-level ownership, but it does NOT satisfy this RG-scoped policy.)
+# =============================================================================
+
+---
+# CAPI envelope. Wires the control plane (AKS) to its infrastructure marker.
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: caps-aks
+  namespace: default
+spec:
+  clusterNetwork:
+    services:
+      cidrBlocks:
+        - 192.168.0.0/16
+  controlPlaneRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AzureManagedControlPlane
+    name: caps-aks
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AzureManagedCluster
+    name: caps-aks
+
+---
+# The AKS control plane itself. This is the CR that drives the underlying
+# AKS cluster create (reconciled by CAPZ). identityRef points back at the
+# Phase-1 UserAssignedMSI identity.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureManagedControlPlane
+metadata:
+  name: caps-aks
+  namespace: default
+spec:
+  identityRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AzureClusterIdentity
+    name: cluster-identity
+    namespace: default
+  location: westus2
+  resourceGroupName: rg-capz-mi-dev2
+  subscriptionID: d2c9544f-4329-4642-b73d-020e7fef844f
+  version: v1.33.12
+  networkPlugin: azure
+  # Empty string == no SSH key on the AKS nodes (AKS does not require one).
+  sshPublicKey: ""
+  oidcIssuerProfile:
+    enabled: true
+  # POLICY FIX: AKS propagates these cluster tags to the node resource group
+  # (MC_rg-capz-mi-dev2_caps-aks_westus2), giving it the Owner tag the org
+  # policy requires before the node VMSS can be created.
+  additionalTags:
+    Owner: t-hernandezc
+
+---
+# Thin infrastructure marker. CAPZ fills in its controlPlaneEndpoint once the
+# control plane is up. The CAPI contract requires every Cluster to have one.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureManagedCluster
+metadata:
+  name: caps-aks
+  namespace: default
+spec: {}
+
+---
+# CAPI node-group envelope for the system agent pool.
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachinePool
+metadata:
+  name: caps-aks-pool0
+  namespace: default
+spec:
+  clusterName: caps-aks
+  replicas: 1
+  template:
+    spec:
+      clusterName: caps-aks
+      # AKS handles bootstrap; the CAPI contract still wants an (empty)
+      # bootstrap reference.
+      bootstrap:
+        dataSecretName: ""
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: AzureManagedMachinePool
+        name: caps-aks-pool0
+      version: v1.33.12
+
+---
+# The AKS System-mode agent pool (its underlying resource is a VMSS Uniform).
+# AKS requires at least one System pool, so this one is it.
+#
+# spec.additionalTags here stamps tags onto THIS pool's VMSS. It does NOT
+# satisfy the RG-scoped Owner policy (that's handled by the control-plane
+# additionalTags above) — it's kept for VMSS-level ownership/cost attribution.
+# Repeat this block on every machine pool you add.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureManagedMachinePool
+metadata:
+  name: caps-aks-pool0
+  namespace: default
+spec:
+  mode: System
+  name: pool0
+  sku: Standard_D2as_v5
+  additionalTags:
+    Owner: t-hernandezc

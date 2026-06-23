@@ -34,6 +34,15 @@ from pko._init_stack import INIT_PROJECT, INIT_REPO_DIR, init_stack_config
 from pko._stack_cr import StackCRSpec, build_stack_spec
 
 
+# Annotation + timeout for the single outer-owned init Stack CR.
+# pulumi-kubernetes honors ``pulumi.com/waitFor`` on CRD writes by polling
+# the named condition until it goes True; combined with the custom
+# create/update timeout below, the outer ``pulumi up`` blocks until PKO
+# reports the init stack Ready (which, for an env like ``azure``, means
+# CAPI Operator + CAPZ + ASO are all installed and the AzureClusterIdentity
+# CR has been applied). Without this gate, ``pulumi up`` returns the
+# moment the Stack CR is submitted and operators must poll for the init
+# stack themselves — brittle for CI and for our test runbook.
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_READY = "condition=Ready"
 _DELETION_PROPAGATION_ANNOTATION = "pulumi.com/deletionPropagationPolicy"
