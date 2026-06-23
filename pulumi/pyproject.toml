@@ -1,0 +1,37 @@
+## Test-tooling configuration for the umbrella Pulumi stack at this dir.
+##
+## This file deliberately holds NO Python packaging metadata
+## (``[build-system]`` / ``[project]``) — the umbrella stack is not a
+## distributable package. The only reason this file exists is that pytest
+## reads ``[tool.pytest.ini_options]`` from the nearest ``pyproject.toml``
+## at or above the rootdir it auto-discovers, and we want that config to
+## travel with the tests.
+##
+## Pulumi itself ignores this file; it only cares about ``Pulumi.yaml``.
+
+[tool.pytest.ini_options]
+# Tests live under tests/ as siblings of the modules they exercise. ``ctlptl``
+# and ``gitrepo`` are auto-importable because Pulumi puts this dir on
+# ``sys.path``; pytest does the same via ``rootdir`` discovery once it sees
+# this ``pyproject.toml``.
+testpaths = ["tests"]
+
+# Default: skip slow integration tests (they spin up a real kind cluster).
+# Run them explicitly with ``pytest -m integration`` or ``pytest -m ''``.
+addopts = "-ra -q -m 'not integration'"
+
+# Markers used across the suite. Keep this list narrow — undeclared markers
+# raise warnings via ``--strict-markers``.
+markers = [
+    "integration: end-to-end tests that drive a real ``pulumi up`` / ``destroy`` cycle via the Automation API; require Docker + ~2 min runtime",
+]
+
+# Treat collected warnings as errors so quietly-deprecated APIs in
+# pulumi-kubernetes / pulumi-random surface during CI rather than rotting.
+filterwarnings = [
+    "error",
+    # The Pulumi Python SDK currently uses ``asyncio.get_event_loop()`` in
+    # a few places; that's a DeprecationWarning on Python 3.12 and not
+    # something we can fix from this side. Re-evaluate when bumping Pulumi.
+    "ignore::DeprecationWarning:pulumi.*",
+]

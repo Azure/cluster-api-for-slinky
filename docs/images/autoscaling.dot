@@ -1,0 +1,227 @@
+digraph autoscaling {
+  graph [
+    rankdir=TB,
+    compound=true,
+    newrank=true,
+    bgcolor="transparent",
+    pad="0.25",
+    nodesep="0.75",
+    ranksep="0.85",
+    splines=line,
+    outputorder=edgesfirst,
+    fontname="DejaVu Sans",
+    fontsize=18,
+    label="Autoscaling: Slurm jobs to CAPD nodes",
+    labelloc=t
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fillcolor="white",
+    color="#344054",
+    penwidth=1.4,
+    fontname="DejaVu Sans",
+    fontsize=12,
+    margin="0.12,0.08"
+  ];
+
+  edge [
+    color="#475467",
+    fontname="DejaVu Sans",
+    fontsize=10,
+    arrowsize=0.8,
+    penwidth=1.2
+  ];
+
+  layout [
+    shape=plain,
+    style=invis,
+    label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0">
+        <TR>
+          <TD PORT="workload" WIDTH="700" HEIGHT="1"></TD>
+          <TD PORT="management" WIDTH="230" HEIGHT="1"></TD>
+        </TR>
+      </TABLE>
+    >
+  ];
+
+  subgraph cluster_workload {
+    label="Workload Cluster";
+    color="#B54708";
+    fillcolor="#FFEDD5";
+    penwidth=1.8;
+    style="rounded,filled";
+    margin=24;
+
+    subgraph cluster_head {
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0">
+          <TR><TD WIDTH="760">head / controller node</TD></TR>
+        </TABLE>
+      >;
+      color="#175CD3";
+      fillcolor="#EFF8FF";
+      penwidth=1.5;
+      style="rounded,filled";
+      margin=52;
+
+      slurmctld [label="slurmctld pod", fillcolor="#F5FAFF", color="#175CD3", group="head"];
+      metrics [label="slurmctld\nmetrics", fillcolor="#ECFDF3", color="#027A48", group="head"];
+      prometheus [label="Prometheus", fillcolor="#ECFDF3", color="#027A48", group="head"];
+      scaler [label="KEDA\nScaledObject", fillcolor="#ECFDF3", color="#027A48", group="head"];
+      nodeset [label="NodeSet CR\nworker-compute", fillcolor="#FFEDD5", color="#B54708", group="head"];
+
+      slurmctld -> metrics [label="exports", color="#027A48", fontcolor="#027A48", constraint=false];
+      metrics -> prometheus [label="scraped by", color="#027A48", fontcolor="#027A48", constraint=false];
+      prometheus -> scaler [label="read by", color="#027A48", fontcolor="#027A48", constraint=false];
+      scaler -> nodeset [label="scales", style=dashed, color="#027A48", fontcolor="#027A48", constraint=false];
+
+      {
+        rank=same;
+        slurmctld;
+        metrics;
+        prometheus;
+        scaler;
+        nodeset;
+      }
+      slurmctld -> metrics -> prometheus -> scaler -> nodeset [
+        style=invis,
+        weight=1000,
+        constraint=true
+      ];
+    }
+
+    subgraph cluster_compute_all {
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0">
+          <TR><TD WIDTH="793">compute nodes</TD></TR>
+        </TABLE>
+      >;
+      color="transparent";
+      penwidth=1.5;
+      style="rounded";
+      margin=24;
+
+      subgraph cluster_compute1 {
+        label="compute node 1";
+        color="#DC6803";
+        fillcolor="#FFF7ED";
+        penwidth=1.3;
+        style="rounded,filled";
+        margin=14;
+
+        slurmd1 [label="slurmd pod 1", fillcolor="#FFFCF5", color="#DC6803", group="compute1"];
+      }
+
+      subgraph cluster_compute2 {
+        label="compute node 2";
+        color="#DC6803";
+        fillcolor="#FFF7ED";
+        penwidth=1.3;
+        style="rounded,filled";
+        margin=14;
+
+        slurmd2 [label="slurmd pod 2", fillcolor="#FFFCF5", color="#DC6803", group="compute2"];
+      }
+
+      subgraph cluster_computeN {
+        label="compute node N";
+        color="#DC6803";
+        fillcolor="#FFF7ED";
+        penwidth=1.3;
+        style="rounded,filled,dashed";
+        margin=14;
+
+        slurmdN [
+          label="slurmd pod N",
+          fillcolor="#FFFCF5",
+          color="#DC6803",
+          group="computeN",
+          style="rounded,filled,dashed"
+        ];
+      }
+
+      {
+        rank=same;
+        slurmd1;
+        slurmd2;
+        slurmdN;
+      }
+      slurmd1 -> slurmd2 [style=invis, weight=10000, constraint=true, minlen=2];
+      slurmd2 -> slurmdN [style=invis, weight=10000, constraint=true, minlen=2];
+    }
+  }
+
+  subgraph cluster_management {
+    label="Management Cluster";
+    color="#175CD3";
+    fillcolor="#EFF8FF";
+    penwidth=1.8;
+    style="rounded,filled";
+    margin=18;
+
+    autoscaler [label="Cluster Autoscaler", fillcolor="#ECFDF3", color="#027A48", group="mgmt"];
+    md [label="MachineDeployment\n(compute)", fillcolor="#FFEDD5", color="#B54708", group="mgmt"];
+    capdN [label="CAPD\nDocker node N", fillcolor="#FFF7ED", color="#DC6803", style="rounded,filled,dashed", group="mgmt"];
+
+    autoscaler -> md [label="discovers", style=dashed, color="#027A48", fontcolor="#027A48"];
+    md -> capdN [label="creates", style=dashed, color="#027A48", fontcolor="#027A48"];
+  }
+
+  nodeset -> slurmd2 [
+    style=invis,
+    weight=100,
+    minlen=2,
+    ltail=cluster_head,
+    lhead=cluster_compute_all
+  ];
+
+  layout:workload -> slurmctld [
+    style=invis,
+    weight=10000,
+    constraint=true
+  ];
+  layout:management -> autoscaler [
+    style=invis,
+    weight=10000,
+    minlen=1,
+    constraint=true
+  ];
+
+  capdN -> slurmdN [
+    label="creates",
+    style=dashed,
+    color="#027A48",
+    fontcolor="#027A48",
+    lhead=cluster_computeN,
+    constraint=false
+  ];
+
+  nodeset -> slurmdN [
+    xlabel="creates",
+    style=dashed,
+    color="#027A48",
+    fontcolor="#027A48",
+    constraint=false
+  ];
+
+  slurmctld -> slurmd1 [
+    xlabel="manages workers",
+    dir=none,
+    color="#175CD3",
+    fontcolor="#175CD3",
+    constraint=false
+  ];
+  slurmd1 -> slurmd2 [dir=none, color="#175CD3", constraint=false];
+  slurmd2 -> slurmdN [dir=none, color="#175CD3", constraint=false];
+
+  slurmdN -> autoscaler [
+    xlabel="triggers",
+    style=dashed,
+    color="#027A48",
+    fontcolor="#027A48",
+    constraint=false
+  ];
+}

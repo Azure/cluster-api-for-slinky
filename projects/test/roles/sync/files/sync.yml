@@ -1,0 +1,28 @@
+# code: language=ansible
+
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+- name: Find all Cluster API nodes
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Find all Cluster API nodes
+      # In general CAPI nodes fall under either
+      # - `MachineDeployment` (corresponding to managing infra via managing a bunch of VMs on Azure) or
+      # - `MachinePool` (corresponding to managing infra via managing VMSS or potentially Compute Fleet on Azure)
+      # For Azure, we'd need extra Azure-specific code to get IP addresses of nodes, unless we modify CAPZ.
+      kubernetes.core.k8s_info:
+        kind: Machine
+        namespace: default
+        api_version: cluster.x-k8s.io/v1beta1
+      register: machines
+    - name: Display status
+      ansible.builtin.debug:
+        var: machines
+    - name: Write machine status to file
+      ansible.builtin.copy:
+        content: "{{ machines | to_nice_yaml }}"
+        dest: "{{ output_path }}/output.yaml"
+        mode: '0644'

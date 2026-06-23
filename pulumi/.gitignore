@@ -1,0 +1,9 @@
+# Pulumi local backend state for the umbrella stack at this project root.
+.state/
+__pycache__/
+*.pyc
+
+# pytest / mypy caches generated when running the test scaffold under
+# tests/. Safe to delete at any time.
+.pytest_cache/
+.mypy_cache/

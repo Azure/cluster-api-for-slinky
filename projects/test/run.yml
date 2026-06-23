@@ -1,0 +1,9 @@
+# code: language=ansible
+
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+- name: Run Python script
+  hosts: localhost
+  roles:
+    - sync

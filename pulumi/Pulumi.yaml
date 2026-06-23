@@ -1,0 +1,61 @@
+name: ca4s-infra
+description: |
+  End-to-end Pulumi bootstrap for the management cluster, parameterized by
+  *stack* over multiple target environments.
+
+  Stack-per-target dispatch
+  -------------------------
+  ``main: __main__.py`` is a ~30-line dispatcher that switches on
+  ``pulumi.get_stack()`` and imports the matching ``stack_<name>.py``
+  module:
+
+    * stack ``local``  → ``stack_local.py`` (kind + ctlptl + Gitea — only
+      target currently implemented)
+    * stack ``azure``  → ``stack_azure.py`` *(TODO)*
+
+  Each ``stack_<name>.py`` is a self-contained program — it builds its own
+  resources from scratch and exposes its own ``pulumi.export(...)``s.
+  Shared building blocks live in sibling packages:
+
+    * ``ctlptl/``  — kind / cloud-provider-kind / local image registry
+      dynamic resources
+    * ``gitrepo/`` — GitOpsRepository ComponentResource contract +
+      provider implementations (``gitea-builtin`` today; ``github``,
+      ``gitlab`` to follow)
+
+  Both packages are auto-importable because Pulumi adds the project root
+  (``pulumi/``) to ``sys.path`` for the language host AND for every
+  dynamic-Resource worker subprocess. No editable install, no
+  ``sys.path`` shim, no ``PYTHONPATH`` wiring.
+
+  Per-target configuration lives in the corresponding stack config file
+  (``Pulumi.local.yaml``, ``Pulumi.azure.yaml``, ...). ``pulumi config
+  set <key> <value> -s <stack>`` is the canonical way to populate them;
+  they are NOT meant to be hand-edited as a primary workflow.
+runtime:
+  name: python
+  options:
+    # Reuse the repo-root .venv so we don't fragment Python environments.
+    virtualenv: ../.venv
+
+# Explicit (matches Pulumi's default). ``__main__.py`` is the dispatcher;
+# the per-target stack body it imports is ``stack_<stackname>.py``.
+main: __main__.py
+
+packages:
+  awx:
+    source: terraform-provider
+    version: 1.1.3
+    parameters:
+      - registry.terraform.io/josh-silvas/awx
+      - 1.8.0
+  gitea:
+    source: terraform-provider
+    version: 1.1.3
+    parameters:
+      - go-gitea/gitea
+  local:
+    source: terraform-provider
+    version: 1.1.3
+    parameters:
+      - hashicorp/local

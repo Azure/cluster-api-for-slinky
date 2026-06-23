@@ -1,0 +1,22 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+.venv
+.vscode/
+
+# CAPD workload cluster kubeconfig shall not be committed to source control
+*.kubeconfig
+
+# Local working notes
+ROADMAP.local
+
+# Local Pulumi backend and generated host config
+.state/
+
+# Python build / cache artefacts (per-tree .gitignore in pulumi/ also
+# covers its subtree; this root-level entry catches everything else,
+# e.g. scripts/__pycache__/).
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/

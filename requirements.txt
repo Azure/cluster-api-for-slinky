@@ -1,0 +1,43 @@
+# Python dependencies for cluster-api-provider-slinky Pulumi stacks and tests
+
+# Pulumi Python SDK (used by the umbrella stack at pulumi/)
+pulumi>=3.0,<4.0
+
+# Pulumi providers used by the gitops phase of pulumi/__main__.py
+pulumi-kubernetes>=4.0,<5.0
+pulumi-random>=4.0,<5.0
+
+# Generated Pulumi local-provider SDK used by the workload-cluster inner stack
+# to build an explicit management-cluster provider from projected kubeconfig files.
+-e ./pulumi/sdks/local
+
+# Generated Pulumi Gitea-provider SDK used by the local GitOps provider to
+# manage repository webhooks through terraform-provider-gitea.
+-e ./pulumi/sdks/gitea
+
+# Generated Pulumi AWX-provider SDK used by the control-plane stack to manage
+# AWX API objects after the AWX Operator has created the instance.
+-e ./pulumi/sdks/awx
+
+# Generated Flux CRD shim used by the control-plane stack to read the typed
+# spec of the PKO GitRepository source.
+-e ./pulumi/sdks/flux
+
+# HTTP for Pulumi dynamic resources that wrap the Gitea REST API.
+# Imported lazily inside provider methods (gitrepo/gitea_repo.py,
+# gitrepo/gitea_sshkey.py, gitrepo/gitea_sync.py) so it must be in
+# the same venv the language host launches workers from.
+requests>=2.31,<3.0
+
+# ---------------------------------------------------------------------------
+# Test / dev tooling. Imported only from pulumi/tests/. Not needed at
+# runtime for ``pulumi up``; kept in the same file for a single local setup
+# command.
+# ---------------------------------------------------------------------------
+
+# Test runner + plugins.
+pytest>=8.0,<9.0
+pytest-mock>=3.10,<4.0
+
+# HTTP mocking for the Gitea API wrappers in pulumi/gitrepo/gitea_*.py.
+responses>=0.25,<1.0
