@@ -33,39 +33,20 @@ import pulumi_kubernetes as k8s
 import pulumi_local as local
 import yaml
 
-try:
-    from .registry_setting import (
-        REGISTRY_CONFIG_NAME,
-        RegistrySetting,
-        parse_registry_setting,
-    )
-except ImportError:
-    from registry_setting import (
-        REGISTRY_CONFIG_NAME,
-        RegistrySetting,
-        parse_registry_setting,
-    )
-
-try:
-    from .workload_cluster_infrastructure import (
-        AUTOSCALER_MAX_ANNOTATION,
-        AUTOSCALER_MIN_ANNOTATION,
-        ClusterAPIAutoscaler,
-        NODE_TYPE_LABEL,
-        POD_SECURITY_PRIVILEGED_LABELS,
-        machine_deployment_labels,
-        worker_labels,
-    )
-except ImportError:
-    from workload_cluster_infrastructure import (
-        AUTOSCALER_MAX_ANNOTATION,
-        AUTOSCALER_MIN_ANNOTATION,
-        ClusterAPIAutoscaler,
-        NODE_TYPE_LABEL,
-        POD_SECURITY_PRIVILEGED_LABELS,
-        machine_deployment_labels,
-        worker_labels,
-    )
+from stacks.workload_cluster.registry_setting import (
+    REGISTRY_CONFIG_NAME,
+    RegistrySetting,
+    parse_registry_setting,
+)
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    AUTOSCALER_MAX_ANNOTATION,
+    AUTOSCALER_MIN_ANNOTATION,
+    ClusterAPIAutoscaler,
+    NODE_TYPE_LABEL,
+    POD_SECURITY_PRIVILEGED_LABELS,
+    machine_deployment_labels,
+    worker_labels,
+)
 
 
 _CAPI_API_VERSION = "cluster.x-k8s.io/v1beta2"

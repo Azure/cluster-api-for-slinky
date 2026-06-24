@@ -8,18 +8,11 @@ from typing import Any
 import pulumi
 import pulumi_kubernetes as k8s
 
-try:
-    from .workload_cluster_infrastructure import (
-        CONTROLLER_NODE_TYPE,
-        NODE_TYPE_LABEL,
-        POD_SECURITY_PRIVILEGED_LABELS,
-    )
-except ImportError:
-    from workload_cluster_infrastructure import (
-        CONTROLLER_NODE_TYPE,
-        NODE_TYPE_LABEL,
-        POD_SECURITY_PRIVILEGED_LABELS,
-    )
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    CONTROLLER_NODE_TYPE,
+    NODE_TYPE_LABEL,
+    POD_SECURITY_PRIVILEGED_LABELS,
+)
 
 
 _CERT_MANAGER_CHART_REPO = "https://charts.jetstack.io"

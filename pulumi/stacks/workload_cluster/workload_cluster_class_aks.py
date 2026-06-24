@@ -7,40 +7,22 @@ from typing import Any, Mapping
 
 import pulumi
 
-try:
-    from .workload_cluster_infrastructure import (
-        COMPUTE_NODE_TYPE,
-        CONTROLLER_NODE_TYPE,
-    )
-    from .workload_cluster_deployments import (
-        KEDANodeSetScalerSpec,
-        SlurmNodeSetSpec,
-        _KEDA_CHART_VERSION,
-        _PROMETHEUS_CHART_VERSION,
-        _SLINKY_CHART_VERSION,
-        WorkloadClusterDeployments,
-    )
-    from .workload_cluster_infrastructure_aks import (
-        AKSNodePoolSpec,
-        AKSWorkloadClusterInfrastructure,
-    )
-except ImportError:
-    from workload_cluster_infrastructure import (
-        COMPUTE_NODE_TYPE,
-        CONTROLLER_NODE_TYPE,
-    )
-    from workload_cluster_deployments import (
-        KEDANodeSetScalerSpec,
-        SlurmNodeSetSpec,
-        _KEDA_CHART_VERSION,
-        _PROMETHEUS_CHART_VERSION,
-        _SLINKY_CHART_VERSION,
-        WorkloadClusterDeployments,
-    )
-    from workload_cluster_infrastructure_aks import (
-        AKSNodePoolSpec,
-        AKSWorkloadClusterInfrastructure,
-    )
+from stacks.workload_cluster.workload_cluster_deployments import (
+    KEDANodeSetScalerSpec,
+    SlurmNodeSetSpec,
+    _KEDA_CHART_VERSION,
+    _PROMETHEUS_CHART_VERSION,
+    _SLINKY_CHART_VERSION,
+    WorkloadClusterDeployments,
+)
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    COMPUTE_NODE_TYPE,
+    CONTROLLER_NODE_TYPE,
+)
+from stacks.workload_cluster.workload_cluster_infrastructure_aks import (
+    AKSNodePoolSpec,
+    AKSWorkloadClusterInfrastructure,
+)
 
 
 _CLUSTER_CLASS = "aks"

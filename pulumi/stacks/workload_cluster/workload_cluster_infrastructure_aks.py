@@ -11,18 +11,11 @@ import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
-try:
-    from .workload_cluster_infrastructure import (
-        CONTROLLER_NODE_TYPE,
-        NODE_TYPE_LABEL,
-        node_labels,
-    )
-except ImportError:
-    from workload_cluster_infrastructure import (
-        CONTROLLER_NODE_TYPE,
-        NODE_TYPE_LABEL,
-        node_labels,
-    )
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    CONTROLLER_NODE_TYPE,
+    NODE_TYPE_LABEL,
+    node_labels,
+)
 
 
 # Core CAPI types (Cluster, MachinePool) on v1beta1 to match the CAPZ v1.24.1

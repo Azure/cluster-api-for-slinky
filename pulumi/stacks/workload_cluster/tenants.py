@@ -8,12 +8,8 @@ from typing import Any, Mapping
 
 import pulumi
 
-try:
-    from .workload_cluster_class_aks import AKSWorkloadClusterClass
-    from .workload_cluster_class_local import LocalWorkloadClusterClass
-except ImportError:
-    from workload_cluster_class_aks import AKSWorkloadClusterClass
-    from workload_cluster_class_local import LocalWorkloadClusterClass
+from stacks.workload_cluster.workload_cluster_class_aks import AKSWorkloadClusterClass
+from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterClass
 
 
 _PROJECT_NAME = "ca4s-workload-cluster"

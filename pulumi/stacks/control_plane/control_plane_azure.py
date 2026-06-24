@@ -54,14 +54,9 @@ from typing import Mapping
 
 import pulumi
 
-try:
-    from .azure import AzureClusterIdentity, IMDSPreflightJob
-    from .capi import ClusterAPIOperator
-    from .certmanager import CertManager
-except ImportError:
-    from azure import AzureClusterIdentity, IMDSPreflightJob
-    from capi import ClusterAPIOperator
-    from certmanager import CertManager
+from stacks.control_plane.azure import AzureClusterIdentity, IMDSPreflightJob
+from stacks.control_plane.capi import ClusterAPIOperator
+from stacks.control_plane.certmanager import CertManager
 
 
 @dataclass(frozen=True)

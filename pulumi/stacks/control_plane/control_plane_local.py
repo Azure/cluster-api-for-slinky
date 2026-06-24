@@ -30,16 +30,10 @@ from __future__ import annotations
 
 import pulumi
 
-try:
-    from .awx import AWXInstance, AWXOperator, AWXProviderConfig
-    from .awx._configuration import AWXConfiguration
-    from .capi import ClusterAPIOperator
-    from .certmanager import CertManager
-except ImportError:
-    from awx import AWXInstance, AWXOperator, AWXProviderConfig
-    from awx._configuration import AWXConfiguration
-    from capi import ClusterAPIOperator
-    from certmanager import CertManager
+from stacks.control_plane.awx import AWXInstance, AWXOperator, AWXProviderConfig
+from stacks.control_plane.awx._configuration import AWXConfiguration
+from stacks.control_plane.capi import ClusterAPIOperator
+from stacks.control_plane.certmanager import CertManager
 
 
 class ControlPlaneLocal(pulumi.ComponentResource):
