@@ -4,7 +4,7 @@ Phase 2 of the CAPZ migration. Where Phase 1 stopped at the identity
 foundation (``AzureClusterIdentity`` + IMDS preflight, no workload
 clusters), this module provisions a **single AKS managed cluster** via the
 CAPZ "managed" CR set. It is the Azure analogue of
-:mod:`stacks.workload_cluster.workload_cluster_local_local` (the CAPD
+:mod:`stacks.workload_cluster.workload_cluster_infrastructure_local` (the CAPD
 path), but deliberately much smaller because AKS owns most of the day-1
 concerns the local path has to install by hand.
 
@@ -35,7 +35,7 @@ Why this is so much smaller than the CAPD path
 ----------------------------------------------
 AKS is a *managed* control plane: Microsoft runs the API server, etcd, and
 scheduler, and AKS installs its own CNI, CoreDNS, and storage drivers. So
-unlike :mod:`workload_cluster_local_local`, this module installs **no**
+unlike :mod:`workload_cluster_infrastructure_local`, this module installs **no**
 Calico, **no** cert-manager-on-workload, **no** local-path storage, and
 does no kubeadm wiring. Day-2 concerns (retrieving the workload kubeconfig,
 landing Slurm / Slinky) are intentionally out of scope for this increment
@@ -364,7 +364,7 @@ _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 def _resource_name(instance: str, suffix: str | None = None) -> str:
     """Derive a DNS-label-safe CR name from the tenant instance.
 
-    Mirrors the helper in :mod:`workload_cluster_local_local`. With ``suffix``
+    Mirrors the helper in :mod:`workload_cluster_infrastructure_local`. With ``suffix``
     omitted, returns the sanitized instance; with a suffix, returns
     ``<instance>-<suffix>`` truncated to the 63-char DNS-label limit.
     """

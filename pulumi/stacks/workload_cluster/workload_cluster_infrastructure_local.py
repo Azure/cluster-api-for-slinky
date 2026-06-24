@@ -1,7 +1,6 @@
-"""Local workload-cluster class for ``local`` instances.
+"""Local workload-cluster infrastructure for ``local`` instances.
 
-Selected by ``tenants_local.py`` for ``workloadClusters`` entries with
-``class: local``. Produces a local CAPD-backed workload-cluster resource graph
+Produces a local CAPD-backed workload-cluster infrastructure resource graph
 for the requested instance:
 
 1. On the management cluster (via ``pulumi-runner`` SA): explicit CAPI
@@ -9,10 +8,8 @@ for the requested instance:
     ``MachineDeployment`` resources. CAPI then provisions the instance's
     workload k8s cluster on the docker infrastructure provider.
 2. On the resulting workload cluster (via a second k8s provider built
-   from the ``${cluster}-kubeconfig`` Secret CAPI publishes on the management
-    cluster): local-path storage, Calico, workload cert-manager, Prometheus /
-    Grafana, Slinky CRDs, ``slurm-operator``, the Slurm chart, and
-    per-instance ``NodeSet``s.
+    from the ``${cluster}-kubeconfig`` Secret CAPI publishes on the management
+    cluster): local-path storage.
 
 State backend
 -------------
@@ -49,55 +46,21 @@ except ImportError:
 
 try:
     from .workload_cluster_deployments import (
-        _AUTOSCALER_MAX_ANNOTATION,
-        _AUTOSCALER_MIN_ANNOTATION,
-        _CALICO_CHART_VERSION,
-        _COMPUTE_NODE_TYPE,
-        _CONTROLLER_NODE_TYPE,
-        _KEDA_CHART_VERSION,
         _NODE_TYPE_LABEL,
         _POD_CIDR,
         _POD_SECURITY_PRIVILEGED_LABELS,
-        _PROMETHEUS_CHART_VERSION,
-        _SLINKY_CHART_VERSION,
         _WORKER_NODE_CLASSES,
-        WorkloadClusterDeployments,
         WorkerClassSpec,
         _autoscaled_worker_classes,
-        _keda_release_name,
-        _keda_scaled_object_name,
-        _keda_scaled_object_spec,
-        _keda_values,
-        _prometheus_server_address,
-        _prometheus_service_name,
-        _prometheus_values,
-        _slurm_nodeset_name,
     )
 except ImportError:
     from workload_cluster_deployments import (
-        _AUTOSCALER_MAX_ANNOTATION,
-        _AUTOSCALER_MIN_ANNOTATION,
-        _CALICO_CHART_VERSION,
-        _COMPUTE_NODE_TYPE,
-        _CONTROLLER_NODE_TYPE,
-        _KEDA_CHART_VERSION,
         _NODE_TYPE_LABEL,
         _POD_CIDR,
         _POD_SECURITY_PRIVILEGED_LABELS,
-        _PROMETHEUS_CHART_VERSION,
-        _SLINKY_CHART_VERSION,
         _WORKER_NODE_CLASSES,
-        WorkloadClusterDeployments,
         WorkerClassSpec,
         _autoscaled_worker_classes,
-        _keda_release_name,
-        _keda_scaled_object_name,
-        _keda_scaled_object_spec,
-        _keda_values,
-        _prometheus_server_address,
-        _prometheus_service_name,
-        _prometheus_values,
-        _slurm_nodeset_name,
     )
 
 
@@ -128,7 +91,6 @@ _CLUSTER_AUTOSCALER_CHART_VERSION = "9.57.0"
 _CLUSTER_AUTOSCALER_DISCOVERY_LABEL = "ca4s.azure.com/autoscaler-enabled"
 _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE = "true"
 
-_CLUSTER_CLASS = "local"
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
@@ -1299,124 +1261,3 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "cluster_autoscaler_status": self.cluster_autoscaler_status,
             }
         )
-
-
-class LocalWorkloadClusterClass(pulumi.ComponentResource):
-    """Reusable local workload-cluster class.
-
-    A class captures the resource graph shape. The ``instance`` passed to
-    the constructor supplies the concrete identity used for Kubernetes object
-    names and Pulumi outputs.
-    """
-
-    cluster_class: pulumi.Output[str]
-    cluster_instance: pulumi.Output[str]
-    cluster_name: pulumi.Output[str]
-    docker_cluster_name: pulumi.Output[str]
-    control_plane_name: pulumi.Output[str]
-    worker_machine_deployments: list[pulumi.Output[str]]
-    cluster_autoscaler_namespace: pulumi.Output[str | None]
-    cluster_autoscaler_status: pulumi.Output[Any]
-    keda_namespace: pulumi.Output[str | None]
-    keda_scaled_object_names: pulumi.Output[list[str]]
-    keda_status: pulumi.Output[Any]
-    prometheus_namespace: pulumi.Output[str]
-    prometheus_status: pulumi.Output[Any]
-    calico_operator_chart_version: pulumi.Output[str]
-    calico_operator_status: pulumi.Output[Any]
-    workload_cluster_ready: pulumi.Output[bool]
-    todo: pulumi.Output[str]
-
-    def __init__(
-        self,
-        name: str,
-        *,
-        instance: str,
-        worker_node_classes: tuple[WorkerClassSpec, ...] = _WORKER_NODE_CLASSES,
-        opts: pulumi.ResourceOptions | None = None,
-    ) -> None:
-        """Build one local workload-cluster instance from this class."""
-        super().__init__(
-            "ca4s:workload:LocalWorkloadClusterClass",
-            name,
-            props={},
-            opts=opts,
-        )
-
-        def child_options(
-            *,
-            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
-        ) -> pulumi.ResourceOptions:
-            return pulumi.ResourceOptions(
-                parent=self,
-                depends_on=depends_on,
-            )
-
-        infrastructure = LocalWorkloadClusterInfrastructure(
-            "infrastructure",
-            instance=instance,
-            worker_node_classes=worker_node_classes,
-            opts=child_options(),
-        )
-        deployments = WorkloadClusterDeployments(
-            "deployments",
-            instance=instance,
-            worker_node_classes=worker_node_classes,
-            workload_provider=infrastructure.workload_provider,
-            workload_kubeconfig_secret=infrastructure.workload_kubeconfig_secret,
-            cluster_control_plane_available=(
-                infrastructure.cluster_control_plane_available
-            ),
-            cluster_autoscaler_status=infrastructure.cluster_autoscaler_status,
-            opts=child_options(depends_on=[infrastructure]),
-        )
-
-        self.cluster_class = pulumi.Output.from_input(_CLUSTER_CLASS)
-        self.cluster_instance = pulumi.Output.from_input(instance)
-        self.cluster_name = infrastructure.cluster_name
-        self.docker_cluster_name = infrastructure.docker_cluster_name
-        self.control_plane_name = infrastructure.control_plane_name
-        self.worker_machine_deployments = infrastructure.worker_machine_deployments
-        self.cluster_autoscaler_namespace = infrastructure.cluster_autoscaler_namespace
-        self.cluster_autoscaler_status = infrastructure.cluster_autoscaler_status
-        self.keda_namespace = deployments.keda_namespace
-        self.keda_scaled_object_names = deployments.keda_scaled_object_names
-        self.keda_status = deployments.keda_status
-        self.prometheus_namespace = deployments.prometheus_namespace
-        self.prometheus_status = deployments.prometheus_status
-        self.calico_operator_chart_version = deployments.calico_operator_chart_version
-        self.calico_operator_status = deployments.calico_operator_status
-        self.workload_cluster_ready = deployments.workload_cluster_ready
-        self.todo = pulumi.Output.from_input(
-            "Wire workload-driven autoscaling and tenant-facing Slurm operations."
-        )
-
-        self.register_outputs(
-            {
-                "cluster_class": self.cluster_class,
-                "cluster_instance": self.cluster_instance,
-                "cluster_name": self.cluster_name,
-                "docker_cluster_name": self.docker_cluster_name,
-                "control_plane_name": self.control_plane_name,
-                "worker_machine_deployments": self.worker_machine_deployments,
-                "cluster_autoscaler_namespace": self.cluster_autoscaler_namespace,
-                "cluster_autoscaler_status": self.cluster_autoscaler_status,
-                "keda_chart_version": _KEDA_CHART_VERSION,
-                "keda_namespace": self.keda_namespace,
-                "keda_scaled_object_names": self.keda_scaled_object_names,
-                "keda_status": self.keda_status,
-                "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
-                "prometheus_namespace": self.prometheus_namespace,
-                "prometheus_status": self.prometheus_status,
-                "calico_operator_chart_version": self.calico_operator_chart_version,
-                "calico_operator_status": self.calico_operator_status,
-                "workload_cluster_ready": self.workload_cluster_ready,
-                "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
-                "slurm_operator_status": deployments.slurm_operator_status,
-                "slurm_chart_version": _SLINKY_CHART_VERSION,
-                "slurm_status": deployments.slurm_status,
-                "todo": self.todo,
-            }
-        )
-
-WorkloadClusterClass = LocalWorkloadClusterClass

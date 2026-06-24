@@ -4,7 +4,7 @@ The workload-cluster project stack name is the outer env, ``local``. The
 top-level ``__main__.py`` imports this module and instantiates
 ``TenantsLocal``. This component reads ``spec.workloadClusters`` config, fans
 out one child per entry, handles cross-workload-cluster concerns, and
-instantiates the selected ``workload_cluster_local_<class>.py`` component for
+instantiates the selected ``workload_cluster_class_<class>.py`` component for
 each instance.
 """
 
@@ -20,7 +20,7 @@ import pulumi
 
 _PROJECT_NAME = "ca4s-workload-cluster"
 _SPEC_CONFIG_KEY = "spec"
-_CLASS_MODULE_PREFIX = "workload_cluster_local_"
+_CLASS_MODULE_PREFIX = "workload_cluster_class_"
 _CLASS_EXPORT = "WorkloadClusterClass"
 _MODULE_INVALID_CHARS = re.compile(r"[^a-z0-9_]+")
 _DNS_LABEL = re.compile(r"[a-z0-9]([-a-z0-9]*[a-z0-9])?")
@@ -60,7 +60,7 @@ def _parse_workload_cluster_spec(value: object) -> WorkloadClusterSpec:
     if not isinstance(name, str):
         raise ValueError("local workload cluster name must be a string")
     if not isinstance(cluster_class, str):
-        raise ValueError("local workload cluster class must be a string")
+        raise ValueError("workload infrastructure class must be a string")
 
     _validate_dns_label("instance name", name)
     _validate_dns_label("class", cluster_class)
@@ -228,7 +228,7 @@ class TenantsLocal(pulumi.ComponentResource):
             if exc.name != package_module_name:
                 raise
             raise ValueError(
-                f"unsupported local workload cluster class {workload_cluster.cluster_class!r} "
+                f"unsupported workload cluster class {workload_cluster.cluster_class!r} "
                 f"for instance {workload_cluster.name!r}: expected sibling module "
                 f"{module_name!r}. "
                 f"Create pulumi/stacks/workload_cluster/{module_name}.py exposing "
@@ -239,7 +239,7 @@ class TenantsLocal(pulumi.ComponentResource):
             workload_cluster_class = getattr(module, _CLASS_EXPORT)
         except AttributeError:
             raise ValueError(
-                f"local workload cluster class module {module_name!r} must expose "
+                f"workload cluster class module {module_name!r} must expose "
                 f"a ``{_CLASS_EXPORT}`` ComponentResource class."
             ) from None
 

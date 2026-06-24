@@ -1,29 +1,31 @@
 from __future__ import annotations
 
-from stacks.workload_cluster.workload_cluster_local_local import (
+from stacks.workload_cluster.workload_cluster_deployments import (
     _AUTOSCALER_MAX_ANNOTATION,
     _AUTOSCALER_MIN_ANNOTATION,
+    WorkerClassSpec,
+    _autoscaled_worker_classes,
+    _keda_release_name,
+    _keda_scaled_object_name,
+    _keda_scaled_object_spec,
+    _keda_values,
+    _prometheus_server_address,
+    _prometheus_service_name,
+    _prometheus_values,
+    _slurm_nodeset_name,
+)
+from stacks.workload_cluster.workload_cluster_infrastructure_local import (
     _CLUSTER_AUTOSCALER_DISCOVERY_LABEL,
     _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE,
     _DELETE_FOREGROUND,
     _DELETION_PROPAGATION_ANNOTATION,
-    WorkerClassSpec,
-    _autoscaled_worker_classes,
     _cluster_autoscaler_fullname,
     _cluster_autoscaler_kubeconfig_secret_name,
     _cluster_autoscaler_namespace,
     _cluster_autoscaler_release_name,
     _cluster_autoscaler_values,
     _foreground_delete_annotations,
-    _keda_release_name,
-    _keda_scaled_object_name,
-    _keda_values,
     _machine_deployment_labels,
-    _prometheus_server_address,
-    _prometheus_service_name,
-    _prometheus_values,
-    _slurm_nodeset_name,
-    _keda_scaled_object_spec,
     _worker_labels,
 )
 
