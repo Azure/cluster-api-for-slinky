@@ -38,8 +38,8 @@ Without that wait, the API server would reject the CR with a
 What Phase 1 does NOT include
 -----------------------------
 * No workload-cluster resources (``AzureCluster``,
-  ``AzureManagedControlPlane``, ``MachinePool``, etc.) -- the per-env
-  tenants component (``TenantsAzure``) is intentionally empty.
+  ``AzureManagedControlPlane``, ``MachinePool``, etc.) -- those belong to
+  the workload ``Tenants`` component.
 * No Calico or any CNI install (no workload cluster to install it on).
 * No autoscaling, no SSH/node customization, no AWX, no Slurm.
 
@@ -397,7 +397,7 @@ class ControlPlaneAzure(pulumi.ComponentResource):
         self.imds_preflight_job_namespace = imds_preflight_job.job_namespace
         # Echo the UAMI identifiers parsed off the spec. Phase 2 consumers
         # (ASO ``RoleAssignment``, ``AzureManagedControlPlane``,
-        # tenants_azure fan-out) read them from these outputs so they
+        # workload-cluster fan-out) read them from these outputs so they
         # don't need a second config read.
         self.azure_client_id = pulumi.Output.from_input(spec.client_id)
         self.azure_principal_id = pulumi.Output.from_input(spec.principal_id)

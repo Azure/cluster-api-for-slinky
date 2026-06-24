@@ -6,13 +6,13 @@ Mirror of :mod:`pko._init_stack_local`. Selected by the dispatcher in
 
 Phase 2 responsibility:
 
-1. Unpack the Azure-specific child config the outer ``stack_azure.py``
-   sent down via ``PKOBootstrap(config=...)``: the UAMI identifiers
-   (``childConfig.azure``) and the workload-cluster placement/sizing
-   (``childConfig.azureWorkload``).
+1. Unpack the child config the outer ``stack_azure.py`` sent down via
+    ``PKOBootstrap(config=...)``: the UAMI identifiers
+    (``childConfig.azure``) and the workload-cluster inventory
+    (``childConfig.spec``).
 2. Instantiate :class:`ControlPlaneAzure`, passing the typed identity spec.
-3. Instantiate :class:`TenantsAzure`, threading in the parsed workload
-   spec, the subscription ID, and the ``AzureClusterIdentity`` name +
+3. Instantiate :class:`Tenants`, threading in the subscription ID and the
+    ``AzureClusterIdentity`` name +
    namespace so the AKS control plane's ``identityRef`` resolves back to
    the Phase 1 identity.
 """
@@ -28,10 +28,10 @@ from stacks.control_plane.control_plane_azure import (
     ControlPlaneAzure,
     parse_control_plane_azure_spec,
 )
-from stacks.workload_cluster.tenants_azure import TenantsAzure
-from stacks.workload_cluster.tenants_azure import (
-    AZURE_WORKLOAD_CHILD_CONFIG_KEY,
-    parse_azure_workload_spec,
+from stacks.workload_cluster.tenants import (
+    SPEC_CONFIG_KEY,
+    Tenants,
+    WorkloadClusterContext,
 )
 
 
@@ -64,26 +64,19 @@ class InitStackAzure(pulumi.ComponentResource):
         spec = parse_control_plane_azure_spec(
             inputs.child_config.get(CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY)
         )
-        # Workload-cluster placement/sizing lives in a sibling childConfig
-        # block (``azureWorkload``) owned by the workload package, kept
-        # separate from the identity block so the two contracts evolve
-        # independently. The subscription ID is NOT duplicated there — it is
-        # threaded from the identity ``spec`` below.
-        workload_spec = parse_azure_workload_spec(
-            inputs.child_config.get(AZURE_WORKLOAD_CHILD_CONFIG_KEY)
-        )
-
         control_plane = ControlPlaneAzure(
             "control-plane",
             spec=spec,
             opts=pulumi.ResourceOptions(parent=self),
         )
-        tenants = TenantsAzure(
+        tenants = Tenants(
             "tenants-azure",
-            workload_spec=workload_spec,
-            subscription_id=spec.subscription_id,
-            identity_name=control_plane.azure_cluster_identity_name,
-            identity_namespace=control_plane.azure_cluster_identity_namespace,
+            spec=inputs.child_config.get(SPEC_CONFIG_KEY),
+            context=WorkloadClusterContext(
+                subscription_id=spec.subscription_id,
+                identity_name=control_plane.azure_cluster_identity_name,
+                identity_namespace=control_plane.azure_cluster_identity_namespace,
+            ),
             opts=pulumi.ResourceOptions(parent=self, depends_on=[control_plane]),
         )
 

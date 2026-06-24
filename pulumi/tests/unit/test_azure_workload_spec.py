@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from stacks.workload_cluster.tenants_azure import (
-    AZURE_WORKLOAD_CHILD_CONFIG_KEY,
+from stacks.workload_cluster.workload_cluster_class_aks import (
     AzureWorkloadSpec,
     _DEFAULT_AKS_KUBERNETES_VERSION,
     _DEFAULT_AKS_NODE_COUNT,
     _DEFAULT_AKS_NODE_SKU,
-    build_azure_workload_child_config,
+    build_aks_workload_cluster_child_config,
     parse_azure_workload_spec,
 )
 
@@ -19,20 +18,34 @@ _LOCATION = "westus2"
 _RESOURCE_GROUP = "rg-capz-mi-dev2"
 
 
+def _parameters(config: dict[str, object]) -> object:
+    return config["spec"]["workloadClusters"][0]["spec"]["parameters"]  # type: ignore[index]
+
+
 def test_build_and_parse_round_trip_defaults() -> None:
-    built = build_azure_workload_child_config(
+    built = build_aks_workload_cluster_child_config(
         location=_LOCATION,
         resource_group=_RESOURCE_GROUP,
     )
 
     assert built == {
-        AZURE_WORKLOAD_CHILD_CONFIG_KEY: {
-            "location": _LOCATION,
-            "resourceGroup": _RESOURCE_GROUP,
+        "spec": {
+            "workloadClusters": [
+                {
+                    "metadata": {"name": "caps-aks"},
+                    "spec": {
+                        "className": "aks",
+                        "parameters": {
+                            "location": _LOCATION,
+                            "resourceGroup": _RESOURCE_GROUP,
+                        },
+                    },
+                }
+            ]
         }
     }
 
-    parsed = parse_azure_workload_spec(built[AZURE_WORKLOAD_CHILD_CONFIG_KEY])
+    parsed = parse_azure_workload_spec(_parameters(built))
     assert parsed == AzureWorkloadSpec(
         location=_LOCATION,
         resource_group=_RESOURCE_GROUP,
@@ -43,7 +56,7 @@ def test_build_and_parse_round_trip_defaults() -> None:
 
 
 def test_build_omits_aks_block_when_no_overrides() -> None:
-    built = build_azure_workload_child_config(
+    built = build_aks_workload_cluster_child_config(
         location=_LOCATION,
         resource_group=_RESOURCE_GROUP,
     )
@@ -51,36 +64,36 @@ def test_build_omits_aks_block_when_no_overrides() -> None:
     # No sizing overrides => no ``aks`` key => the parser falls back to the
     # module defaults. Keeping the wire shape minimal lets an operator revert
     # to "use the default" by removing the config key.
-    assert "aks" not in built[AZURE_WORKLOAD_CHILD_CONFIG_KEY]  # type: ignore[operator]
+    assert "aks" not in _parameters(built)  # type: ignore[operator]
     # Likewise, no tags => no ``additionalTags`` key.
-    assert "additionalTags" not in built[AZURE_WORKLOAD_CHILD_CONFIG_KEY]  # type: ignore[operator]
+    assert "additionalTags" not in _parameters(built)  # type: ignore[operator]
 
 
 def test_build_and_parse_round_trip_additional_tags() -> None:
-    built = build_azure_workload_child_config(
+    built = build_aks_workload_cluster_child_config(
         location=_LOCATION,
         resource_group=_RESOURCE_GROUP,
         additional_tags={"Owner": "t-hernandezc"},
     )
 
-    assert built[AZURE_WORKLOAD_CHILD_CONFIG_KEY] == {
+    assert _parameters(built) == {
         "location": _LOCATION,
         "resourceGroup": _RESOURCE_GROUP,
         "additionalTags": {"Owner": "t-hernandezc"},
     }
 
-    parsed = parse_azure_workload_spec(built[AZURE_WORKLOAD_CHILD_CONFIG_KEY])
+    parsed = parse_azure_workload_spec(_parameters(built))
     assert parsed.additional_tags == {"Owner": "t-hernandezc"}
 
 
 def test_build_omits_additional_tags_when_empty() -> None:
-    built = build_azure_workload_child_config(
+    built = build_aks_workload_cluster_child_config(
         location=_LOCATION,
         resource_group=_RESOURCE_GROUP,
         additional_tags={},
     )
 
-    assert "additionalTags" not in built[AZURE_WORKLOAD_CHILD_CONFIG_KEY]  # type: ignore[operator]
+    assert "additionalTags" not in _parameters(built)  # type: ignore[operator]
 
 
 def test_parse_defaults_additional_tags_to_empty() -> None:
@@ -92,7 +105,7 @@ def test_parse_defaults_additional_tags_to_empty() -> None:
 
 
 def test_build_and_parse_round_trip_full_aks_overrides() -> None:
-    built = build_azure_workload_child_config(
+    built = build_aks_workload_cluster_child_config(
         location=_LOCATION,
         resource_group=_RESOURCE_GROUP,
         aks_kubernetes_version="v1.31.1",
@@ -100,7 +113,7 @@ def test_build_and_parse_round_trip_full_aks_overrides() -> None:
         aks_node_count=3,
     )
 
-    assert built[AZURE_WORKLOAD_CHILD_CONFIG_KEY] == {
+    assert _parameters(built) == {
         "location": _LOCATION,
         "resourceGroup": _RESOURCE_GROUP,
         "aks": {
@@ -110,7 +123,7 @@ def test_build_and_parse_round_trip_full_aks_overrides() -> None:
         },
     }
 
-    parsed = parse_azure_workload_spec(built[AZURE_WORKLOAD_CHILD_CONFIG_KEY])
+    parsed = parse_azure_workload_spec(_parameters(built))
     assert parsed == AzureWorkloadSpec(
         location=_LOCATION,
         resource_group=_RESOURCE_GROUP,
@@ -121,7 +134,7 @@ def test_build_and_parse_round_trip_full_aks_overrides() -> None:
 
 
 def test_build_omits_only_unset_aks_keys() -> None:
-    built = build_azure_workload_child_config(
+    built = build_aks_workload_cluster_child_config(
         location=_LOCATION,
         resource_group=_RESOURCE_GROUP,
         aks_node_count=5,
@@ -129,7 +142,7 @@ def test_build_omits_only_unset_aks_keys() -> None:
 
     # Only the overridden key is serialized; the other two fall back to
     # defaults on the parse side.
-    assert built[AZURE_WORKLOAD_CHILD_CONFIG_KEY] == {
+    assert _parameters(built) == {
         "location": _LOCATION,
         "resourceGroup": _RESOURCE_GROUP,
         "aks": {"nodeCount": 5},
@@ -151,7 +164,7 @@ def test_parse_applies_defaults_for_partial_aks_block() -> None:
 
 
 def test_parse_rejects_none_payload() -> None:
-    with pytest.raises(ValueError, match="missing required Azure workload"):
+    with pytest.raises(ValueError, match="spec.parameters must be an object"):
         parse_azure_workload_spec(None)
 
 
@@ -170,7 +183,7 @@ def test_parse_rejects_missing_required_key(missing_key: str) -> None:
 
     with pytest.raises(
         ValueError,
-        match=f"azureWorkload.{missing_key} must be a non-empty string",
+        match=f"spec.parameters.{missing_key} must be a non-empty string",
     ):
         parse_azure_workload_spec(payload)
 
@@ -182,7 +195,7 @@ def test_parse_rejects_non_object_aks_block() -> None:
         "aks": "big",
     }
 
-    with pytest.raises(ValueError, match="azureWorkload.aks must be an object"):
+    with pytest.raises(ValueError, match="spec.parameters.aks must be an object"):
         parse_azure_workload_spec(payload)
 
 
@@ -219,7 +232,7 @@ def test_parse_rejects_non_object_additional_tags() -> None:
     }
 
     with pytest.raises(
-        ValueError, match="additionalTags must be an object of string tags"
+        ValueError, match="spec.parameters.additionalTags must be an object of strings"
     ):
         parse_azure_workload_spec(payload)
 

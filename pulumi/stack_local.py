@@ -196,7 +196,7 @@ def run() -> None:
     # Install PKO and hand it the Flux GitRepository source created by the
     # GitOps provider. The outer stack owns exactly one Stack CR under PKO:
     # ``ca4s-init``. That init stack runs inside PKO and instantiates
-    # ``ControlPlaneLocal`` plus ``TenantsLocal`` directly. Workload-cluster
+    # ``ControlPlaneLocal`` plus shared ``Tenants`` directly. Workload-cluster
     # instance churn is therefore
     # reconciled by PKO from Git after the init stack notices the repo change,
     # rather than by adding/removing Stack CRs directly from this outer
@@ -210,7 +210,7 @@ def run() -> None:
     #     pulumi/stacks/control_plane/    - component modules for CAPI providers
     #                                       + AWX (tenant-agnostic).
     #     pulumi/stacks/workload_cluster/ - tenants/workload component modules;
-    #                                       ``TenantsLocal`` creates per-instance
+    #                                       ``Tenants`` creates per-instance
     #                                       CAPI Clusters on mgmt, then installs
     #                                       workload-cluster-side resources via
     #                                       each cluster's own kubeconfig.
@@ -224,7 +224,7 @@ def run() -> None:
     #     ca4s-init             -> spec.stack=organization/ca4s-init/local
     #                              -> dispatcher picks ``InitStackLocal``;
     #                                 that component instantiates
-    #                                 ``ControlPlaneLocal`` and ``TenantsLocal``.
+    #                                 ``ControlPlaneLocal`` and ``Tenants``.
 
     pko = PKOBootstrap(
         "pko",

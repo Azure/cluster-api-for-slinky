@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
 
 import pulumi
 
@@ -97,6 +97,8 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
         name: str,
         *,
         instance: str,
+        parameters: Mapping[str, object] | None = None,
+        context: Any | None = None,
         machine_deployments: tuple[LocalMachineDeploymentSpec, ...] = _LOCAL_MACHINE_DEPLOYMENTS,
         slurm_node_sets: tuple[SlurmNodeSetSpec, ...] = _LOCAL_SLURM_NODE_SETS,
         keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = _LOCAL_KEDA_SCALED_NODE_SETS,

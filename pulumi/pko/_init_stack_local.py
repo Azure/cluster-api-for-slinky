@@ -7,7 +7,7 @@ from typing import Any
 import pulumi
 
 from stacks.control_plane.control_plane_local import ControlPlaneLocal
-from stacks.workload_cluster.tenants_local import TenantsLocal
+from stacks.workload_cluster.tenants import Tenants
 
 
 class InitStackLocal(pulumi.ComponentResource):
@@ -32,7 +32,7 @@ class InitStackLocal(pulumi.ComponentResource):
             flux_source_name=stack_spec.flux_source_name,
             opts=pulumi.ResourceOptions(parent=self),
         )
-        tenants = TenantsLocal(
+        tenants = Tenants(
             "tenants-local",
             opts=pulumi.ResourceOptions(parent=self, depends_on=[control_plane]),
         )
