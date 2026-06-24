@@ -8,8 +8,6 @@ import pulumi
 
 try:
     from .workload_cluster_infrastructure import (
-        AUTOSCALER_MAX_ANNOTATION,
-        AUTOSCALER_MIN_ANNOTATION,
         COMPUTE_NODE_TYPE,
         CONTROLLER_NODE_TYPE,
     )
@@ -27,8 +25,6 @@ try:
     )
 except ImportError:
     from workload_cluster_infrastructure import (
-        AUTOSCALER_MAX_ANNOTATION,
-        AUTOSCALER_MIN_ANNOTATION,
         COMPUTE_NODE_TYPE,
         CONTROLLER_NODE_TYPE,
     )
@@ -144,7 +140,6 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             slurm_node_sets=slurm_node_sets,
             keda_scaled_node_sets=keda_scaled_node_sets,
             workload_provider=infrastructure.workload_provider,
-            workload_kubeconfig_secret=infrastructure.workload_kubeconfig_secret,
             opts=child_options(depends_on=[infrastructure]),
         )
 

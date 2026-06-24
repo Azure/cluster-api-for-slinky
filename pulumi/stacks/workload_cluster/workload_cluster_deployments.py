@@ -474,7 +474,6 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         slurm_node_sets: tuple[SlurmNodeSetSpec, ...],
         keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = (),
         workload_provider: k8s.Provider,
-        workload_kubeconfig_secret: k8s.core.v1.Secret,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -633,7 +632,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 instance=instance,
                 prometheus_release_name=prometheus.status.name,
                 slurm_release_name=slurm_release.status.name,
-            scaled_node_sets=keda_scaled_node_sets,
+                scaled_node_sets=keda_scaled_node_sets,
                 provider=workload_provider,
                 depends_on=[prometheus, slurm_release],
                 opts=child_options(provider=workload_provider),
@@ -653,7 +652,6 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         self.slurm_operator_status = slurm_operator.status
         self.slurm_status = slurm_release.status
         self.workload_cluster_ready = pulumi.Output.all(
-            workload_kubeconfig_secret.metadata["name"],  # type: ignore[index]
             self.keda_status,
             prometheus.status,
             slurm_operator.status,

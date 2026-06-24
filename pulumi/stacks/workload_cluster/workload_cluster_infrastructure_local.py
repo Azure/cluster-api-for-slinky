@@ -50,8 +50,7 @@ try:
     from .workload_cluster_infrastructure import (
         AUTOSCALER_MAX_ANNOTATION,
         AUTOSCALER_MIN_ANNOTATION,
-        CLUSTER_AUTOSCALER_DISCOVERY_LABEL,
-        CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE,
+        ClusterAPIAutoscaler,
         NODE_TYPE_LABEL,
         POD_SECURITY_PRIVILEGED_LABELS,
         machine_deployment_labels,
@@ -61,8 +60,7 @@ except ImportError:
     from workload_cluster_infrastructure import (
         AUTOSCALER_MAX_ANNOTATION,
         AUTOSCALER_MIN_ANNOTATION,
-        CLUSTER_AUTOSCALER_DISCOVERY_LABEL,
-        CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE,
+        ClusterAPIAutoscaler,
         NODE_TYPE_LABEL,
         POD_SECURITY_PRIVILEGED_LABELS,
         machine_deployment_labels,
@@ -100,10 +98,6 @@ _LOCAL_PATH_RBAC_NAME = "local-path-provisioner-role"
 _LOCAL_PATH_RBAC_BINDING_NAME = "local-path-provisioner-bind"
 _LOCAL_PATH_CONFIG_NAME = "local-path-config"
 _LOCAL_PATH_DEPLOYMENT_NAME = "local-path-provisioner"
-
-_CLUSTER_AUTOSCALER_CHART_REPO = "https://kubernetes.github.io/autoscaler"
-_CLUSTER_AUTOSCALER_CHART_NAME = "cluster-autoscaler"
-_CLUSTER_AUTOSCALER_CHART_VERSION = "9.57.0"
 
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
@@ -309,49 +303,6 @@ def _api_group(api_version: str) -> str:
 
 def _object_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
     return {"apiGroup": _api_group(api_version), "kind": kind, "name": name}
-
-
-def _cluster_autoscaler_namespace(instance: str) -> str:
-    return _resource_name(instance, "autoscaler")
-
-
-def _cluster_autoscaler_release_name(instance: str) -> str:
-    return _resource_name(instance, "autoscaler")
-
-
-def _cluster_autoscaler_fullname(instance: str) -> str:
-    return _resource_name(instance, "cluster-autoscaler")
-
-
-def _cluster_autoscaler_kubeconfig_secret_name(instance: str) -> str:
-    return _resource_name(instance, "autoscaler-kubeconfig")
-
-
-def _cluster_autoscaler_values(
-    *,
-    cluster_name: str,
-    fullname: str,
-    kubeconfig_secret_name: str,
-) -> dict[str, object]:
-    return {
-        "fullnameOverride": fullname,
-        "cloudProvider": "clusterapi",
-        "clusterAPIMode": "kubeconfig-incluster",
-        "clusterAPIKubeconfigSecret": kubeconfig_secret_name,
-        "clusterAPIWorkloadKubeconfigPath": (
-            f"/etc/kubernetes/{_WORKLOAD_KUBECONFIG_SECRET_KEY}"
-        ),
-        "autoDiscovery": {
-            "namespace": _NAMESPACE,
-            "clusterName": cluster_name,
-        },
-        "extraArgs": {
-            "logtostderr": True,
-            "stderrthreshold": "info",
-            "v": 4,
-            "scale-down-unneeded-time": "2m",
-        },
-    }
 
 
 def _calico_values() -> dict[str, object]:
@@ -736,126 +687,6 @@ class LocalPathStorage(pulumi.ComponentResource):
             {
                 "namespace": self.namespace,
                 "storage_class_name": self.storage_class_name,
-            }
-        )
-
-
-class ClusterAPIAutoscaler(pulumi.ComponentResource):
-    """Cluster Autoscaler for a CAPI-managed workload cluster."""
-
-    namespace: pulumi.Output[str]
-    release_name: pulumi.Output[str]
-    status: pulumi.Output[Any]
-
-    def __init__(
-        self,
-        name: str,
-        *,
-        instance: str,
-        workload_kubeconfig: pulumi.Input[str],
-        provider: k8s.Provider,
-        depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
-        opts: pulumi.ResourceOptions | None = None,
-    ) -> None:
-        super().__init__(
-            "ca4s:workload:ClusterAPIAutoscaler",
-            name,
-            props={},
-            opts=opts,
-        )
-
-        namespace_name = _cluster_autoscaler_namespace(instance)
-        release_name = _cluster_autoscaler_release_name(instance)
-        fullname = _cluster_autoscaler_fullname(instance)
-        kubeconfig_secret_name = _cluster_autoscaler_kubeconfig_secret_name(instance)
-        capd_rbac_name = _resource_name(instance, "autoscaler-capd")
-
-        def child_options(
-            *,
-            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
-            delete_before_replace: bool | None = None,
-        ) -> pulumi.ResourceOptions:
-            return pulumi.ResourceOptions(
-                parent=self,
-                provider=provider,
-                depends_on=depends_on,
-                delete_before_replace=delete_before_replace,
-            )
-
-        namespace = k8s.core.v1.Namespace(
-            "namespace",
-            metadata={"name": namespace_name},
-            opts=child_options(depends_on=depends_on),
-        )
-        kubeconfig_secret = k8s.core.v1.Secret(
-            "workload-kubeconfig",
-            metadata={
-                "name": kubeconfig_secret_name,
-                "namespace": namespace_name,
-            },
-            type="Opaque",
-            string_data={_WORKLOAD_KUBECONFIG_SECRET_KEY: workload_kubeconfig},
-            opts=child_options(depends_on=[namespace]),
-        )
-        capd_cluster_role = k8s.rbac.v1.ClusterRole(
-            "capd-cluster-role",
-            metadata={"name": capd_rbac_name},
-            rules=[
-                k8s.rbac.v1.PolicyRuleArgs(
-                    api_groups=[_api_group(_INFRASTRUCTURE_API_VERSION)],
-                    resources=["*"],
-                    verbs=["get", "list", "watch", "update", "patch"],
-                )
-            ],
-            opts=child_options(depends_on=depends_on),
-        )
-        k8s.rbac.v1.ClusterRoleBinding(
-            "capd-cluster-role-binding",
-            metadata={"name": capd_rbac_name},
-            role_ref=k8s.rbac.v1.RoleRefArgs(
-                api_group="rbac.authorization.k8s.io",
-                kind="ClusterRole",
-                name=capd_rbac_name,
-            ),
-            subjects=[
-                k8s.rbac.v1.SubjectArgs(
-                    kind="ServiceAccount",
-                    name=fullname,
-                    namespace=namespace_name,
-                )
-            ],
-            opts=child_options(depends_on=[capd_cluster_role, namespace]),
-        )
-        release = k8s.helm.v3.Release(
-            "release",
-            chart=_CLUSTER_AUTOSCALER_CHART_NAME,
-            name=release_name,
-            version=_CLUSTER_AUTOSCALER_CHART_VERSION,
-            repository_opts={"repo": _CLUSTER_AUTOSCALER_CHART_REPO},
-            namespace=namespace_name,
-            cleanup_on_fail=True,
-            atomic=True,
-            wait_for_jobs=True,
-            timeout=600,
-            values=_cluster_autoscaler_values(
-                cluster_name=_resource_name(instance, "workload"),
-                fullname=fullname,
-                kubeconfig_secret_name=kubeconfig_secret_name,
-            ),
-            opts=child_options(
-                depends_on=[namespace, kubeconfig_secret],
-                delete_before_replace=True,
-            ),
-        )
-
-        self.namespace = pulumi.Output.from_input(namespace_name)
-        self.release_name = pulumi.Output.from_input(release_name)
-        self.status = release.status
-        self.register_outputs(
-            {
-                "namespace": self.namespace,
-                "release_name": self.release_name,
-                "status": self.status,
             }
         )
 
@@ -1361,6 +1192,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             cluster_autoscaler = ClusterAPIAutoscaler(
                 "cluster-autoscaler",
                 instance=instance,
+                cluster_name=cluster_name,
                 workload_kubeconfig=workload_kubeconfig,
                 provider=management_provider,
                 depends_on=[workload_kubeconfig_secret, *worker_classes],
