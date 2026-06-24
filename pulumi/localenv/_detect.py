@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import getpass
 import json
 from dataclasses import dataclass
 from typing import Any, Final
@@ -48,6 +49,7 @@ class ManagementPlaneDefaults:
 class LocalEnvironment:
     """Local-kind host discovery result."""
 
+    local_username: str | None
     azure: AzureEnvironment | None
     management_defaults: ManagementPlaneDefaults
     warnings: tuple[str, ...] = ()
@@ -81,12 +83,21 @@ def discover_local_environment(
     )
     providers = ("docker", "azure") if azure is not None else ("docker",)
     return LocalEnvironment(
+        local_username=_discover_local_username(),
         azure=azure,
         management_defaults=ManagementPlaneDefaults(
             infrastructure_providers=providers,
         ),
         warnings=tuple(warnings),
     )
+
+
+def _discover_local_username() -> str | None:
+    try:
+        username = getpass.getuser()
+    except OSError:
+        return None
+    return username or None
 
 
 def _discover_azure_environment(
