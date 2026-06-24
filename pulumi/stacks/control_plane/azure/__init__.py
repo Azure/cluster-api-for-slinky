@@ -12,11 +12,6 @@ Phase 1 contents:
   ``capz-system`` that probes IMDS for a UAMI-bound token from inside
   the same network namespace CAPZ runs in. Gates
   :class:`ControlPlaneAzure`'s ``control_plane_ready`` output.
-* :func:`check_uami_attached` \u2014 host-side IMDS preflight helper.
-  Complement to :class:`IMDSPreflightJob`: runs in the language host
-  before any CRs are submitted, so it catches off-Azure / wrong-clientId
-  setups at plan time rather than at reconcile time.
-
 Future Phase 2+ contents will likely include thin Pulumi wrappers
 around the CAPZ workload-cluster shapes (``AzureManagedControlPlane``
 / ``AzureManagedCluster`` / ``AzureManagedMachinePool``) once
@@ -29,13 +24,10 @@ are where its consumers run (alongside sibling subpackages ``awx/``,
 from __future__ import annotations
 
 from ._cluster_identity import AzureClusterIdentity
-from ._imds_preflight import ImdsPreflightError, check_uami_attached
 from ._imds_preflight_job import IMDSPreflightJob
 
 
 __all__ = [
     "AzureClusterIdentity",
     "IMDSPreflightJob",
-    "ImdsPreflightError",
-    "check_uami_attached",
 ]

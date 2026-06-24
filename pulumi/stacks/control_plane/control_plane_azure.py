@@ -103,11 +103,9 @@ class ControlPlaneAzureSpec:
     tenant_id: str
     subscription_id: str
     allowed_namespaces: list[str] | None = None
+    infrastructure_providers: tuple[str, ...] = ("azure",)
     # When True, skip the in-cluster IMDS preflight Job that
-    # ControlPlaneAzure would otherwise schedule into capz-system.
-    # Mirror of the outer stack's ``skip_imds_preflight`` config key
-    # — there is no value in running the in-cluster check if the
-    # operator has already opted out of the host-side check. Defaults
+    # ControlPlaneAzure would otherwise schedule into capz-system. Defaults
     # to False so production paths always get the verification.
     skip_in_cluster_preflight: bool = False
 
@@ -124,6 +122,7 @@ _CONFIG_TENANT_ID = "tenantId"
 _CONFIG_SUBSCRIPTION_ID = "subscriptionId"
 _CONFIG_ALLOWED_NAMESPACES = "allowedNamespaces"
 _CONFIG_SKIP_IN_CLUSTER_PREFLIGHT = "skipInClusterPreflight"
+_CONFIG_INFRASTRUCTURE_PROVIDERS = "infrastructureProviders"
 
 # Azure identifiers (clientId, principalId, tenantId, subscriptionId) are
 # all GUIDs in the canonical 8-4-4-4-12 hex layout. Reject anything else
@@ -159,6 +158,25 @@ def _parse_allowed_namespaces(
             )
         parsed.append(entry)
     return parsed
+
+
+def _parse_infrastructure_providers(
+    field_path: str, value: object | None
+) -> tuple[str, ...]:
+    if value is None:
+        return ("azure",)
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"{field_path} must be a list of provider names")
+    parsed: list[str] = []
+    for index, entry in enumerate(value):
+        if not isinstance(entry, str) or not entry:
+            raise ValueError(
+                f"{field_path}[{index}] must be a non-empty string"
+            )
+        parsed.append(entry)
+    if "azure" not in parsed:
+        raise ValueError(f"{field_path} must include 'azure'")
+    return tuple(parsed)
 
 
 def parse_control_plane_azure_spec(
@@ -200,6 +218,10 @@ def parse_control_plane_azure_spec(
         f"{CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY}.{_CONFIG_ALLOWED_NAMESPACES}",
         value.get(_CONFIG_ALLOWED_NAMESPACES),
     )
+    infrastructure_providers = _parse_infrastructure_providers(
+        f"{CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY}.{_CONFIG_INFRASTRUCTURE_PROVIDERS}",
+        value.get(_CONFIG_INFRASTRUCTURE_PROVIDERS),
+    )
 
     skip_field = value.get(_CONFIG_SKIP_IN_CLUSTER_PREFLIGHT)
     if skip_field is not None and not isinstance(skip_field, bool):
@@ -212,6 +234,7 @@ def parse_control_plane_azure_spec(
     return ControlPlaneAzureSpec(
         **fields,
         allowed_namespaces=allowed_namespaces,
+        infrastructure_providers=infrastructure_providers,
         skip_in_cluster_preflight=bool(skip_field),
     )
 
@@ -223,6 +246,7 @@ def build_control_plane_azure_child_config(
     tenant_id: str,
     subscription_id: str,
     allowed_namespaces: list[str] | None = None,
+    infrastructure_providers: tuple[str, ...] = ("azure",),
     skip_in_cluster_preflight: bool = False,
 ) -> dict[str, object]:
     """Build the dict the outer stack passes via PKOBootstrap(config=...).
@@ -247,6 +271,8 @@ def build_control_plane_azure_child_config(
     }
     if allowed_namespaces is not None:
         child[_CONFIG_ALLOWED_NAMESPACES] = list(allowed_namespaces)
+    if infrastructure_providers != ("azure",):
+        child[_CONFIG_INFRASTRUCTURE_PROVIDERS] = list(infrastructure_providers)
     if skip_in_cluster_preflight:
         child[_CONFIG_SKIP_IN_CLUSTER_PREFLIGHT] = True
     return {CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY: child}
@@ -323,7 +349,7 @@ class ControlPlaneAzure(pulumi.ComponentResource):
         capi = ClusterAPIOperator(
             "cluster-api",
             cert_manager=cert_manager,
-            infrastructure_providers=("azure",),
+            infrastructure_providers=spec.infrastructure_providers,
             opts=child_options(),
         )
 

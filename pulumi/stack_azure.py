@@ -65,25 +65,38 @@ Confirm the UAMI has the necessary role on the subscription (typically
 
 One-time setup before ``pulumi up -s azure``
 --------------------------------------------
-The four config keys this module reads must be set on the ``azure``
-stack first. **None of them are secrets** \u2014 they're just GUIDs::
+When run on an Azure VM with a usable managed identity, this stack discovers
+the identity, tenant, subscription, location, and host resource group from
+IMDS. The old Azure keys remain as optional hints/overrides; none are secrets::
 
     pulumi stack init azure
-    pulumi config set ca4s-infra:azureClientId       <uami-client-id>
-    pulumi config set ca4s-infra:azurePrincipalId    <uami-principal-id>
-    pulumi config set ca4s-infra:azureTenantId       <entra-tenant-id>
-    pulumi config set ca4s-infra:azureSubscriptionId <subscription-id>
-    pulumi config set ca4s-infra:azureLocation       <region e.g. westus2>
-    pulumi config set ca4s-infra:azureResourceGroup  <existing-rg-name>
+    # Optional: select a specific managed identity instead of the IMDS default.
+    # pulumi config set ca4s-infra:azureClientId    <mi-client-id>
+    # pulumi config set ca4s-infra:azurePrincipalId <mi-principal-id>
+    # pulumi config set ca4s-infra:azureTenantId    <entra-tenant-id>
+    # Optional: override the IMDS-derived workload placement defaults.
+    # pulumi config set ca4s-infra:azureSubscriptionId <subscription-id>
+    # pulumi config set ca4s-infra:azureLocation       <region e.g. westus2>
+    # pulumi config set ca4s-infra:azureResourceGroup  <existing-rg-name>
     pulumi up -s azure
-
-Grab the UAMI's ``clientId`` and ``principalId`` together with::
-
-    az identity show -g <rg> -n <uami-name> \\
-        --query '{client:clientId, principal:principalId}'
 
 Optional config keys
 --------------------
+* ``ca4s-infra:azureClientId`` — managed identity client ID hint. When set,
+    host discovery asks IMDS for this identity first; if IMDS refuses it,
+    discovery falls back to the default identity selected by IMDS and logs a
+    warning.
+* ``ca4s-infra:azurePrincipalId`` — managed identity principal/object ID hint.
+    Normally discovered from the IMDS token's ``oid`` claim; this is a fallback
+    for unusual token shapes and for future role-assignment consumers.
+* ``ca4s-infra:azureTenantId`` — tenant ID hint. Normally discovered from the
+    IMDS token's ``tid`` claim.
+* ``ca4s-infra:azureSubscriptionId`` — workload subscription override. Unset
+    uses the host VM subscription from IMDS.
+* ``ca4s-infra:azureLocation`` — workload location override. Unset uses the
+    host VM location from IMDS.
+* ``ca4s-infra:azureResourceGroup`` — workload resource group override. Unset
+    uses the host VM resource group from IMDS.
 * ``ca4s-infra:aksKubernetesVersion`` — AKS control-plane Kubernetes
   version (e.g. ``v1.30.6``). Unset uses the default pinned in
   :mod:`stacks.workload_cluster.workload_cluster_azure_aks`. VERIFY the
@@ -101,23 +114,17 @@ Optional config keys
   ``spec.allowedNamespaces: {}`` (CAPZ idiom for \"all namespaces\"),
   which is the right default for multi-tenant Phase 2. Set this only
   to tighten the default.
-* ``ca4s-infra:skip_imds_preflight`` \u2014 boolean. When ``true``, skip
-  the host-side IMDS check that confirms the UAMI is actually
-  attached. Useful for off-Azure ``pulumi preview`` and tests.
 * ``ca4s-infra:skip_in_cluster_preflight`` \u2014 boolean. When ``true``,
   skip the in-cluster IMDS preflight Job that ``ControlPlaneAzure``
-  schedules into ``capz-system`` after CAPZ is installed. Mirror of
-  ``skip_imds_preflight``; useful in the same off-Azure / test
-  scenarios.
+  schedules into ``capz-system`` after CAPZ is installed.
 
 IMDS reachability prerequisite
 ------------------------------
-This module runs a host-side preflight (unless
-``skip_imds_preflight=true``) that hits
-``http://169.254.169.254/metadata/identity/oauth2/token`` and
-confirms the configured ``azureClientId`` resolves to a UAMI
-attached to this VM. That catches the two common Phase 1 failure
-modes (running off-Azure, mistyped clientId) at plan time.
+This module always runs host-side discovery against
+``http://169.254.169.254/metadata/instance`` and
+``/metadata/identity/oauth2/token``. If a configured ``azureClientId`` hint
+cannot mint a token, discovery falls back to the default managed identity IMDS
+selects for this VM and logs a warning.
 
 The host-side preflight only proves the *language host* can hit IMDS.
 For the in-cluster path, ``ControlPlaneAzure`` schedules a one-shot
@@ -155,10 +162,10 @@ import pulumi_kubernetes as k8s
 
 from ctlptl import CloudProviderKind, CtlptlCluster, CtlptlRegistry
 from gitrepo import GitOpsRepository, GitOpsWebhook
+from localenv import discover_local_environment
 from pko import PKOBootstrap
 from pko._flux import FluxInfrastructure
 from pko._release import PKO_NAMESPACE
-from stacks.control_plane.azure import check_uami_attached
 from stacks.control_plane.control_plane_azure import (
     build_control_plane_azure_child_config,
 )
@@ -205,19 +212,26 @@ def run() -> None:
     )
     configured_gitops_provider_args = config.get_object("gitops_provider_args") or {}
 
-    # Azure UAMI identifiers. All four are non-sensitive GUIDs that
-    # identify the UAMI, its Entra object representation, its tenant,
-    # and its home subscription — plain ``config.require()`` is the
-    # right verb (no ``--secret`` needed when setting them).
-    #
-    # ``azurePrincipalId`` is required even though Phase 1 doesn't
-    # consume it: surfacing it as a stack output now lets a later
-    # increment reference the UAMI by its Entra object ID without a
-    # config round-trip.
-    azure_client_id = config.require("azureClientId")
-    azure_principal_id = config.require("azurePrincipalId")
-    azure_tenant_id = config.require("azureTenantId")
-    azure_subscription_id = config.require("azureSubscriptionId")
+    # Discover the local host's Azure capability before declaring resources.
+    # Config values are hints/overrides: IMDS supplies identity, subscription,
+    # location, and resource group on the Azure VM that hosts this kind stack.
+    local_environment = discover_local_environment(
+        azure_client_id_hint=config.get("azureClientId"),
+        azure_principal_id_hint=config.get("azurePrincipalId"),
+        azure_tenant_id_hint=config.get("azureTenantId"),
+        azure_subscription_id_hint=config.get("azureSubscriptionId"),
+        azure_location_hint=config.get("azureLocation"),
+        azure_resource_group_hint=config.get("azureResourceGroup"),
+    )
+    for warning in local_environment.warnings:
+        pulumi.log.warn(warning)
+
+    if local_environment.azure is None:
+        raise ValueError(
+            "azure stack requires an Azure managed identity capability. Run "
+            "from an Azure VM with IMDS available."
+        )
+    azure_environment = local_environment.azure
 
     # Optional restriction on which namespaces' workload-cluster CRs may
     # reference the AzureClusterIdentity. Unset (the default) emits
@@ -229,12 +243,12 @@ def run() -> None:
     )
 
     # Workload-cluster placement + sizing for the AKS managed cluster that
-    # TenantsAzure provisions. location + resource group are required (there
-    # is no safe default for "where to spend money"); the AKS sizing keys are
-    # optional and fall back to the defaults baked into
+    # TenantsAzure provisions. location + resource group default to the host
+    # VM's IMDS metadata, with config still accepted as an explicit override.
+    # The AKS sizing keys are optional and fall back to the defaults baked into
     # workload_cluster_azure_aks when unset.
-    azure_location = config.require("azureLocation")
-    azure_resource_group = config.require("azureResourceGroup")
+    azure_location = azure_environment.location
+    azure_resource_group = azure_environment.resource_group
     aks_kubernetes_version = config.get("aksKubernetesVersion")
     aks_node_sku = config.get("aksNodeSku")
     aks_node_count = config.get_int("aksNodeCount")
@@ -253,21 +267,11 @@ def run() -> None:
     )
 
     # Skip the in-cluster IMDS preflight Job that ``ControlPlaneAzure``
-    # would otherwise schedule into ``capz-system``. Mirror of
-    # ``skip_imds_preflight`` (host-side) so an operator who opts out of
-    # the host check can also opt out of the in-cluster check — there's
-    # no point in running one without the other. Defaults to False so
+    # would otherwise schedule into ``capz-system``. Defaults to False so
     # production paths always get both layers of verification.
     skip_in_cluster_preflight = bool(
         config.get_bool("skip_in_cluster_preflight")
     )
-
-    # IMDS preflight: validate from the host that the configured UAMI
-    # is actually attached before we let the resource graph commit to a
-    # CR that CAPZ won't be able to use. Skip for off-Azure dev loops
-    # via ``pulumi config set skip_imds_preflight true -s azure``.
-    if not config.get_bool("skip_imds_preflight"):
-        check_uami_attached(azure_client_id)
 
     # ----------------------------------------------------------------------
     # Phase 1 \u2014 cluster + registry + LB controller. Identical shape to
@@ -342,12 +346,15 @@ def run() -> None:
         env=pulumi.get_stack(),
         config={
             **build_control_plane_azure_child_config(
-                client_id=azure_client_id,
-                principal_id=azure_principal_id,
-                tenant_id=azure_tenant_id,
-                subscription_id=azure_subscription_id,
+                client_id=azure_environment.client_id,
+                principal_id=azure_environment.principal_id,
+                tenant_id=azure_environment.tenant_id,
+                subscription_id=azure_environment.subscription_id,
                 allowed_namespaces=_normalize_allowed_namespaces(
                     azure_allowed_namespaces
+                ),
+                infrastructure_providers=(
+                    local_environment.management_defaults.infrastructure_providers
                 ),
                 skip_in_cluster_preflight=skip_in_cluster_preflight,
             ),
@@ -405,12 +412,18 @@ def run() -> None:
     # the identifiers made it through to the resource graph. None are
     # secrets, so they're safe to surface verbatim. principalId is
     # included so a later increment can read it from stack state.
-    pulumi.export("azure_client_id", azure_client_id)
-    pulumi.export("azure_principal_id", azure_principal_id)
-    pulumi.export("azure_tenant_id", azure_tenant_id)
-    pulumi.export("azure_subscription_id", azure_subscription_id)
+    pulumi.export("capi_infrastructure_providers", list(
+        local_environment.management_defaults.infrastructure_providers
+    ))
+    pulumi.export("azure_client_id", azure_environment.client_id)
+    pulumi.export("azure_principal_id", azure_environment.principal_id)
+    pulumi.export("azure_tenant_id", azure_environment.tenant_id)
+    pulumi.export("azure_subscription_id", azure_environment.subscription_id)
     pulumi.export("azure_location", azure_location)
     pulumi.export("azure_resource_group", azure_resource_group)
+    pulumi.export("azure_host_subscription_id", azure_environment.host_subscription_id)
+    pulumi.export("azure_host_location", azure_environment.host_location)
+    pulumi.export("azure_host_resource_group", azure_environment.host_resource_group)
 
 
 def _normalize_allowed_namespaces(

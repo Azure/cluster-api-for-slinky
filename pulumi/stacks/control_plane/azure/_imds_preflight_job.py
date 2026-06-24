@@ -10,15 +10,10 @@ Azure Instance Metadata Service (IMDS) at ``169.254.169.254`` for a
 the network path is broken, the Job exits non-zero and Pulumi surfaces
 the failure as a stack error.
 
-This is the **production-path** complement of the host-side preflight in
-:mod:`stacks.control_plane.azure._imds_preflight`:
-
-* Host-side preflight runs in the language host (the operator's laptop
-  or CI runner) before any CRs are applied. It catches "off-Azure",
-  "wrong clientId", and host-network misconfiguration at *plan time*.
-* In-cluster preflight runs *after* CAPI Operator + CAPZ have rolled
-  out, in the same namespace CAPZ itself runs in. It catches drift the
-  host-side check cannot see:
+The local-kind stack performs host-side IMDS discovery in plain Python before
+declaring resources. This in-cluster preflight runs *after* CAPI Operator +
+CAPZ have rolled out, in the same namespace CAPZ itself runs in, and catches
+drift the host-side discovery cannot see:
 
     * a CNI swap (e.g. kindnet \u2192 Cilium with strict default-deny)
       that drops link-local egress from pods,
@@ -54,8 +49,8 @@ Why no retries
 ``restartPolicy: Never`` + ``backoffLimit: 0`` + ``activeDeadlineSeconds:
 60``. We deliberately do not want the Job to retry on failure:
 
-* The host-side preflight already smoke-tested the clientId, so a
-  failure here is a real signal (CNI drift / proxy / etc.), not flake.
+* Host-side discovery already smoke-tested the clientId, so a failure
+    here is a real signal (CNI drift / proxy / etc.), not flake.
 * A retry loop would slow ``pulumi up`` down on legitimately broken
   setups and mask the first error in retry noise. Fail fast, surface
   the IMDS response body verbatim, let the operator fix and re-run.
@@ -71,10 +66,9 @@ treats the control plane as ready.
 
 Skipping
 --------
-``IMDSPreflightJob(..., skip=True)`` returns immediately without
-creating the Job. Use this only when the host-side preflight has
-already been bypassed (``stack_azure``'s ``skip_imds_preflight``) and
-the operator has accepted the trade-off.
+``IMDSPreflightJob(..., skip=True)`` returns immediately without creating the
+Job. This is intended only for targeted tests or one-off debugging; the normal
+Azure stack path runs the in-cluster probe.
 """
 
 from __future__ import annotations

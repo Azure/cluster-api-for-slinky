@@ -224,3 +224,39 @@ def test_parse_rejects_non_bool_skip_in_cluster_preflight() -> None:
         ValueError, match=r"skipInClusterPreflight must be a boolean"
     ):
         parse_control_plane_azure_spec(payload)
+
+
+def test_infrastructure_providers_round_trip() -> None:
+    built = build_control_plane_azure_child_config(
+        client_id=_CLIENT_ID,
+        principal_id=_PRINCIPAL_ID,
+        tenant_id=_TENANT_ID,
+        subscription_id=_SUBSCRIPTION_ID,
+        infrastructure_providers=("docker", "azure"),
+    )
+
+    assert built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY] == {
+        "clientId": _CLIENT_ID,
+        "principalId": _PRINCIPAL_ID,
+        "tenantId": _TENANT_ID,
+        "subscriptionId": _SUBSCRIPTION_ID,
+        "infrastructureProviders": ["docker", "azure"],
+    }
+    parsed = parse_control_plane_azure_spec(
+        built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY]
+    )
+    assert parsed.infrastructure_providers == ("docker", "azure")
+
+
+def test_parse_rejects_infrastructure_providers_without_azure() -> None:
+    payload = _full_payload(infrastructureProviders=["docker"])
+
+    with pytest.raises(ValueError, match="must include 'azure'"):
+        parse_control_plane_azure_spec(payload)
+
+
+def test_parse_rejects_non_list_infrastructure_providers() -> None:
+    payload = _full_payload(infrastructureProviders="azure")
+
+    with pytest.raises(ValueError, match="must be a list of provider names"):
+        parse_control_plane_azure_spec(payload)

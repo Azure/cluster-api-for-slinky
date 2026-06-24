@@ -69,10 +69,8 @@ on a standard kind-on-Azure-VM topology is:
 Things that break this path (and the failure mode for each):
 
 * **Off-Azure host** — ``169.254.169.254`` is unreachable.
-  ``stack_azure.py``'s IMDS preflight (host-side) catches this at
-  plan time and aborts with a clear message. Set
-  ``skip_imds_preflight=true`` if you've already accepted that
-  trade-off (e.g. ``pulumi preview`` from a dev laptop).
+    ``stack_azure.py``'s host-side IMDS discovery catches this at plan time and
+    aborts with a clear message.
 * **CNI that drops link-local egress** (e.g. some Cilium policies
   with strict default-deny) — the preflight passes (host-side path is
   fine) but the CAPZ pod fails to acquire tokens. Symptom: CAPZ
