@@ -1,4 +1,4 @@
-"""Local workload-cluster class composition."""
+"""AKS workload-cluster class composition."""
 
 from __future__ import annotations
 
@@ -21,9 +21,9 @@ try:
         _SLINKY_CHART_VERSION,
         WorkloadClusterDeployments,
     )
-    from .workload_cluster_infrastructure_local import (
-        LocalMachineDeploymentSpec,
-        LocalWorkloadClusterInfrastructure,
+    from .workload_cluster_infrastructure_aks import (
+        AKSNodePoolSpec,
+        AKSWorkloadClusterInfrastructure,
     )
 except ImportError:
     from workload_cluster_infrastructure import (
@@ -40,59 +40,55 @@ except ImportError:
         _SLINKY_CHART_VERSION,
         WorkloadClusterDeployments,
     )
-    from workload_cluster_infrastructure_local import (
-        LocalMachineDeploymentSpec,
-        LocalWorkloadClusterInfrastructure,
+    from workload_cluster_infrastructure_aks import (
+        AKSNodePoolSpec,
+        AKSWorkloadClusterInfrastructure,
     )
 
 
-_CLUSTER_CLASS = "local"
+_CLUSTER_CLASS = "aks"
 
-_LOCAL_MACHINE_DEPLOYMENTS = (
-    LocalMachineDeploymentSpec(
-        name="head",
-        node_type=CONTROLLER_NODE_TYPE,
-        replicas=1,
-        controller=True,
-    ),
-    LocalMachineDeploymentSpec(
-        name="compute",
-        node_type=COMPUTE_NODE_TYPE,
-        replicas=1,
-        autoscaler_bounds=(1, 10),
-    ),
-)
-_LOCAL_SLURM_NODE_SETS = (
+
+def _default_aks_node_pools(node_count: int) -> tuple[AKSNodePoolSpec, ...]:
+    return (
+        AKSNodePoolSpec(
+            name="head",
+            node_type=CONTROLLER_NODE_TYPE,
+            replicas=node_count,
+            controller=True,
+        ),
+        AKSNodePoolSpec(
+            name="compute",
+            node_type=COMPUTE_NODE_TYPE,
+            replicas=1,
+            autoscaling_bounds=(1, 10),
+        ),
+    )
+
+
+_AKS_SLURM_NODE_SETS = (
     SlurmNodeSetSpec(name="compute", node_type=COMPUTE_NODE_TYPE, replicas=1),
 )
-_LOCAL_KEDA_SCALED_NODE_SETS = (
+_AKS_KEDA_SCALED_NODE_SETS = (
     KEDANodeSetScalerSpec(node_set_name="compute", min_replicas=1, max_replicas=10),
 )
 
 
-class LocalWorkloadClusterClass(pulumi.ComponentResource):
-    """Reusable local workload-cluster class.
-
-    A class captures the resource graph shape. The ``instance`` passed to
-    the constructor supplies the concrete identity used for Kubernetes object
-    names and Pulumi outputs.
-    """
+class AKSWorkloadClusterClass(pulumi.ComponentResource):
+    """Reusable AKS workload-cluster class."""
 
     cluster_class: pulumi.Output[str]
     cluster_instance: pulumi.Output[str]
     cluster_name: pulumi.Output[str]
-    docker_cluster_name: pulumi.Output[str]
     control_plane_name: pulumi.Output[str]
-    worker_machine_deployments: list[pulumi.Output[str]]
-    cluster_autoscaler_namespace: pulumi.Output[str | None]
-    cluster_autoscaler_status: pulumi.Output[Any]
+    machine_pool_name: pulumi.Output[str]
+    machine_pool_names: list[pulumi.Output[str]]
+    control_plane_ready: pulumi.Output[bool]
     keda_namespace: pulumi.Output[str | None]
     keda_scaled_object_names: pulumi.Output[list[str]]
     keda_status: pulumi.Output[Any]
     prometheus_namespace: pulumi.Output[str]
     prometheus_status: pulumi.Output[Any]
-    calico_operator_chart_version: pulumi.Output[str | None]
-    calico_operator_status: pulumi.Output[Any]
     workload_cluster_ready: pulumi.Output[bool]
     todo: pulumi.Output[str]
 
@@ -101,14 +97,17 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
         name: str,
         *,
         instance: str,
-        machine_deployments: tuple[LocalMachineDeploymentSpec, ...] = _LOCAL_MACHINE_DEPLOYMENTS,
-        slurm_node_sets: tuple[SlurmNodeSetSpec, ...] = _LOCAL_SLURM_NODE_SETS,
-        keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = _LOCAL_KEDA_SCALED_NODE_SETS,
+        workload_spec: Any,
+        subscription_id: str,
+        identity_name: pulumi.Input[str],
+        identity_namespace: pulumi.Input[str],
+        node_pools: tuple[AKSNodePoolSpec, ...] | None = None,
+        slurm_node_sets: tuple[SlurmNodeSetSpec, ...] = _AKS_SLURM_NODE_SETS,
+        keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = _AKS_KEDA_SCALED_NODE_SETS,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        """Build one local workload-cluster instance from this class."""
         super().__init__(
-            "ca4s:workload:LocalWorkloadClusterClass",
+            "ca4s:workload:AKSWorkloadClusterClass",
             name,
             props={},
             opts=opts,
@@ -123,10 +122,20 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 depends_on=depends_on,
             )
 
-        infrastructure = LocalWorkloadClusterInfrastructure(
+        node_pools = node_pools or _default_aks_node_pools(workload_spec.node_count)
+
+        infrastructure = AKSWorkloadClusterInfrastructure(
             "infrastructure",
             instance=instance,
-            worker_machine_deployments=machine_deployments,
+            subscription_id=subscription_id,
+            identity_name=identity_name,
+            identity_namespace=identity_namespace,
+            location=workload_spec.location,
+            resource_group=workload_spec.resource_group,
+            kubernetes_version=workload_spec.kubernetes_version,
+            node_sku=workload_spec.node_sku,
+            node_pools=node_pools,
+            additional_tags=workload_spec.additional_tags,
             opts=child_options(),
         )
         deployments = WorkloadClusterDeployments(
@@ -142,21 +151,18 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
         self.cluster_class = pulumi.Output.from_input(_CLUSTER_CLASS)
         self.cluster_instance = pulumi.Output.from_input(instance)
         self.cluster_name = infrastructure.cluster_name
-        self.docker_cluster_name = infrastructure.docker_cluster_name
         self.control_plane_name = infrastructure.control_plane_name
-        self.worker_machine_deployments = infrastructure.worker_machine_deployments
-        self.cluster_autoscaler_namespace = infrastructure.cluster_autoscaler_namespace
-        self.cluster_autoscaler_status = infrastructure.cluster_autoscaler_status
+        self.machine_pool_name = infrastructure.machine_pool_name
+        self.machine_pool_names = infrastructure.machine_pool_names
+        self.control_plane_ready = infrastructure.control_plane_ready
         self.keda_namespace = deployments.keda_namespace
         self.keda_scaled_object_names = deployments.keda_scaled_object_names
         self.keda_status = deployments.keda_status
         self.prometheus_namespace = deployments.prometheus_namespace
         self.prometheus_status = deployments.prometheus_status
-        self.calico_operator_chart_version = infrastructure.calico_operator_chart_version
-        self.calico_operator_status = infrastructure.calico_operator_status
         self.workload_cluster_ready = deployments.workload_cluster_ready
         self.todo = pulumi.Output.from_input(
-            "Wire workload-driven autoscaling and tenant-facing Slurm operations."
+            "Validate AKS workload-driven autoscaling end-to-end."
         )
 
         self.register_outputs(
@@ -164,11 +170,10 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 "cluster_class": self.cluster_class,
                 "cluster_instance": self.cluster_instance,
                 "cluster_name": self.cluster_name,
-                "docker_cluster_name": self.docker_cluster_name,
                 "control_plane_name": self.control_plane_name,
-                "worker_machine_deployments": self.worker_machine_deployments,
-                "cluster_autoscaler_namespace": self.cluster_autoscaler_namespace,
-                "cluster_autoscaler_status": self.cluster_autoscaler_status,
+                "machine_pool_name": self.machine_pool_name,
+                "machine_pool_names": self.machine_pool_names,
+                "control_plane_ready": self.control_plane_ready,
                 "keda_chart_version": _KEDA_CHART_VERSION,
                 "keda_namespace": self.keda_namespace,
                 "keda_scaled_object_names": self.keda_scaled_object_names,
@@ -176,8 +181,6 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
                 "prometheus_namespace": self.prometheus_namespace,
                 "prometheus_status": self.prometheus_status,
-                "calico_operator_chart_version": self.calico_operator_chart_version,
-                "calico_operator_status": self.calico_operator_status,
                 "workload_cluster_ready": self.workload_cluster_ready,
                 "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
                 "slurm_operator_status": deployments.slurm_operator_status,
@@ -188,4 +191,4 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
         )
 
 
-WorkloadClusterClass = LocalWorkloadClusterClass
+WorkloadClusterClass = AKSWorkloadClusterClass

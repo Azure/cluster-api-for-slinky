@@ -24,6 +24,8 @@ from __future__ import annotations
 import base64
 import os
 import re
+import urllib.request
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 import pulumi
@@ -45,22 +47,26 @@ except ImportError:
     )
 
 try:
-    from .workload_cluster_deployments import (
-        _NODE_TYPE_LABEL,
-        _POD_CIDR,
-        _POD_SECURITY_PRIVILEGED_LABELS,
-        _WORKER_NODE_CLASSES,
-        WorkerClassSpec,
-        _autoscaled_worker_classes,
+    from .workload_cluster_infrastructure import (
+        AUTOSCALER_MAX_ANNOTATION,
+        AUTOSCALER_MIN_ANNOTATION,
+        CLUSTER_AUTOSCALER_DISCOVERY_LABEL,
+        CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE,
+        NODE_TYPE_LABEL,
+        POD_SECURITY_PRIVILEGED_LABELS,
+        machine_deployment_labels,
+        worker_labels,
     )
 except ImportError:
-    from workload_cluster_deployments import (
-        _NODE_TYPE_LABEL,
-        _POD_CIDR,
-        _POD_SECURITY_PRIVILEGED_LABELS,
-        _WORKER_NODE_CLASSES,
-        WorkerClassSpec,
-        _autoscaled_worker_classes,
+    from workload_cluster_infrastructure import (
+        AUTOSCALER_MAX_ANNOTATION,
+        AUTOSCALER_MIN_ANNOTATION,
+        CLUSTER_AUTOSCALER_DISCOVERY_LABEL,
+        CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE,
+        NODE_TYPE_LABEL,
+        POD_SECURITY_PRIVILEGED_LABELS,
+        machine_deployment_labels,
+        worker_labels,
     )
 
 
@@ -71,10 +77,20 @@ _INFRASTRUCTURE_API_VERSION = "infrastructure.cluster.x-k8s.io/v1beta2"
 
 _NAMESPACE = "default"
 _KUBERNETES_VERSION = "v1.36.1"
+_POD_CIDR = "192.168.0.0/16"
 _SERVICE_CIDR = "10.128.0.0/12"
 _SERVICE_DOMAIN = "cluster.local"
 
 _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
+
+_CALICO_CHART_REPO = "https://docs.tigera.io/calico/charts"
+_CALICO_CHART_NAME = "tigera-operator"
+_CALICO_CHART_VERSION = "v3.32.0"
+_CALICO_OPERATOR_CRDS_URL = (
+    "https://raw.githubusercontent.com/projectcalico/calico/"
+    f"{_CALICO_CHART_VERSION}/manifests/operator-crds.yaml"
+)
+_CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 
 _LOCAL_PATH_NAMESPACE = "local-path-storage"
 _LOCAL_PATH_STORAGE_CLASS = "local-path"
@@ -88,8 +104,6 @@ _LOCAL_PATH_DEPLOYMENT_NAME = "local-path-provisioner"
 _CLUSTER_AUTOSCALER_CHART_REPO = "https://kubernetes.github.io/autoscaler"
 _CLUSTER_AUTOSCALER_CHART_NAME = "cluster-autoscaler"
 _CLUSTER_AUTOSCALER_CHART_VERSION = "9.57.0"
-_CLUSTER_AUTOSCALER_DISCOVERY_LABEL = "ca4s.azure.com/autoscaler-enabled"
-_CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE = "true"
 
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
@@ -104,6 +118,27 @@ _DOCKER_IO_HOSTS_DIR = "/etc/containerd/certs.d/docker.io"
 _DOCKER_IO_SERVER = "https://registry-1.docker.io"
 _DOCKER_HUB_PUBLIC_MIRROR = "https://mirror.gcr.io"
 _DOCKER_DESKTOP_HOST = "host.docker.internal"
+
+
+@dataclass(frozen=True)
+class LocalMachineDeploymentSpec:
+    name: str
+    node_type: str
+    replicas: int
+    controller: bool = False
+    autoscaler_bounds: tuple[int, int] | None = None
+
+
+def _autoscaler_annotations(
+    bounds: tuple[int, int] | None,
+) -> dict[str, str]:
+    if bounds is None:
+        return {}
+    min_replicas, max_replicas = bounds
+    return {
+        AUTOSCALER_MIN_ANNOTATION: str(min_replicas),
+        AUTOSCALER_MAX_ANNOTATION: str(max_replicas),
+    }
 
 
 def _read_registry_setting() -> RegistrySetting | None:
@@ -188,7 +223,7 @@ def _kubelet_extra_args(node_type: str | None = None) -> list[dict[str, str]]:
     ]
     if node_type is not None:
         args.append(
-            {"name": "node-labels", "value": f"{_NODE_TYPE_LABEL}={node_type}"}
+            {"name": "node-labels", "value": f"{NODE_TYPE_LABEL}={node_type}"}
         )
     return args
 
@@ -276,33 +311,6 @@ def _object_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
     return {"apiGroup": _api_group(api_version), "kind": kind, "name": name}
 
 
-def _worker_labels(cluster_name: str, worker: WorkerClassSpec) -> dict[str, str]:
-    return {
-        "cluster.x-k8s.io/cluster-name": cluster_name,
-        _NODE_TYPE_LABEL: worker.node_type,
-    }
-
-
-def _autoscaler_discovery_labels(worker: WorkerClassSpec) -> dict[str, str]:
-    if worker.replicas is None:
-        return {
-            _CLUSTER_AUTOSCALER_DISCOVERY_LABEL: (
-                _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE
-            )
-        }
-    return {}
-
-
-def _machine_deployment_labels(
-    cluster_name: str,
-    worker: WorkerClassSpec,
-) -> dict[str, str]:
-    return {
-        **_worker_labels(cluster_name, worker),
-        **_autoscaler_discovery_labels(worker),
-    }
-
-
 def _cluster_autoscaler_namespace(instance: str) -> str:
     return _resource_name(instance, "autoscaler")
 
@@ -346,6 +354,122 @@ def _cluster_autoscaler_values(
     }
 
 
+def _calico_values() -> dict[str, object]:
+    return {
+        "installation": {
+            "calicoNetwork": {
+                "ipPools": [
+                    {
+                        "name": "default-ipv4-ippool",
+                        "blockSize": 26,
+                        "cidr": _POD_CIDR,
+                        "encapsulation": "VXLANCrossSubnet",
+                        "natOutgoing": "Enabled",
+                        "nodeSelector": "all()",
+                    }
+                ],
+            },
+        },
+    }
+
+
+def _read_url(url: str) -> str:
+    with urllib.request.urlopen(url, timeout=60) as response:
+        return response.read().decode("utf-8")
+
+
+def _calico_operator_crd_dependencies(
+    calico_operator_crds: k8s.yaml.ConfigGroup,
+) -> list[pulumi.Input[pulumi.Resource]]:
+    return [
+        calico_operator_crds.get_resource(
+            "apiextensions.k8s.io/v1/CustomResourceDefinition",
+            name,
+        )
+        for name in (
+            "apiservers.operator.tigera.io",
+            "goldmanes.operator.tigera.io",
+            "installations.operator.tigera.io",
+            "whiskers.operator.tigera.io",
+        )
+    ]
+
+
+class CalicoCNI(pulumi.ComponentResource):
+    """Calico CNI for local CAPD workload clusters."""
+
+    chart_version: pulumi.Output[str]
+    status: pulumi.Output[Any]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        provider: k8s.Provider,
+        depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            "ca4s:workload:CalicoCNI",
+            name,
+            props={},
+            opts=opts,
+        )
+
+        def child_options(
+            *,
+            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+        ) -> pulumi.ResourceOptions:
+            return pulumi.ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=depends_on,
+                retain_on_delete=True,
+            )
+
+        namespace = k8s.core.v1.Namespace(
+            "namespace",
+            metadata={
+                "name": _CALICO_OPERATOR_NAMESPACE,
+                "labels": {"pod-security.kubernetes.io/enforce": "privileged"},
+            },
+            opts=child_options(depends_on=depends_on),
+        )
+        operator_crds = k8s.yaml.ConfigGroup(
+            "operator-crds",
+            yaml=[_read_url(_CALICO_OPERATOR_CRDS_URL)],
+            opts=child_options(depends_on=[namespace]),
+        )
+        operator = k8s.helm.v3.Release(
+            "operator",
+            chart=_CALICO_CHART_NAME,
+            version=_CALICO_CHART_VERSION,
+            repository_opts={"repo": _CALICO_CHART_REPO},
+            namespace=_CALICO_OPERATOR_NAMESPACE,
+            cleanup_on_fail=True,
+            atomic=True,
+            wait_for_jobs=True,
+            skip_crds=True,
+            timeout=600,
+            values=_calico_values(),
+            opts=child_options(
+                depends_on=[
+                    namespace,
+                    *_calico_operator_crd_dependencies(operator_crds),
+                ],
+            ),
+        )
+
+        self.chart_version = pulumi.Output.from_input(_CALICO_CHART_VERSION)
+        self.status = operator.status
+        self.register_outputs(
+            {
+                "chart_version": self.chart_version,
+                "status": self.status,
+            }
+        )
+
+
 class LocalPathStorage(pulumi.ComponentResource):
     """local-path provisioner and default StorageClass for workload clusters."""
 
@@ -375,7 +499,7 @@ class LocalPathStorage(pulumi.ComponentResource):
             "local-path-storage-namespace",
             metadata={
                 "name": _LOCAL_PATH_NAMESPACE,
-                "labels": _POD_SECURITY_PRIVILEGED_LABELS,
+                "labels": POD_SECURITY_PRIVILEGED_LABELS,
             },
             opts=child_options(depends_on=depends_on),
         )
@@ -629,7 +753,6 @@ class ClusterAPIAutoscaler(pulumi.ComponentResource):
         *,
         instance: str,
         workload_kubeconfig: pulumi.Input[str],
-        autoscaled_workers: tuple[WorkerClassSpec, ...],
         provider: k8s.Provider,
         depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
         opts: pulumi.ResourceOptions | None = None,
@@ -640,11 +763,6 @@ class ClusterAPIAutoscaler(pulumi.ComponentResource):
             props={},
             opts=opts,
         )
-
-        if not autoscaled_workers:
-            raise ValueError(
-                "ClusterAPIAutoscaler requires at least one autoscaled worker"
-            )
 
         namespace_name = _cluster_autoscaler_namespace(instance)
         release_name = _cluster_autoscaler_release_name(instance)
@@ -753,7 +871,7 @@ class WorkerClass(pulumi.ComponentResource):
         cluster_name: str,
         node_image: str,
         pre_kubeadm_commands: list[str],
-        worker: WorkerClassSpec,
+        worker: LocalMachineDeploymentSpec,
         provider: k8s.Provider,
         cluster: pulumi.Resource,
         control_plane: pulumi.Resource,
@@ -764,8 +882,13 @@ class WorkerClass(pulumi.ComponentResource):
         machine_template_name = _resource_name(instance, f"{worker.name}-machine")
         bootstrap_template_name = _resource_name(instance, f"{worker.name}-bootstrap")
         machine_deployment_name = _resource_name(instance, worker.name)
-        labels = _worker_labels(cluster_name, worker)
-        machine_deployment_labels = _machine_deployment_labels(cluster_name, worker)
+        autoscaler_annotations = _autoscaler_annotations(worker.autoscaler_bounds)
+        labels = worker_labels(cluster_name, worker.node_type)
+        machine_deployment_label_set = machine_deployment_labels(
+            cluster_name,
+            worker.node_type,
+            autoscaler_enabled=worker.autoscaler_bounds is not None,
+        )
 
         def child_options(
             *,
@@ -801,8 +924,8 @@ class WorkerClass(pulumi.ComponentResource):
                 "metadata": {
                     "labels": labels,
                     **(
-                        {"annotations": worker.annotations}
-                        if worker.annotations
+                        {"annotations": autoscaler_annotations}
+                        if autoscaler_annotations
                         else {}
                     ),
                 },
@@ -825,8 +948,7 @@ class WorkerClass(pulumi.ComponentResource):
                 },
             },
         }
-        if worker.replicas is not None:
-            machine_deployment_spec["replicas"] = worker.replicas
+        machine_deployment_spec["replicas"] = worker.replicas
 
         machine_deployment = k8s.apiextensions.CustomResource(
             f"cluster-{worker.name}-machine-deployment",
@@ -835,8 +957,8 @@ class WorkerClass(pulumi.ComponentResource):
             metadata={
                 "name": machine_deployment_name,
                 "namespace": _NAMESPACE,
-                "labels": machine_deployment_labels,
-                "annotations": _foreground_delete_annotations(worker.annotations),
+                "labels": machine_deployment_label_set,
+                "annotations": _foreground_delete_annotations(autoscaler_annotations),
             },
             spec=machine_deployment_spec,
             opts=child_options(
@@ -847,7 +969,7 @@ class WorkerClass(pulumi.ComponentResource):
                     bootstrap_template,
                 ],
                 ignore_changes=(
-                    ["spec.replicas"] if worker.replicas is None else None
+                    ["spec.replicas"] if worker.autoscaler_bounds is not None else None
                 ),
             ),
         )
@@ -976,6 +1098,8 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
     workload_provider: k8s.Provider
     workload_kubeconfig_secret: k8s.core.v1.Secret
     cluster_control_plane_available: k8s.apiextensions.CustomResourcePatch
+    calico_operator_chart_version: pulumi.Output[str]
+    calico_operator_status: pulumi.Output[Any]
     cluster_autoscaler_namespace: pulumi.Output[str | None]
     cluster_autoscaler_status: pulumi.Output[Any]
 
@@ -984,11 +1108,11 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         name: str,
         *,
         instance: str,
-        worker_node_classes: tuple[WorkerClassSpec, ...] = _WORKER_NODE_CLASSES,
+        worker_machine_deployments: tuple[LocalMachineDeploymentSpec, ...],
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
-            "ca4s:workload:WorkloadClusterInfrastructure",
+            "ca4s:workload:LocalWorkloadClusterInfrastructure",
             name,
             props={},
             opts=opts,
@@ -1176,7 +1300,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
 
         worker_machine_deployment_names: list[pulumi.Output[str]] = []
         worker_classes: list[WorkerClass] = []
-        for worker in worker_node_classes:
+        for worker in worker_machine_deployments:
             worker_class = WorkerClass(
                 f"cluster-{worker.name}",
                 instance=instance,
@@ -1215,21 +1339,29 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             opts=child_options(depends_on=[workload_kubeconfig_secret]),
         )
 
-        local_path_storage = LocalPathStorage(
-            "local-path-storage",
+        calico_cni = CalicoCNI(
+            "calico-cni",
             provider=workload_provider,
             depends_on=[workload_kubeconfig_secret],
             opts=child_options(provider=workload_provider),
         )
 
-        autoscaled_workers = _autoscaled_worker_classes(worker_node_classes)
+        local_path_storage = LocalPathStorage(
+            "local-path-storage",
+            provider=workload_provider,
+            depends_on=[workload_kubeconfig_secret, calico_cni],
+            opts=child_options(provider=workload_provider),
+        )
+
+        cluster_autoscaler_enabled = any(
+            worker.autoscaler_bounds is not None for worker in worker_machine_deployments
+        )
         cluster_autoscaler: ClusterAPIAutoscaler | None = None
-        if autoscaled_workers:
+        if cluster_autoscaler_enabled:
             cluster_autoscaler = ClusterAPIAutoscaler(
                 "cluster-autoscaler",
                 instance=instance,
                 workload_kubeconfig=workload_kubeconfig,
-                autoscaled_workers=autoscaled_workers,
                 provider=management_provider,
                 depends_on=[workload_kubeconfig_secret, *worker_classes],
                 opts=child_options(provider=management_provider),
@@ -1243,6 +1375,8 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.workload_provider = workload_provider
         self.workload_kubeconfig_secret = workload_kubeconfig_secret
         self.cluster_control_plane_available = cluster_control_plane_available
+        self.calico_operator_chart_version = calico_cni.chart_version
+        self.calico_operator_status = calico_cni.status
         self.cluster_autoscaler_namespace = pulumi.Output.from_input(
             cluster_autoscaler.namespace if cluster_autoscaler is not None else None
         )
@@ -1256,6 +1390,8 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "docker_cluster_name": self.docker_cluster_name,
                 "control_plane_name": self.control_plane_name,
                 "worker_machine_deployments": self.worker_machine_deployments,
+                "calico_operator_chart_version": self.calico_operator_chart_version,
+                "calico_operator_status": self.calico_operator_status,
                 "local_path_storage_class_name": local_path_storage.storage_class_name,
                 "cluster_autoscaler_namespace": self.cluster_autoscaler_namespace,
                 "cluster_autoscaler_status": self.cluster_autoscaler_status,

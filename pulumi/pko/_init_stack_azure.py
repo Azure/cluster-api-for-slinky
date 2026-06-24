@@ -29,7 +29,7 @@ from stacks.control_plane.control_plane_azure import (
     parse_control_plane_azure_spec,
 )
 from stacks.workload_cluster.tenants_azure import TenantsAzure
-from stacks.workload_cluster.workload_cluster_azure_aks import (
+from stacks.workload_cluster.tenants_azure import (
     AZURE_WORKLOAD_CHILD_CONFIG_KEY,
     parse_azure_workload_spec,
 )

@@ -99,7 +99,7 @@ Optional config keys
     uses the host VM resource group from IMDS.
 * ``ca4s-infra:aksKubernetesVersion`` — AKS control-plane Kubernetes
   version (e.g. ``v1.30.6``). Unset uses the default pinned in
-  :mod:`stacks.workload_cluster.workload_cluster_azure_aks`. VERIFY the
+    :mod:`stacks.workload_cluster.tenants_azure`. VERIFY the
   version is currently offered in ``azureLocation`` with
   ``az aks get-versions --location <region> -o table`` — AKS rejects
   unsupported versions and the ``waitFor=condition=Ready`` gate turns
@@ -169,7 +169,7 @@ from pko._release import PKO_NAMESPACE
 from stacks.control_plane.control_plane_azure import (
     build_control_plane_azure_child_config,
 )
-from stacks.workload_cluster.workload_cluster_azure_aks import (
+from stacks.workload_cluster.tenants_azure import (
     build_azure_workload_child_config,
 )
 
@@ -246,7 +246,7 @@ def run() -> None:
     # TenantsAzure provisions. location + resource group default to the host
     # VM's IMDS metadata, with config still accepted as an explicit override.
     # The AKS sizing keys are optional and fall back to the defaults baked into
-    # workload_cluster_azure_aks when unset.
+    # tenants_azure when unset.
     azure_location = azure_environment.location
     azure_resource_group = azure_environment.resource_group
     aks_kubernetes_version = config.get("aksKubernetesVersion")

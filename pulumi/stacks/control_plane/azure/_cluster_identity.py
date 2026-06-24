@@ -120,7 +120,7 @@ import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
 
-# CAPZ v1.23.2 still serves AzureClusterIdentity on the v1beta1 API
+# CAPZ v1.24.1 still serves AzureClusterIdentity on the v1beta1 API
 # surface (the v1beta2 transition is in flight for some types but not
 # for the identity CRDs). Pin explicitly so a CAPZ bump that lands a
 # v1beta2 version doesn't silently switch us behind the scenes.

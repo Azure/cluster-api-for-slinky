@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from stacks.workload_cluster.workload_cluster_azure_aks import (
+from stacks.workload_cluster.tenants_azure import (
     AZURE_WORKLOAD_CHILD_CONFIG_KEY,
     AzureWorkloadSpec,
     _DEFAULT_AKS_KUBERNETES_VERSION,

@@ -2,24 +2,25 @@
 
 from __future__ import annotations
 
-import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import pulumi
 import pulumi_kubernetes as k8s
 
+try:
+    from .workload_cluster_infrastructure import (
+        CONTROLLER_NODE_TYPE,
+        NODE_TYPE_LABEL,
+        POD_SECURITY_PRIVILEGED_LABELS,
+    )
+except ImportError:
+    from workload_cluster_infrastructure import (
+        CONTROLLER_NODE_TYPE,
+        NODE_TYPE_LABEL,
+        POD_SECURITY_PRIVILEGED_LABELS,
+    )
 
-_POD_CIDR = "192.168.0.0/16"
-
-_CALICO_CHART_REPO = "https://docs.tigera.io/calico/charts"
-_CALICO_CHART_NAME = "tigera-operator"
-_CALICO_CHART_VERSION = "v3.32.0"
-_CALICO_OPERATOR_CRDS_URL = (
-    "https://raw.githubusercontent.com/projectcalico/calico/"
-    f"{_CALICO_CHART_VERSION}/manifests/operator-crds.yaml"
-)
-_CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 
 _CERT_MANAGER_CHART_REPO = "https://charts.jetstack.io"
 _CERT_MANAGER_CHART_NAME = "cert-manager"
@@ -47,52 +48,19 @@ _SLURM_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm"
 _SLINKY_OPERATOR_NAMESPACE = "slinky"
 _SLURM_NAMESPACE = "slurm"
 
-_NODE_TYPE_LABEL = "slinky.slurm.net/node-type"
-_CONTROLLER_NODE_TYPE = "controller"
-_COMPUTE_NODE_TYPE = "compute"
-_AUTOSCALER_MIN_ANNOTATION = (
-    "cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size"
-)
-_AUTOSCALER_MAX_ANNOTATION = (
-    "cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size"
-)
-_POD_SECURITY_PRIVILEGED_LABELS = {
-    "pod-security.kubernetes.io/enforce": "privileged",
-    "pod-security.kubernetes.io/enforce-version": "latest",
-}
+
+@dataclass(frozen=True)
+class SlurmNodeSetSpec:
+    name: str
+    node_type: str
+    replicas: int
 
 
 @dataclass(frozen=True)
-class WorkerClassSpec:
-    name: str
-    node_type: str
-    replicas: int | None = 1
-    controller: bool = False
-    annotations: dict[str, str] = field(default_factory=dict)
-
-
-_WORKER_NODE_CLASSES = (
-    WorkerClassSpec(
-        name="head",
-        node_type=_CONTROLLER_NODE_TYPE,
-        controller=True,
-    ),
-    WorkerClassSpec(
-        name="compute",
-        node_type=_COMPUTE_NODE_TYPE,
-        replicas=None,
-        annotations={
-            _AUTOSCALER_MIN_ANNOTATION: "1",
-            _AUTOSCALER_MAX_ANNOTATION: "10",
-        },
-    ),
-)
-
-
-def _autoscaled_worker_classes(
-    workers: tuple[WorkerClassSpec, ...],
-) -> tuple[WorkerClassSpec, ...]:
-    return tuple(worker for worker in workers if worker.replicas is None)
+class KEDANodeSetScalerSpec:
+    node_set_name: str
+    min_replicas: int
+    max_replicas: int
 
 
 def _keda_namespace(instance: str) -> str:
@@ -143,7 +111,7 @@ def _node_type_affinity(node_type: str) -> dict[str, object]:
                     {
                         "matchExpressions": [
                             {
-                                "key": _NODE_TYPE_LABEL,
+                                "key": NODE_TYPE_LABEL,
                                 "operator": "In",
                                 "values": [node_type],
                             }
@@ -168,12 +136,12 @@ def _controller_tolerations() -> list[dict[str, str]]:
 def _controller_pod_spec() -> dict[str, object]:
     return {
         "tolerations": _controller_tolerations(),
-        "affinity": _node_type_affinity(_CONTROLLER_NODE_TYPE),
+        "affinity": _node_type_affinity(CONTROLLER_NODE_TYPE),
     }
 
 
 def _keda_values() -> dict[str, object]:
-    controller_node_selector = {_NODE_TYPE_LABEL: _CONTROLLER_NODE_TYPE}
+    controller_node_selector = {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
     controller_tolerations = _controller_tolerations()
     component_placement = {
         "nodeSelector": controller_node_selector,
@@ -216,62 +184,21 @@ def _keda_scaled_object_spec(
     }
 
 
-def _calico_values() -> dict[str, object]:
-    return {
-        "installation": {
-            "calicoNetwork": {
-                "ipPools": [
-                    {
-                        "name": "default-ipv4-ippool",
-                        "blockSize": 26,
-                        "cidr": _POD_CIDR,
-                        "encapsulation": "VXLANCrossSubnet",
-                        "natOutgoing": "Enabled",
-                        "nodeSelector": "all()",
-                    }
-                ],
-            },
-        },
-    }
-
-
-def _read_url(url: str) -> str:
-    with urllib.request.urlopen(url, timeout=60) as response:
-        return response.read().decode("utf-8")
-
-
-def _calico_operator_crd_dependencies(
-    calico_operator_crds: k8s.yaml.ConfigGroup,
-) -> list[pulumi.Input[pulumi.Resource]]:
-    return [
-        calico_operator_crds.get_resource(
-            "apiextensions.k8s.io/v1/CustomResourceDefinition",
-            name,
-        )
-        for name in (
-            "apiservers.operator.tigera.io",
-            "goldmanes.operator.tigera.io",
-            "installations.operator.tigera.io",
-            "whiskers.operator.tigera.io",
-        )
-    ]
-
-
 def _slurm_operator_values() -> dict[str, object]:
     return {
         "operator": {
             "tolerations": _controller_tolerations(),
-            "affinity": _node_type_affinity(_CONTROLLER_NODE_TYPE),
+            "affinity": _node_type_affinity(CONTROLLER_NODE_TYPE),
         },
         "webhook": {
             "tolerations": _controller_tolerations(),
-            "affinity": _node_type_affinity(_CONTROLLER_NODE_TYPE),
+            "affinity": _node_type_affinity(CONTROLLER_NODE_TYPE),
         },
     }
 
 
 def _prometheus_values() -> dict[str, object]:
-    controller_node_selector = {_NODE_TYPE_LABEL: _CONTROLLER_NODE_TYPE}
+    controller_node_selector = {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
     controller_tolerations = _controller_tolerations()
     return {
         "prometheus": {
@@ -309,13 +236,10 @@ def _prometheus_values() -> dict[str, object]:
     }
 
 
-def _slurm_nodeset_values(worker: WorkerClassSpec) -> dict[str, object]:
-    replicas = worker.replicas
-    if replicas is None:
-        replicas = int(worker.annotations.get(_AUTOSCALER_MIN_ANNOTATION, "1"))
+def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
     return {
         "enabled": True,
-        "replicas": replicas,
+        "replicas": node_set.replicas,
         "slurmd": {
             "image": {
                 "repository": "ghcr.io/slinkyproject/slurmd",
@@ -340,7 +264,7 @@ def _slurm_nodeset_values(worker: WorkerClassSpec) -> dict[str, object]:
         "taintKubeNodes": False,
         "podSpec": {
             "affinity": {
-                **_node_type_affinity(worker.node_type),
+                **_node_type_affinity(node_set.node_type),
                 "podAntiAffinity": {
                     "requiredDuringSchedulingIgnoredDuringExecution": [
                         {
@@ -362,8 +286,7 @@ def _slurm_nodeset_values(worker: WorkerClassSpec) -> dict[str, object]:
     }
 
 
-def _slurm_values(workers: tuple[WorkerClassSpec, ...]) -> dict[str, object]:
-    compute_workers = tuple(worker for worker in workers if not worker.controller)
+def _slurm_values(node_sets: tuple[SlurmNodeSetSpec, ...]) -> dict[str, object]:
     return {
         "configFiles": {
             "cgroup.conf": "CgroupPlugin=disabled\n",
@@ -411,8 +334,8 @@ auth_provider = none
         "nodesets": {
             "slinky": {"enabled": False},
             **{
-                worker.name: _slurm_nodeset_values(worker)
-                for worker in compute_workers
+                node_set.name: _slurm_nodeset_values(node_set)
+                for node_set in node_sets
             },
         },
         "restapi": {"podSpec": _controller_pod_spec()},
@@ -434,7 +357,7 @@ class KEDANodeSetScaler(pulumi.ComponentResource):
         instance: str,
         prometheus_release_name: pulumi.Input[str],
         slurm_release_name: pulumi.Input[str],
-        autoscaled_workers: tuple[WorkerClassSpec, ...],
+        scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...],
         provider: k8s.Provider,
         depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
         opts: pulumi.ResourceOptions | None = None,
@@ -446,10 +369,8 @@ class KEDANodeSetScaler(pulumi.ComponentResource):
             opts=opts,
         )
 
-        if not autoscaled_workers:
-            raise ValueError(
-                "KEDANodeSetScaler requires at least one autoscaled worker"
-            )
+        if not scaled_node_sets:
+            raise ValueError("KEDANodeSetScaler requires at least one scaled NodeSet")
 
         namespace_name = _keda_namespace(instance)
         release_name = _keda_release_name(instance)
@@ -493,17 +414,17 @@ class KEDANodeSetScaler(pulumi.ComponentResource):
         )
 
         scaled_object_names: list[str] = []
-        for worker in autoscaled_workers:
-            scaled_object_name = _keda_scaled_object_name(instance, worker.name)
+        for scaled_node_set in scaled_node_sets:
+            scaled_object_name = _keda_scaled_object_name(instance, scaled_node_set.node_set_name)
             scaled_object_names.append(scaled_object_name)
             node_set_name = pulumi.Output.from_input(slurm_release_name).apply(
-                lambda resolved_release_name, worker_name=worker.name: _slurm_nodeset_name(
+                lambda resolved_release_name, worker_name=scaled_node_set.node_set_name: _slurm_nodeset_name(
                     resolved_release_name,
                     worker_name,
                 )
             )
             k8s.apiextensions.CustomResource(
-                f"{worker.name}-scaled-object",
+                f"{scaled_node_set.node_set_name}-scaled-object",
                 api_version=_KEDA_SCALED_OBJECT_API_VERSION,
                 kind="ScaledObject",
                 metadata={
@@ -512,12 +433,8 @@ class KEDANodeSetScaler(pulumi.ComponentResource):
                 },
                 spec=_keda_scaled_object_spec(
                     node_set_name=node_set_name,
-                    min_replicas=int(
-                        worker.annotations[_AUTOSCALER_MIN_ANNOTATION]
-                    ),
-                    max_replicas=int(
-                        worker.annotations[_AUTOSCALER_MAX_ANNOTATION]
-                    ),
+                    min_replicas=scaled_node_set.min_replicas,
+                    max_replicas=scaled_node_set.max_replicas,
                     prometheus_server_address=prometheus_server_address,
                 ),
                 opts=child_options(depends_on=[release, *(depends_on or [])]),
@@ -545,8 +462,6 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
     keda_status: pulumi.Output[Any]
     prometheus_namespace: pulumi.Output[str]
     prometheus_status: pulumi.Output[Any]
-    calico_operator_chart_version: pulumi.Output[str]
-    calico_operator_status: pulumi.Output[Any]
     slurm_operator_status: pulumi.Output[Any]
     slurm_status: pulumi.Output[Any]
     workload_cluster_ready: pulumi.Output[bool]
@@ -556,11 +471,10 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         name: str,
         *,
         instance: str,
-        worker_node_classes: tuple[WorkerClassSpec, ...],
+        slurm_node_sets: tuple[SlurmNodeSetSpec, ...],
+        keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = (),
         workload_provider: k8s.Provider,
         workload_kubeconfig_secret: k8s.core.v1.Secret,
-        cluster_control_plane_available: k8s.apiextensions.CustomResourcePatch,
-        cluster_autoscaler_status: pulumi.Input[Any],
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -583,57 +497,11 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 retain_on_delete=retain_on_delete,
             )
 
-        calico_namespace = k8s.core.v1.Namespace(
-            "calico-operator-namespace",
-            metadata={
-                "name": _CALICO_OPERATOR_NAMESPACE,
-                "labels": {"pod-security.kubernetes.io/enforce": "privileged"},
-            },
-            opts=child_options(
-                provider=workload_provider,
-                # Keep CNI alive while CAPI deletes the workload cluster. The
-                # whole workload cluster is disposable, so retained Calico
-                # resources are removed when CAPD deletes the cluster containers.
-                retain_on_delete=True,
-            ),
-        )
-        calico_operator_crds = k8s.yaml.ConfigGroup(
-            "calico-operator-crds",
-            yaml=[_read_url(_CALICO_OPERATOR_CRDS_URL)],
-            opts=child_options(
-                provider=workload_provider,
-                depends_on=[calico_namespace],
-                retain_on_delete=True,
-            ),
-        )
-        calico_operator = k8s.helm.v3.Release(
-            "calico-operator",
-            chart=_CALICO_CHART_NAME,
-            version=_CALICO_CHART_VERSION,
-            repository_opts={"repo": _CALICO_CHART_REPO},
-            namespace=_CALICO_OPERATOR_NAMESPACE,
-            cleanup_on_fail=True,
-            atomic=True,
-            wait_for_jobs=True,
-            skip_crds=True,
-            timeout=600,
-            values=_calico_values(),
-            opts=child_options(
-                provider=workload_provider,
-                depends_on=[
-                    calico_namespace,
-                    *_calico_operator_crd_dependencies(calico_operator_crds),
-                ],
-                retain_on_delete=True,
-            ),
-        )
-
         cert_manager_namespace = k8s.core.v1.Namespace(
             "workload-cert-manager-namespace",
             metadata={"name": _CERT_MANAGER_NAMESPACE},
             opts=child_options(
                 provider=workload_provider,
-                depends_on=[calico_operator],
                 retain_on_delete=True,
             ),
         )
@@ -659,11 +527,10 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
             "prometheus-namespace",
             metadata={
                 "name": _PROMETHEUS_NAMESPACE,
-                "labels": _POD_SECURITY_PRIVILEGED_LABELS,
+                "labels": POD_SECURITY_PRIVILEGED_LABELS,
             },
             opts=child_options(
                 provider=workload_provider,
-                depends_on=[calico_operator],
                 retain_on_delete=True,
             ),
         )
@@ -689,7 +556,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
             "slinky-operator-namespace",
             metadata={
                 "name": _SLINKY_OPERATOR_NAMESPACE,
-                "labels": _POD_SECURITY_PRIVILEGED_LABELS,
+                "labels": POD_SECURITY_PRIVILEGED_LABELS,
             },
             opts=child_options(
                 provider=workload_provider,
@@ -701,7 +568,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
             "slurm-namespace",
             metadata={
                 "name": _SLURM_NAMESPACE,
-                "labels": _POD_SECURITY_PRIVILEGED_LABELS,
+                "labels": POD_SECURITY_PRIVILEGED_LABELS,
             },
             opts=child_options(
                 provider=workload_provider,
@@ -749,7 +616,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
             atomic=True,
             wait_for_jobs=True,
             timeout=900,
-            values=_slurm_values(worker_node_classes),
+            values=_slurm_values(slurm_node_sets),
             opts=child_options(
                 provider=workload_provider,
                 depends_on=[
@@ -759,15 +626,14 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 retain_on_delete=True,
             ),
         )
-        autoscaled_workers = _autoscaled_worker_classes(worker_node_classes)
         keda: KEDANodeSetScaler | None = None
-        if autoscaled_workers:
+        if keda_scaled_node_sets:
             keda = KEDANodeSetScaler(
                 "keda-nodeset-scaler",
                 instance=instance,
                 prometheus_release_name=prometheus.status.name,
                 slurm_release_name=slurm_release.status.name,
-                autoscaled_workers=autoscaled_workers,
+            scaled_node_sets=keda_scaled_node_sets,
                 provider=workload_provider,
                 depends_on=[prometheus, slurm_release],
                 opts=child_options(provider=workload_provider),
@@ -784,17 +650,10 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         )
         self.prometheus_namespace = pulumi.Output.from_input(_PROMETHEUS_NAMESPACE)
         self.prometheus_status = prometheus.status
-        self.calico_operator_chart_version = pulumi.Output.from_input(
-            _CALICO_CHART_VERSION
-        )
-        self.calico_operator_status = calico_operator.status
         self.slurm_operator_status = slurm_operator.status
         self.slurm_status = slurm_release.status
         self.workload_cluster_ready = pulumi.Output.all(
-            cluster_control_plane_available.metadata["name"],  # type: ignore[index]
             workload_kubeconfig_secret.metadata["name"],  # type: ignore[index]
-            calico_operator.status,
-            cluster_autoscaler_status,
             self.keda_status,
             prometheus.status,
             slurm_operator.status,
@@ -810,8 +669,6 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
                 "prometheus_namespace": self.prometheus_namespace,
                 "prometheus_status": self.prometheus_status,
-                "calico_operator_chart_version": self.calico_operator_chart_version,
-                "calico_operator_status": self.calico_operator_status,
                 "workload_cluster_ready": self.workload_cluster_ready,
                 "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
                 "slurm_operator_status": self.slurm_operator_status,

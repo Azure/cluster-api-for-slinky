@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    AUTOSCALER_MAX_ANNOTATION,
+    AUTOSCALER_MIN_ANNOTATION,
+    CLUSTER_AUTOSCALER_DISCOVERY_LABEL,
+    CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE,
+    machine_deployment_labels,
+    worker_labels,
+)
 from stacks.workload_cluster.workload_cluster_deployments import (
-    _AUTOSCALER_MAX_ANNOTATION,
-    _AUTOSCALER_MIN_ANNOTATION,
-    WorkerClassSpec,
-    _autoscaled_worker_classes,
     _keda_release_name,
     _keda_scaled_object_name,
     _keda_scaled_object_spec,
@@ -15,8 +19,6 @@ from stacks.workload_cluster.workload_cluster_deployments import (
     _slurm_nodeset_name,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_local import (
-    _CLUSTER_AUTOSCALER_DISCOVERY_LABEL,
-    _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE,
     _DELETE_FOREGROUND,
     _DELETION_PROPAGATION_ANNOTATION,
     _cluster_autoscaler_fullname,
@@ -25,43 +27,31 @@ from stacks.workload_cluster.workload_cluster_infrastructure_local import (
     _cluster_autoscaler_release_name,
     _cluster_autoscaler_values,
     _foreground_delete_annotations,
-    _machine_deployment_labels,
-    _worker_labels,
 )
 
 
-def test_autoscaled_worker_class_is_discoverable_without_fixed_replicas() -> None:
-    worker = WorkerClassSpec(
-        name="compute",
-        node_type="compute",
-        replicas=None,
-        annotations={
-            _AUTOSCALER_MIN_ANNOTATION: "1",
-            _AUTOSCALER_MAX_ANNOTATION: "10",
-        },
-    )
-
-    assert _autoscaled_worker_classes((worker,)) == (worker,)
-    assert _worker_labels("local-workload", worker) == {
+def test_autoscaled_worker_labels_are_explicitly_requested() -> None:
+    assert worker_labels("local-workload", "compute") == {
         "cluster.x-k8s.io/cluster-name": "local-workload",
         "slinky.slurm.net/node-type": "compute",
     }
-    assert _machine_deployment_labels("local-workload", worker) == {
+    assert machine_deployment_labels(
+        "local-workload",
+        "compute",
+        autoscaler_enabled=True,
+    ) == {
         "cluster.x-k8s.io/cluster-name": "local-workload",
         "slinky.slurm.net/node-type": "compute",
-        _CLUSTER_AUTOSCALER_DISCOVERY_LABEL: _CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE,
+        CLUSTER_AUTOSCALER_DISCOVERY_LABEL: CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE,
     }
 
 
-def test_fixed_worker_class_is_not_autoscaler_discovered() -> None:
-    worker = WorkerClassSpec(name="head", node_type="controller", replicas=1)
-
-    assert _autoscaled_worker_classes((worker,)) == ()
-    assert _worker_labels("local-workload", worker) == {
+def test_fixed_worker_labels_do_not_get_autoscaler_discovery() -> None:
+    assert worker_labels("local-workload", "controller") == {
         "cluster.x-k8s.io/cluster-name": "local-workload",
         "slinky.slurm.net/node-type": "controller",
     }
-    assert _machine_deployment_labels("local-workload", worker) == {
+    assert machine_deployment_labels("local-workload", "controller") == {
         "cluster.x-k8s.io/cluster-name": "local-workload",
         "slinky.slurm.net/node-type": "controller",
     }
@@ -70,14 +60,14 @@ def test_fixed_worker_class_is_not_autoscaler_discovered() -> None:
 def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
     annotations = _foreground_delete_annotations(
         {
-            _AUTOSCALER_MIN_ANNOTATION: "1",
-            _AUTOSCALER_MAX_ANNOTATION: "10",
+            AUTOSCALER_MIN_ANNOTATION: "1",
+            AUTOSCALER_MAX_ANNOTATION: "10",
         }
     )
 
     assert annotations == {
-        _AUTOSCALER_MIN_ANNOTATION: "1",
-        _AUTOSCALER_MAX_ANNOTATION: "10",
+        AUTOSCALER_MIN_ANNOTATION: "1",
+        AUTOSCALER_MAX_ANNOTATION: "10",
         _DELETION_PROPAGATION_ANNOTATION: _DELETE_FOREGROUND,
     }
 
