@@ -8,6 +8,7 @@ from typing import Any
 import pulumi
 import pulumi_kubernetes as k8s
 
+from lib.outputs import CompositeOutput
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     CONTROLLER_NODE_TYPE,
     NODE_TYPE_LABEL,
@@ -54,6 +55,15 @@ class KEDANodeSetScalerSpec:
     node_set_name: str
     min_replicas: int
     max_replicas: int
+
+
+@dataclass(frozen=True)
+class KEDAOutputs(CompositeOutput):
+    chart_version: pulumi.Output[str]
+    namespace: pulumi.Output[str]
+    release_name: pulumi.Output[str]
+    scaled_object_names: pulumi.Output[list[str]]
+    status: pulumi.Output[Any]
 
 
 def _keda_namespace(instance: str) -> str:
@@ -338,10 +348,12 @@ auth_provider = none
 class KEDANodeSetScaler(pulumi.ComponentResource):
     """KEDA ScaledObjects that translate Slurm queue depth into NodeSet replicas."""
 
+    chart_version: pulumi.Output[str]
     namespace: pulumi.Output[str]
     release_name: pulumi.Output[str]
     scaled_object_names: pulumi.Output[list[str]]
     status: pulumi.Output[Any]
+    outputs: KEDAOutputs
 
     def __init__(
         self,
@@ -434,25 +446,24 @@ class KEDANodeSetScaler(pulumi.ComponentResource):
             )
 
         self.namespace = pulumi.Output.from_input(namespace_name)
+        self.chart_version = pulumi.Output.from_input(_KEDA_CHART_VERSION)
         self.release_name = pulumi.Output.from_input(release_name)
         self.scaled_object_names = pulumi.Output.from_input(scaled_object_names)
         self.status = release.status
-        self.register_outputs(
-            {
-                "namespace": self.namespace,
-                "release_name": self.release_name,
-                "scaled_object_names": self.scaled_object_names,
-                "status": self.status,
-            }
+        self.outputs = KEDAOutputs(
+            chart_version=self.chart_version,
+            namespace=self.namespace,
+            release_name=self.release_name,
+            scaled_object_names=self.scaled_object_names,
+            status=self.status,
         )
+        self.register_outputs(self.outputs.to_outputs())
 
 
 class WorkloadClusterDeployments(pulumi.ComponentResource):
     """Kubernetes deployments installed after a workload cluster exists."""
 
-    keda_namespace: pulumi.Output[str | None]
-    keda_scaled_object_names: pulumi.Output[list[str]]
-    keda_status: pulumi.Output[Any]
+    keda: KEDAOutputs | None
     prometheus_namespace: pulumi.Output[str]
     prometheus_status: pulumi.Output[Any]
     slurm_operator_status: pulumi.Output[Any]
@@ -631,32 +642,23 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 opts=child_options(provider=workload_provider),
             )
 
-        self.keda_namespace = pulumi.Output.from_input(
-            keda.namespace if keda is not None else None
-        )
-        self.keda_scaled_object_names = pulumi.Output.from_input(
-            keda.scaled_object_names if keda is not None else []
-        )
-        self.keda_status = pulumi.Output.from_input(
-            keda.status if keda is not None else None
-        )
+        self.keda = keda.outputs if keda is not None else None
         self.prometheus_namespace = pulumi.Output.from_input(_PROMETHEUS_NAMESPACE)
         self.prometheus_status = prometheus.status
         self.slurm_operator_status = slurm_operator.status
         self.slurm_status = slurm_release.status
-        self.workload_cluster_ready = pulumi.Output.all(
-            self.keda_status,
+        ready_inputs: list[pulumi.Input[Any]] = [
             prometheus.status,
             slurm_operator.status,
             slurm_release.status,
-        ).apply(lambda _: True)
+        ]
+        if self.keda is not None:
+            ready_inputs.append(self.keda.status)
+        self.workload_cluster_ready = pulumi.Output.all(*ready_inputs).apply(lambda _: True)
 
         self.register_outputs(
             {
-                "keda_chart_version": _KEDA_CHART_VERSION,
-                "keda_namespace": self.keda_namespace,
-                "keda_scaled_object_names": self.keda_scaled_object_names,
-                "keda_status": self.keda_status,
+                "keda": self.keda.to_outputs() if self.keda else None,
                 "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
                 "prometheus_namespace": self.prometheus_namespace,
                 "prometheus_status": self.prometheus_status,

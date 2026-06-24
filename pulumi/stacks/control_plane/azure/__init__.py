@@ -24,10 +24,11 @@ are where its consumers run (alongside sibling subpackages ``awx/``,
 from __future__ import annotations
 
 from ._cluster_identity import AzureClusterIdentity
-from ._imds_preflight_job import IMDSPreflightJob
+from ._imds_preflight_job import IMDSPreflightJob, IMDSPreflightJobOutputs
 
 
 __all__ = [
     "AzureClusterIdentity",
     "IMDSPreflightJob",
+    "IMDSPreflightJobOutputs",
 ]

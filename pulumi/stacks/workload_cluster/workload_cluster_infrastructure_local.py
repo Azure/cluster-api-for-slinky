@@ -42,6 +42,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
     AUTOSCALER_MIN_ANNOTATION,
     ClusterAPIAutoscaler,
+    ClusterAPIAutoscalerOutputs,
     NODE_TYPE_LABEL,
     POD_SECURITY_PRIVILEGED_LABELS,
     machine_deployment_labels,
@@ -912,8 +913,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
     cluster_control_plane_available: k8s.apiextensions.CustomResourcePatch
     calico_operator_chart_version: pulumi.Output[str]
     calico_operator_status: pulumi.Output[Any]
-    cluster_autoscaler_namespace: pulumi.Output[str | None]
-    cluster_autoscaler_status: pulumi.Output[Any]
+    cluster_autoscaler: ClusterAPIAutoscalerOutputs | None
 
     def __init__(
         self,
@@ -1190,11 +1190,8 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.cluster_control_plane_available = cluster_control_plane_available
         self.calico_operator_chart_version = calico_cni.chart_version
         self.calico_operator_status = calico_cni.status
-        self.cluster_autoscaler_namespace = pulumi.Output.from_input(
-            cluster_autoscaler.namespace if cluster_autoscaler is not None else None
-        )
-        self.cluster_autoscaler_status = pulumi.Output.from_input(
-            cluster_autoscaler.status if cluster_autoscaler is not None else None
+        self.cluster_autoscaler = (
+            cluster_autoscaler.outputs if cluster_autoscaler is not None else None
         )
 
         self.register_outputs(
@@ -1206,7 +1203,10 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "calico_operator_chart_version": self.calico_operator_chart_version,
                 "calico_operator_status": self.calico_operator_status,
                 "local_path_storage_class_name": local_path_storage.storage_class_name,
-                "cluster_autoscaler_namespace": self.cluster_autoscaler_namespace,
-                "cluster_autoscaler_status": self.cluster_autoscaler_status,
+                "cluster_autoscaler": (
+                    self.cluster_autoscaler.to_outputs()
+                    if self.cluster_autoscaler
+                    else None
+                ),
             }
         )

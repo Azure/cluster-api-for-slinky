@@ -54,7 +54,11 @@ from typing import Mapping
 
 import pulumi
 
-from stacks.control_plane.azure import AzureClusterIdentity, IMDSPreflightJob
+from stacks.control_plane.azure import (
+    AzureClusterIdentity,
+    IMDSPreflightJob,
+    IMDSPreflightJobOutputs,
+)
 from stacks.control_plane.capi import ClusterAPIOperator
 from stacks.control_plane.certmanager import CertManager
 
@@ -304,12 +308,7 @@ class ControlPlaneAzure(pulumi.ComponentResource):
     capi_provider_namespaces: dict[str, pulumi.Output[str]]
     azure_cluster_identity_name: pulumi.Output[str]
     azure_cluster_identity_namespace: pulumi.Output[str]
-    # IMDS preflight Job outputs. ``imds_preflight_job_name`` is
-    # ``Output[str]`` when the Job was created and ``Output[None]``
-    # when ``spec.skip_in_cluster_preflight`` is True. The union type
-    # matches :class:`azure.IMDSPreflightJob`.
-    imds_preflight_job_name: pulumi.Output[str | None]
-    imds_preflight_job_namespace: pulumi.Output[str]
+    imds_preflight_job: IMDSPreflightJobOutputs | None
     # UAMI identifiers echoed as outputs so Phase 2 components (ASO
     # ``RoleAssignment``, ``AzureManagedControlPlane.spec.subscriptionID``,
     # tenant fan-out) can pull them out of stack state instead of
@@ -369,11 +368,14 @@ class ControlPlaneAzure(pulumi.ComponentResource):
         # pulumi-kubernetes blocks on the Job's exit — a token-mint
         # failure surfaces here as a hard stack error instead of as a
         # silent CAPZ reconcile loop hours later.
-        imds_preflight_job = IMDSPreflightJob(
-            "imds-preflight",
-            client_id=spec.client_id,
-            skip=spec.skip_in_cluster_preflight,
-            opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
+        imds_preflight_job = (
+            None
+            if spec.skip_in_cluster_preflight
+            else IMDSPreflightJob(
+                "imds-preflight",
+                client_id=spec.client_id,
+                opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
+            )
         )
 
         self.cert_manager_namespace = cert_manager.namespace
@@ -384,12 +386,9 @@ class ControlPlaneAzure(pulumi.ComponentResource):
         self.azure_cluster_identity_namespace = (
             azure_cluster_identity.identity_namespace
         )
-        # IMDS preflight Job handles. When skip=True both are still
-        # present (job_name is Output[None]); downstream code should
-        # treat ``imds_preflight_job_name`` as advisory and rely on
-        # ``control_plane_ready`` for the actual readiness gate.
-        self.imds_preflight_job_name = imds_preflight_job.job_name
-        self.imds_preflight_job_namespace = imds_preflight_job.job_namespace
+        self.imds_preflight_job = (
+            imds_preflight_job.outputs if imds_preflight_job is not None else None
+        )
         # Echo the UAMI identifiers parsed off the spec. Phase 2 consumers
         # (ASO ``RoleAssignment``, ``AzureManagedControlPlane``,
         # workload-cluster fan-out) read them from these outputs so they
@@ -403,19 +402,20 @@ class ControlPlaneAzure(pulumi.ComponentResource):
         # rolled out (provider_version is its post-release output), the
         # AzureClusterIdentity CR was submitted (its identity_name
         # output is set only after the CRD existed and the CR applied),
-        # and the in-cluster IMDS preflight Job completed (its
-        # job_name Output is bound to the Job's metadata.name, which
+        # and the in-cluster IMDS preflight Job completed (its job_name
+        # Output is bound to the Job's metadata.name, which
         # pulumi-kubernetes only resolves after the
         # ``pulumi.com/waitFor=condition=Complete`` annotation lifts —
         # i.e. after IMDS actually issued a token from inside
         # ``capz-system``). When ``skip_in_cluster_preflight`` is True,
-        # ``job_name`` resolves to ``None`` immediately and the gate
-        # degrades to the pre-Phase-B behavior.
-        self.control_plane_ready = pulumi.Output.all(
+        # the gate degrades to the pre-Phase-B behavior.
+        ready_inputs: list[pulumi.Input[object]] = [
             capi.provider_version,
             azure_cluster_identity.identity_name,
-            imds_preflight_job.job_name,
-        ).apply(lambda _: True)
+        ]
+        if self.imds_preflight_job is not None:
+            ready_inputs.append(self.imds_preflight_job.job_name)
+        self.control_plane_ready = pulumi.Output.all(*ready_inputs).apply(lambda _: True)
         self.todo = pulumi.Output.from_input(
             "Phase 1 scaffold only -- add workload-cluster Azure "
             "components (AzureManagedControlPlane + MachinePool + "
@@ -432,9 +432,10 @@ class ControlPlaneAzure(pulumi.ComponentResource):
                 "azure_cluster_identity_namespace": (
                     self.azure_cluster_identity_namespace
                 ),
-                "imds_preflight_job_name": self.imds_preflight_job_name,
-                "imds_preflight_job_namespace": (
-                    self.imds_preflight_job_namespace
+                "imds_preflight_job": (
+                    self.imds_preflight_job.to_outputs()
+                    if self.imds_preflight_job
+                    else None
                 ),
                 "azure_client_id": self.azure_client_id,
                 "azure_principal_id": self.azure_principal_id,

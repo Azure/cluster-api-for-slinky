@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 import pulumi
 
+from lib.outputs import to_output_value
 from stacks.workload_cluster.workload_cluster_class_aks import AKSWorkloadClusterClass
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterClass
 
@@ -192,7 +193,7 @@ def parse_tenants_spec(value: object | None) -> TenantsSpec:
 
 def _workload_cluster_output(cluster: Any) -> dict[str, Any]:
     return {
-        name: value
+        name: to_output_value(value)
         for name, value in vars(cluster).items()
         if not name.startswith("_")
     }

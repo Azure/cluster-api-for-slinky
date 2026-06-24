@@ -14,18 +14,18 @@ class CompositeOutput:
             raise TypeError("CompositeOutput subclasses must be dataclasses")
 
         return {
-            field.name: _to_output_value(getattr(self, field.name))
+            field.name: to_output_value(getattr(self, field.name))
             for field in fields(self)
         }
 
 
-def _to_output_value(value: object) -> object:
+def to_output_value(value: object) -> object:
     if isinstance(value, CompositeOutput):
         return value.to_outputs()
     if isinstance(value, Mapping):
-        return {key: _to_output_value(nested) for key, nested in value.items()}
+        return {key: to_output_value(nested) for key, nested in value.items()}
     if isinstance(value, list):
-        return [_to_output_value(nested) for nested in value]
+        return [to_output_value(nested) for nested in value]
     if isinstance(value, tuple):
-        return tuple(_to_output_value(nested) for nested in value)
+        return tuple(to_output_value(nested) for nested in value)
     return value

@@ -8,9 +8,9 @@ from typing import Any, Mapping
 import pulumi
 
 from stacks.workload_cluster.workload_cluster_deployments import (
+    KEDAOutputs,
     KEDANodeSetScalerSpec,
     SlurmNodeSetSpec,
-    _KEDA_CHART_VERSION,
     _PROMETHEUS_CHART_VERSION,
     _SLINKY_CHART_VERSION,
     WorkloadClusterDeployments,
@@ -248,9 +248,7 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
     machine_pool_name: pulumi.Output[str]
     machine_pool_names: list[pulumi.Output[str]]
     control_plane_ready: pulumi.Output[bool]
-    keda_namespace: pulumi.Output[str | None]
-    keda_scaled_object_names: pulumi.Output[list[str]]
-    keda_status: pulumi.Output[Any]
+    keda: KEDAOutputs | None
     prometheus_namespace: pulumi.Output[str]
     prometheus_status: pulumi.Output[Any]
     workload_cluster_ready: pulumi.Output[bool]
@@ -332,9 +330,7 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
         self.machine_pool_name = infrastructure.machine_pool_name
         self.machine_pool_names = infrastructure.machine_pool_names
         self.control_plane_ready = infrastructure.control_plane_ready
-        self.keda_namespace = deployments.keda_namespace
-        self.keda_scaled_object_names = deployments.keda_scaled_object_names
-        self.keda_status = deployments.keda_status
+        self.keda = deployments.keda
         self.prometheus_namespace = deployments.prometheus_namespace
         self.prometheus_status = deployments.prometheus_status
         self.workload_cluster_ready = deployments.workload_cluster_ready
@@ -351,10 +347,7 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
                 "machine_pool_name": self.machine_pool_name,
                 "machine_pool_names": self.machine_pool_names,
                 "control_plane_ready": self.control_plane_ready,
-                "keda_chart_version": _KEDA_CHART_VERSION,
-                "keda_namespace": self.keda_namespace,
-                "keda_scaled_object_names": self.keda_scaled_object_names,
-                "keda_status": self.keda_status,
+                "keda": self.keda.to_outputs() if self.keda else None,
                 "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
                 "prometheus_namespace": self.prometheus_namespace,
                 "prometheus_status": self.prometheus_status,

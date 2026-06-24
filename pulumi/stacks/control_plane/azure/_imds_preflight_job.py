@@ -73,9 +73,13 @@ Azure stack path runs the in-cluster probe.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
+
+from lib.outputs import CompositeOutput
 
 
 # Image pinned by tag (not digest) to match what the host-side runbook
@@ -148,6 +152,12 @@ def _probe_command(client_id: str) -> list[str]:
     return ["sh", "-c", script]
 
 
+@dataclass(frozen=True)
+class IMDSPreflightJobOutputs(CompositeOutput):
+    job_name: Output[str]
+    job_namespace: Output[str]
+
+
 class IMDSPreflightJob(pulumi.ComponentResource):
     """In-cluster IMDS preflight Job in ``capz-system``.
 
@@ -167,7 +177,7 @@ class IMDSPreflightJob(pulumi.ComponentResource):
             Override only for testing.
         skip:
             When True, the component creates no Job and exposes an
-            ``Output[None]`` for ``job_name``. Use only when the
+            no output object. Use only when the
             host-side preflight has also been skipped.
         provider:
             Kubernetes provider for the management cluster. None means
@@ -180,18 +190,12 @@ class IMDSPreflightJob(pulumi.ComponentResource):
             ``capz-system`` namespace to exist.
 
     Outputs:
-        job_name:
-            ``Output[str | None]`` echoing the Job's ``metadata.name``.
-            ``None`` when ``skip=True``. Downstream code should gate on
-            this Output (or on the component itself) so the implicit
-            ``pulumi.com/waitFor=condition=Complete`` annotation
-            blocks the resource graph until IMDS has been verified.
-        job_namespace:
-            ``Output[str]`` echoing the namespace.
+        outputs:
+            ``IMDSPreflightJobOutputs`` when the Job exists, otherwise
+            ``None`` when ``skip=True``.
     """
 
-    job_name: Output[str | None]
-    job_namespace: Output[str]
+    outputs: IMDSPreflightJobOutputs | None
 
     def __init__(
         self,
@@ -208,14 +212,8 @@ class IMDSPreflightJob(pulumi.ComponentResource):
         )
 
         if skip:
-            self.job_name = Output.from_input(None)
-            self.job_namespace = Output.from_input(namespace)
-            self.register_outputs(
-                {
-                    "job_name": self.job_name,
-                    "job_namespace": self.job_namespace,
-                }
-            )
+            self.outputs = None
+            self.register_outputs({"job": None})
             return
 
         # Use Output.from_input so the Job spec can interpolate the
@@ -311,16 +309,13 @@ class IMDSPreflightJob(pulumi.ComponentResource):
         )
 
         # Echo metadata.name as an Output so downstream gates have
-        # something to depend on. Wrap in Output[str | None] to keep
-        # the type identical to the skip=True branch.
-        self.job_name = job.metadata["name"].apply(  # type: ignore[union-attr]
+        # something to depend on.
+        job_name = job.metadata["name"].apply(  # type: ignore[union-attr]
             lambda n: n
         )
-        self.job_namespace = Output.from_input(namespace)
-
-        self.register_outputs(
-            {
-                "job_name": self.job_name,
-                "job_namespace": self.job_namespace,
-            }
+        self.outputs = IMDSPreflightJobOutputs(
+            job_name=job_name,
+            job_namespace=Output.from_input(namespace),
         )
+
+        self.register_outputs(self.outputs.to_outputs())

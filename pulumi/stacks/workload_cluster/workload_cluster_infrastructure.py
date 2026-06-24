@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Any
 
 import pulumi
 import pulumi_kubernetes as k8s
+
+from lib.outputs import CompositeOutput
 
 NODE_TYPE_LABEL = "slinky.slurm.net/node-type"
 CONTROLLER_NODE_TYPE = "controller"
@@ -120,12 +123,20 @@ def node_labels(node_type: str) -> dict[str, str]:
     return {NODE_TYPE_LABEL: node_type}
 
 
+@dataclass(frozen=True)
+class ClusterAPIAutoscalerOutputs(CompositeOutput):
+    namespace: pulumi.Output[str]
+    release_name: pulumi.Output[str]
+    status: pulumi.Output[Any]
+
+
 class ClusterAPIAutoscaler(pulumi.ComponentResource):
     """Cluster Autoscaler for a CAPI-managed workload cluster."""
 
     namespace: pulumi.Output[str]
     release_name: pulumi.Output[str]
     status: pulumi.Output[Any]
+    outputs: ClusterAPIAutoscalerOutputs
 
     def __init__(
         self,
@@ -235,10 +246,9 @@ class ClusterAPIAutoscaler(pulumi.ComponentResource):
         self.namespace = pulumi.Output.from_input(namespace_name)
         self.release_name = pulumi.Output.from_input(release_name)
         self.status = release.status
-        self.register_outputs(
-            {
-                "namespace": self.namespace,
-                "release_name": self.release_name,
-                "status": self.status,
-            }
+        self.outputs = ClusterAPIAutoscalerOutputs(
+            namespace=self.namespace,
+            release_name=self.release_name,
+            status=self.status,
         )
+        self.register_outputs(self.outputs.to_outputs())
