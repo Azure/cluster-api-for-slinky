@@ -9,3 +9,4 @@ requests>=2.31,<3.0
 ../../sdks/local
 ../../sdks/awx
 ../../sdks/flux
+../../sdks/capi-core
