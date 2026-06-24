@@ -776,10 +776,10 @@ class LocalPathStorage(pulumi.ComponentResource):
                 "namespace": _LOCAL_PATH_NAMESPACE,
             },
             rules=[
-                {
-                    "apiGroups": [""],
-                    "resources": ["pods"],
-                    "verbs": [
+                k8s.rbac.v1.PolicyRuleArgs(
+                    api_groups=[""],
+                    resources=["pods"],
+                    verbs=[
                         "get",
                         "list",
                         "watch",
@@ -788,7 +788,7 @@ class LocalPathStorage(pulumi.ComponentResource):
                         "update",
                         "delete",
                     ],
-                }
+                )
             ],
             opts=child_options(depends_on=[namespace]),
         )
@@ -796,21 +796,21 @@ class LocalPathStorage(pulumi.ComponentResource):
             "local-path-cluster-role",
             metadata={"name": _LOCAL_PATH_RBAC_NAME},
             rules=[
-                {
-                    "apiGroups": [""],
-                    "resources": [
+                k8s.rbac.v1.PolicyRuleArgs(
+                    api_groups=[""],
+                    resources=[
                         "nodes",
                         "persistentvolumeclaims",
                         "configmaps",
                         "pods",
                         "pods/log",
                     ],
-                    "verbs": ["get", "list", "watch"],
-                },
-                {
-                    "apiGroups": [""],
-                    "resources": ["persistentvolumes"],
-                    "verbs": [
+                    verbs=["get", "list", "watch"],
+                ),
+                k8s.rbac.v1.PolicyRuleArgs(
+                    api_groups=[""],
+                    resources=["persistentvolumes"],
+                    verbs=[
                         "get",
                         "list",
                         "watch",
@@ -819,17 +819,17 @@ class LocalPathStorage(pulumi.ComponentResource):
                         "update",
                         "delete",
                     ],
-                },
-                {
-                    "apiGroups": [""],
-                    "resources": ["events"],
-                    "verbs": ["create", "patch"],
-                },
-                {
-                    "apiGroups": ["storage.k8s.io"],
-                    "resources": ["storageclasses"],
-                    "verbs": ["get", "list", "watch"],
-                },
+                ),
+                k8s.rbac.v1.PolicyRuleArgs(
+                    api_groups=[""],
+                    resources=["events"],
+                    verbs=["create", "patch"],
+                ),
+                k8s.rbac.v1.PolicyRuleArgs(
+                    api_groups=["storage.k8s.io"],
+                    resources=["storageclasses"],
+                    verbs=["get", "list", "watch"],
+                ),
             ],
             opts=child_options(depends_on=depends_on),
         )
@@ -839,34 +839,34 @@ class LocalPathStorage(pulumi.ComponentResource):
                 "name": _LOCAL_PATH_RBAC_BINDING_NAME,
                 "namespace": _LOCAL_PATH_NAMESPACE,
             },
-            role_ref={
-                "apiGroup": "rbac.authorization.k8s.io",
-                "kind": "Role",
-                "name": _LOCAL_PATH_RBAC_NAME,
-            },
+            role_ref=k8s.rbac.v1.RoleRefArgs(
+                api_group="rbac.authorization.k8s.io",
+                kind="Role",
+                name=_LOCAL_PATH_RBAC_NAME,
+            ),
             subjects=[
-                {
-                    "kind": "ServiceAccount",
-                    "name": _LOCAL_PATH_SERVICE_ACCOUNT,
-                    "namespace": _LOCAL_PATH_NAMESPACE,
-                }
+                k8s.rbac.v1.SubjectArgs(
+                    kind="ServiceAccount",
+                    name=_LOCAL_PATH_SERVICE_ACCOUNT,
+                    namespace=_LOCAL_PATH_NAMESPACE,
+                )
             ],
             opts=child_options(depends_on=[role, service_account]),
         )
         k8s.rbac.v1.ClusterRoleBinding(
             "local-path-cluster-role-binding",
             metadata={"name": _LOCAL_PATH_RBAC_BINDING_NAME},
-            role_ref={
-                "apiGroup": "rbac.authorization.k8s.io",
-                "kind": "ClusterRole",
-                "name": _LOCAL_PATH_RBAC_NAME,
-            },
+            role_ref=k8s.rbac.v1.RoleRefArgs(
+                api_group="rbac.authorization.k8s.io",
+                kind="ClusterRole",
+                name=_LOCAL_PATH_RBAC_NAME,
+            ),
             subjects=[
-                {
-                    "kind": "ServiceAccount",
-                    "name": _LOCAL_PATH_SERVICE_ACCOUNT,
-                    "namespace": _LOCAL_PATH_NAMESPACE,
-                }
+                k8s.rbac.v1.SubjectArgs(
+                    kind="ServiceAccount",
+                    name=_LOCAL_PATH_SERVICE_ACCOUNT,
+                    namespace=_LOCAL_PATH_NAMESPACE,
+                )
             ],
             opts=child_options(depends_on=[cluster_role, service_account]),
         )
@@ -923,59 +923,67 @@ class LocalPathStorage(pulumi.ComponentResource):
                 "name": _LOCAL_PATH_DEPLOYMENT_NAME,
                 "namespace": _LOCAL_PATH_NAMESPACE,
             },
-            spec={
-                "replicas": 1,
-                "selector": {"matchLabels": {"app": _LOCAL_PATH_DEPLOYMENT_NAME}},
-                "template": {
-                    "metadata": {"labels": {"app": _LOCAL_PATH_DEPLOYMENT_NAME}},
-                    "spec": {
-                        "serviceAccountName": _LOCAL_PATH_SERVICE_ACCOUNT,
-                        "containers": [
-                            {
-                                "name": _LOCAL_PATH_DEPLOYMENT_NAME,
-                                "image": (
+            spec=k8s.apps.v1.DeploymentSpecArgs(
+                replicas=1,
+                selector=k8s.meta.v1.LabelSelectorArgs(
+                    match_labels={"app": _LOCAL_PATH_DEPLOYMENT_NAME},
+                ),
+                template=k8s.core.v1.PodTemplateSpecArgs(
+                    metadata=k8s.meta.v1.ObjectMetaArgs(
+                        labels={"app": _LOCAL_PATH_DEPLOYMENT_NAME},
+                    ),
+                    spec=k8s.core.v1.PodSpecArgs(
+                        service_account_name=_LOCAL_PATH_SERVICE_ACCOUNT,
+                        containers=[
+                            k8s.core.v1.ContainerArgs(
+                                name=_LOCAL_PATH_DEPLOYMENT_NAME,
+                                image=(
                                     "rancher/local-path-provisioner:"
                                     f"{_LOCAL_PATH_PROVISIONER_VERSION}"
                                 ),
-                                "imagePullPolicy": "IfNotPresent",
-                                "command": [
+                                image_pull_policy="IfNotPresent",
+                                command=[
                                     "local-path-provisioner",
                                     "--debug",
                                     "start",
                                     "--config",
                                     "/etc/config/config.json",
                                 ],
-                                "volumeMounts": [
-                                    {
-                                        "name": "config-volume",
-                                        "mountPath": "/etc/config/",
-                                    }
+                                volume_mounts=[
+                                    k8s.core.v1.VolumeMountArgs(
+                                        name="config-volume",
+                                        mount_path="/etc/config/",
+                                    )
                                 ],
-                                "env": [
-                                    {
-                                        "name": "POD_NAMESPACE",
-                                        "valueFrom": {
-                                            "fieldRef": {
-                                                "fieldPath": "metadata.namespace"
-                                            }
-                                        },
-                                    },
-                                    {
-                                        "name": "CONFIG_MOUNT_PATH",
-                                        "value": "/etc/config/",
-                                    },
+                                env=[
+                                    k8s.core.v1.EnvVarArgs(
+                                        name="POD_NAMESPACE",
+                                        value_from=k8s.core.v1.EnvVarSourceArgs(
+                                            field_ref=(
+                                                k8s.core.v1.ObjectFieldSelectorArgs(
+                                                    field_path="metadata.namespace"
+                                                )
+                                            ),
+                                        ),
+                                    ),
+                                    k8s.core.v1.EnvVarArgs(
+                                        name="CONFIG_MOUNT_PATH",
+                                        value="/etc/config/",
+                                    ),
                                 ],
-                            }
+                            )
                         ],
-                        "volumes": [
-                            {
-                                "name": "config-volume",
-                                "configMap": {"name": _LOCAL_PATH_CONFIG_NAME},
-                            }
+                        volumes=[
+                            k8s.core.v1.VolumeArgs(
+                                name="config-volume",
+                                config_map=k8s.core.v1.ConfigMapVolumeSourceArgs(
+                                    name=_LOCAL_PATH_CONFIG_NAME,
+                                ),
+                            )
                         ],
-                    },
-                },
-            },
+                    ),
+                ),
+            ),
             opts=child_options(depends_on=[config, service_account, storage_class]),
         )
 
@@ -1057,28 +1065,28 @@ class ClusterAPIAutoscaler(pulumi.ComponentResource):
             "capd-cluster-role",
             metadata={"name": capd_rbac_name},
             rules=[
-                {
-                    "apiGroups": [_api_group(_INFRASTRUCTURE_API_VERSION)],
-                    "resources": ["*"],
-                    "verbs": ["get", "list", "watch", "update", "patch"],
-                }
+                k8s.rbac.v1.PolicyRuleArgs(
+                    api_groups=[_api_group(_INFRASTRUCTURE_API_VERSION)],
+                    resources=["*"],
+                    verbs=["get", "list", "watch", "update", "patch"],
+                )
             ],
             opts=child_options(depends_on=depends_on),
         )
         k8s.rbac.v1.ClusterRoleBinding(
             "capd-cluster-role-binding",
             metadata={"name": capd_rbac_name},
-            role_ref={
-                "apiGroup": "rbac.authorization.k8s.io",
-                "kind": "ClusterRole",
-                "name": capd_rbac_name,
-            },
+            role_ref=k8s.rbac.v1.RoleRefArgs(
+                api_group="rbac.authorization.k8s.io",
+                kind="ClusterRole",
+                name=capd_rbac_name,
+            ),
             subjects=[
-                {
-                    "kind": "ServiceAccount",
-                    "name": fullname,
-                    "namespace": namespace_name,
-                }
+                k8s.rbac.v1.SubjectArgs(
+                    kind="ServiceAccount",
+                    name=fullname,
+                    namespace=namespace_name,
+                )
             ],
             opts=child_options(depends_on=[capd_cluster_role, namespace]),
         )
