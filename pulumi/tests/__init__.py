@@ -2,12 +2,12 @@
 
 Two tiers, separated by directory:
 
-* ``unit/`` \u2014 fast pure-Python tests of the dynamic-Resource provider
+* ``unit/`` -- fast pure-Python tests of the dynamic-Resource provider
   lifecycle methods (``Create`` / ``Read`` / ``Update`` / ``Delete`` /
   ``Diff`` / ``Check``). No Pulumi runtime, no Docker, no network.
   Mock ``subprocess.run`` for CLI wrappers and ``responses`` for HTTP.
 
-* ``integration/`` \u2014 end-to-end tests that drive a real ``pulumi up`` /
+* ``integration/`` -- end-to-end tests that drive a real ``pulumi up`` /
   ``destroy`` against Docker via the Pulumi Automation API. Gated behind
   the ``integration`` pytest marker (skipped by default).
 

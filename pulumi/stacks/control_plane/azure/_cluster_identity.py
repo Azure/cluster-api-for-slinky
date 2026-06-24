@@ -8,7 +8,7 @@ clusters: an ``AzureClusterIdentity`` CR of
 Visually::
 
     +---------------------------+
-    | AzureClusterIdentity CR   |       no Secret \u2014 IMDS provides
+    | AzureClusterIdentity CR   |       no Secret -- IMDS provides
     |   spec.type=              |       tokens at runtime via:
     |     UserAssignedMSI       |       http://169.254.169.254/...
     |   spec.tenantID           |       ?client_id=<UAMI clientID>
@@ -140,7 +140,7 @@ class AzureClusterIdentity(pulumi.ComponentResource):
             stable across Pulumi resource renames.
         client_id:
             ``clientId`` of the user-assigned managed identity (UAMI).
-            NOT the ``principalId`` \u2014 those are two different GUIDs on
+            NOT the ``principalId`` -- those are two different GUIDs on
             the same identity. Confirm with::
 
                 az identity show -g <rg> -n <uami-name> --query clientId
@@ -153,12 +153,12 @@ class AzureClusterIdentity(pulumi.ComponentResource):
             Namespaces whose workload-cluster CRs may reference this
             identity. CAPZ admission enforces this list. ``None`` (the
             default) emits the CR with ``spec.allowedNamespaces`` set
-            to an empty object \u2014 the CAPZ convention for \"any
-            namespace may reference this identity\" \u2014 which is the
+            to an empty object -- the CAPZ convention for \"any
+            namespace may reference this identity\" -- which is the
             right default for multi-tenant Phase 2 where each tenant
             lands its CRs in its own namespace. Pass an explicit list
             to restrict to those namespaces only. Note: an empty list
-            is NOT the same as ``None`` \u2014 ``[]`` means \"no namespace
+            is NOT the same as ``None`` -- ``[]`` means \"no namespace
             may reference this identity\", per the upstream
             ``AzureClusterIdentity.spec.allowedNamespaces.list``
             schema.
@@ -211,9 +211,9 @@ class AzureClusterIdentity(pulumi.ComponentResource):
 
         # CAPZ schema for ``AzureClusterIdentity.spec.allowedNamespaces``:
         #
-        #   * ``None`` (field absent)               \u2192 same-namespace only
-        #   * ``{}``   (empty struct)               \u2192 ALL namespaces
-        #   * ``{list: [\"a\", \"b\"]}``               \u2192 only \"a\", \"b\"
+        #   * ``None`` (field absent)               -> same-namespace only
+        #   * ``{}``   (empty struct)               -> ALL namespaces
+        #   * ``{list: [\"a\", \"b\"]}``               -> only \"a\", \"b\"
         #
         # We default to the empty-struct \"allow all\" form so multi-tenant
         # Phase 2 (per-tenant namespaces) works without a Phase 1
@@ -224,7 +224,7 @@ class AzureClusterIdentity(pulumi.ComponentResource):
         else:
             allowed_namespaces_spec = {"list": allowed_namespaces}
 
-        # UserAssignedMSI carries NO ``spec.clientSecret`` field \u2014 CAPZ
+        # UserAssignedMSI carries NO ``spec.clientSecret`` field -- CAPZ
         # obtains tokens at runtime from IMDS at 169.254.169.254 using
         # the UAMI selected by ``spec.clientID``. There is therefore no
         # backing Kubernetes Secret to create or wire up; the CR alone
@@ -254,7 +254,7 @@ class AzureClusterIdentity(pulumi.ComponentResource):
         self.identity_name = Output.from_input(identity_name)
         self.identity_namespace = Output.from_input(namespace)
         # Suppress unused-var warning while keeping the CR alive in the
-        # resource graph \u2014 Pulumi tracks it via parent=self.
+        # resource graph -- Pulumi tracks it via parent=self.
         _ = identity
 
         self.register_outputs(

@@ -4,14 +4,14 @@ Mirrors :mod:`stacks.control_plane.control_plane_local` in structure but
 with two deliberate differences:
 
 * **No AWX.** AWX node-level integration is out of scope for the CAPZ
-  learning sandbox \u2014 this control plane installs only what's needed
+  learning sandbox -- this control plane installs only what's needed
   to understand CAPZ + ASO + the AzureClusterIdentity wiring.
 * **azure infrastructure provider.** :class:`capi.ClusterAPIOperator`
   is invoked with ``infrastructure_providers=(\"azure\",)`` instead of
   the default ``(\"docker\",)``. The CAPI Operator's azure
   ``InfrastructureProvider`` CR auto-installs both the CAPZ controller
   (in ``capz-system``) and the Azure Service Operator controller
-  alongside it; see https://capz.sigs.k8s.io/topics/aso \u2014
+  alongside it; see https://capz.sigs.k8s.io/topics/aso --
   \"Beginning with CAPZ v1.11.0, ASO's control plane will be installed
   automatically by clusterctl in the capz-system namespace alongside
   CAPZ's control plane components.\"
@@ -25,7 +25,7 @@ management ``kind`` cluster runs on.
 
 The three identifiers needed to populate the CR are passed by
 :class:`pko._init_stack_azure.InitStackAzure` via the ``spec`` kwarg.
-None of these are secrets \u2014 they're just GUIDs that identify the UAMI,
+None of these are secrets -- they're just GUIDs that identify the UAMI,
 its tenant, and its home subscription.
 
 The Pulumi resource graph relies on the
@@ -38,7 +38,7 @@ Without that wait, the API server would reject the CR with a
 What Phase 1 does NOT include
 -----------------------------
 * No workload-cluster resources (``AzureCluster``,
-  ``AzureManagedControlPlane``, ``MachinePool``, etc.) \u2014 the per-env
+  ``AzureManagedControlPlane``, ``MachinePool``, etc.) -- the per-env
   tenants component (``TenantsAzure``) is intentionally empty.
 * No Calico or any CNI install (no workload cluster to install it on).
 * No autoscaling, no SSH/node customization, no AWX, no Slurm.
@@ -283,18 +283,18 @@ class ControlPlaneAzure(pulumi.ComponentResource):
 
     Order and reasoning:
 
-    1. :class:`certmanager.CertManager` \u2014 cert-manager + CRDs.
+    1. :class:`certmanager.CertManager` -- cert-manager + CRDs.
        Prerequisite for the CAPI Operator's webhooks.
     2. :class:`capi.ClusterAPIOperator` with
-       ``infrastructure_providers=(\"azure\",)`` \u2014 installs CAPI core +
+       ``infrastructure_providers=(\"azure\",)`` -- installs CAPI core +
        kubeadm bootstrap + kubeadm control-plane + the azure
        infrastructure provider. The CAPI Operator's azure provider
        brings the CAPZ controller and ASO into ``capz-system``, plus
        all CAPZ + ASO CRDs (including ``AzureClusterIdentity``).
-    3. :class:`azure.AzureClusterIdentity` \u2014 creates a
+    3. :class:`azure.AzureClusterIdentity` -- creates a
        ``UserAssignedMSI``-typed identity that future workload-cluster
        reconciliations will use to obtain Azure AD tokens via the host
-       VM's IMDS endpoint. No backing Secret \u2014 the UAMI's credential
+       VM's IMDS endpoint. No backing Secret -- the UAMI's credential
        material never leaves Azure.
 
     cert-manager and the CAPI Operator are independent and install in
@@ -353,7 +353,7 @@ class ControlPlaneAzure(pulumi.ComponentResource):
             opts=child_options(),
         )
 
-        # UAMI carries no client secret \u2014 the AzureClusterIdentity CR
+        # UAMI carries no client secret -- the AzureClusterIdentity CR
         # references the UAMI by its clientID, and the CAPZ controller
         # fetches tokens from IMDS at reconcile time.
         #
@@ -422,7 +422,7 @@ class ControlPlaneAzure(pulumi.ComponentResource):
             imds_preflight_job.job_name,
         ).apply(lambda _: True)
         self.todo = pulumi.Output.from_input(
-            "Phase 1 scaffold only \u2014 add workload-cluster Azure "
+            "Phase 1 scaffold only -- add workload-cluster Azure "
             "components (AzureManagedControlPlane + MachinePool + "
             "AzureManagedMachinePool) in Phase 2."
         )

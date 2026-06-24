@@ -18,10 +18,10 @@ PKO then runs the init stack inside the cluster, which dispatches to
 instantiates:
 
 * :class:`stacks.control_plane.control_plane_azure.ControlPlaneAzure`
-  \u2014 cert-manager + CAPI Operator (with the azure infrastructure
+  -- cert-manager + CAPI Operator (with the azure infrastructure
   provider) + a single
   ``AzureClusterIdentity`` CR of type ``UserAssignedMSI``.
-* :class:`stacks.workload_cluster.tenants_azure.TenantsAzure` \u2014
+* :class:`stacks.workload_cluster.tenants_azure.TenantsAzure` --
   provisions a single AKS managed workload cluster (Phase 2).
 
 Phase 2 scope (and what's NOT here yet)
@@ -45,7 +45,7 @@ Identity model: UserAssignedMSI (no Secret)
 The host Linux VM must have a user-assigned managed identity (UAMI)
 attached. The CR carries only ``tenantID`` + ``clientID``; the CAPZ
 controller pod calls Azure IMDS (``169.254.169.254``) to mint tokens
-at reconcile time. There is no Kubernetes Secret in the loop \u2014 the
+at reconcile time. There is no Kubernetes Secret in the loop -- the
 three UAMI identifiers are non-sensitive GUIDs and flow as plain
 Pulumi config values.
 
@@ -108,13 +108,13 @@ Optional config keys
   ``Standard_D2s_v3``). Unset uses the module default.
 * ``ca4s-infra:aksNodeCount`` — integer node count for the system pool.
   Unset uses the module default (1).
-* ``ca4s-infra:azureClusterIdentityAllowedNamespaces`` \u2014 list of
+* ``ca4s-infra:azureClusterIdentityAllowedNamespaces`` -- list of
   namespace names whose workload-cluster CRs may reference the
   AzureClusterIdentity. Unset (the default) emits the CR with
   ``spec.allowedNamespaces: {}`` (CAPZ idiom for \"all namespaces\"),
   which is the right default for multi-tenant Phase 2. Set this only
   to tighten the default.
-* ``ca4s-infra:skip_in_cluster_preflight`` \u2014 boolean. When ``true``,
+* ``ca4s-infra:skip_in_cluster_preflight`` -- boolean. When ``true``,
   skip the in-cluster IMDS preflight Job that ``ControlPlaneAzure``
   schedules into ``capz-system`` after CAPZ is installed.
 
@@ -130,8 +130,8 @@ The host-side preflight only proves the *language host* can hit IMDS.
 For the in-cluster path, ``ControlPlaneAzure`` schedules a one-shot
 ``IMDSPreflightJob`` into ``capz-system`` after CAPZ is installed; that
 Job carries ``pulumi.com/waitFor=condition=Complete`` so the outer
-``pulumi up`` blocks until the routing path **pod \u2192 kindnet \u2192 docker
-bridge SNAT \u2192 host route \u2192 IMDS** has been empirically verified.
+``pulumi up`` blocks until the routing path **pod -> kindnet -> docker
+bridge SNAT -> host route -> IMDS** has been empirically verified.
 
 For CAPZ to actually mint tokens at workload-cluster reconcile time
 (Phase 2), the CAPZ pod inside the ``kind`` mgmt cluster must also
@@ -179,11 +179,11 @@ def run() -> None:
 
     Same shape as :mod:`stack_local`:
 
-      Phase 1 \u2014 kind cluster + image registry + LB controller
-      Phase 2 \u2014 GitOps source (Gitea by default) + Flux
-      Phase 3 \u2014 PKO bootstrap + the single ``ca4s-init`` Stack CR
+      Phase 1 -- kind cluster + image registry + LB controller
+      Phase 2 -- GitOps source (Gitea by default) + Flux
+      Phase 3 -- PKO bootstrap + the single ``ca4s-init`` Stack CR
                  carrying the UAMI identifiers in ``spec.config``
-      Phase 4 \u2014 stack outputs
+      Phase 4 -- stack outputs
 
     The materially different bit vs ``stack_local`` is Phase 3: we
     pass ``PKOBootstrap(config={...})`` with the UAMI identifiers so
@@ -274,7 +274,7 @@ def run() -> None:
     )
 
     # ----------------------------------------------------------------------
-    # Phase 1 \u2014 cluster + registry + LB controller. Identical shape to
+    # Phase 1 -- cluster + registry + LB controller. Identical shape to
     # stack_local; ctlptl's per-stack autonamed kind cluster name
     # differentiates this from any concurrently-running local cluster.
     # ----------------------------------------------------------------------
@@ -306,7 +306,7 @@ def run() -> None:
     )
 
     # ----------------------------------------------------------------------
-    # Phase 2 \u2014 GitOps source. Same as stack_local.
+    # Phase 2 -- GitOps source. Same as stack_local.
     # ----------------------------------------------------------------------
     repo = GitOpsRepository(
         "gitops",
@@ -322,7 +322,7 @@ def run() -> None:
     )
 
     # ----------------------------------------------------------------------
-    # Phase 3 \u2014 PKO bootstrap + Azure UAMI identifier projection.
+    # Phase 3 -- PKO bootstrap + Azure UAMI identifier projection.
     #
     # We need the init stack to know which UAMI to put in the
     # AzureClusterIdentity CR. The new architecture provides exactly
@@ -377,7 +377,7 @@ def run() -> None:
     )
 
     # ----------------------------------------------------------------------
-    # Phase 4 \u2014 stack outputs (same shape as stack_local, plus Azure echo).
+    # Phase 4 -- stack outputs (same shape as stack_local, plus Azure echo).
     # ----------------------------------------------------------------------
     pulumi.export("registry_name", registry.registry_name)
     pulumi.export("registry_port", registry.port)

@@ -74,7 +74,7 @@ def test_probe_command_fails_when_no_access_token() -> None:
 def test_probe_command_exits_nonzero_on_curl_failure() -> None:
     # ``set -e`` ensures a non-zero curl exit (timeout, connection
     # refused, etc.) propagates to the script's exit code, which the
-    # Job translates into Failed \u2014 then pulumi-kubernetes surfaces
+    # Job translates into Failed -- then pulumi-kubernetes surfaces
     # as a stack error via waitFor=condition=Complete.
     script = _probe_command(_CLIENT_ID)[2]
 
@@ -107,7 +107,7 @@ def test_probe_image_pinned_by_tag() -> None:
     ["", "00000000-0000-0000-0000-000000000000"],
 )
 def test_probe_command_renders_for_any_string_input(bad_client_id: str) -> None:
-    # _probe_command is intentionally permissive about its input \u2014
+    # _probe_command is intentionally permissive about its input --
     # GUID validation happens upstream in parse_control_plane_azure_spec.
     # Confirm the renderer doesn't choke on edge cases (empty string,
     # all-zeros). Both should produce a syntactically valid script that

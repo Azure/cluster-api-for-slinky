@@ -1,7 +1,7 @@
 """Pulumi-mock-based tests for the ``gitops`` ComponentResource factory.
 
 Unlike the dynamic-provider tests in the other modules of this directory,
-these tests DO need Pulumi's runtime \u2014 specifically ``pulumi.runtime``'s
+these tests DO need Pulumi's runtime -- specifically ``pulumi.runtime``'s
 mock harness, which intercepts resource creation and lets us assert on the
 DAG that ``GiteaBuiltinRepository.__init__`` builds.
 

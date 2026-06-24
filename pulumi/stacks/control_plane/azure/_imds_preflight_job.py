@@ -15,10 +15,10 @@ declaring resources. This in-cluster preflight runs *after* CAPI Operator +
 CAPZ have rolled out, in the same namespace CAPZ itself runs in, and catches
 drift the host-side discovery cannot see:
 
-    * a CNI swap (e.g. kindnet \u2192 Cilium with strict default-deny)
+    * a CNI swap (e.g. kindnet -> Cilium with strict default-deny)
       that drops link-local egress from pods,
-    * a proxy/firewall change on the host that blocks pod \u2192 IMDS
-      without blocking host \u2192 IMDS,
+    * a proxy/firewall change on the host that blocks pod -> IMDS
+      without blocking host -> IMDS,
     * a Pod Security Admission tightening that prevents the CAPZ
       controller from acquiring the netns it needs.
 
@@ -33,7 +33,7 @@ The Job pod uses ``curlimages/curl:8.10.1`` (a 3MB Alpine image with
 
 * ``runAsNonRoot: true``, ``runAsUser: 100``, ``runAsGroup: 101``. The
   ``curlimages/curl`` image's default user is named ``curl_user`` (UID
-  100) \u2014 setting a **numeric** uid here makes Pod Security
+  100) -- setting a **numeric** uid here makes Pod Security
   Admission's "restricted" profile happy. Without an explicit numeric
   uid, PSA rejects the pod with ``container has runAsNonRoot and image
   has non-numeric user (curl_user), cannot verify user is non-root``
@@ -117,7 +117,7 @@ _IMDS_TOKEN_URL = (
 )
 _IMDS_CURL_TIMEOUT_SECONDS = 5
 
-# Job-level safety net. 60s is generous \u2014 host-side preflight against
+# Job-level safety net. 60s is generous -- host-side preflight against
 # IMDS in our measurements responds in <100ms; if the in-cluster path
 # takes more than 60s we want to know about it (something is genuinely
 # wrong, not just slow).
@@ -127,7 +127,7 @@ _JOB_ACTIVE_DEADLINE_SECONDS = 60
 # fit it on one ``-c`` argv element. The grep -q at the end is the
 # decisive bit: a successful IMDS response includes ``access_token``;
 # any other response (HTTP 4xx, JSON error body, empty body, timeout)
-# fails the grep and the Job exits non-zero \u2014 Pulumi then surfaces
+# fails the grep and the Job exits non-zero -- Pulumi then surfaces
 # the curl output in the Stack diagnostics.
 def _probe_command(client_id: str) -> list[str]:
     url = f"{_IMDS_TOKEN_URL}&client_id={client_id}"
