@@ -30,15 +30,15 @@ CAPI_OPERATOR_RELEASE_NAME = "cluster-api-operator"
 
 # Keep this aligned with the CAPI v1beta2 workload resources emitted by the
 # local workload-cluster class.
-CAPI_PROVIDER_VERSION = "v1.12.8"
+CAPI_PROVIDER_VERSION = "v1.13.2"
 
-# CAPZ release whose notes explicitly pair it with CAPI v1.12.8.
-# https://github.com/kubernetes-sigs/cluster-api-provider-azure/releases/tag/v1.23.2
+# CAPZ release paired with the CAPI provider pin above.
+# https://github.com/kubernetes-sigs/cluster-api-provider-azure/releases/tag/v1.24.1
 # When CAPI_PROVIDER_VERSION moves, look for the next CAPZ release whose notes
 # call out a matching CAPI bump and update both together. CAPZ auto-installs the
 # Azure Service Operator (ASO) into the same ``capz-system`` namespace since
 # CAPZ v1.11.0 — there is no separate ASO provider CR.
-CAPZ_PROVIDER_VERSION = "v1.23.2"
+CAPZ_PROVIDER_VERSION = "v1.24.1"
 
 CAPI_OPERATOR_NAMESPACE = "capi-operator-system"
 CAPI_CORE_NAMESPACE = "capi-system"

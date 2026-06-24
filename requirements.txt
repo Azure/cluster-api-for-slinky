@@ -23,6 +23,10 @@ pulumi-random>=4.0,<5.0
 # spec of the PKO GitRepository source.
 -e ./pulumi/sdks/flux
 
+# Generated CAPI core CRD shim used by workload-cluster stacks for typed
+# Cluster API core resources.
+-e ./pulumi/sdks/capi-core
+
 # HTTP for Pulumi dynamic resources that wrap the Gitea REST API.
 # Imported lazily inside provider methods (gitrepo/gitea_repo.py,
 # gitrepo/gitea_sshkey.py, gitrepo/gitea_sync.py) so it must be in
