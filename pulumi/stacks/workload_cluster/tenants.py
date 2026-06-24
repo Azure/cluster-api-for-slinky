@@ -3,19 +3,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import importlib
 import re
 from typing import Any, Mapping
 
 import pulumi
 
+try:
+    from .workload_cluster_class_aks import AKSWorkloadClusterClass
+    from .workload_cluster_class_local import LocalWorkloadClusterClass
+except ImportError:
+    from workload_cluster_class_aks import AKSWorkloadClusterClass
+    from workload_cluster_class_local import LocalWorkloadClusterClass
+
 
 _PROJECT_NAME = "ca4s-workload-cluster"
 SPEC_CONFIG_KEY = "spec"
-_CLASS_MODULE_PREFIX = "workload_cluster_class_"
-_CLASS_EXPORT = "WorkloadClusterClass"
-_MODULE_INVALID_CHARS = re.compile(r"[^a-z0-9_]+")
 _DNS_LABEL = re.compile(r"[a-z0-9]([-a-z0-9]*[a-z0-9])?")
+_WORKLOAD_CLUSTER_CLASSES = {
+    "aks": AKSWorkloadClusterClass,
+    "local": LocalWorkloadClusterClass,
+}
 
 _CONFIG_WORKLOAD_CLUSTERS = "workloadClusters"
 _CONFIG_METADATA = "metadata"
@@ -187,15 +194,6 @@ def parse_tenants_spec(value: object | None) -> TenantsSpec:
     )
 
 
-def _module_suffix(value: str, *, field_name: str) -> str:
-    suffix = _MODULE_INVALID_CHARS.sub("_", value.lower()).strip("_")
-    if not suffix:
-        raise ValueError(f"{field_name} must contain at least one module-safe character")
-    if suffix[0].isdigit():
-        suffix = f"class_{suffix}"
-    return suffix
-
-
 def _workload_cluster_output(cluster: Any) -> dict[str, Any]:
     return {
         name: value
@@ -242,34 +240,13 @@ class Tenants(pulumi.ComponentResource):
         workload_cluster: WorkloadClusterSpec,
         context: WorkloadClusterContext,
     ) -> Any:
-        class_module_suffix = _module_suffix(
-            workload_cluster.class_name,
-            field_name="workload cluster class",
-        )
-        module_name = f"{_CLASS_MODULE_PREFIX}{class_module_suffix}"
-        package_module_name = (
-            f"{__package__}.{module_name}" if __package__ else module_name
-        )
-
         try:
-            module = importlib.import_module(package_module_name)
-        except ModuleNotFoundError as exc:
-            if exc.name != package_module_name:
-                raise
+            workload_cluster_class = _WORKLOAD_CLUSTER_CLASSES[workload_cluster.class_name]
+        except KeyError:
             raise ValueError(
                 f"unsupported workload cluster class {workload_cluster.class_name!r} "
-                f"for instance {workload_cluster.metadata.name!r}: expected sibling "
-                f"module {module_name!r}. Create "
-                f"pulumi/stacks/workload_cluster/{module_name}.py exposing "
-                f"a ``{_CLASS_EXPORT}`` ComponentResource class to register this class."
-            ) from None
-
-        try:
-            workload_cluster_class = getattr(module, _CLASS_EXPORT)
-        except AttributeError:
-            raise ValueError(
-                f"workload cluster class module {module_name!r} must expose "
-                f"a ``{_CLASS_EXPORT}`` ComponentResource class."
+                f"for instance {workload_cluster.metadata.name!r}; supported classes: "
+                + ", ".join(sorted(_WORKLOAD_CLUSTER_CLASSES))
             ) from None
 
         return workload_cluster_class(

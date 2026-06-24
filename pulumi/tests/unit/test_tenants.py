@@ -3,8 +3,10 @@ from __future__ import annotations
 import pytest
 
 from stacks.workload_cluster.tenants import (
+    Tenants,
     ObjectMeta,
     WorkloadClusterSpec,
+    WorkloadClusterContext,
     parse_tenants_spec,
 )
 
@@ -90,3 +92,20 @@ def test_parse_tenants_spec_rejects_duplicate_cluster_names() -> None:
 def test_parse_tenants_spec_rejects_invalid_shape(value: object) -> None:
     with pytest.raises(ValueError):
         parse_tenants_spec(value)
+
+
+def test_tenants_rejects_unsupported_workload_cluster_class() -> None:
+    tenants = object.__new__(Tenants)
+
+    with pytest.raises(
+        ValueError,
+        match="unsupported workload cluster class 'bogus'.*supported classes: aks, local",
+    ):
+        Tenants._instantiate_workload_cluster(
+            tenants,
+            WorkloadClusterSpec(
+                metadata=ObjectMeta(name="sample"),
+                class_name="bogus",
+            ),
+            WorkloadClusterContext(),
+        )
