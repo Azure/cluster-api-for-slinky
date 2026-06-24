@@ -1461,31 +1461,23 @@ def _decode_secret_data_value(data: Mapping[str, str], key: str) -> str:
     return base64.b64decode(encoded_value).decode("utf-8")
 
 
-class LocalWorkloadClusterClass(pulumi.ComponentResource):
-    """Reusable local workload-cluster class.
+class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
+    """Environment-specific Kubernetes workload-cluster bring-up.
 
-    A class captures the resource graph shape. The ``instance`` passed to
-    the constructor supplies the concrete identity used for Kubernetes object
-    names and Pulumi outputs.
+    For the local class this means management-cluster CAPI/CAPD resources plus
+    the provider/kubeconfig needed to talk to the resulting workload cluster.
     """
 
-    cluster_class: pulumi.Output[str]
-    cluster_instance: pulumi.Output[str]
     cluster_name: pulumi.Output[str]
     docker_cluster_name: pulumi.Output[str]
     control_plane_name: pulumi.Output[str]
     worker_machine_deployments: list[pulumi.Output[str]]
+    workload_kubeconfig: pulumi.Output[str]
+    workload_provider: k8s.Provider
+    workload_kubeconfig_secret: k8s.core.v1.Secret
+    cluster_control_plane_available: k8s.apiextensions.CustomResourcePatch
     cluster_autoscaler_namespace: pulumi.Output[str | None]
     cluster_autoscaler_status: pulumi.Output[Any]
-    keda_namespace: pulumi.Output[str | None]
-    keda_scaled_object_names: pulumi.Output[list[str]]
-    keda_status: pulumi.Output[Any]
-    prometheus_namespace: pulumi.Output[str]
-    prometheus_status: pulumi.Output[Any]
-    calico_operator_chart_version: pulumi.Output[str]
-    calico_operator_status: pulumi.Output[Any]
-    workload_cluster_ready: pulumi.Output[bool]
-    todo: pulumi.Output[str]
 
     def __init__(
         self,
@@ -1495,9 +1487,8 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
         worker_node_classes: tuple[WorkerClassSpec, ...] = _WORKER_NODE_CLASSES,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        """Build one local workload-cluster instance from this class."""
         super().__init__(
-            "ca4s:workload:LocalWorkloadClusterClass",
+            "ca4s:workload:WorkloadClusterInfrastructure",
             name,
             props={},
             opts=opts,
@@ -1513,13 +1504,11 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             *,
             provider: pulumi.ProviderResource | None = None,
             depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
-            retain_on_delete: bool | None = None,
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
-                retain_on_delete=retain_on_delete,
             )
 
         management_kubeconfig = ManagementKubeconfig(
@@ -1726,6 +1715,13 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             opts=child_options(depends_on=[workload_kubeconfig_secret]),
         )
 
+        local_path_storage = LocalPathStorage(
+            "local-path-storage",
+            provider=workload_provider,
+            depends_on=[workload_kubeconfig_secret],
+            opts=child_options(provider=workload_provider),
+        )
+
         autoscaled_workers = _autoscaled_worker_classes(worker_node_classes)
         cluster_autoscaler: ClusterAPIAutoscaler | None = None
         if autoscaled_workers:
@@ -1739,12 +1735,79 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 opts=child_options(provider=management_provider),
             )
 
-        local_path_storage = LocalPathStorage(
-            "local-path-storage",
-            provider=workload_provider,
-            depends_on=[workload_kubeconfig_secret],
-            opts=child_options(provider=workload_provider),
+        self.cluster_name = pulumi.Output.from_input(cluster_name)
+        self.docker_cluster_name = pulumi.Output.from_input(cluster_name)
+        self.control_plane_name = pulumi.Output.from_input(control_plane_template_name)
+        self.worker_machine_deployments = worker_machine_deployment_names
+        self.workload_kubeconfig = workload_kubeconfig
+        self.workload_provider = workload_provider
+        self.workload_kubeconfig_secret = workload_kubeconfig_secret
+        self.cluster_control_plane_available = cluster_control_plane_available
+        self.cluster_autoscaler_namespace = pulumi.Output.from_input(
+            cluster_autoscaler.namespace if cluster_autoscaler is not None else None
         )
+        self.cluster_autoscaler_status = pulumi.Output.from_input(
+            cluster_autoscaler.status if cluster_autoscaler is not None else None
+        )
+
+        self.register_outputs(
+            {
+                "cluster_name": self.cluster_name,
+                "docker_cluster_name": self.docker_cluster_name,
+                "control_plane_name": self.control_plane_name,
+                "worker_machine_deployments": self.worker_machine_deployments,
+                "local_path_storage_class_name": local_path_storage.storage_class_name,
+                "cluster_autoscaler_namespace": self.cluster_autoscaler_namespace,
+                "cluster_autoscaler_status": self.cluster_autoscaler_status,
+            }
+        )
+
+
+class WorkloadClusterDeployments(pulumi.ComponentResource):
+    """Kubernetes deployments installed after a workload cluster exists."""
+
+    keda_namespace: pulumi.Output[str | None]
+    keda_scaled_object_names: pulumi.Output[list[str]]
+    keda_status: pulumi.Output[Any]
+    prometheus_namespace: pulumi.Output[str]
+    prometheus_status: pulumi.Output[Any]
+    calico_operator_chart_version: pulumi.Output[str]
+    calico_operator_status: pulumi.Output[Any]
+    slurm_operator_status: pulumi.Output[Any]
+    slurm_status: pulumi.Output[Any]
+    workload_cluster_ready: pulumi.Output[bool]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        instance: str,
+        worker_node_classes: tuple[WorkerClassSpec, ...],
+        workload_provider: k8s.Provider,
+        workload_kubeconfig_secret: k8s.core.v1.Secret,
+        cluster_control_plane_available: k8s.apiextensions.CustomResourcePatch,
+        cluster_autoscaler_status: pulumi.Input[Any],
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            "ca4s:workload:WorkloadClusterDeployments",
+            name,
+            props={},
+            opts=opts,
+        )
+
+        def child_options(
+            *,
+            provider: pulumi.ProviderResource | None = None,
+            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+            retain_on_delete: bool | None = None,
+        ) -> pulumi.ResourceOptions:
+            return pulumi.ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=depends_on,
+                retain_on_delete=retain_on_delete,
+            )
 
         calico_namespace = k8s.core.v1.Namespace(
             "calico-operator-namespace",
@@ -1917,12 +1980,12 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 provider=workload_provider,
                 depends_on=[
                     slurm_namespace,
-                    local_path_storage,
                     slurm_operator,
                 ],
                 retain_on_delete=True,
             ),
         )
+        autoscaled_workers = _autoscaled_worker_classes(worker_node_classes)
         keda: KEDANodeSetScaler | None = None
         if autoscaled_workers:
             keda = KEDANodeSetScaler(
@@ -1936,18 +1999,6 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 opts=child_options(provider=workload_provider),
             )
 
-        self.cluster_class = pulumi.Output.from_input(_CLUSTER_CLASS)
-        self.cluster_instance = pulumi.Output.from_input(instance)
-        self.cluster_name = pulumi.Output.from_input(cluster_name)
-        self.docker_cluster_name = pulumi.Output.from_input(cluster_name)
-        self.control_plane_name = pulumi.Output.from_input(control_plane_template_name)
-        self.worker_machine_deployments = worker_machine_deployment_names
-        self.cluster_autoscaler_namespace = pulumi.Output.from_input(
-            cluster_autoscaler.namespace if cluster_autoscaler is not None else None
-        )
-        self.cluster_autoscaler_status = pulumi.Output.from_input(
-            cluster_autoscaler.status if cluster_autoscaler is not None else None
-        )
         self.keda_namespace = pulumi.Output.from_input(
             keda.namespace if keda is not None else None
         )
@@ -1963,16 +2014,125 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             _CALICO_CHART_VERSION
         )
         self.calico_operator_status = calico_operator.status
+        self.slurm_operator_status = slurm_operator.status
+        self.slurm_status = slurm_release.status
         self.workload_cluster_ready = pulumi.Output.all(
             cluster_control_plane_available.metadata["name"],  # type: ignore[index]
             workload_kubeconfig_secret.metadata["name"],  # type: ignore[index]
             calico_operator.status,
-            self.cluster_autoscaler_status,
+            cluster_autoscaler_status,
             self.keda_status,
             prometheus.status,
             slurm_operator.status,
             slurm_release.status,
         ).apply(lambda _: True)
+
+        self.register_outputs(
+            {
+                "keda_chart_version": _KEDA_CHART_VERSION,
+                "keda_namespace": self.keda_namespace,
+                "keda_scaled_object_names": self.keda_scaled_object_names,
+                "keda_status": self.keda_status,
+                "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
+                "prometheus_namespace": self.prometheus_namespace,
+                "prometheus_status": self.prometheus_status,
+                "calico_operator_chart_version": self.calico_operator_chart_version,
+                "calico_operator_status": self.calico_operator_status,
+                "workload_cluster_ready": self.workload_cluster_ready,
+                "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+                "slurm_operator_status": self.slurm_operator_status,
+                "slurm_chart_version": _SLINKY_CHART_VERSION,
+                "slurm_status": self.slurm_status,
+            }
+        )
+
+
+class LocalWorkloadClusterClass(pulumi.ComponentResource):
+    """Reusable local workload-cluster class.
+
+    A class captures the resource graph shape. The ``instance`` passed to
+    the constructor supplies the concrete identity used for Kubernetes object
+    names and Pulumi outputs.
+    """
+
+    cluster_class: pulumi.Output[str]
+    cluster_instance: pulumi.Output[str]
+    cluster_name: pulumi.Output[str]
+    docker_cluster_name: pulumi.Output[str]
+    control_plane_name: pulumi.Output[str]
+    worker_machine_deployments: list[pulumi.Output[str]]
+    cluster_autoscaler_namespace: pulumi.Output[str | None]
+    cluster_autoscaler_status: pulumi.Output[Any]
+    keda_namespace: pulumi.Output[str | None]
+    keda_scaled_object_names: pulumi.Output[list[str]]
+    keda_status: pulumi.Output[Any]
+    prometheus_namespace: pulumi.Output[str]
+    prometheus_status: pulumi.Output[Any]
+    calico_operator_chart_version: pulumi.Output[str]
+    calico_operator_status: pulumi.Output[Any]
+    workload_cluster_ready: pulumi.Output[bool]
+    todo: pulumi.Output[str]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        instance: str,
+        worker_node_classes: tuple[WorkerClassSpec, ...] = _WORKER_NODE_CLASSES,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        """Build one local workload-cluster instance from this class."""
+        super().__init__(
+            "ca4s:workload:LocalWorkloadClusterClass",
+            name,
+            props={},
+            opts=opts,
+        )
+
+        def child_options(
+            *,
+            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+        ) -> pulumi.ResourceOptions:
+            return pulumi.ResourceOptions(
+                parent=self,
+                depends_on=depends_on,
+            )
+
+        infrastructure = LocalWorkloadClusterInfrastructure(
+            "infrastructure",
+            instance=instance,
+            worker_node_classes=worker_node_classes,
+            opts=child_options(),
+        )
+        deployments = WorkloadClusterDeployments(
+            "deployments",
+            instance=instance,
+            worker_node_classes=worker_node_classes,
+            workload_provider=infrastructure.workload_provider,
+            workload_kubeconfig_secret=infrastructure.workload_kubeconfig_secret,
+            cluster_control_plane_available=(
+                infrastructure.cluster_control_plane_available
+            ),
+            cluster_autoscaler_status=infrastructure.cluster_autoscaler_status,
+            opts=child_options(depends_on=[infrastructure]),
+        )
+
+        self.cluster_class = pulumi.Output.from_input(_CLUSTER_CLASS)
+        self.cluster_instance = pulumi.Output.from_input(instance)
+        self.cluster_name = infrastructure.cluster_name
+        self.docker_cluster_name = infrastructure.docker_cluster_name
+        self.control_plane_name = infrastructure.control_plane_name
+        self.worker_machine_deployments = infrastructure.worker_machine_deployments
+        self.cluster_autoscaler_namespace = infrastructure.cluster_autoscaler_namespace
+        self.cluster_autoscaler_status = infrastructure.cluster_autoscaler_status
+        self.keda_namespace = deployments.keda_namespace
+        self.keda_scaled_object_names = deployments.keda_scaled_object_names
+        self.keda_status = deployments.keda_status
+        self.prometheus_namespace = deployments.prometheus_namespace
+        self.prometheus_status = deployments.prometheus_status
+        self.calico_operator_chart_version = deployments.calico_operator_chart_version
+        self.calico_operator_status = deployments.calico_operator_status
+        self.workload_cluster_ready = deployments.workload_cluster_ready
         self.todo = pulumi.Output.from_input(
             "Wire workload-driven autoscaling and tenant-facing Slurm operations."
         )
@@ -1998,9 +2158,9 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
                 "calico_operator_status": self.calico_operator_status,
                 "workload_cluster_ready": self.workload_cluster_ready,
                 "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
-                "slurm_operator_status": slurm_operator.status,
+                "slurm_operator_status": deployments.slurm_operator_status,
                 "slurm_chart_version": _SLINKY_CHART_VERSION,
-                "slurm_status": slurm_release.status,
+                "slurm_status": deployments.slurm_status,
                 "todo": self.todo,
             }
         )
