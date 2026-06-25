@@ -1,10 +1,10 @@
-"""Unit tests for the ControlPlaneAzure spec round-trip + GUID/allow-list validation."""
+"""Unit tests for Azure control-plane config parsing and rendering."""
 
 from __future__ import annotations
 
 import pytest
 
-from stacks.control_plane.control_plane_azure import (
+from stacks.control_plane.control_plane_config import (
     CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY,
     ControlPlaneAzureSpec,
     build_control_plane_azure_child_config,

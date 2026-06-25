@@ -10,7 +10,7 @@ Phase 2 responsibility:
     ``PKOBootstrap(config=...)``: the UAMI identifiers
     (``childConfig.azure``) and the workload-cluster inventory
     (``childConfig.spec``).
-2. Instantiate :class:`ControlPlaneAzure`, passing the typed identity spec.
+2. Instantiate :class:`ControlPlaneKind`, passing the typed identity spec.
 3. Instantiate :class:`Tenants`, threading in the subscription ID and the
     ``AzureClusterIdentity`` name +
    namespace so the AKS control plane's ``identityRef`` resolves back to
@@ -23,10 +23,16 @@ from typing import Any
 
 import pulumi
 
-from stacks.control_plane.control_plane_azure import (
+from stacks.control_plane.control_plane_config import (
     CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY,
-    ControlPlaneAzure,
+    LEGACY_AZURE_CONTROL_PLANE_TYPE,
     parse_control_plane_azure_spec,
+)
+from stacks.control_plane.control_plane_kind import (
+    ControlPlaneKind,
+    ControlPlaneKindSpec,
+    KindAzureControlPlaneOutputs,
+    KindAzureControlPlaneSpec,
 )
 from stacks.workload_cluster.tenants import (
     SPEC_CONFIG_KEY,
@@ -64,18 +70,35 @@ class InitStackAzure(pulumi.ComponentResource):
         spec = parse_control_plane_azure_spec(
             inputs.child_config.get(CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY)
         )
-        control_plane = ControlPlaneAzure(
+        control_plane = ControlPlaneKind(
             "control-plane",
-            spec=spec,
-            opts=pulumi.ResourceOptions(parent=self),
+            spec=ControlPlaneKindSpec(
+                infrastructure_providers=spec.infrastructure_providers,
+                enable_awx=False,
+                azure=KindAzureControlPlaneSpec(
+                    client_id=spec.client_id,
+                    principal_id=spec.principal_id,
+                    tenant_id=spec.tenant_id,
+                    subscription_id=spec.subscription_id,
+                    allowed_namespaces=spec.allowed_namespaces,
+                    skip_in_cluster_preflight=spec.skip_in_cluster_preflight,
+                ),
+            ),
+            opts=pulumi.ResourceOptions(
+                parent=self,
+                aliases=[pulumi.Alias(type_=LEGACY_AZURE_CONTROL_PLANE_TYPE)],
+            ),
         )
+        azure_outputs = control_plane.azure
+        if not isinstance(azure_outputs, KindAzureControlPlaneOutputs):
+            raise RuntimeError("InitStackAzure requires Azure control-plane outputs")
         tenants = Tenants(
             "tenants-azure",
             spec=inputs.child_config.get(SPEC_CONFIG_KEY),
             context=WorkloadClusterContext(
                 subscription_id=spec.subscription_id,
-                identity_name=control_plane.azure_cluster_identity_name,
-                identity_namespace=control_plane.azure_cluster_identity_namespace,
+                identity_name=azure_outputs.cluster_identity_name,
+                identity_namespace=azure_outputs.cluster_identity_namespace,
             ),
             opts=pulumi.ResourceOptions(parent=self, depends_on=[control_plane]),
         )

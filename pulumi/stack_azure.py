@@ -115,7 +115,7 @@ Optional config keys
   which is the right default for multi-tenant Phase 2. Set this only
   to tighten the default.
 * ``ca4s-infra:skip_in_cluster_preflight`` -- boolean. When ``true``,
-  skip the in-cluster IMDS preflight Job that ``ControlPlaneAzure``
+  skip the in-cluster IMDS preflight Job that ``ControlPlaneKind``
   schedules into ``capz-system`` after CAPZ is installed.
 
 IMDS reachability prerequisite
@@ -127,7 +127,7 @@ cannot mint a token, discovery falls back to the default managed identity IMDS
 selects for this VM and logs a warning.
 
 The host-side preflight only proves the *language host* can hit IMDS.
-For the in-cluster path, ``ControlPlaneAzure`` schedules a one-shot
+For the in-cluster path, ``ControlPlaneKind`` schedules a one-shot
 ``IMDSPreflightJob`` into ``capz-system`` after CAPZ is installed; that
 Job carries ``pulumi.com/waitFor=condition=Complete`` so the outer
 ``pulumi up`` blocks until the routing path **pod -> kindnet -> docker
@@ -166,7 +166,7 @@ from localenv import discover_local_environment
 from pko import PKOBootstrap
 from pko._flux import FluxInfrastructure
 from pko._release import PKO_NAMESPACE
-from stacks.control_plane.control_plane_azure import (
+from stacks.control_plane.control_plane_config import (
     build_control_plane_azure_child_config,
 )
 from stacks.workload_cluster.workload_cluster_class_aks import (
@@ -331,7 +331,7 @@ def run() -> None:
     # Pulumi config as ``ca4s-init:childConfig``. InitStackAzure
     # reads that map and unpacks ``childConfig.azure.{clientId,
     # tenantId, subscriptionId}`` into a typed spec for
-    # ControlPlaneAzure.
+    # ControlPlaneKind.
     #
     # The shape of the dict is built by build_control_plane_azure_child_config
     # so the writer (here) and the reader (parse_control_plane_azure_spec

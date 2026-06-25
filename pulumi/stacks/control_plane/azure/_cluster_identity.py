@@ -106,7 +106,7 @@ The AzureClusterIdentity CRD must already be installed by the CAPZ
 controller (via the CAPI Operator's ``InfrastructureProvider: azure``)
 before this component runs. In the Phase 1 layout that ordering is
 satisfied because this component is instantiated from
-``ControlPlaneAzure``, *after* ``ClusterAPIOperator(...)`` has released
+``ControlPlaneKind``, *after* ``ClusterAPIOperator(...)`` has released
 the CAPI Operator chart and the azure InfrastructureProvider CR has been
 reconciled by the operator (the CR carries
 ``waitFor=condition=Ready`` so the Pulumi DAG blocks downstream

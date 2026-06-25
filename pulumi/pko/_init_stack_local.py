@@ -6,11 +6,13 @@ from typing import Any
 
 import pulumi
 
-from stacks.control_plane.control_plane_local import (
+from stacks.control_plane.control_plane_config import (
     CONTROL_PLANE_LOCAL_CHILD_CONFIG_KEY,
-    ControlPlaneLocal,
+    LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE,
+    LEGACY_LOCAL_CONTROL_PLANE_TYPE,
     parse_control_plane_local_spec,
 )
+from stacks.control_plane.control_plane_kind import ControlPlaneKind, ControlPlaneKindSpec
 from stacks.workload_cluster.tenants import Tenants
 
 
@@ -33,12 +35,19 @@ class InitStackLocal(pulumi.ComponentResource):
             inputs.child_config.get(CONTROL_PLANE_LOCAL_CHILD_CONFIG_KEY)
         )
 
-        control_plane = ControlPlaneLocal(
+        control_plane = ControlPlaneKind(
             "control-plane",
             flux_source_namespace=stack_spec.pko_namespace,
             flux_source_name=stack_spec.flux_source_name,
-            enable_awx=control_plane_spec.enable_awx,
-            opts=pulumi.ResourceOptions(parent=self),
+            spec=ControlPlaneKindSpec(
+                infrastructure_providers=("docker",),
+                enable_awx=control_plane_spec.enable_awx,
+            ),
+            legacy_awx_type=LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE,
+            opts=pulumi.ResourceOptions(
+                parent=self,
+                aliases=[pulumi.Alias(type_=LEGACY_LOCAL_CONTROL_PLANE_TYPE)],
+            ),
         )
         tenants = Tenants(
             "tenants-local",

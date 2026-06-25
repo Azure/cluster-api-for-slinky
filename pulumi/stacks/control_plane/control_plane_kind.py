@@ -1,34 +1,7 @@
-"""Per-env control-plane component for the ``local`` env.
-
-Runs inside a PKO workspace pod with ``cluster-admin`` on the
-management cluster (via ``pulumi-runner`` SA). Its job is to land the
-tenant-AGNOSTIC management-cluster operators:
-
-* Cluster API Operator + the core, kubeadm bootstrap, kubeadm control-plane,
-  and Docker infrastructure providers.
-* AWX. Exposed via a ``Service: LoadBalancer``
-  serviced by cloud-provider-kind in local; no ingress controller in
-  the picture yet.
-
-Slinky CRDs / slurm-operator / Slurm chart are deliberately NOT in
-this list: they belong on each tenant's workload cluster (that's
-where ``slurm-operator`` reconciles ``NodeSet``s onto CAPI-managed
-worker nodes). ``Tenants`` installs those after CAPI brings the
-workload cluster up.
-
-None of the resources here touch tenant state — tenants/workload components
-produce per-tenant resources.
-
-State backend
--------------
-Runs inside the PKO-owned ``ca4s-init`` stack, so control-plane resources share
-that stack's ``file:///state`` backend. A separate control-plane Stack boundary
-can be reintroduced later if isolated lifecycle/state becomes useful.
-"""
+"""Kind management-cluster control plane with optional capabilities."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -37,19 +10,13 @@ import pulumi
 from lib.outputs import CompositeOutput
 from stacks.control_plane.awx import AWXInstance, AWXOperator, AWXProviderConfig
 from stacks.control_plane.awx._configuration import AWXConfiguration
+from stacks.control_plane.azure import (
+    AzureClusterIdentity,
+    IMDSPreflightJob,
+    IMDSPreflightJobOutputs,
+)
 from stacks.control_plane.capi import ClusterAPIOperator
 from stacks.control_plane.certmanager import CertManager
-
-
-CONTROL_PLANE_LOCAL_CHILD_CONFIG_KEY = "controlPlane"
-_CONFIG_AWX = "awx"
-_CONFIG_ENABLED = "enabled"
-_LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE = "ca4s:control_plane:LocalAWXControlPlane"
-
-
-@dataclass(frozen=True)
-class ControlPlaneLocalSpec:
-    enable_awx: bool = True
 
 
 @dataclass(frozen=True)
@@ -72,34 +39,33 @@ class ManagementAWXControlPlaneOutputs(CompositeOutput):
     ready: pulumi.Output[bool]
 
 
-def _require_mapping(field_path: str, value: object) -> Mapping[str, object]:
-    if not isinstance(value, Mapping):
-        raise ValueError(f"{field_path} must be an object")
-    return value
+@dataclass(frozen=True)
+class KindAzureControlPlaneSpec:
+    client_id: str
+    principal_id: str
+    tenant_id: str
+    subscription_id: str
+    allowed_namespaces: list[str] | None = None
+    skip_in_cluster_preflight: bool = False
 
 
-def parse_control_plane_local_spec(value: object | None) -> ControlPlaneLocalSpec:
-    if value is None:
-        return ControlPlaneLocalSpec()
-    if isinstance(value, ControlPlaneLocalSpec):
-        return value
+@dataclass(frozen=True)
+class KindAzureControlPlaneOutputs(CompositeOutput):
+    cluster_identity_name: pulumi.Output[str]
+    cluster_identity_namespace: pulumi.Output[str]
+    imds_preflight_job: IMDSPreflightJobOutputs | None
+    client_id: pulumi.Output[str]
+    principal_id: pulumi.Output[str]
+    tenant_id: pulumi.Output[str]
+    subscription_id: pulumi.Output[str]
+    ready: pulumi.Output[bool]
 
-    spec = _require_mapping(CONTROL_PLANE_LOCAL_CHILD_CONFIG_KEY, value)
-    awx_value = spec.get(_CONFIG_AWX)
-    if awx_value is None:
-        return ControlPlaneLocalSpec()
 
-    awx = _require_mapping(
-        f"{CONTROL_PLANE_LOCAL_CHILD_CONFIG_KEY}.{_CONFIG_AWX}",
-        awx_value,
-    )
-    enabled = awx.get(_CONFIG_ENABLED, True)
-    if not isinstance(enabled, bool):
-        raise ValueError(
-            f"{CONTROL_PLANE_LOCAL_CHILD_CONFIG_KEY}.{_CONFIG_AWX}.{_CONFIG_ENABLED} "
-            "must be a boolean"
-        )
-    return ControlPlaneLocalSpec(enable_awx=enabled)
+@dataclass(frozen=True)
+class ControlPlaneKindSpec:
+    infrastructure_providers: tuple[str, ...] = ("docker",)
+    enable_awx: bool = True
+    azure: KindAzureControlPlaneSpec | None = None
 
 
 class ManagementAWXControlPlane(pulumi.ComponentResource):
@@ -180,15 +146,77 @@ class ManagementAWXControlPlane(pulumi.ComponentResource):
         self.register_outputs(self.outputs.to_outputs())
 
 
-class ControlPlaneLocal(pulumi.ComponentResource):
-    """Build the local control-plane resource graph."""
+class KindAzureControlPlane(pulumi.ComponentResource):
+    """Azure capability block for a Kind management control plane."""
+
+    outputs: KindAzureControlPlaneOutputs
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        spec: KindAzureControlPlaneSpec,
+        capi: ClusterAPIOperator,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            "ca4s:control_plane:KindAzureControlPlane",
+            name,
+            props={},
+            opts=opts,
+        )
+
+        azure_cluster_identity = AzureClusterIdentity(
+            "cluster-identity",
+            client_id=spec.client_id,
+            tenant_id=spec.tenant_id,
+            allowed_namespaces=spec.allowed_namespaces,
+            opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
+        )
+        imds_preflight_job = (
+            None
+            if spec.skip_in_cluster_preflight
+            else IMDSPreflightJob(
+                "imds-preflight",
+                client_id=spec.client_id,
+                opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
+            )
+        )
+        imds_preflight_outputs = (
+            imds_preflight_job.outputs if imds_preflight_job is not None else None
+        )
+
+        ready_inputs: list[pulumi.Input[object]] = [
+            azure_cluster_identity.identity_name,
+        ]
+        if imds_preflight_outputs is not None:
+            ready_inputs.append(imds_preflight_outputs.job_name)
+
+        self.outputs = KindAzureControlPlaneOutputs(
+            cluster_identity_name=azure_cluster_identity.identity_name,
+            cluster_identity_namespace=azure_cluster_identity.identity_namespace,
+            imds_preflight_job=imds_preflight_outputs,
+            client_id=pulumi.Output.from_input(spec.client_id),
+            principal_id=pulumi.Output.from_input(spec.principal_id),
+            tenant_id=pulumi.Output.from_input(spec.tenant_id),
+            subscription_id=pulumi.Output.from_input(spec.subscription_id),
+            ready=pulumi.Output.all(*ready_inputs).apply(lambda _: True),
+        )
+
+        self.register_outputs(self.outputs.to_outputs())
+
+
+class ControlPlaneKind(pulumi.ComponentResource):
+    """Build a Kind management-cluster control plane."""
 
     cert_manager_namespace: pulumi.Output[str]
     capi_operator_namespace: pulumi.Output[str]
     capi_provider_version: pulumi.Output[str]
     capi_provider_namespaces: dict[str, pulumi.Output[str]]
+    infrastructure_providers: pulumi.Output[list[str]]
     awx_enabled: pulumi.Output[bool]
     awx: ManagementAWXControlPlaneOutputs | None
+    azure: KindAzureControlPlaneOutputs | None
     control_plane_ready: pulumi.Output[bool]
     todo: pulumi.Output[str]
 
@@ -196,17 +224,20 @@ class ControlPlaneLocal(pulumi.ComponentResource):
         self,
         name: str,
         *,
-        flux_source_namespace: pulumi.Input[str],
-        flux_source_name: pulumi.Input[str],
-        enable_awx: bool = True,
+        flux_source_namespace: pulumi.Input[str] = "",
+        flux_source_name: pulumi.Input[str] = "",
+        spec: ControlPlaneKindSpec | None = None,
+        legacy_awx_parent: pulumi.Resource | None = None,
+        legacy_awx_type: str | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
-            "ca4s:control_plane:ControlPlaneLocal",
+            "ca4s:control_plane:ControlPlaneKind",
             name,
             props={},
             opts=opts,
         )
+        spec = spec or ControlPlaneKindSpec()
 
         def child_options() -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(parent=self)
@@ -215,23 +246,36 @@ class ControlPlaneLocal(pulumi.ComponentResource):
         capi = ClusterAPIOperator(
             "cluster-api",
             cert_manager=cert_manager,
+            infrastructure_providers=spec.infrastructure_providers,
             opts=child_options(),
         )
 
+        awx_aliases = (
+            [pulumi.Alias(type_=legacy_awx_type)] if legacy_awx_type else None
+        )
         awx = (
             ManagementAWXControlPlane(
                 "awx",
                 flux_source_namespace=flux_source_namespace,
                 flux_source_name=flux_source_name,
-                legacy_parent=self,
-                opts=pulumi.ResourceOptions(
-                    parent=self,
-                    aliases=[
-                        pulumi.Alias(type_=_LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE),
-                    ],
+                legacy_parent=(
+                    legacy_awx_parent
+                    if legacy_awx_parent is not None
+                    else self if legacy_awx_type else None
                 ),
+                opts=pulumi.ResourceOptions(parent=self, aliases=awx_aliases),
             )
-            if enable_awx
+            if spec.enable_awx
+            else None
+        )
+        azure = (
+            KindAzureControlPlane(
+                "azure",
+                spec=spec.azure,
+                capi=capi,
+                opts=child_options(),
+            )
+            if spec.azure is not None
             else None
         )
 
@@ -239,16 +283,21 @@ class ControlPlaneLocal(pulumi.ComponentResource):
         self.capi_operator_namespace = capi.namespace
         self.capi_provider_version = capi.provider_version
         self.capi_provider_namespaces = capi.provider_namespaces
-        self.awx_enabled = pulumi.Output.from_input(enable_awx)
+        self.infrastructure_providers = pulumi.Output.from_input(
+            list(spec.infrastructure_providers)
+        )
+        self.awx_enabled = pulumi.Output.from_input(spec.enable_awx)
         self.awx = awx.outputs if awx else None
+        self.azure = azure.outputs if azure else None
+
         ready_inputs: list[pulumi.Input[Any]] = [capi.provider_version]
-        if self.awx:
+        if self.awx is not None:
             ready_inputs.append(self.awx.ready)
+        if self.azure is not None:
+            ready_inputs.append(self.azure.ready)
         self.control_plane_ready = pulumi.Output.all(*ready_inputs).apply(lambda _: True)
         self.todo = pulumi.Output.from_input(
-            "Wire AWX tenant inventories, credentials, and Slurm day-2 job templates."
-            if enable_awx
-            else "AWX disabled; local control plane installs cert-manager and CAPI only."
+            "Kind control plane installed cert-manager, CAPI, and requested capabilities."
         )
 
         self.register_outputs(
@@ -257,8 +306,10 @@ class ControlPlaneLocal(pulumi.ComponentResource):
                 "capi_operator_namespace": self.capi_operator_namespace,
                 "capi_provider_version": self.capi_provider_version,
                 "capi_provider_namespaces": self.capi_provider_namespaces,
+                "infrastructure_providers": self.infrastructure_providers,
                 "awx_enabled": self.awx_enabled,
                 "awx": self.awx.to_outputs() if self.awx else None,
+                "azure": self.azure.to_outputs() if self.azure else None,
                 "control_plane_ready": self.control_plane_ready,
                 "todo": self.todo,
             }

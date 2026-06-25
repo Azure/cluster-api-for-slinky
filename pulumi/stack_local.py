@@ -196,7 +196,7 @@ def run() -> None:
     # Install PKO and hand it the Flux GitRepository source created by the
     # GitOps provider. The outer stack owns exactly one Stack CR under PKO:
     # ``ca4s-init``. That init stack runs inside PKO and instantiates
-    # ``ControlPlaneLocal`` plus shared ``Tenants`` directly. Workload-cluster
+    # ``ControlPlaneKind`` plus shared ``Tenants`` directly. Workload-cluster
     # instance churn is therefore
     # reconciled by PKO from Git after the init stack notices the repo change,
     # rather than by adding/removing Stack CRs directly from this outer
@@ -224,7 +224,7 @@ def run() -> None:
     #     ca4s-init             -> spec.stack=organization/ca4s-init/local
     #                              -> dispatcher picks ``InitStackLocal``;
     #                                 that component instantiates
-    #                                 ``ControlPlaneLocal`` and ``Tenants``.
+    #                                 ``ControlPlaneKind`` and ``Tenants``.
 
     pko = PKOBootstrap(
         "pko",

@@ -5,25 +5,34 @@ from typing import Any
 import pulumi
 import pytest
 
-from stacks.control_plane import control_plane_local
-from stacks.control_plane.control_plane_local import ManagementAWXControlPlaneOutputs
+from stacks.control_plane import control_plane_kind
+from stacks.control_plane import control_plane_config
+from stacks.control_plane.control_plane_config import (
+    LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE,
+    ControlPlaneLocalSpec,
+)
+from stacks.control_plane.control_plane_kind import (
+    ControlPlaneKind,
+    ControlPlaneKindSpec,
+    ManagementAWXControlPlaneOutputs,
+)
 
 
 def test_parse_control_plane_local_spec_defaults_awx_enabled() -> None:
-    assert control_plane_local.parse_control_plane_local_spec(None) == (
-        control_plane_local.ControlPlaneLocalSpec(enable_awx=True)
+    assert control_plane_config.parse_control_plane_local_spec(None) == (
+        ControlPlaneLocalSpec(enable_awx=True)
     )
 
 
 def test_parse_control_plane_local_spec_reads_awx_enabled() -> None:
-    assert control_plane_local.parse_control_plane_local_spec(
+    assert control_plane_config.parse_control_plane_local_spec(
         {"awx": {"enabled": False}}
-    ) == control_plane_local.ControlPlaneLocalSpec(enable_awx=False)
+    ) == ControlPlaneLocalSpec(enable_awx=False)
 
 
 def test_parse_control_plane_local_spec_rejects_non_bool_awx_enabled() -> None:
     with pytest.raises(ValueError, match="controlPlane.awx.enabled must be a boolean"):
-        control_plane_local.parse_control_plane_local_spec(
+        control_plane_config.parse_control_plane_local_spec(
             {"awx": {"enabled": "false"}}
         )
 
@@ -46,10 +55,12 @@ class _FakeClusterAPIOperator:
         name: str,
         *,
         cert_manager: _FakeCertManager,
+        infrastructure_providers: tuple[str, ...] = ("docker",),
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         self.name = name
         self.cert_manager = cert_manager
+        self.infrastructure_providers = infrastructure_providers
         self.opts = opts
 
 
@@ -105,14 +116,14 @@ def _patch_pulumi_component(monkeypatch: Any) -> None:
 
 def _patch_local_children(monkeypatch: Any) -> None:
     _FakeManagementAWXControlPlane.calls = []
-    monkeypatch.setattr(control_plane_local, "CertManager", _FakeCertManager)
+    monkeypatch.setattr(control_plane_kind, "CertManager", _FakeCertManager)
     monkeypatch.setattr(
-        control_plane_local,
+        control_plane_kind,
         "ClusterAPIOperator",
         _FakeClusterAPIOperator,
     )
     monkeypatch.setattr(
-        control_plane_local,
+        control_plane_kind,
         "ManagementAWXControlPlane",
         _FakeManagementAWXControlPlane,
     )
@@ -122,11 +133,15 @@ def test_control_plane_local_skips_awx_when_disabled(monkeypatch: Any) -> None:
     _patch_pulumi_component(monkeypatch)
     _patch_local_children(monkeypatch)
 
-    control_plane = control_plane_local.ControlPlaneLocal(
+    control_plane = ControlPlaneKind(
         "control-plane",
         flux_source_namespace="pko-system",
         flux_source_name="gitops-source",
-        enable_awx=False,
+        spec=ControlPlaneKindSpec(
+            infrastructure_providers=("docker",),
+            enable_awx=False,
+        ),
+        legacy_awx_type=LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE,
     )
 
     assert _FakeManagementAWXControlPlane.calls == []
@@ -139,10 +154,15 @@ def test_control_plane_local_instantiates_awx_by_default(monkeypatch: Any) -> No
     _patch_pulumi_component(monkeypatch)
     _patch_local_children(monkeypatch)
 
-    control_plane = control_plane_local.ControlPlaneLocal(
+    control_plane = ControlPlaneKind(
         "control-plane",
         flux_source_namespace="pko-system",
         flux_source_name="gitops-source",
+        spec=ControlPlaneKindSpec(
+            infrastructure_providers=("docker",),
+            enable_awx=True,
+        ),
+        legacy_awx_type=LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE,
     )
 
     assert len(_FakeManagementAWXControlPlane.calls) == 1

@@ -11,7 +11,7 @@ Phase 1 contents:
 * :class:`IMDSPreflightJob` -- one-shot ``batch/v1`` Job in
   ``capz-system`` that probes IMDS for a UAMI-bound token from inside
   the same network namespace CAPZ runs in. Gates
-  :class:`ControlPlaneAzure`'s ``control_plane_ready`` output.
+  :class:`ControlPlaneKind`'s ``control_plane_ready`` output.
 Future Phase 2+ contents will likely include thin Pulumi wrappers
 around the CAPZ workload-cluster shapes (``AzureManagedControlPlane``
 / ``AzureManagedCluster`` / ``AzureManagedMachinePool``) once
