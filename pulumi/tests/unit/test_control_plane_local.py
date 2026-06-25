@@ -9,7 +9,7 @@ from stacks.control_plane import control_plane_kind
 from stacks.control_plane import control_plane_config
 from stacks.control_plane.control_plane_config import (
     LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE,
-    ControlPlaneLocalSpec,
+    ControlPlaneKindConfig,
 )
 from stacks.control_plane.control_plane_kind import (
     ControlPlaneKind,
@@ -18,21 +18,21 @@ from stacks.control_plane.control_plane_kind import (
 )
 
 
-def test_parse_control_plane_local_spec_defaults_awx_enabled() -> None:
-    assert control_plane_config.parse_control_plane_local_spec(None) == (
-        ControlPlaneLocalSpec(enable_awx=True)
+def test_parse_control_plane_kind_config_defaults_awx_enabled() -> None:
+    assert control_plane_config.parse_control_plane_kind_config(None) == (
+        ControlPlaneKindConfig(enable_awx=True)
     )
 
 
-def test_parse_control_plane_local_spec_reads_awx_enabled() -> None:
-    assert control_plane_config.parse_control_plane_local_spec(
+def test_parse_control_plane_kind_config_reads_awx_enabled() -> None:
+    assert control_plane_config.parse_control_plane_kind_config(
         {"awx": {"enabled": False}}
-    ) == ControlPlaneLocalSpec(enable_awx=False)
+    ) == ControlPlaneKindConfig(enable_awx=False)
 
 
-def test_parse_control_plane_local_spec_rejects_non_bool_awx_enabled() -> None:
+def test_parse_control_plane_kind_config_rejects_non_bool_awx_enabled() -> None:
     with pytest.raises(ValueError, match="controlPlane.awx.enabled must be a boolean"):
-        control_plane_config.parse_control_plane_local_spec(
+        control_plane_config.parse_control_plane_kind_config(
             {"awx": {"enabled": "false"}}
         )
 

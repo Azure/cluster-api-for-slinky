@@ -167,7 +167,7 @@ from pko import PKOBootstrap
 from pko._flux import FluxInfrastructure
 from pko._release import PKO_NAMESPACE
 from stacks.control_plane.control_plane_config import (
-    build_control_plane_azure_child_config,
+    build_control_plane_kind_azure_child_config,
 )
 from stacks.workload_cluster.workload_cluster_class_aks import (
     build_aks_workload_cluster_child_config,
@@ -328,13 +328,13 @@ def run() -> None:
     # AzureClusterIdentity CR. The new architecture provides exactly
     # the mechanism: PKOBootstrap(config=...) flows through the
     # init Stack CR's spec.config and lands in the workspace pod's
-    # Pulumi config as ``ca4s-init:childConfig``. InitStackAzure
-    # reads that map and unpacks ``childConfig.azure.{clientId,
+    # Pulumi config as ``ca4s-init:childConfig``. InitStack
+    # reads that map and unpacks ``childConfig.controlPlane.azure.{clientId,
     # tenantId, subscriptionId}`` into a typed spec for
     # ControlPlaneKind.
     #
-    # The shape of the dict is built by build_control_plane_azure_child_config
-    # so the writer (here) and the reader (parse_control_plane_azure_spec
+    # The shape of the dict is built by build_control_plane_kind_azure_child_config
+    # so the writer (here) and the reader (parse_control_plane_kind_config
     # inside the init stack) stay in lockstep.
     # ----------------------------------------------------------------------
     pko = PKOBootstrap(
@@ -345,7 +345,7 @@ def run() -> None:
         flux_source_resource=repo.flux_source,
         env=pulumi.get_stack(),
         config={
-            **build_control_plane_azure_child_config(
+            **build_control_plane_kind_azure_child_config(
                 client_id=azure_environment.client_id,
                 principal_id=azure_environment.principal_id,
                 tenant_id=azure_environment.tenant_id,

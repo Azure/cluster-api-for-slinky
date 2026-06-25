@@ -222,8 +222,7 @@ def run() -> None:
     # ``pulumi.get_stack()`` returns the third segment unchanged:
     #
     #     ca4s-init             -> spec.stack=organization/ca4s-init/local
-    #                              -> dispatcher picks ``InitStackLocal``;
-    #                                 that component instantiates
+    #                              -> unified init stack instantiates
     #                                 ``ControlPlaneKind`` and ``Tenants``.
 
     pko = PKOBootstrap(

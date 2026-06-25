@@ -1,8 +1,8 @@
 """PKO init-stack contract and env dispatcher.
 
 The outer stack should own exactly one ``pulumi.com/v1`` Stack CR after PKO is
-installed: ``ca4s-init``. That init stack then runs inside PKO and dispatches to
-an env-specific init component such as :class:`pko._init_stack_local.InitStackLocal`.
+installed: ``ca4s-init``. That init stack then runs inside PKO and builds the
+control plane and workload tenants for the active env.
 
 This module is intentionally shared by both sides of that handoff:
 
@@ -10,18 +10,35 @@ This module is intentionally shared by both sides of that handoff:
   creates the single init Stack CR.
 * ``pulumi/stacks/init/__main__.py`` calls :func:`run` from inside the PKO
     workspace to reconstruct :class:`pko._stack_cr.StackCRSpec` and instantiate
-    the env-specific init component.
+    the unified init component for the active env.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-import importlib
 from typing import Any, Mapping
 
 import pulumi
 
 from pko._stack_cr import StackCRSpec
+from stacks.control_plane.control_plane_config import (
+    CONTROL_PLANE_KIND_CHILD_CONFIG_KEY,
+    ControlPlaneKindConfig,
+    LEGACY_AZURE_CONTROL_PLANE_TYPE,
+    LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE,
+    LEGACY_LOCAL_CONTROL_PLANE_TYPE,
+    parse_control_plane_kind_config,
+)
+from stacks.control_plane.control_plane_kind import (
+    ControlPlaneKind,
+    ControlPlaneKindSpec,
+    KindAzureControlPlaneSpec,
+)
+from stacks.workload_cluster.tenants import (
+    SPEC_CONFIG_KEY,
+    Tenants,
+    WorkloadClusterContext,
+)
 
 
 INIT_PROJECT = "ca4s-init"
@@ -31,8 +48,10 @@ INIT_CHILD_CONFIG_NAME = "childConfig"
 INIT_STACK_SPEC_CONFIG_KEY = f"{INIT_PROJECT}:{INIT_STACK_SPEC_CONFIG_NAME}"
 INIT_CHILD_CONFIG_KEY = f"{INIT_PROJECT}:{INIT_CHILD_CONFIG_NAME}"
 
-_INIT_STACK_MODULE_PREFIX = "pko._init_stack_"
-_INIT_STACK_CLASS_PREFIX = "InitStack"
+_LEGACY_INIT_STACK_TYPES = {
+    "azure": "ca4s:pko:InitStackAzure",
+    "local": "ca4s:pko:InitStackLocal",
+}
 
 _STACK_SPEC_CONFIG_KEYS = {
     "pkoNamespace": "pko_namespace",
@@ -48,6 +67,119 @@ _STACK_SPEC_CONFIG_KEYS = {
 class InitStackInputs:
     stack_spec: StackCRSpec
     child_config: dict[str, Any]
+
+
+class InitStack(pulumi.ComponentResource):
+    """Instantiate the env-specific control plane and workload tenants."""
+
+    control_plane_ready: pulumi.Output[bool]
+    workload_clusters: list[dict[str, object]]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        env: str,
+        inputs: InitStackInputs,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        legacy_type = _LEGACY_INIT_STACK_TYPES.get(env)
+        aliases = [pulumi.Alias(type_=legacy_type)] if legacy_type else None
+        super().__init__(
+            "ca4s:pko:InitStack",
+            name,
+            props={},
+            opts=pulumi.ResourceOptions.merge(
+                opts,
+                pulumi.ResourceOptions(aliases=aliases),
+            ),
+        )
+
+        control_plane_config = parse_control_plane_kind_config(
+            inputs.child_config.get(CONTROL_PLANE_KIND_CHILD_CONFIG_KEY)
+        )
+        control_plane, tenants = self._build(env, inputs, control_plane_config)
+
+        self.control_plane_ready = control_plane.control_plane_ready
+        self.workload_clusters = tenants.workload_clusters
+
+        self.register_outputs(
+            {
+                "control_plane_ready": self.control_plane_ready,
+                "workload_clusters": self.workload_clusters,
+            }
+        )
+
+    def _build(
+        self,
+        env: str,
+        inputs: InitStackInputs,
+        control_plane_config: ControlPlaneKindConfig,
+    ) -> tuple[ControlPlaneKind, Tenants]:
+        stack_spec = inputs.stack_spec
+        azure_config = control_plane_config.azure
+
+        control_plane = ControlPlaneKind(
+            "control-plane",
+            flux_source_namespace=stack_spec.pko_namespace,
+            flux_source_name=stack_spec.flux_source_name,
+            spec=ControlPlaneKindSpec(
+                infrastructure_providers=control_plane_config.infrastructure_providers,
+                enable_awx=control_plane_config.enable_awx,
+                azure=(
+                    KindAzureControlPlaneSpec(
+                        client_id=azure_config.client_id,
+                        principal_id=azure_config.principal_id,
+                        tenant_id=azure_config.tenant_id,
+                        subscription_id=azure_config.subscription_id,
+                        allowed_namespaces=azure_config.allowed_namespaces,
+                        skip_in_cluster_preflight=(
+                            azure_config.skip_in_cluster_preflight
+                        ),
+                    )
+                    if azure_config is not None
+                    else None
+                ),
+            ),
+            legacy_awx_type=(
+                LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE if env == "local" else None
+            ),
+            opts=pulumi.ResourceOptions(
+                parent=self,
+                aliases=[pulumi.Alias(type_=_legacy_control_plane_type(env))],
+            ),
+        )
+
+        tenant_context = None
+        if env == "azure":
+            if azure_config is None:
+                raise ValueError("azure init stack requires controlPlane.azure config")
+            azure_outputs = control_plane.azure
+            if azure_outputs is None:
+                raise RuntimeError("InitStack requires Azure control-plane outputs")
+            tenant_context = WorkloadClusterContext(
+                subscription_id=azure_config.subscription_id,
+                identity_name=azure_outputs.cluster_identity_name,
+                identity_namespace=azure_outputs.cluster_identity_namespace,
+            )
+        elif env != "local":
+            raise ValueError(f"unsupported init stack env {env!r}")
+
+        tenants = Tenants(
+            f"tenants-{env}",
+            spec=inputs.child_config.get(SPEC_CONFIG_KEY),
+            context=tenant_context,
+            opts=pulumi.ResourceOptions(parent=self, depends_on=[control_plane]),
+        )
+        return control_plane, tenants
+
+
+def _legacy_control_plane_type(env: str) -> str:
+    if env == "azure":
+        return LEGACY_AZURE_CONTROL_PLANE_TYPE
+    if env == "local":
+        return LEGACY_LOCAL_CONTROL_PLANE_TYPE
+    raise ValueError(f"unsupported init stack env {env!r}")
 
 
 def init_stack_config(
@@ -98,37 +230,12 @@ def load_init_stack_inputs() -> InitStackInputs:
     return InitStackInputs(stack_spec=stack_spec, child_config=child_config)
 
 
-def _pascal_case(value: str) -> str:
-    words = value.replace("-", "_").split("_")
-    return "".join(word.capitalize() for word in words if word)
-
-
 def run() -> None:
-    """Instantiate the env-specific init-stack component."""
+    """Instantiate the init-stack component for the active env."""
     inputs = load_init_stack_inputs()
     env = pulumi.get_stack()
 
-    module_name = f"{_INIT_STACK_MODULE_PREFIX}{env}"
-    class_name = f"{_INIT_STACK_CLASS_PREFIX}{_pascal_case(env)}"
-    try:
-        module = importlib.import_module(module_name)
-    except ModuleNotFoundError as exc:
-        if exc.name != module_name:
-            raise
-        raise ValueError(
-            f"unsupported init stack env {env!r}: expected module {module_name!r} "
-            f"exposing class {class_name!r}."
-        ) from None
-
-    try:
-        concrete = getattr(module, class_name)
-    except AttributeError:
-        raise ValueError(
-            f"module {module_name!r} does not expose class {class_name!r}; "
-            "env-specific init-stack modules must follow InitStack<Env>."
-        ) from None
-
-    init_stack = concrete("init-stack", inputs=inputs)
+    init_stack = InitStack("init-stack", env=env, inputs=inputs)
 
     pulumi.export("control_plane_ready", init_stack.control_plane_ready)
     pulumi.export("workload_clusters", init_stack.workload_clusters)

@@ -108,7 +108,7 @@ def test_probe_image_pinned_by_tag() -> None:
 )
 def test_probe_command_renders_for_any_string_input(bad_client_id: str) -> None:
     # _probe_command is intentionally permissive about its input --
-    # GUID validation happens upstream in parse_control_plane_azure_spec.
+    # GUID validation happens upstream in parse_control_plane_kind_config.
     # Confirm the renderer doesn't choke on edge cases (empty string,
     # all-zeros). Both should produce a syntactically valid script that
     # would simply fail the IMDS lookup at run time.

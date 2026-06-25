@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 
 from stacks.control_plane.control_plane_config import (
-    CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY,
-    ControlPlaneAzureSpec,
-    build_control_plane_azure_child_config,
-    parse_control_plane_azure_spec,
+    CONTROL_PLANE_KIND_CHILD_CONFIG_KEY,
+    ControlPlaneAzureConfig,
+    build_control_plane_kind_azure_child_config,
+    parse_control_plane_kind_config,
 )
 
 
@@ -32,8 +32,14 @@ def _full_payload(**overrides: object) -> dict[str, object]:
     return payload
 
 
-def test_build_and_parse_round_trip_minimum_fields() -> None:
-    built = build_control_plane_azure_child_config(
+def _parse_azure_payload(payload: object) -> ControlPlaneAzureConfig:
+    parsed = parse_control_plane_kind_config({"azure": payload})
+    assert parsed.azure is not None
+    return parsed.azure
+
+
+def test_build_and_parse_control_plane_kind_round_trip_minimum_fields() -> None:
+    built = build_control_plane_kind_azure_child_config(
         client_id=_CLIENT_ID,
         principal_id=_PRINCIPAL_ID,
         tenant_id=_TENANT_ID,
@@ -41,18 +47,22 @@ def test_build_and_parse_round_trip_minimum_fields() -> None:
     )
 
     assert built == {
-        CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY: {
-            "clientId": _CLIENT_ID,
-            "principalId": _PRINCIPAL_ID,
-            "tenantId": _TENANT_ID,
-            "subscriptionId": _SUBSCRIPTION_ID,
+        CONTROL_PLANE_KIND_CHILD_CONFIG_KEY: {
+            "awx": {"enabled": False},
+            "azure": {
+                "clientId": _CLIENT_ID,
+                "principalId": _PRINCIPAL_ID,
+                "tenantId": _TENANT_ID,
+                "subscriptionId": _SUBSCRIPTION_ID,
+            },
         },
     }
 
-    parsed = parse_control_plane_azure_spec(
-        built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY]
+    parsed = parse_control_plane_kind_config(
+        built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
     )
-    assert parsed == ControlPlaneAzureSpec(
+    assert parsed.enable_awx is False
+    assert parsed.azure == ControlPlaneAzureConfig(
         client_id=_CLIENT_ID,
         principal_id=_PRINCIPAL_ID,
         tenant_id=_TENANT_ID,
@@ -62,7 +72,7 @@ def test_build_and_parse_round_trip_minimum_fields() -> None:
 
 
 def test_build_omits_allowed_namespaces_when_none() -> None:
-    built = build_control_plane_azure_child_config(
+    built = build_control_plane_kind_azure_child_config(
         client_id=_CLIENT_ID,
         principal_id=_PRINCIPAL_ID,
         tenant_id=_TENANT_ID,
@@ -72,11 +82,15 @@ def test_build_omits_allowed_namespaces_when_none() -> None:
 
     # The CR side treats absence as "allow all"; omitting the key keeps
     # the wire shape minimal and matches what the parser expects.
-    assert "allowedNamespaces" not in built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY]  # type: ignore[operator]
+    control_plane = built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
+    assert isinstance(control_plane, dict)
+    azure = control_plane["azure"]
+    assert isinstance(azure, dict)
+    assert "allowedNamespaces" not in azure
 
 
 def test_build_serializes_allowed_namespaces_list() -> None:
-    built = build_control_plane_azure_child_config(
+    built = build_control_plane_kind_azure_child_config(
         client_id=_CLIENT_ID,
         principal_id=_PRINCIPAL_ID,
         tenant_id=_TENANT_ID,
@@ -84,7 +98,9 @@ def test_build_serializes_allowed_namespaces_list() -> None:
         allowed_namespaces=["default", "tenant-a"],
     )
 
-    assert built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY] == {
+    control_plane = built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
+    assert isinstance(control_plane, dict)
+    assert control_plane["azure"] == {
         "clientId": _CLIENT_ID,
         "principalId": _PRINCIPAL_ID,
         "tenantId": _TENANT_ID,
@@ -92,20 +108,19 @@ def test_build_serializes_allowed_namespaces_list() -> None:
         "allowedNamespaces": ["default", "tenant-a"],
     }
 
-    parsed = parse_control_plane_azure_spec(
-        built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY]
-    )
-    assert parsed.allowed_namespaces == ["default", "tenant-a"]
+    parsed = parse_control_plane_kind_config(control_plane)
+    assert parsed.azure is not None
+    assert parsed.azure.allowed_namespaces == ["default", "tenant-a"]
 
 
-def test_parse_rejects_none_payload() -> None:
-    with pytest.raises(ValueError, match="missing required Azure"):
-        parse_control_plane_azure_spec(None)
+def test_parse_kind_config_without_azure_leaves_azure_none() -> None:
+    parsed = parse_control_plane_kind_config(None)
+    assert parsed.azure is None
 
 
 def test_parse_rejects_non_mapping_payload() -> None:
     with pytest.raises(ValueError, match="must be an object"):
-        parse_control_plane_azure_spec("not-a-dict")  # type: ignore[arg-type]
+        _parse_azure_payload("not-a-dict")
 
 
 @pytest.mark.parametrize(
@@ -117,9 +132,10 @@ def test_parse_rejects_missing_guid_field(missing_key: str) -> None:
     del payload[missing_key]
 
     with pytest.raises(
-        ValueError, match=f"azure.{missing_key} must be a non-empty string"
+        ValueError,
+        match=f"controlPlane.azure.{missing_key} must be a non-empty string",
     ):
-        parse_control_plane_azure_spec(payload)
+        _parse_azure_payload(payload)
 
 
 @pytest.mark.parametrize(
@@ -130,9 +146,9 @@ def test_parse_rejects_malformed_guid(bad_guid_field: str) -> None:
     payload = _full_payload(**{bad_guid_field: "not-a-guid"})
 
     with pytest.raises(
-        ValueError, match=f"azure.{bad_guid_field} must be a GUID"
+        ValueError, match=f"controlPlane.azure.{bad_guid_field} must be a GUID"
     ):
-        parse_control_plane_azure_spec(payload)
+        _parse_azure_payload(payload)
 
 
 def test_parse_rejects_non_string_guid() -> None:
@@ -140,15 +156,17 @@ def test_parse_rejects_non_string_guid() -> None:
     # must reject them before reaching the regex.
     payload = _full_payload(clientId=12345)
 
-    with pytest.raises(ValueError, match="azure.clientId must be a non-empty string"):
-        parse_control_plane_azure_spec(payload)
+    with pytest.raises(
+        ValueError, match="controlPlane.azure.clientId must be a non-empty string"
+    ):
+        _parse_azure_payload(payload)
 
 
 def test_parse_rejects_non_list_allowed_namespaces() -> None:
     payload = _full_payload(allowedNamespaces="default")
 
     with pytest.raises(ValueError, match="must be a list of namespace names"):
-        parse_control_plane_azure_spec(payload)
+        _parse_azure_payload(payload)
 
 
 def test_parse_rejects_empty_allowed_namespace_entry() -> None:
@@ -157,7 +175,7 @@ def test_parse_rejects_empty_allowed_namespace_entry() -> None:
     with pytest.raises(
         ValueError, match=r"allowedNamespaces\[1\] must be a non-empty string"
     ):
-        parse_control_plane_azure_spec(payload)
+        _parse_azure_payload(payload)
 
 
 def test_parse_allows_empty_allowed_namespaces_list() -> None:
@@ -167,19 +185,19 @@ def test_parse_allows_empty_allowed_namespaces_list() -> None:
     # surface it as an empty list (not None) so callers can tell.
     payload = _full_payload(allowedNamespaces=[])
 
-    parsed = parse_control_plane_azure_spec(payload)
+    parsed = _parse_azure_payload(payload)
     assert parsed.allowed_namespaces == []
 
 
 def test_skip_in_cluster_preflight_defaults_to_false() -> None:
     # ``skipInClusterPreflight`` is optional; absent in the wire shape
     # means "run the preflight" so the safe default is False.
-    parsed = parse_control_plane_azure_spec(_full_payload())
+    parsed = _parse_azure_payload(_full_payload())
     assert parsed.skip_in_cluster_preflight is False
 
 
 def test_skip_in_cluster_preflight_round_trips_true() -> None:
-    built = build_control_plane_azure_child_config(
+    built = build_control_plane_kind_azure_child_config(
         client_id=_CLIENT_ID,
         principal_id=_PRINCIPAL_ID,
         tenant_id=_TENANT_ID,
@@ -187,24 +205,25 @@ def test_skip_in_cluster_preflight_round_trips_true() -> None:
         skip_in_cluster_preflight=True,
     )
 
-    assert built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY] == {
+    control_plane = built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
+    assert isinstance(control_plane, dict)
+    assert control_plane["azure"] == {
         "clientId": _CLIENT_ID,
         "principalId": _PRINCIPAL_ID,
         "tenantId": _TENANT_ID,
         "subscriptionId": _SUBSCRIPTION_ID,
         "skipInClusterPreflight": True,
     }
-    parsed = parse_control_plane_azure_spec(
-        built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY]
-    )
-    assert parsed.skip_in_cluster_preflight is True
+    parsed = parse_control_plane_kind_config(control_plane)
+    assert parsed.azure is not None
+    assert parsed.azure.skip_in_cluster_preflight is True
 
 
 def test_build_omits_skip_in_cluster_preflight_when_false() -> None:
     # The default-False case must produce the minimal wire shape so
     # operators can flip the flag back to "use the default" by removing
     # the config key, not by setting it to false explicitly.
-    built = build_control_plane_azure_child_config(
+    built = build_control_plane_kind_azure_child_config(
         client_id=_CLIENT_ID,
         principal_id=_PRINCIPAL_ID,
         tenant_id=_TENANT_ID,
@@ -212,9 +231,11 @@ def test_build_omits_skip_in_cluster_preflight_when_false() -> None:
         skip_in_cluster_preflight=False,
     )
 
-    assert "skipInClusterPreflight" not in built[
-        CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY  # type: ignore[operator]
-    ]
+    control_plane = built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
+    assert isinstance(control_plane, dict)
+    azure = control_plane["azure"]
+    assert isinstance(azure, dict)
+    assert "skipInClusterPreflight" not in azure
 
 
 def test_parse_rejects_non_bool_skip_in_cluster_preflight() -> None:
@@ -223,11 +244,11 @@ def test_parse_rejects_non_bool_skip_in_cluster_preflight() -> None:
     with pytest.raises(
         ValueError, match=r"skipInClusterPreflight must be a boolean"
     ):
-        parse_control_plane_azure_spec(payload)
+        _parse_azure_payload(payload)
 
 
 def test_infrastructure_providers_round_trip() -> None:
-    built = build_control_plane_azure_child_config(
+    built = build_control_plane_kind_azure_child_config(
         client_id=_CLIENT_ID,
         principal_id=_PRINCIPAL_ID,
         tenant_id=_TENANT_ID,
@@ -235,16 +256,16 @@ def test_infrastructure_providers_round_trip() -> None:
         infrastructure_providers=("docker", "azure"),
     )
 
-    assert built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY] == {
+    control_plane = built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
+    assert isinstance(control_plane, dict)
+    assert control_plane["azure"] == {
         "clientId": _CLIENT_ID,
         "principalId": _PRINCIPAL_ID,
         "tenantId": _TENANT_ID,
         "subscriptionId": _SUBSCRIPTION_ID,
         "infrastructureProviders": ["docker", "azure"],
     }
-    parsed = parse_control_plane_azure_spec(
-        built[CONTROL_PLANE_AZURE_CHILD_CONFIG_KEY]
-    )
+    parsed = parse_control_plane_kind_config(control_plane)
     assert parsed.infrastructure_providers == ("docker", "azure")
 
 
@@ -252,11 +273,11 @@ def test_parse_rejects_infrastructure_providers_without_azure() -> None:
     payload = _full_payload(infrastructureProviders=["docker"])
 
     with pytest.raises(ValueError, match="must include 'azure'"):
-        parse_control_plane_azure_spec(payload)
+        _parse_azure_payload(payload)
 
 
 def test_parse_rejects_non_list_infrastructure_providers() -> None:
     payload = _full_payload(infrastructureProviders="azure")
 
     with pytest.raises(ValueError, match="must be a list of provider names"):
-        parse_control_plane_azure_spec(payload)
+        _parse_azure_payload(payload)
