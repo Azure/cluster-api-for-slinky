@@ -158,8 +158,7 @@ def _parse_control_plane_azure_config(
     if value is None:
         raise ValueError(
             "missing required Azure control-plane config under "
-            f"{field_path!r}; the outer "
-            "stack_azure.py must pass PKOBootstrap(config={...}) with an "
+            f"{field_path!r}; childConfig.controlPlane must include an "
             f"{field_path!r} entry"
         )
     if not isinstance(value, Mapping):

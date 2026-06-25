@@ -69,7 +69,8 @@ on a standard kind-on-Azure-VM topology is:
 Things that break this path (and the failure mode for each):
 
 * **Off-Azure host** — ``169.254.169.254`` is unreachable.
-    ``stack_azure.py``'s host-side IMDS discovery catches this at plan time and
+    The Azure-capable config path's host-side IMDS discovery catches this at
+    plan time and
     aborts with a clear message.
 * **CNI that drops link-local egress** (e.g. some Cilium policies
   with strict default-deny) — the preflight passes (host-side path is
@@ -88,7 +89,7 @@ Things that break this path (and the failure mode for each):
   above. Switch to ServicePrincipal (carries a clientSecret) or
   WorkloadIdentity (needs an OIDC issuer Entra can reach).
 
-The host-side preflight in ``stack_azure.py`` is a *necessary but not
+The host-side preflight in the Azure outer stack is a *necessary but not
 sufficient* signal: if it passes, the kind nodes on the same host
 typically also work, but a CNI install between Phase 1 and the first
 workload-cluster reconcile can silently break the in-cluster path.

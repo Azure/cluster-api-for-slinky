@@ -1,4 +1,4 @@
-"""ctlptl-based dynamic-resource bindings for the ``stack_local.py`` target.
+"""ctlptl-based dynamic-resource bindings for Kind-backed outer stacks.
 
 Three Pulumi dynamic providers that wrap the ``ctlptl`` and
 ``cloud-provider-kind`` CLIs:
@@ -12,12 +12,9 @@ Import surface intentionally narrow: this package is meant to be a
 thin compatibility shim around the ctlptl CLI, not a general-purpose
 kind-control library.
 
-TODO(multi-target): all three resources are kind-specific by design.
-The project-level dispatcher in ``__main__.py`` selects ``stack_local.py``
-for the ``local`` stack; future cloud-target stack modules
-(``stack_azure.py``, ...) will reach for sibling provider packages under
-the same contract: ``cluster_name``, ``context``, ``kubeconfig`` outputs
-plus an optional registry handle.
+All three resources are kind-specific by design. The outer stack uses a Kind
+management cluster for both local-only and Azure-capable configurations, so it
+shares this package through ``stack.py``.
 """
 
 from ctlptl.cloud_provider_kind import CloudProviderKind
