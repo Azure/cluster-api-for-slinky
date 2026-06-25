@@ -66,6 +66,8 @@ _STACK_SPEC_CONFIG_KEYS = {
 @dataclass(frozen=True)
 class InitStackInputs:
     stack_spec: StackCRSpec
+    # TODO: Replace this raw handoff dict with typed init-stack input objects
+    # as the control-plane, registry, and workload config contracts stabilize.
     child_config: dict[str, Any]
 
 
