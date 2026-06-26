@@ -29,9 +29,7 @@ def run_stack() -> None:
     """Build the Kind management-cluster graph from config and discovery."""
     config = pulumi.Config()
 
-    enable_lb_port_mapping = config.get_bool("enable_lb_port_mapping")
-    if enable_lb_port_mapping is None:
-        enable_lb_port_mapping = True
+    enable_lb_port_mapping = config.get_bool("enable_lb_port_mapping", True)
 
     gitops_provider = config.get("gitops_provider") or "gitea-builtin"
     gitops_sync_triggers = (
@@ -140,7 +138,7 @@ def _azure_child_config(
     azure_allowed_namespaces = _normalize_allowed_namespaces(
         config.get_object("azureClusterIdentityAllowedNamespaces")
     )
-    skip_in_cluster_preflight = bool(config.get_bool("skip_in_cluster_preflight"))
+    skip_in_cluster_preflight = config.get_bool("skip_in_cluster_preflight", False)
 
     exports.update(
         {
@@ -201,7 +199,7 @@ def _azure_workload_requested(config: pulumi.Config) -> bool:
             "azureAdditionalTags",
             "azureClusterIdentityAllowedNamespaces",
         )
-    ) or config.get_bool("skip_in_cluster_preflight") is not None
+    )
 
 
 def _export_common_outputs(
