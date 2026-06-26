@@ -211,7 +211,7 @@ def _chart_values(
         # pod restarts don't wipe the seeded repo.
         #
         # Chart v12 renamed the Redis subcharts to Valkey ("valkey-cluster"
-        # is the new default, on by default!). The legacy ``redis`` /
+        # is the new default, on by default!). The old ``redis`` /
         # ``redis-cluster`` keys are silently ignored, which is exactly the
         # kind of "my override did nothing" bug that wastes the most time.
         # ``valkey-cluster.enabled=false`` is the one that matters — without

@@ -8,9 +8,6 @@ from dataclasses import dataclass
 
 
 CONTROL_PLANE_KIND_CHILD_CONFIG_KEY = "controlPlane"
-LEGACY_LOCAL_CONTROL_PLANE_TYPE = "ca4s:control_plane:ControlPlaneLocal"
-LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE = "ca4s:control_plane:LocalAWXControlPlane"
-LEGACY_AZURE_CONTROL_PLANE_TYPE = "ca4s:control_plane:ControlPlaneAzure"
 
 _CONFIG_AZURE = "azure"
 _CONFIG_AWX = "awx"

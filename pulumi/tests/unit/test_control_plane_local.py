@@ -7,10 +7,7 @@ import pytest
 
 from stacks.control_plane import control_plane_kind
 from stacks.control_plane import control_plane_config
-from stacks.control_plane.control_plane_config import (
-    LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE,
-    ControlPlaneKindConfig,
-)
+from stacks.control_plane.control_plane_config import ControlPlaneKindConfig
 from stacks.control_plane.control_plane_kind import (
     ControlPlaneKind,
     ControlPlaneKindSpec,
@@ -141,7 +138,6 @@ def test_control_plane_local_skips_awx_when_disabled(monkeypatch: Any) -> None:
             infrastructure_providers=("docker",),
             enable_awx=False,
         ),
-        legacy_awx_type=LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE,
     )
 
     assert _FakeManagementAWXControlPlane.calls == []
@@ -162,7 +158,6 @@ def test_control_plane_local_instantiates_awx_by_default(monkeypatch: Any) -> No
             infrastructure_providers=("docker",),
             enable_awx=True,
         ),
-        legacy_awx_type=LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE,
     )
 
     assert len(_FakeManagementAWXControlPlane.calls) == 1
@@ -170,7 +165,6 @@ def test_control_plane_local_instantiates_awx_by_default(monkeypatch: Any) -> No
     assert call["name"] == "awx"
     assert call["flux_source_namespace"] == "pko-system"
     assert call["flux_source_name"] == "gitops-source"
-    assert call["legacy_parent"] is control_plane
     assert control_plane.awx is not None
     assert "project_id" in control_plane._test_outputs["awx"]
     assert "provider" not in control_plane._test_outputs["awx"]

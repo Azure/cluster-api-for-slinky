@@ -36,7 +36,6 @@ def run_stack() -> None:
     gitops_provider = config.get("gitops_provider") or "gitea-builtin"
     gitops_sync_triggers = (
         config.get_object("gitops_sync_triggers")
-        or config.get_object("gitea_sync_triggers")
         or {}
     )
     configured_gitops_provider_args = config.get_object("gitops_provider_args") or {}

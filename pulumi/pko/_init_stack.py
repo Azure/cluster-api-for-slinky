@@ -24,9 +24,6 @@ from pko._stack_cr import StackCRSpec
 from stacks.control_plane.control_plane_config import (
     CONTROL_PLANE_KIND_CHILD_CONFIG_KEY,
     ControlPlaneKindConfig,
-    LEGACY_AZURE_CONTROL_PLANE_TYPE,
-    LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE,
-    LEGACY_LOCAL_CONTROL_PLANE_TYPE,
     parse_control_plane_kind_config,
 )
 from stacks.control_plane.control_plane_kind import (
@@ -47,11 +44,6 @@ INIT_STACK_SPEC_CONFIG_NAME = "stackSpec"
 INIT_CHILD_CONFIG_NAME = "childConfig"
 INIT_STACK_SPEC_CONFIG_KEY = f"{INIT_PROJECT}:{INIT_STACK_SPEC_CONFIG_NAME}"
 INIT_CHILD_CONFIG_KEY = f"{INIT_PROJECT}:{INIT_CHILD_CONFIG_NAME}"
-
-_LEGACY_INIT_STACK_TYPES = {
-    "azure": "ca4s:pko:InitStackAzure",
-    "local": "ca4s:pko:InitStackLocal",
-}
 
 _STACK_SPEC_CONFIG_KEYS = {
     "pkoNamespace": "pko_namespace",
@@ -85,16 +77,11 @@ class InitStack(pulumi.ComponentResource):
         inputs: InitStackInputs,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        legacy_type = _LEGACY_INIT_STACK_TYPES.get(env)
-        aliases = [pulumi.Alias(type_=legacy_type)] if legacy_type else None
         super().__init__(
             "ca4s:pko:InitStack",
             name,
             props={},
-            opts=pulumi.ResourceOptions.merge(
-                opts,
-                pulumi.ResourceOptions(aliases=aliases),
-            ),
+            opts=opts,
         )
 
         control_plane_config = parse_control_plane_kind_config(
@@ -143,13 +130,7 @@ class InitStack(pulumi.ComponentResource):
                     else None
                 ),
             ),
-            legacy_awx_type=(
-                LEGACY_LOCAL_AWX_CONTROL_PLANE_TYPE if env == "local" else None
-            ),
-            opts=pulumi.ResourceOptions(
-                parent=self,
-                aliases=[pulumi.Alias(type_=_legacy_control_plane_type(env))],
-            ),
+            opts=pulumi.ResourceOptions(parent=self),
         )
 
         tenant_context = None
@@ -174,14 +155,6 @@ class InitStack(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self, depends_on=[control_plane]),
         )
         return control_plane, tenants
-
-
-def _legacy_control_plane_type(env: str) -> str:
-    if env == "azure":
-        return LEGACY_AZURE_CONTROL_PLANE_TYPE
-    if env == "local":
-        return LEGACY_LOCAL_CONTROL_PLANE_TYPE
-    raise ValueError(f"unsupported init stack env {env!r}")
 
 
 def init_stack_config(

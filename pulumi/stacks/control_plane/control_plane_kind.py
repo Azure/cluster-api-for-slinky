@@ -79,7 +79,6 @@ class ManagementAWXControlPlane(pulumi.ComponentResource):
         *,
         flux_source_namespace: pulumi.Input[str],
         flux_source_name: pulumi.Input[str],
-        legacy_parent: pulumi.Resource | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -90,8 +89,7 @@ class ManagementAWXControlPlane(pulumi.ComponentResource):
         )
 
         def child_options() -> pulumi.ResourceOptions:
-            aliases = [pulumi.Alias(parent=legacy_parent)] if legacy_parent else None
-            return pulumi.ResourceOptions(parent=self, aliases=aliases)
+            return pulumi.ResourceOptions(parent=self)
 
         awx_operator = AWXOperator("awx-operator", opts=child_options())
         awx_instance = AWXInstance(
@@ -227,8 +225,6 @@ class ControlPlaneKind(pulumi.ComponentResource):
         flux_source_namespace: pulumi.Input[str] = "",
         flux_source_name: pulumi.Input[str] = "",
         spec: ControlPlaneKindSpec | None = None,
-        legacy_awx_parent: pulumi.Resource | None = None,
-        legacy_awx_type: str | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -250,20 +246,12 @@ class ControlPlaneKind(pulumi.ComponentResource):
             opts=child_options(),
         )
 
-        awx_aliases = (
-            [pulumi.Alias(type_=legacy_awx_type)] if legacy_awx_type else None
-        )
         awx = (
             ManagementAWXControlPlane(
                 "awx",
                 flux_source_namespace=flux_source_namespace,
                 flux_source_name=flux_source_name,
-                legacy_parent=(
-                    legacy_awx_parent
-                    if legacy_awx_parent is not None
-                    else self if legacy_awx_type else None
-                ),
-                opts=pulumi.ResourceOptions(parent=self, aliases=awx_aliases),
+                opts=child_options(),
             )
             if spec.enable_awx
             else None
