@@ -138,7 +138,6 @@ def _containerd_docker_io_mirror_commands(
             "systemctl restart containerd",
         ]
 
-    port = registry_setting["port"]
     return [
         f"mkdir -p {_DOCKER_IO_HOSTS_DIR}",
         (
@@ -153,7 +152,7 @@ def _containerd_docker_io_mirror_commands(
             "fi\n"
             f"cat >{_DOCKER_IO_HOSTS_DIR}/hosts.toml <<EOF\n"
             f'server = "{_DOCKER_IO_SERVER}"\n\n'
-            f'[host."http://${{_CA4S_REGISTRY_HOST}}:{port}"]\n'
+            f'[host."http://${{_CA4S_REGISTRY_HOST}}:{registry_setting["port"]}"]\n'
             '  capabilities = ["pull", "resolve"]\n'
             "EOF"
         ),
@@ -165,8 +164,7 @@ def _resource_name(tenant: str, suffix: str) -> str:
     normalized = _DNS_LABEL_INVALID_CHARS.sub("-", tenant.lower()).strip("-")
     if not normalized:
         raise ValueError("tenant must contain at least one alphanumeric character")
-    max_tenant_length = _DNS_LABEL_MAX_LENGTH - len(suffix) - 1
-    normalized = normalized[:max_tenant_length].rstrip("-")
+    normalized = normalized[: _DNS_LABEL_MAX_LENGTH - len(suffix) - 1].rstrip("-")
     return f"{normalized}-{suffix}"
 
 

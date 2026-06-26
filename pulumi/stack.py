@@ -29,14 +29,6 @@ def run_stack() -> None:
     """Build the Kind management-cluster graph from config and discovery."""
     config = pulumi.Config()
 
-    enable_lb_port_mapping = config.get_bool("enable_lb_port_mapping", True)
-
-    gitops_provider = config.get("gitops_provider") or "gitea-builtin"
-    gitops_sync_triggers = (
-        config.get_object("gitops_sync_triggers")
-        or {}
-    )
-    configured_gitops_provider_args = config.get_object("gitops_provider_args") or {}
     local_environment = discover_local_environment(
         azure_client_id_hint=config.get("azureClientId"),
         azure_principal_id_hint=config.get("azurePrincipalId"),
@@ -72,19 +64,23 @@ def run_stack() -> None:
         metadata={"name": PKO_NAMESPACE},
         opts=pulumi.ResourceOptions(provider=mgmt_provider),
     )
-    lb = CloudProviderKind("lb", enable_lb_port_mapping=enable_lb_port_mapping)
+    lb = CloudProviderKind(
+        "lb",
+        enable_lb_port_mapping=config.get_bool("enable_lb_port_mapping", True),
+    )
     flux = FluxInfrastructure("flux", provider=mgmt_provider)
 
+    gitops_provider = config.get("gitops_provider") or "gitea-builtin"
     repo = GitOpsRepository(
         "gitops",
         gitops_provider_name=gitops_provider,
         gitops_provider_args={
-            **configured_gitops_provider_args,
+            **(config.get_object("gitops_provider_args") or {}),
             "kubeconfig": cluster.kubeconfig,
             "flux_provider": mgmt_provider,
             "flux_infrastructure": flux,
             "pko_namespace_resource": pko_namespace,
-            "sync_triggers": gitops_sync_triggers,
+            "sync_triggers": config.get_object("gitops_sync_triggers") or {},
         },
     )
 
@@ -129,16 +125,6 @@ def _azure_child_config(
 
     azure_location = azure_environment.location
     azure_resource_group = azure_environment.resource_group
-    aks_kubernetes_version = config.get("aksKubernetesVersion")
-    aks_node_sku = config.get("aksNodeSku")
-    aks_node_count = config.get_int("aksNodeCount")
-    azure_additional_tags = _normalize_additional_tags(
-        config.get_object("azureAdditionalTags")
-    )
-    azure_allowed_namespaces = _normalize_allowed_namespaces(
-        config.get_object("azureClusterIdentityAllowedNamespaces")
-    )
-    skip_in_cluster_preflight = config.get_bool("skip_in_cluster_preflight", False)
 
     exports.update(
         {
@@ -163,19 +149,25 @@ def _azure_child_config(
             principal_id=azure_environment.principal_id,
             tenant_id=azure_environment.tenant_id,
             subscription_id=azure_environment.subscription_id,
-            allowed_namespaces=azure_allowed_namespaces,
+            allowed_namespaces=_normalize_allowed_namespaces(
+                config.get_object("azureClusterIdentityAllowedNamespaces")
+            ),
             infrastructure_providers=(
                 local_environment.management_defaults.infrastructure_providers
             ),
-            skip_in_cluster_preflight=skip_in_cluster_preflight,
+            skip_in_cluster_preflight=config.get_bool(
+                "skip_in_cluster_preflight", False
+            ),
         ),
         **build_aks_workload_cluster_child_config(
             location=azure_location,
             resource_group=azure_resource_group,
-            additional_tags=azure_additional_tags,
-            aks_kubernetes_version=aks_kubernetes_version,
-            aks_node_sku=aks_node_sku,
-            aks_node_count=aks_node_count,
+            additional_tags=_normalize_additional_tags(
+                config.get_object("azureAdditionalTags")
+            ),
+            aks_kubernetes_version=config.get("aksKubernetesVersion"),
+            aks_node_sku=config.get("aksNodeSku"),
+            aks_node_count=config.get_int("aksNodeCount"),
         ),
     }
 

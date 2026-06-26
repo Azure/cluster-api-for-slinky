@@ -86,8 +86,7 @@ def _resource_name(tenant: str, suffix: str) -> str:
     normalized = dns_label_invalid_chars.sub("-", tenant.lower()).strip("-")
     if not normalized:
         raise ValueError("tenant must contain at least one alphanumeric character")
-    max_tenant_length = dns_label_max_length - len(suffix) - 1
-    normalized = normalized[:max_tenant_length].rstrip("-")
+    normalized = normalized[: dns_label_max_length - len(suffix) - 1].rstrip("-")
     return f"{normalized}-{suffix}"
 
 
@@ -144,11 +143,9 @@ def _controller_pod_spec() -> dict[str, object]:
 
 
 def _keda_values() -> dict[str, object]:
-    controller_node_selector = {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
-    controller_tolerations = _controller_tolerations()
     component_placement = {
-        "nodeSelector": controller_node_selector,
-        "tolerations": controller_tolerations,
+        "nodeSelector": {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE},
+        "tolerations": _controller_tolerations(),
     }
     return {
         **component_placement,

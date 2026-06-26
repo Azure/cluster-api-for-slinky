@@ -74,8 +74,7 @@ def _resource_name(instance: str, suffix: str | None = None) -> str:
         raise ValueError("instance must contain at least one alphanumeric character")
     if suffix is None:
         return normalized[:_DNS_LABEL_MAX_LENGTH].rstrip("-")
-    max_instance_length = _DNS_LABEL_MAX_LENGTH - len(suffix) - 1
-    normalized = normalized[:max_instance_length].rstrip("-")
+    normalized = normalized[: _DNS_LABEL_MAX_LENGTH - len(suffix) - 1].rstrip("-")
     return f"{normalized}-{suffix}"
 
 

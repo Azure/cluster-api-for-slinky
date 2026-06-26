@@ -73,8 +73,11 @@ def _provider_module_name(provider_name: str) -> str:
 
 
 def _provider_class_name(provider_name: str, suffix: str) -> str:
-    parts = provider_name.replace("_", "-").split("-")
-    return "".join(part.capitalize() for part in parts if part) + suffix
+    return "".join(
+        part.capitalize()
+        for part in provider_name.replace("_", "-").split("-")
+        if part
+    ) + suffix
 
 
 def _load_provider_class(provider_name: str, suffix: str) -> type[Any]:

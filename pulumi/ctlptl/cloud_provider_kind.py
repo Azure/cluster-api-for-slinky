@@ -234,14 +234,16 @@ def _check_binary_caps(binary: str) -> Optional[set]:
     if len(parts) < 2:
         return set()
     # "cap_a,cap_b=eip" → drop the "=mode" suffix, split on commas.
-    rhs = parts[1].split("=", 1)[0]
-    return {c.strip().lower() for c in rhs.split(",") if c.strip()}
+    return {
+        c.strip().lower()
+        for c in parts[1].split("=", 1)[0].split(",")
+        if c.strip()
+    }
 
 
 def _setcap_command(binary: str) -> str:
     """Return the exact one-liner the user should paste."""
-    caps = ",".join(_OPTIONAL_CAPS)
-    return f"sudo setcap '{caps}=+eip' {binary}"
+    return f"sudo setcap '{','.join(_OPTIONAL_CAPS)}=+eip' {binary}"
 
 
 def _missing_caps(binary: str) -> Optional[set]:
@@ -390,8 +392,9 @@ class _CloudProviderKindProvider(ResourceProvider):
         # respawns the daemon with the new argv.
         replaces: list[str] = []
         old_flag = olds.get("enable_lb_port_mapping")
-        new_flag = news.get("enable_lb_port_mapping", True)
-        if old_flag is None or bool(old_flag) != bool(new_flag):
+        if old_flag is None or bool(old_flag) != bool(
+            news.get("enable_lb_port_mapping", True)
+        ):
             replaces.append("enable_lb_port_mapping")
         return DiffResult(changes=bool(replaces), replaces=replaces)
 

@@ -91,11 +91,10 @@ def parse_control_plane_kind_config(value: object | None) -> ControlPlaneKindCon
         if azure_value is not None
         else None
     )
-    infrastructure_providers = (
-        azure.infrastructure_providers if azure is not None else ("docker",)
-    )
     return ControlPlaneKindConfig(
-        infrastructure_providers=infrastructure_providers,
+        infrastructure_providers=(
+            azure.infrastructure_providers if azure is not None else ("docker",)
+        ),
         enable_awx=awx_config.enable_awx,
         azure=azure,
     )

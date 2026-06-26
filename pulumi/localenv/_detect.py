@@ -81,12 +81,13 @@ def discover_local_environment(
         azure_resource_group_hint=azure_resource_group_hint,
         warnings=warnings,
     )
-    providers = ("docker", "azure") if azure is not None else ("docker",)
     return LocalEnvironment(
         local_username=_discover_local_username(),
         azure=azure,
         management_defaults=ManagementPlaneDefaults(
-            infrastructure_providers=providers,
+            infrastructure_providers=(
+                ("docker", "azure") if azure is not None else ("docker",)
+            ),
         ),
         warnings=tuple(warnings),
     )

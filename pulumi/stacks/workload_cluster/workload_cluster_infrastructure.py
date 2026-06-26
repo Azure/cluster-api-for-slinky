@@ -42,8 +42,7 @@ def _resource_name(tenant: str, suffix: str) -> str:
     normalized = _DNS_LABEL_INVALID_CHARS.sub("-", tenant.lower()).strip("-")
     if not normalized:
         raise ValueError("tenant must contain at least one alphanumeric character")
-    max_tenant_length = _DNS_LABEL_MAX_LENGTH - len(suffix) - 1
-    normalized = normalized[:max_tenant_length].rstrip("-")
+    normalized = normalized[: _DNS_LABEL_MAX_LENGTH - len(suffix) - 1].rstrip("-")
     return f"{normalized}-{suffix}"
 
 

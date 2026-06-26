@@ -256,8 +256,10 @@ def _registry_port(data: dict) -> Optional[int]:
 
 def _registry_env(data: dict) -> list[str]:
     """Return a registry object's live container environment."""
-    env = data.get("env") or data.get("status", {}).get("env") or []
-    return [str(item) for item in env]
+    return [
+        str(item)
+        for item in data.get("env") or data.get("status", {}).get("env") or []
+    ]
 
 
 def _env_is_compatible(data: dict, desired_env: Optional[list[str]]) -> bool:
@@ -372,21 +374,19 @@ class _CtlptlRegistryProvider(ResourceProvider):
         registry_name: str = props.get("registry_name") or (
             f"{props.get('_autoname_seed') or 'ctlptl-registry'}-{secrets.token_hex(4)}"
         )
-        desired_port: Optional[int] = props.get("port")
         _run(
             ["ctlptl", "apply", "-f", "-"],
             stdin=_registry_manifest(
                 registry_name,
-                desired_port,
+                props.get("port"),
                 env,
             ),
         )
-        port = _observe_port(registry_name)
         return CreateResult(
             id_=registry_name,
             outs={
                 "registry_name": registry_name,
-                "port": port,
+                "port": _observe_port(registry_name),
                 "env": env,
                 "adopt_existing": adopt_existing,
                 "adopted": False,
