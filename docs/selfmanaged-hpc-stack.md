@@ -5,7 +5,7 @@ workload cluster `caps-self` and the intended path to running **HPC-X MPI** jobs
 on it under Slurm. It is distinct from:
 
 - the **AKS-managed** workload path (`aks-workload-cluster.yaml`), and
-- the **CAPD / Slinky** local dev path (`capi-quickstart.yaml`, `docs/autoscaling.md`).
+- the **CAPD / Slinky** local dev path (Pulumi `local` stack; `docs/autoscaling.md`).
 
 Source of truth for the cluster shape: [selfmanaged-workload-cluster.yaml](../selfmanaged-workload-cluster.yaml).
 
