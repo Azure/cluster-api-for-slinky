@@ -1,0 +1,49 @@
+# Helm values for the Slinky `slurm-bridge` chart on the `caps-self` cluster.
+#
+# Scope: a SMALL, CPU-only experiment to validate the basic co-scheduling idea
+# (Slurm acting as the Kubernetes scheduler for select pods, sharing the same
+# nodes as native Slurm jobs). NO GPU/DRA, NO custom Slurm image.
+#
+# Install (done by run.sh, ON the mgmt VM, against the caps-self kubeconfig):
+#   helm upgrade --install slurm-bridge \
+#     oci://ghcr.io/slinkyproject/charts/slurm-bridge \
+#     -n slurm -f slurm-bridge-values.yaml
+#
+# Components land in ns `slurm` (alongside the slinky Slurm cluster):
+#   slurm-bridge-scheduler / -controllers / -admission.
+
+schedulerConfig:
+  # Non-primary scheduler name. The admission webhook stamps this onto pods in
+  # the managed namespace(s); it does NOT replace the default kube-scheduler.
+  schedulerName: slurm-bridge-scheduler
+  # MCS label applied to the representative Slurm "external" jobs.
+  mcsLabel: kubernetes
+  # IMPORTANT (caps-self-specific): reuse the EXISTING Slurm partition `all`
+  # instead of the chart default `slurm-bridge`. On caps-self every Slurm node is
+  # a hybrid compute node (slurmd DaemonSet co-located with kubelet), and the
+  # `all` partition already contains exactly those nodes — so it satisfies the
+  # bridge requirement that the partition hold only Slurm nodes that map to
+  # Kubernetes nodes. This avoids a `helm upgrade` of the Slurm chart just to add
+  # a partition. Sharing one partition between native jobs and bridge external
+  # jobs is also what makes the co-scheduling contention demo meaningful.
+  # (Production: prefer a dedicated `slurm-bridge` partition.)
+  partition: all
+
+admission:
+  enabled: true
+  # Pods created in these namespaces have `.spec.schedulerName` rewritten to
+  # slurm-bridge-scheduler automatically. The experiment submits its CPU Job into
+  # `slurm-bridge`.
+  managedNamespaces:
+    - slurm-bridge
+
+controllers:
+  replicas: 1
+
+sharedConfig:
+  # The slinky Slurm chart exposes slurmrestd as the `slurm-restapi` Service in
+  # the `slurm` namespace on port 6820 (chart default — matches caps-self).
+  slurmRestApi: http://slurm-restapi.slurm:6820
+  # Secret (in ns slurm) holding the SLURM_JWT used to talk to slurmrestd. It is
+  # populated by the Token CR in slurm-bridge-token.yaml (operator-managed).
+  slurmJwtSecret: slurm-bridge-token

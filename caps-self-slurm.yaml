@@ -1,0 +1,150 @@
+# Slinky Slurm cluster values for the `caps-self` self-managed workload cluster.
+#
+# Differs from slurm-cluster.yaml (the CAPD/Slinky dev path): caps-self has 1 k8s
+# control-plane node (tainted) + 2 HPC workers labeled
+# `slinky.slurm.net/node-type=compute`. There is NO dedicated controller node, so
+# the lightweight control-plane components (slurmctld, slurmrestd) use default
+# placement and land on the workers; only slurmd is pinned to the compute nodes.
+#
+# slurmd runs as a DaemonSet (one per compute worker) and BIND-MOUNTS the host HPC
+# image's HPC-X tree at /opt/hpcx, so an MPI job can `source /opt/hpcx/hpcx-init.sh;
+# hpcx_load; mpirun ...`. On the Standard_ND96asr_v4 SKU (8x A100 + HDR IB) the
+# slurmd pod also mounts /dev/infiniband + a Memory-backed /dev/shm so HPC-X/UCX
+# can use RDMA (UCX_TLS=rc).
+#
+# rdma-core IS IN THE IMAGE (verified 2026-06-26 by probing
+# ghcr.io/slinkyproject/slurmd:25.11-ubuntu24.04): the image already ships the
+# full rdma-core userspace stack UCX needs for IB — libibverbs.so.1, the
+# libmlx5.so.1 provider, librdmacm.so.1, libnl-3/route, the bundled UCX
+# (libucp/libucs), and /etc/libibverbs.d/mlx5.driver. So NO custom slurmd image
+# and NO host rdma-core bind-mount are required: the host /opt/hpcx bind-mount
+# (HPC-X launcher + OSU) + /dev/infiniband + a privileged, host-networked pod are
+# sufficient for real in-pod RDMA (UCX_TLS=rc). HPC-X UCX from /opt/hpcx wins via
+# LD_LIBRARY_PATH and dlopen()s the image's inbox libibverbs/libmlx5 (verbs ABI is
+# stable). See docs/selfmanaged-hpc-stack.md §7/§9.
+clusterName: caps-self
+
+# Disable the cgroup plugin — slurmd runs in a container without its own cgroup
+# hierarchy, so the default cgroup plugin would fail.
+configFiles:
+  cgroup.conf: |
+    CgroupPlugin=disabled
+
+controller:
+  persistence:
+    enabled: true
+    # uses the default StorageClass (local-path)
+    resources:
+      requests:
+        storage: 2Gi
+
+# Accounting (slurmdbd) — REQUIRED for durable `sacct` job history, which is how
+# the Slurm benchmark harness (scripts/nccl-slurm/) detects NCCL/MPI job failures
+# AFTER they leave the queue. It is the analog of hpc-image-val2 PR 740's PBS
+# `job_history_enable=t` + `qstat -xf`: without it, finished jobs age out of
+# `scontrol` (MinJobAge, ~5 min) and a crashed run is indistinguishable from a
+# successful one.
+#
+# Enabling slurmdbd needs a storage backend (MariaDB). NOTE: slinky slurm chart
+# v1.1.1 does NOT bundle a mariadb subchart (verified: no chart dependency and no
+# top-level `mariadb:` value), and the Accounting CR requires a pre-existing
+# `mariadb-password` Secret plus a reachable `mariadb` service. Until that
+# external MariaDB is wired up, accounting is DISABLED so slurmctld can start and
+# the slurmd NodeSet can register. Re-enable once MariaDB + the Secret exist.
+accounting:
+  enabled: false
+
+# MariaDB backing store for slurmdbd. NOTE: chart v1.1.1 IGNORES this block (no
+# bundled mariadb subchart). Kept here (disabled) as a template for a future
+# standalone MariaDB deployment (e.g. a separate bitnami/mariadb release) whose
+# service must be named `mariadb` with a `mariadb-password` Secret (key
+# `password`), database `slurm_acct_db`, user `slurm`.
+mariadb:
+  enabled: false
+  auth:
+    username: slurm
+    database: slurm_acct_db
+    # password is auto-generated into a Secret when left unset
+  primary:
+    persistence:
+      enabled: true
+      storageClass: local-path
+      size: 8Gi
+  nodeSelector:
+    kubernetes.io/os: linux
+
+loginsets:
+  slinky:
+    enabled: false
+
+nodesets:
+  slinky:
+    enabled: true
+    # One slurmd per compute node (both HPC workers).
+    scalingMode: DaemonSet
+    slurmd:
+      volumeMounts:
+        # Host HPC-X (from the ubuntu-hpc image) mounted read-only. hpcx-init.sh
+        # computes paths relative to itself, so the version-suffixed host dir maps
+        # cleanly to the fixed /opt/hpcx mount point.
+        - name: hpcx
+          mountPath: /opt/hpcx
+          readOnly: true
+        # InfiniBand (Standard_ND96asr_v4). The HCA char devices
+        # (/dev/infiniband/uverbs*, rdma_cm) must be visible inside slurmd for
+        # UCX's RDMA transport. The container is privileged (operator-rendered),
+        # so it can open them.
+        - name: infiniband
+          mountPath: /dev/infiniband
+        # MPI/RDMA need a large shared-memory segment; the container's default
+        # 64MB /dev/shm is too small for IB registered buffers + intra-node shm.
+        - name: dshm
+          mountPath: /dev/shm
+    podSpec:
+      # Host networking (mentor-directed; also the posture the InfiniBand path
+      # needs). hostNetwork puts MPI traffic on the host NICs directly (no Calico
+      # VXLAN overlay); ClusterFirstWithHostNet keeps cluster DNS so slurmd can
+      # still resolve the slurmctld service.
+      #
+      # NOTE: privileged for the slurmd container is NOT settable via this chart
+      # (v1.1.1 exposes `securityContext` on loginsets but not on nodesets.slurmd,
+      # and podSpec.containers only APPENDS — adding one here makes a duplicate
+      # `slurmd` container and wedges the NodeSet). It is applied out-of-band by
+      # patching the NodeSet pod template (see docs / day-2). privileged grants the
+      # host /dev (incl. /dev/infiniband) + IPC_LOCK for the RDMA path.
+      #
+      # MEMLOCK: there is no pod-spec field for RLIMIT_MEMLOCK, but it is already
+      # covered — privileged carries CAP_IPC_LOCK, which exempts the process from
+      # the RLIMIT_MEMLOCK ceiling, so UCX / ibv_reg_mr can pin unlimited RDMA
+      # buffers regardless of the container's default ulimit (srun tasks inherit
+      # this too via the privileged container + Slurm PropagateResourceLimits). If
+      # UCX ever still warns about low memlock, set containerd `default_ulimits` on
+      # the node or raise it in the same out-of-band NodeSet patch.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/os: linux
+        slinky.slurm.net/node-type: compute
+      volumes:
+        - name: hpcx
+          hostPath:
+            path: /opt/hpcx-v2.25.1-gcc-doca_ofed-ubuntu24.04-cuda12-x86_64
+            type: Directory
+        - name: infiniband
+          hostPath:
+            path: /dev/infiniband
+            type: DirectoryOrCreate
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Gi
+
+partitions:
+  all:
+    enabled: true
+    nodesets:
+      - ALL
+    configMap:
+      State: UP
+      Default: "YES"
+      MaxTime: UNLIMITED

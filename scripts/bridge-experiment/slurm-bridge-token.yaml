@@ -1,0 +1,28 @@
+# Slinky `Token` CR — mints a long-lived SLURM_JWT into the Secret that
+# `slurm-bridge` uses to authenticate to slurmrestd. This is the operator-managed
+# path (preferred over a manual `scontrol token`): the slurm-operator keeps the
+# Secret refreshed.
+#
+# ${JWT_KEY_SECRET} is substituted by run.sh with the auto-detected name of the
+# Slurm JWT signing-key Secret in ns `slurm` (the slinky chart usually names it
+# `slurm-auth-jwt`, but run.sh detects whatever holds a `jwt.key` data field, so
+# this stays correct across releases/renames).
+#
+# NOTE: a long lifetime is intentional — slurm-bridge does not auto-restart when
+# the secret is refreshed (upstream limitation), so a short-lived token would
+# silently break auth on rotation.
+apiVersion: slinky.slurm.net/v1beta1
+kind: Token
+metadata:
+  name: slurm-bridge-token
+  namespace: slurm
+spec:
+  jwtKeyRef:
+    name: ${JWT_KEY_SECRET}
+    key: jwt.key
+  secretRef:
+    name: slurm-bridge-token
+    key: auth-token
+  username: slurm
+  refresh: true
+  lifetime: 8760h

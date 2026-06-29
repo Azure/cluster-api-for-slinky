@@ -1,0 +1,45 @@
+# Demo A workload: a plain CPU Kubernetes Job that is scheduled by Slurm (via
+# slurm-bridge) instead of the default kube-scheduler.
+#
+# It lives in the managed namespace `slurm-bridge`, so the bridge admission
+# webhook rewrites `.spec.schedulerName` to `slurm-bridge-scheduler` on create —
+# we deliberately do NOT hard-code schedulerName here so the experiment actually
+# exercises (and verifies) the admission path. run.sh asserts the rewrite landed.
+#
+# Stock `busybox` image: NO custom Slurm image, NO GPU, NO privileges. The bridge
+# makes an exclusive WHOLE-NODE allocation per pod regardless of the cpu request
+# below (that request only shapes the representative Slurm job).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bridge-cpu-hello
+  namespace: slurm-bridge
+  # Optional slurm-bridge annotations on the parent object influence how the
+  # representative Slurm external job is submitted.
+  annotations:
+    slurmjob.slinky.slurm.net/job-name: bridge-cpu-hello
+    slurmjob.slinky.slurm.net/timelimit: "5"
+spec:
+  backoffLimit: 0
+  completions: 1
+  parallelism: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: hello
+          image: busybox:stable
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "[bridge-cpu-hello] running on node $(hostname) with $(nproc) cpus at $(date -u)"
+              sleep 15
+              echo "[bridge-cpu-hello] done"
+          resources:
+            requests:
+              cpu: "1"
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 64Mi

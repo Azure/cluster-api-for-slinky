@@ -1,0 +1,398 @@
+# =============================================================================
+# Self-managed workload cluster — CAPZ + kubeadm (NOT AKS).
+# =============================================================================
+#
+# We own the control plane here: etcd, API server, and scheduler run on Azure
+# VMs that CAPZ provisions and kubeadm bootstraps. Modeled on the CAPZ v1.23.2
+# `cluster-template-machinepool.yaml`, adapted for this environment.
+#
+# Apply on the MANAGEMENT kind cluster (where CAPI/CAPZ run):
+#     kubectl --context kind-mgmt-<hex> apply -f selfmanaged-workload-cluster.yaml
+#
+# Decisions baked in:
+#   * 1 control-plane replica (dev; no etcd HA)
+#   * workers = AzureMachinePool, VMSS *Uniform* (default; Flex is a later step)
+#   * CNI = Calico (installed on the workload cluster AFTER the CP is up)
+#   * RG `rg-capz-mi-scus` (created with an Owner tag → the VM Azure Policy is
+#     satisfied; no auto-created MC_ node RG here)
+#   * k8s v1.36.1
+#   * reuse the Phase-1 `cluster-identity` (UserAssignedMSI) — referenced, not
+#     redefined
+#
+# Images:
+#   * control plane: default CAPI community-gallery image
+#     (capi-ubun2-2404/1.36.1) — kubeadm/kubelet/containerd already baked in, so
+#     no extra provisioning is needed there.
+#   * workers: for now a STANDARD, low-cost Azure Marketplace Ubuntu 24.04 LTS
+#     image (Canonical / ubuntu-24_04-lts / server) — the same base that
+#     `azhpc-images` builds on. It carries no Kubernetes, so `preKubeadmCommands`
+#     on the worker KubeadmConfig install kubelet/kubeadm/containerd pinned to
+#     v1.36.1 before kubeadm join runs. This keeps dev costs down while the
+#     bring-up is validated.
+#   * FUTURE: swap the worker image to the HPC image built by `azhpc-images` and
+#     promoted to the `AzHPCImageRelease` Azure Compute Gallery by the
+#     `hpc-image-val` pipeline, referenced via `image.computeGallery` per the
+#     CAPZ custom-images guide
+#     (https://capz.sigs.k8s.io/self-managed/custom-images). The same
+#     preKubeadmCommands apply (the HPC image ships GPU/IB bits but no k8s).
+#
+# NOTE / TODO (tracked, not yet done):
+#   * vmSize + image architecture must agree. Workers are on `Standard_ND40rs_v2`
+#     (x86_64, 8x V100 GPU + 100Gb EDR InfiniBand) with the x86_64 ubuntu-hpc
+#     V100 image, so HPC-X can run real RDMA MPI (`UCX_TLS=rc`). The two instances
+#     share one VMSS placement group (Uniform default, <=100 VMs) which the IB
+#     fabric requires; a proximity placement group is only needed when mixing
+#     SKUs or pinning latency across multiple scale sets.
+#   * The azhpc-images build disables cloud-init on some variants; CAPZ/kubeadm
+#     bootstrap REQUIRES cloud-init, so confirm it is enabled on the chosen HPC
+#     image definition/version before switching to it.
+#   * The HPC gallery lives in the `HPCScrub1` subscription (RG
+#     `azhpc-images-rg`), NOT the cluster subscription — when switching to the
+#     computeGallery image, set that gallery subscriptionID and pin a validated
+#     image version.
+#
+# cloud-provider: external everywhere — the in-tree Azure provider is gone, so
+# the nodes stay NotReady (and tainted uninitialized) until cloud-provider-azure
+# (CCM/CNM) + Calico are installed on the workload cluster. CAPZ auto-creates the
+# `*-azure-json` cloud-config secrets the kubeadm files below mount.
+#
+# The control-plane VMs + worker VMSS authenticate to Azure (for CCM, disks, LB)
+# via the same UAMI attached to the mgmt VM, referenced by providerID below.
+# =============================================================================
+
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: caps-self
+  namespace: default
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+        - 192.168.0.0/16
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KubeadmControlPlane
+    name: caps-self-control-plane
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AzureCluster
+    name: caps-self
+
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureCluster
+metadata:
+  name: caps-self
+  namespace: default
+spec:
+  identityRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AzureClusterIdentity
+    name: cluster-identity
+    namespace: default
+  location: southcentralus
+  resourceGroup: rg-capz-mi-scus
+  subscriptionID: d2c9544f-4329-4642-b73d-020e7fef844f
+  # SCUS move: the workload cluster lives in its OWN VNet (vnet-capz-mi-scus,
+  # 10.1.0.0/16) which is GLOBALLY PEERED to the westus2 management VNet
+  # (vm-capz-mi-devVNET, 10.0.0.0/16). The mgmt VM reaches the workload API
+  # server's Internal LB over that peering (a Standard internal LB IS reachable
+  # across global peering; only Basic is not). Standard_ND40rs_v2 (V100) is only
+  # offered in SCUS for this subscription, across zones 1/2/3 — see MachinePool below.
+  networkSpec:
+    vnet:
+      name: vnet-capz-mi-scus
+      resourceGroup: rg-capz-mi-scus
+    # Internal API LB => private IP in the control-plane subnet, reachable from
+    # the mgmt VM over the global VNet peering (intra-VNet/peered 6443 is NOT
+    # corp-egress filtered, unlike the public endpoint which was blocked).
+    apiServerLB:
+      type: Internal
+      frontendIPs:
+        - name: caps-self-internal-lb-frontend
+          privateIP: 10.1.1.100
+    subnets:
+      - name: caps-self-cp-subnet
+        role: control-plane
+        cidrBlocks:
+          - 10.1.1.0/24
+        # The CP node has no public IP and the API LB is Internal, so this subnet
+        # has NO outbound path by default — CAPZ only auto-provisions egress for
+        # NODE subnets. Without it the CP node cannot pull addon/system images
+        # (Calico, cloud-provider-azure, any new pod). Declaring the NAT gateway
+        # HERE makes CAPZ create+own it, so it survives reconciliation. (A manual
+        # `az ... subnet update --nat-gateway` on this CAPZ-managed subnet gets
+        # reverted on the next reconcile.)
+        natGateway:
+          name: caps-self-cp-natgw
+      - name: caps-self-node-subnet
+        role: node
+        cidrBlocks:
+          - 10.1.2.0/24
+  additionalTags:
+    Owner: t-hernandezc
+
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  name: caps-self-control-plane
+  namespace: default
+spec:
+  replicas: 1
+  version: v1.36.1
+  machineTemplate:
+    infrastructureRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      kind: AzureMachineTemplate
+      name: caps-self-control-plane
+  kubeadmConfigSpec:
+    clusterConfiguration:
+      controllerManager:
+        extraArgs:
+          allocate-node-cidrs: "false"
+          cloud-provider: external
+          cluster-name: caps-self
+    # CAPZ auto-generates this secret with the Azure cloud-provider config.
+    files:
+      - contentFrom:
+          secret:
+            name: caps-self-control-plane-azure-json
+            key: control-plane-azure.json
+        owner: root:root
+        path: /etc/kubernetes/azure.json
+        permissions: "0644"
+    # The CP now boots the Ubuntu-HPC marketplace image (see the
+    # AzureMachineTemplate image: block) because the default CAPI gallery image
+    # is not replicated to SCUS. That image carries NO Kubernetes, so install
+    # containerd (reuse the image's moby-containerd if present) + kubelet/kubeadm/
+    # kubectl pinned to v1.36.1 before `kubeadm init` runs. Mirrors the worker
+    # KubeadmConfig.preKubeadmCommands — keep the two lists in lockstep.
+    preKubeadmCommands:
+      - set -eux
+      - export DEBIAN_FRONTEND=noninteractive
+      - apt-get -o DPkg::Lock::Timeout=600 update -y
+      - apt-get -o DPkg::Lock::Timeout=600 install -y apt-transport-https ca-certificates curl gpg
+      - command -v containerd >/dev/null 2>&1 || apt-get -o DPkg::Lock::Timeout=600 install -y containerd
+      - mkdir -p /etc/containerd
+      - containerd config default > /etc/containerd/config.toml
+      - sed -ri 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+      - systemctl restart containerd
+      - systemctl enable containerd
+      - modprobe overlay
+      - modprobe br_netfilter
+      - printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/k8s.conf
+      - printf 'net.bridge.bridge-nf-call-iptables=1\nnet.bridge.bridge-nf-call-ip6tables=1\nnet.ipv4.ip_forward=1\n' > /etc/sysctl.d/k8s.conf
+      - sysctl --system
+      - swapoff -a
+      - sed -ri '/\sswap\s/s/^/#/' /etc/fstab
+      - mkdir -p /etc/apt/keyrings
+      - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      - echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.36/deb/ /' > /etc/apt/sources.list.d/kubernetes.list
+      - apt-get -o DPkg::Lock::Timeout=600 update -y
+      - apt-get -o DPkg::Lock::Timeout=600 install -y kubelet=1.36.1-1.1 kubeadm=1.36.1-1.1 kubectl=1.36.1-1.1
+      - apt-mark hold kubelet kubeadm kubectl
+      - apt-mark hold containerd 2>/dev/null || apt-mark hold moby-containerd 2>/dev/null || true
+      - systemctl enable kubelet
+    initConfiguration:
+      nodeRegistration:
+        name: '{{ ds.meta_data["local_hostname"] }}'
+        kubeletExtraArgs:
+          cloud-provider: external
+    joinConfiguration:
+      nodeRegistration:
+        name: '{{ ds.meta_data["local_hostname"] }}'
+        kubeletExtraArgs:
+          cloud-provider: external
+
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureMachineTemplate
+metadata:
+  name: caps-self-control-plane
+  namespace: default
+spec:
+  template:
+    spec:
+      vmSize: Standard_D2as_v5
+      image:
+        marketplace:
+          publisher: microsoft-dsvm
+          offer: ubuntu-hpc
+          sku: "2404-v100"
+          version: 24.04.2026052501
+      osDisk:
+        diskSizeGB: 128
+        osType: Linux
+      # Authenticate the CP VMs to Azure (CCM, disks, LB) via the existing UAMI.
+      identity: UserAssigned
+      userAssignedIdentities:
+        - providerID: azure:///subscriptions/d2c9544f-4329-4642-b73d-020e7fef844f/resourceGroups/rg-capz-mi-dev2/providers/Microsoft.ManagedIdentity/userAssignedIdentities/rg-capz-mi-dev2
+      sshPublicKey: c3NoLXJzYSBBQUFBQjNOemFDMXljMkVBQUFBREFRQUJBQUFCQVFEaFUyKzg2clArMHYyeTE4WURNMEZORTArd0xYR1JYd2ZvQlNnM2hJbHFRanBuUk5lU3luT3k5K20xUHZ4WVNtdWM3eGM0V2dVTWhTZ2FMclYyc3pPQnBQNlNlblM5QlRzazJYM1l4ejBlVTFPNmlTZHMyZi8xUmFoUTR5SHdVRndFWVFtVWVCbnhSUmc2Yzd3enNVZk1KQlIvc3FrYXBIc1ErS1FpMEx3TjZRR2ppSHdWYWVkYXZ0Qkw4YXpVNzAxRGRpTXhGdWhENkdpU0hVVjNWQTUra2FpS053aTFEb2R3U3EzUXZRUEUrT1J0WlBRU1d6N256bzYvRC9HeUdWYUZGL2JjYXlkMFpEc3ZxOFpldnRDOXVZbUluajIzVEtGdVlMendaTU9PNW1xZTM5SU1USzhMREx6bmFIazk5K2xvYnQyWEdhNXl2SnhZMkRZaGd4RmIgYXp1cmV1c2VyQHZtLWNhcHotbWktZGV2Cg==
+      # Stamp the Owner tag directly on the control-plane VMs. The AzureCluster
+      # carries additionalTags too, but the org Azure Policy DENIES VM creation
+      # when the tag is missing on the VM resource itself — relying on
+      # cluster-level tag propagation races that Deny check at PUT time. Setting
+      # it here (mirroring the worker AzureMachinePool.additionalTags) guarantees
+      # the tag is in the VM create body. RG-level tags do NOT auto-inherit to
+      # child resources in Azure, so the pre-tagged RG alone is not sufficient.
+      additionalTags:
+        Owner: t-hernandezc
+
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachinePool
+metadata:
+  name: caps-self-mp-0
+  namespace: default
+spec:
+  clusterName: caps-self
+  # SCUS V100 move: 2 workers for true cross-node InfiniBand. Standard_ND40rs_v2
+  # (8x V100 + 100Gb EDR IB) is offered in southcentralus across zones 1/2/3 with
+  # NO subscription restriction, and SCUS NDSv2 quota is ample (limit 64736
+  # vCPUs), so both instances should allocate. replicas: 2 = run cross-node,
+  # 1 = single-node/parked.
+  replicas: 2
+  # Pin BOTH workers to ONE availability zone (zone 1). Standard_ND40rs_v2 in SCUS
+  # is zonal (`az vm list-skus -l southcentralus --size Standard_ND40rs_v2` ->
+  # zones:["1","2","3"], no restrictions). Co-locating both instances in a single
+  # zone is required for the InfiniBand placement group / cross-node RDMA, and a
+  # zoneless VMSS can fail to allocate a zonal GPU/IB SKU (as the A100
+  # ND96asr_v4 did in westus2). CAPZ maps failureDomains -> VMSS `.zones`
+  # (immutable; changing zone needs a machinepool delete + re-apply). If zone 1
+  # lacks ND40rs_v2 capacity at apply time, retry with "2" or "3".
+  failureDomains:
+    - "1"
+  template:
+    spec:
+      clusterName: caps-self
+      version: v1.36.1
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: KubeadmConfig
+          name: caps-self-mp-0
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: AzureMachinePool
+        name: caps-self-mp-0
+
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureMachinePool
+metadata:
+  name: caps-self-mp-0
+  namespace: default
+spec:
+  location: southcentralus
+  # orchestrationMode omitted => Uniform (the default). Flexible is a later step.
+  identity: UserAssigned
+  userAssignedIdentities:
+    - providerID: azure:///subscriptions/d2c9544f-4329-4642-b73d-020e7fef844f/resourceGroups/rg-capz-mi-dev2/providers/Microsoft.ManagedIdentity/userAssignedIdentities/rg-capz-mi-dev2
+  template:
+    # HPC worker image: the Azure "Ubuntu-HPC" V100 marketplace image
+    # (microsoft-dsvm:ubuntu-hpc:2404-v100:24.04.2026052501). x86_64 / Gen2, no
+    # marketplace plan. Ships HPC-X (env module `mpi/hpcx`), OpenMPI/Intel MPI/
+    # MVAPICH2, Mellanox OFED+DOCA, and NVIDIA/CUDA+NCCL drivers. It carries NO
+    # Kubernetes, so the worker KubeadmConfig.preKubeadmCommands below install
+    # containerd + kubelet/kubeadm/kubectl. On this GPU IB SKU
+    # (Standard_ND40rs_v2: 8x V100 + 100Gb EDR InfiniBand) the GPU/IB drivers
+    # baked into the image are ACTIVE, so HPC-X/UCX can use RDMA (UCX_TLS=rc)
+    # instead of TCP. Both instances land in one VMSS placement group
+    # (singlePlacementGroup defaults true for Uniform <=100 VMs), which IB needs.
+    # cloud-init MUST be enabled on this image (CAPZ bootstrap requires it).
+    image:
+      marketplace:
+        publisher: microsoft-dsvm
+        offer: ubuntu-hpc
+        sku: "2404-v100"
+        version: 24.04.2026052501
+    vmSize: Standard_ND40rs_v2
+    # 128 GB to comfortably fit the HPC image's baked-in stack (HPC-X, OFED, CUDA
+    # drivers) plus container images; the 30 GB used for the bare Ubuntu image is
+    # too tight for ubuntu-hpc. Matches the control-plane osDisk size.
+    osDisk:
+      diskSizeGB: 128
+      managedDisk:
+        storageAccountType: Premium_LRS
+      osType: Linux
+    sshPublicKey: c3NoLXJzYSBBQUFBQjNOemFDMXljMkVBQUFBREFRQUJBQUFCQVFEaFUyKzg2clArMHYyeTE4WURNMEZORTArd0xYR1JYd2ZvQlNnM2hJbHFRanBuUk5lU3luT3k5K20xUHZ4WVNtdWM3eGM0V2dVTWhTZ2FMclYyc3pPQnBQNlNlblM5QlRzazJYM1l4ejBlVTFPNmlTZHMyZi8xUmFoUTR5SHdVRndFWVFtVWVCbnhSUmc2Yzd3enNVZk1KQlIvc3FrYXBIc1ErS1FpMEx3TjZRR2ppSHdWYWVkYXZ0Qkw4YXpVNzAxRGRpTXhGdWhENkdpU0hVVjNWQTUra2FpS053aTFEb2R3U3EzUXZRUEUrT1J0WlBRU1d6N256bzYvRC9HeUdWYUZGL2JjYXlkMFpEc3ZxOFpldnRDOXVZbUluajIzVEtGdVlMendaTU9PNW1xZTM5SU1USzhMREx6bmFIazk5K2xvYnQyWEdhNXl2SnhZMkRZaGd4RmIgYXp1cmV1c2VyQHZtLWNhcHotbWktZGV2Cg==
+  # Tags applied to the VMSS at creation. AzSecPackAutoConfigReady=true signals the
+  # Azure Security Pack (AzSecPack) auto-config MDM/MDSD onboarding for this scale set.
+  additionalTags:
+    Owner: t-hernandezc
+    AzSecPackAutoConfigReady: "true"
+
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+kind: KubeadmConfig
+metadata:
+  name: caps-self-mp-0
+  namespace: default
+spec:
+  # CAPZ auto-generates this secret with the worker cloud-provider config.
+  files:
+    - contentFrom:
+        secret:
+          name: caps-self-mp-0-azure-json
+          key: worker-node-azure.json
+      owner: root:root
+      path: /etc/kubernetes/azure.json
+      permissions: "0644"
+  # The HPC base image (azhpc-images) carries the GPU/IB/HPC stack and a
+  # container runtime (moby-containerd) but NOT kubelet/kubeadm/kubectl, so
+  # install those pinned to v1.36.1 before kubeadm join runs (and reuse the
+  # image's containerd). Keep these versions in lockstep with the MachinePool
+  # `version:` and the control-plane image.
+  preKubeadmCommands:
+    # cloud-init runs these as one /bin/sh (dash) script, NOT bash. dash has no
+    # `set -o pipefail` ("Illegal option -o pipefail") and would abort the whole
+    # runcmd on its very first line — which previously left the worker with no
+    # containerd/kubelet/kubeadm and a failed `kubeadm join`. Use the POSIX
+    # subset (-eux) so errexit/nounset/xtrace still apply under dash.
+    - set -eux
+    - export DEBIAN_FRONTEND=noninteractive
+    # --- container runtime (CRI) ---
+    # Every apt-get carries `-o DPkg::Lock::Timeout=600`: the ubuntu-hpc image
+    # runs its own apt activity at boot (DOCA/driver setup, unattended-upgrades)
+    # that races the dpkg/frontend lock. Without the timeout, a concurrent lock
+    # holder makes apt-get fail instantly and `set -eux` aborts the whole
+    # bootstrap before `kubeadm join` -> the worker never joins the cluster.
+    - apt-get -o DPkg::Lock::Timeout=600 update -y
+    - apt-get -o DPkg::Lock::Timeout=600 install -y apt-transport-https ca-certificates curl gpg
+    # The ubuntu-hpc image already ships a container runtime (moby-containerd);
+    # only install Ubuntu's `containerd` if none is present. Force-installing it
+    # makes dpkg fail trying to overwrite /usr/bin/containerd (owned by
+    # moby-containerd), which aborts the whole bootstrap before kubeadm join.
+    - command -v containerd >/dev/null 2>&1 || apt-get -o DPkg::Lock::Timeout=600 install -y containerd
+    - mkdir -p /etc/containerd
+    - containerd config default > /etc/containerd/config.toml
+    - sed -ri 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+    - systemctl restart containerd
+    - systemctl enable containerd
+    # --- kernel modules + sysctls kubeadm preflight expects ---
+    - modprobe overlay
+    - modprobe br_netfilter
+    - printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/k8s.conf
+    - printf 'net.bridge.bridge-nf-call-iptables=1\nnet.bridge.bridge-nf-call-ip6tables=1\nnet.ipv4.ip_forward=1\n' > /etc/sysctl.d/k8s.conf
+    - sysctl --system
+    - swapoff -a
+    - sed -ri '/\sswap\s/s/^/#/' /etc/fstab
+    # --- Kubernetes apt repo pinned to the v1.36 patch line ---
+    - mkdir -p /etc/apt/keyrings
+    - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    - echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.36/deb/ /' > /etc/apt/sources.list.d/kubernetes.list
+    - apt-get -o DPkg::Lock::Timeout=600 update -y
+    - apt-get -o DPkg::Lock::Timeout=600 install -y kubelet=1.36.1-1.1 kubeadm=1.36.1-1.1 kubectl=1.36.1-1.1
+    # Pin the k8s packages. containerd may be Ubuntu's `containerd` or the HPC
+    # image's `moby-containerd`, so hold whichever is actually installed.
+    - apt-mark hold kubelet kubeadm kubectl
+    - apt-mark hold containerd 2>/dev/null || apt-mark hold moby-containerd 2>/dev/null || true
+    - systemctl enable kubelet
+  joinConfiguration:
+    nodeRegistration:
+      name: '{{ ds.meta_data["local_hostname"] }}'
+      kubeletExtraArgs:
+        cloud-provider: external
