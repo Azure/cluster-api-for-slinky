@@ -158,6 +158,36 @@ Notes / checks at swap time:
 - The GPU and InfiniBand drivers are present but **dormant** on a non-GPU /
   non-IB SKU (see §7); the same `preKubeadmCommands` still apply.
 
+### Future: boot a validated azhpc image from a Compute Gallery
+
+The next step is to swap the marketplace image for the HPC image built by
+`azhpc-images` and promoted to an Azure Compute Gallery by the `hpc-image-val`
+pipeline — referenced via `image.computeGallery` instead of `image.marketplace`:
+
+```yaml
+# AzureMachinePool.spec.template.image
+image:
+  computeGallery:
+    subscriptionID: <gallery-sub>
+    resourceGroup: azhpc-images-rg
+    gallery: AzHPCImageReleaseCandidates
+    name: UbuntuHPC-24.04-gen2     # image definition (GPU SKUs use a suffixed def)
+    version: "2606.19.2872"        # a specific validated build; pin per release
+```
+
+The same toolchain caveat applies — azhpc images ship the GPU/IB/HPC stack but
+**no Kubernetes**, so `preKubeadmCommands` install kubelet/kubeadm/containerd at
+bootstrap (long-term: bake the toolchain into the image). Keep the **control
+plane** on the default CAPI gallery image (`capi-ubun2-2404`, toolchain
+pre-baked) for a reliable bootstrap; only the **workers** boot the azhpc image
+under validation.
+
+> Prototyped in a since-removed `hpc-image-val-cluster.yaml` sketch — a CAPZ
+> drop-in for the imperative `hpc-image-val` flow (`create_resources.sh` →
+> `kubectl apply`; headnode = control plane + Slurm controller, workers = VMSS
+> booting the azhpc image). Recoverable from git history if that direction is
+> revived.
+
 ---
 
 ## 7. InfiniBand & MPI transport
