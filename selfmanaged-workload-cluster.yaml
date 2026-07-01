@@ -300,8 +300,17 @@ spec:
     # containerd + kubelet/kubeadm/kubectl. On this GPU IB SKU
     # (Standard_ND40rs_v2: 8x V100 + 100Gb EDR InfiniBand) the GPU/IB drivers
     # baked into the image are ACTIVE, so HPC-X/UCX can use RDMA (UCX_TLS=rc)
-    # instead of TCP. Both instances land in one VMSS placement group
-    # (singlePlacementGroup defaults true for Uniform <=100 VMs), which IB needs.
+    # instead of TCP.
+    # CROSS-NODE RDMA CAVEAT (verified 2026-06-30): single-node IB loopback works
+    # (UCX rc_mlx5, ~1us osu_latency), but CROSS-NODE RDMA FAILS — the two
+    # instances land in DIFFERENT IB partitions (full-membership pkey 0x8004 vs
+    # 0x8005; only the limited-membership 0x7fff is shared, and two limited members
+    # can't RC-connect). Root cause: the live VMSS has singlePlacementGroup=false
+    # and no proximity placement group. CAPZ v1.23.2 AzureMachinePool exposes
+    # NEITHER singlePlacementGroup NOR proximityPlacementGroup, so this is NOT
+    # fixable by a manifest field here — it needs a CAPZ placement capability or an
+    # out-of-band single-placement-group / PPG VMSS (mentor's Pulumi reconcile).
+    # Cross-node MPI works today over TCP (UCX_TLS=tcp).
     # cloud-init MUST be enabled on this image (CAPZ bootstrap requires it).
     image:
       marketplace:
