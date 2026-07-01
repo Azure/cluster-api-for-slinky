@@ -1,6 +1,6 @@
 # Slinky Slurm cluster values for the `caps-self` self-managed workload cluster.
 #
-# Differs from the CAPD/Slinky local dev path: caps-self has 1 k8s
+# Differs from slurm-cluster.yaml (the CAPD/Slinky dev path): caps-self has 1 k8s
 # control-plane node (tainted) + 2 HPC workers labeled
 # `slinky.slurm.net/node-type=compute`. There is NO dedicated controller node, so
 # the lightweight control-plane components (slurmctld, slurmrestd) use default

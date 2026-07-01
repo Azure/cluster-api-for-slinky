@@ -30,6 +30,15 @@
 # (the experiment never modifies caps-self-slurm.yaml — it reuses the existing
 # `all` partition).
 #
+# !! TOPOLOGY WARNING (learned the hard way): slurm-bridge's controllers taint
+# EVERY node in the managed partition with `slinky.slurm.net/managed-node:NoExecute`
+# so that only Slurm-placed pods run there. On caps-self the Slurm control plane
+# (slurmctld/slurmrestd/operator) and slurmd are CO-LOCATED on the only worker
+# nodes, which ARE the managed partition — so that NoExecute taint EVICTS Slurm
+# itself and takes the cluster down. `install` therefore refuses unless slurmd
+# tolerates the taint (or BRIDGE_ACK_UNSAFE=1). Making it work needs a dedicated
+# non-managed node for the control planes + a slurmd toleration (Slurm chart edit).
+#
 # Env overrides:
 #   CLUSTER=caps-self     workload cluster name (kubeconfig secret <CLUSTER>-kubeconfig)
 #   NAMESPACE=default     namespace of that secret on the mgmt cluster
@@ -37,6 +46,7 @@
 #   WL_NS=slurm-bridge    managed namespace where bridge workloads are submitted
 #   BRIDGE_VERSION=       pin the slurm-bridge chart version (default: latest)
 #   HOLD_SECS=45          how long the native job holds the nodes in Demo B
+#   BRIDGE_ACK_UNSAFE=0   set to 1 to install despite the taint evicting Slurm (DANGER)
 set -euo pipefail
 
 ACTION="${1:-all}"
@@ -48,6 +58,8 @@ WL_NS="${WL_NS:-slurm-bridge}"
 BRIDGE_VERSION="${BRIDGE_VERSION:-}"
 HOLD_SECS="${HOLD_SECS:-45}"
 BRIDGE_CHART="oci://ghcr.io/slinkyproject/charts/slurm-bridge"
+# Taint the bridge controllers imperatively stamp on every managed-partition node.
+MANAGED_TAINT_KEY="slinky.slurm.net/managed-node"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -90,8 +102,10 @@ resolve_slurmctld() {
   fi
   SLURMCTLD_CTR="$(k get pod -n "$SLURM_NS" "$SLURMCTLD_POD" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null \
                      | tr ' ' '\n' | grep -Ei 'slurmctld|controller' | head -1 || true)"
-  [ -z "$SLURMCTLD_CTR" ] && SLURMCTLD_CTR="$(k get pod -n "$SLURM_NS" "$SLURMCTLD_POD" \
-                     -o jsonpath='{.spec.containers[0].name}')"
+  if [ -z "$SLURMCTLD_CTR" ]; then
+    SLURMCTLD_CTR="$(k get pod -n "$SLURM_NS" "$SLURMCTLD_POD" -o jsonpath='{.spec.containers[0].name}')"
+  fi
+  return 0
 }
 # Run a Slurm client command inside the controller pod.
 slurm() { k exec -n "$SLURM_NS" "$SLURMCTLD_POD" -c "$SLURMCTLD_CTR" -- "$@"; }
@@ -99,6 +113,36 @@ slurm() { k exec -n "$SLURM_NS" "$SLURMCTLD_POD" -c "$SLURMCTLD_CTR" -- "$@"; }
 render() { # env-substitute ${JWT_KEY_SECRET} in a manifest (envsubst, sed fallback)
   if command -v envsubst >/dev/null 2>&1; then JWT_KEY_SECRET="$JWT_KEY_SECRET" envsubst < "$1"
   else sed "s|\${JWT_KEY_SECRET}|${JWT_KEY_SECRET}|g" "$1"; fi
+}
+
+# SAFETY: the bridge taints every managed-partition node with
+# ${MANAGED_TAINT_KEY}:NoExecute. If the co-located slurmd (and thus the Slurm
+# control plane) does not tolerate it, installing EVICTS Slurm and takes it down.
+# Refuse in that case unless the operator explicitly acknowledges the risk.
+guard_topology() {
+  local tolerated
+  tolerated="$(k get pods -n "$SLURM_NS" -l app.kubernetes.io/name=slurmd \
+      -o jsonpath='{range .items[*]}{range .spec.tolerations[*]}{.key}{"\n"}{end}{end}' 2>/dev/null \
+      | grep -Fxc "$MANAGED_TAINT_KEY" || true)"
+  if [ "${tolerated:-0}" -gt 0 ]; then
+    echo ">> topology check: slurmd tolerates ${MANAGED_TAINT_KEY} — safe to proceed."
+    return 0
+  fi
+  if [ "${BRIDGE_ACK_UNSAFE:-0}" = "1" ]; then
+    echo "##[warning]BRIDGE_ACK_UNSAFE=1 — proceeding though the taint WILL evict Slurm."
+    return 0
+  fi
+  echo "##[error]REFUSING to install: slurm-bridge taints every node in the managed"
+  echo "##[error]partition with ${MANAGED_TAINT_KEY}=<scheduler>:NoExecute so only Slurm-"
+  echo "##[error]placed pods run there. Your slurmd (and the co-located slurmctld/"
+  echo "##[error]slurmrestd/operator) do NOT tolerate that taint, so installing would"
+  echo "##[error]EVICT them and take Slurm DOWN (converged/hybrid topology, no dedicated"
+  echo "##[error]non-managed node)."
+  echo "##[error]"
+  echo "##[error]To run safely: give slurmd a toleration for ${MANAGED_TAINT_KEY} and host"
+  echo "##[error]slurmctld/slurmrestd/operator + the bridge components on a non-managed"
+  echo "##[error]node. To override anyway (WILL disrupt Slurm): BRIDGE_ACK_UNSAFE=1"
+  exit 1
 }
 
 # ===============================================================================
@@ -127,6 +171,8 @@ preflight() {
 # ===============================================================================
 install() {
   echo "##[section]Installing slurm-bridge (CPU experiment)"
+  # Refuse before touching anything if the taint would take Slurm down.
+  guard_topology
   ensure_helm
   echo ">> helm: $(helm version --short)"
 
@@ -321,6 +367,14 @@ teardown() {
   fi
   ensure_helm
   helmw uninstall slurm-bridge -n "$SLURM_NS" 2>/dev/null || echo ">> slurm-bridge release already gone"
+  # The controllers imperatively taint managed nodes; helm uninstall does NOT undo
+  # that. Strip the taint so any evicted Slurm/infra pods can reschedule.
+  echo ">> removing any ${MANAGED_TAINT_KEY} taint left on nodes"
+  for n in $(k get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    if k taint node "$n" "${MANAGED_TAINT_KEY}-" 2>/dev/null; then
+      echo "   untainted $n"
+    fi
+  done
   k delete token slurm-bridge-token -n "$SLURM_NS" --ignore-not-found 2>/dev/null || true
   k delete secret slurm-bridge-token -n "$SLURM_NS" --ignore-not-found 2>/dev/null || true
   k delete ns "$WL_NS" --ignore-not-found 2>/dev/null || true
