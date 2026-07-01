@@ -34,9 +34,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=common-slurm.sh
 source "${SCRIPT_DIR}/common-slurm.sh"
 
+# Default SKU = the caps-self hardware in play (ND40rs_v2: 8x V100 + 100Gb EDR IB;
+# 40 vCPUs). NOTE: cross-node IB RDMA on caps-self is proven only via the
+# HOST-LAUNCH path (submit-nccl-host.sh); this in-container sbatch path currently
+# exercises the TCP transport (run-nccl.slurm's ND40rs_v2 branch is TCP-tuned).
 HOSTFILE="${1:-$HOME/benchmark_scripts/compute_ccl_mpi.txt}"
-SKU="${2:-Standard_ND96asr_v4}"
-CPUS="${3:-96}"
+SKU="${2:-Standard_ND40rs_v2}"
+CPUS="${3:-40}"
 DEVICES="${4:-8}"
 TESTS="${5:-allreduce allgather alltoall}"
 MPI_BENCH="${MPI_BENCH:-}"
