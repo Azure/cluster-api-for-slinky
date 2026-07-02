@@ -9,7 +9,7 @@ This module is intentionally shared by both sides of that handoff:
 * :class:`pko.pko_bootstrap.PKOBootstrap` calls :func:`init_stack_config` when it
   creates the single init Stack CR.
 * ``pulumi/stacks/init/__main__.py`` calls :func:`run` from inside the PKO
-  workspace to reconstruct :class:`pko._stack_cr.StackCRSpec` and instantiate
+    workspace to reconstruct :class:`stacks.stack_cr.StackCRSpec` and instantiate
   the unified init component for the active env.
 """
 
@@ -20,7 +20,7 @@ from typing import Any, Mapping
 
 import pulumi
 
-from pko._stack_cr import StackCRSpec
+from stacks.stack_cr import StackCRSpec
 from stacks.control_plane.control_plane_config import (
     CONTROL_PLANE_KIND_CHILD_CONFIG_KEY,
     ControlPlaneKindConfig,

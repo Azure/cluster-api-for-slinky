@@ -30,7 +30,7 @@ from typing import Any
 
 import pulumi
 
-from pko._workspace_env import (
+from stacks.workspace_env import (
     PULUMI_DELETE_UNREACHABLE_ENV,
     PULUMI_DELETE_UNREACHABLE_SECRET_NAME,
 )

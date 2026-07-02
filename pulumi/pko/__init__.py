@@ -9,7 +9,6 @@ Layout
 * :mod:`pko._release`            — Helm OCI install
 * :mod:`pko._backend`            — file:// state backend (PVC + passphrase)
 * :mod:`pko._service_account`    — workspace SA + ClusterRoleBindings
-* :mod:`pko._stack_cr`           — ``build_stack_spec`` + ``StackCRSpec``
 * :mod:`pko.pko_bootstrap`       — top-level :class:`PKOBootstrap` component
 """
 

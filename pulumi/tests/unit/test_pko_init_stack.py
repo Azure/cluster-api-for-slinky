@@ -8,7 +8,7 @@ from stacks.init.init_stack import (
     init_stack_config,
     parse_init_stack_spec,
 )
-from pko._stack_cr import StackCRSpec, build_stack_spec
+from stacks.stack_cr import StackCRSpec, build_stack_spec
 
 
 def _stack_spec() -> StackCRSpec:
