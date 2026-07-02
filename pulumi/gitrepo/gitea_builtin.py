@@ -66,12 +66,11 @@ import pulumi_kubernetes as k8s
 import pulumi_random as random
 from pulumi import Output, ResourceOptions
 
+from fluxcd import FluxSource
 from gitrepo._base import GitOpsRepositoryProvider, GitOpsWebhookProvider
 from gitrepo.external_secrets import ExternalSecretsOperator
 from gitrepo.flux_git_auth import FluxGitAuthSecret
 from gitrepo.git_sync import GitSync
-from pko._flux import FluxGitSource
-from pko._release import PKO_NAMESPACE
 
 
 # Pinned upstream chart. Bump this together with ``_GITEA_APP_VERSION``
@@ -371,7 +370,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         ``kubernetes.Provider`` so this stack doesn't accidentally use the
         ambient ``~/.kube/config`` context, which can drift if the user
         ``kubectl config use-context`` to something else mid-session.
-    flux_provider, flux_infrastructure, pko_namespace_resource :
+    flux_provider, flux_infrastructure :
         Management-cluster handles for declaring the Flux ``GitRepository``
         source that PKO Stack CRs consume. The Gitea implementation owns this
         because it knows the provider-specific SSH Secret and known_hosts shape.
@@ -405,7 +404,6 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         *,
         flux_provider: k8s.Provider,
         flux_infrastructure: pulumi.Resource,
-        pko_namespace_resource: pulumi.Resource,
         admin_username: str = _DEFAULT_ADMIN_USERNAME,
         admin_email: str = _DEFAULT_ADMIN_EMAIL,
         repo_owner: Optional[str] = None,
@@ -884,12 +882,12 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             user_private_key_key=_USER_PRIVATE_KEY_SECRET_KEY,
             host_secret_name=_HOST_KEY_SECRET,
             host_public_key_key=_HOST_PUBLIC_KEY_SECRET_KEY,
-            target_namespace=PKO_NAMESPACE,
+            target_namespace=_GITEA_NAMESPACE,
             target_name=_FLUX_GIT_AUTH_SECRET,
             known_hosts_hostname=_in_cluster_ssh_host(),
             opts=ResourceOptions(
                 parent=self,
-                depends_on=[sync, pko_namespace_resource, host_key_secret, user_key_secret],
+                depends_on=[sync, gitea_ns, host_key_secret, user_key_secret],
             ),
         )
 
@@ -904,20 +902,20 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         self.ssh_private_key_secret_name = Output.from_input(_USER_KEY_SECRET)
         self.ssh_private_key_secret_namespace = Output.from_input(_GITEA_NAMESPACE)
 
-        flux_source = FluxGitSource(
+        flux_source = FluxSource(
             f"{name}-flux-source",
             provider=flux_provider,
-            flux_infrastructure=flux_infrastructure,
-            pko_namespace_resource=pko_namespace_resource,
+            namespace=gitea_ns.metadata["name"],
             repo_url=self.url,
             repo_branch=self.default_branch,
-            git_auth_secret_name=_FLUX_GIT_AUTH_SECRET,
-            git_auth_secret_resource=flux_git_auth,
-            opts=ResourceOptions(parent=self, depends_on=[sync]),
+            git_auth_secret_name=flux_git_auth.name,
+            opts=ResourceOptions(
+                parent=self,
+                depends_on=[sync, flux_infrastructure, flux_git_auth],
+            ),
         )
         self.flux_source = flux_source
         self.flux_source_name = flux_source.source_name
-        self.flux_receiver_token = flux_source.receiver_token
         self.flux_receiver_url = flux_source.receiver_url
 
         # Built-in-provider handles used by the local stack to register the
@@ -949,7 +947,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             "owner": self.owner,
             "repo_name": self.repo_name,
             "webhook_url": self.flux_receiver_url,
-            "secret": self.flux_receiver_token,
+            "secret": flux_source.receiver_token,
             "events": ["push"],
         }
 
@@ -965,7 +963,6 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
                 "ssh_private_key_secret_name": self.ssh_private_key_secret_name,
                 "ssh_private_key_secret_namespace": self.ssh_private_key_secret_namespace,
                 "flux_source_name": self.flux_source_name,
-                "flux_receiver_token": self.flux_receiver_token,
                 "flux_receiver_url": self.flux_receiver_url,
                 "api_url": self.api_url,
                 "gitea_chart_version": self.gitea_chart_version,
@@ -974,7 +971,6 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
                 "admin_password": self.admin_password,
                 "owner": self.owner,
                 "repo_name": self.repo_name,
-                "webhook_args": self.webhook_args,
                 "repo_full_name": self.repo_full_name,
                 "repo_html_url": self.repo_html_url,
                 "sync_head_sha": self.sync_head_sha,

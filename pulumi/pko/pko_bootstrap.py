@@ -14,9 +14,8 @@ It is the only PKO Stack CR the outer host-side Pulumi program owns. Once PKO
 runs it, the init stack reflexively instantiates control-plane and
 tenants/workload resources from inside the management cluster.
 
-The caller owns the PKO namespace and the Flux ``GitRepository`` source.
-PKOBootstrap installs PKO and creates the init Stack CR that consumes that
-source via ``spec.fluxSource`` instead of cloning Git directly.
+PKOBootstrap owns the PKO namespace and creates the init Stack CR that consumes
+the supplied Flux source via ``spec.fluxSource`` instead of cloning Git directly.
 """
 
 from __future__ import annotations
@@ -27,8 +26,10 @@ import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
+from fluxcd import FluxSource
+from pko import PKO_NAMESPACE
 from pko._backend import StateBackend
-from pko._release import PKO_NAMESPACE, PKORelease
+from pko._release import PKORelease
 from pko._service_account import WorkspaceServiceAccount
 from pko._init_stack import INIT_PROJECT, INIT_REPO_DIR, init_stack_config
 from pko._stack_cr import StackCRSpec, build_stack_spec
@@ -58,14 +59,8 @@ class PKOBootstrap(pulumi.ComponentResource):
             Pulumi resource name. Used as a prefix for all children.
         provider:
             Kubernetes provider scoped to the management cluster.
-        namespace_resource:
-            Pre-created ``pulumi-kubernetes-operator`` Namespace resource shared
-            by Flux source objects and PKO.
-        flux_source_name:
-            Name of the Flux ``GitRepository`` PKO Stack CRs should consume.
-        flux_source_resource:
-            Optional resource dependency for the concrete Flux source object;
-            the init Stack CR waits for it before being created.
+        flux_source:
+            Flux source handle PKO Stack CRs should consume.
         config:
             Optional inline Pulumi config map to forward to child Stack CRs.
             PKOBootstrap passes this through the init Stack CR unchanged;
@@ -88,6 +83,8 @@ class PKOBootstrap(pulumi.ComponentResource):
             Workspace SA name (constant ``pulumi-runner``).
         flux_source_name:
             Shared Flux ``GitRepository`` source consumed by PKO Stack CRs.
+        flux_source_namespace:
+            Namespace containing the Flux source consumed by PKO Stack CRs.
         init_stack:
             ``metadata.name`` of the single outer-owned init Stack CR.
     """
@@ -95,6 +92,7 @@ class PKOBootstrap(pulumi.ComponentResource):
     namespace: Output[str]
     service_account: Output[str]
     flux_source_name: Output[str]
+    flux_source_namespace: Output[str]
     init_stack: Output[str]
 
     def __init__(
@@ -102,14 +100,18 @@ class PKOBootstrap(pulumi.ComponentResource):
         name: str,
         *,
         provider: k8s.Provider,
-        namespace_resource: pulumi.Resource,
-        flux_source_name: pulumi.Input[str],
-        flux_source_resource: pulumi.Resource | None = None,
+        flux_source: FluxSource,
         env: str,
         config: dict[str, Any] | None = None,
         opts: ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:pko:PKOBootstrap", name, props={}, opts=opts)
+
+        namespace_resource = k8s.core.v1.Namespace(
+            f"{name}-ns",
+            metadata={"name": PKO_NAMESPACE},
+            opts=ResourceOptions(parent=self, provider=provider),
+        )
 
         release = PKORelease(
             f"{name}-release",
@@ -138,7 +140,10 @@ class PKOBootstrap(pulumi.ComponentResource):
         stack_spec = StackCRSpec(
             pko_namespace=release.namespace,
             service_account_name=sa.service_account_name,
-            flux_source_name=flux_source_name,
+            flux_source_name=flux_source.source_name,
+            flux_source_namespace=flux_source.namespace,
+            flux_source_api_version=flux_source.api_version,
+            flux_source_kind=flux_source.kind,
             state_pvc_name=backend.pvc_name,
             state_backend_url=backend.backend_url,
             passphrase_secret_name=backend.passphrase_secret_name,
@@ -152,9 +157,8 @@ class PKOBootstrap(pulumi.ComponentResource):
             release,
             sa,
             backend,
+            flux_source.resource,
         ]
-        if flux_source_resource is not None:
-            cr_deps.append(flux_source_resource)
 
         init_spec = build_stack_spec(
             spec=stack_spec,
@@ -200,7 +204,8 @@ class PKOBootstrap(pulumi.ComponentResource):
 
         self.namespace = release.namespace
         self.service_account = sa.service_account_name
-        self.flux_source_name = Output.from_input(flux_source_name)
+        self.flux_source_name = flux_source.source_name
+        self.flux_source_namespace = flux_source.namespace
         self.init_stack = init_stack_name
 
         self.register_outputs(
@@ -208,6 +213,7 @@ class PKOBootstrap(pulumi.ComponentResource):
                 "namespace": self.namespace,
                 "service_account": self.service_account,
                 "flux_source_name": self.flux_source_name,
+                "flux_source_namespace": self.flux_source_namespace,
                 "init_stack": self.init_stack,
             }
         )

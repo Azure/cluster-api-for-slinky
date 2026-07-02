@@ -76,7 +76,7 @@ class StackCRSpec:
     """
 
     # Where the Stack CRs themselves live. The PKO operator watches this
-    # namespace for Stack CRs; the shared Flux GitRepository lives here too.
+    # namespace for Stack CRs.
     pko_namespace: pulumi.Input[str]
 
     # Workspace pod identity. References the SA created by
@@ -84,8 +84,8 @@ class StackCRSpec:
     service_account_name: pulumi.Input[str]
 
     # Flux Source reference PKO uses to fetch the Pulumi program artifact.
-    # The source lives in ``pko_namespace`` and points at the hydrated Gitea repo.
     flux_source_name: pulumi.Input[str]
+    flux_source_namespace: pulumi.Input[str]
 
     # State backend. The PVC is mounted at ``/state`` and the backend
     # URL is ``file:///state``; the passphrase Secret feeds
@@ -202,6 +202,7 @@ def build_stack_spec(
                 "apiVersion": spec.flux_source_api_version,
                 "kind": spec.flux_source_kind,
                 "name": spec.flux_source_name,
+                "namespace": spec.flux_source_namespace,
             },
             "dir": repo_dir,
         },

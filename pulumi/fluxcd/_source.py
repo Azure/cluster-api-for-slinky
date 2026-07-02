@@ -1,22 +1,15 @@
-"""Flux source plumbing for PKO Stack CRs.
-
-PKO can consume a Pulumi program from a Flux Source instead of cloning a Git
-repository itself. ``FluxInfrastructure`` installs the minimal Flux controllers
-we need for that handoff; ``FluxGitSource`` declares the shared
-``GitRepository`` source and Receiver for the repo Gitea hydrates.
-"""
+"""Flux CD plumbing for GitRepository sources and webhook receivers."""
 
 from __future__ import annotations
 
 import base64
 import hashlib
+from collections.abc import Sequence
 
 import pulumi
 import pulumi_kubernetes as k8s
 import pulumi_random as random
 from pulumi import Output, ResourceOptions
-
-from pko._release import PKO_NAMESPACE
 
 
 FLUX_NAMESPACE = "flux-system"
@@ -52,9 +45,10 @@ class FluxInfrastructure(pulumi.ComponentResource):
         name: str,
         *,
         provider: k8s.Provider,
+        artifact_consumer_namespaces: Sequence[pulumi.Input[str]] = (),
         opts: ResourceOptions | None = None,
     ) -> None:
-        super().__init__("ca4s:pko:FluxInfrastructure", name, props={}, opts=opts)
+        super().__init__("ca4s:fluxcd:FluxInfrastructure", name, props={}, opts=opts)
 
         flux_ns = k8s.core.v1.Namespace(
             f"{name}-ns",
@@ -87,36 +81,39 @@ class FluxInfrastructure(pulumi.ComponentResource):
             ),
         )
 
-        artifact_ingress = k8s.networking.v1.NetworkPolicy(
-            f"{name}-source-artifact-ingress",
-            metadata={
-                "name": "allow-source-controller-artifacts-from-pko",
-                "namespace": FLUX_NAMESPACE,
-            },
-            spec={
-                "pod_selector": {"match_labels": {"app": "source-controller"}},
-                "policy_types": ["Ingress"],
-                "ingress": [
-                    {
-                        "from_": [
-                            {
-                                "namespace_selector": {
-                                    "match_labels": {
-                                        "kubernetes.io/metadata.name": PKO_NAMESPACE
+        artifact_ingress = None
+        if artifact_consumer_namespaces:
+            artifact_ingress = k8s.networking.v1.NetworkPolicy(
+                f"{name}-source-artifact-ingress",
+                metadata={
+                    "name": "allow-source-controller-artifacts-from-consumers",
+                    "namespace": FLUX_NAMESPACE,
+                },
+                spec={
+                    "pod_selector": {"match_labels": {"app": "source-controller"}},
+                    "policy_types": ["Ingress"],
+                    "ingress": [
+                        {
+                            "from_": [
+                                {
+                                    "namespace_selector": {
+                                        "match_labels": {
+                                            "kubernetes.io/metadata.name": namespace
+                                        }
                                     }
                                 }
-                            }
-                        ],
-                        "ports": [{"protocol": "TCP", "port": 9090}],
-                    }
-                ],
-            },
-            opts=ResourceOptions(
-                parent=self,
-                provider=provider,
-                depends_on=[release],
-            ),
-        )
+                                for namespace in artifact_consumer_namespaces
+                            ],
+                            "ports": [{"protocol": "TCP", "port": 9090}],
+                        }
+                    ],
+                },
+                opts=ResourceOptions(
+                    parent=self,
+                    provider=provider,
+                    depends_on=[release],
+                ),
+            )
 
         self.namespace = Output.from_input(FLUX_NAMESPACE)
         self.release_status = release.status
@@ -125,42 +122,48 @@ class FluxInfrastructure(pulumi.ComponentResource):
             {
                 "namespace": self.namespace,
                 "release_status": self.release_status,
-                "artifact_ingress_policy": artifact_ingress.metadata["name"],  # type: ignore[attr-defined]
+                "artifact_ingress_policy": (
+                    artifact_ingress.metadata["name"] if artifact_ingress else None
+                ),
             }
         )
 
 
-class FluxGitSource(pulumi.ComponentResource):
+class FluxSource(pulumi.ComponentResource):
     """Declare the shared Flux GitRepository source and Receiver."""
 
+    api_version: str
+    kind: str
     namespace: Output[str]
     source_name: Output[str]
     receiver_token: Output[str]
     receiver_path: Output[str]
     receiver_url: Output[str]
+    resource: pulumi.Resource
 
     def __init__(
         self,
         name: str,
         *,
         provider: k8s.Provider,
-        flux_infrastructure: pulumi.Resource,
-        pko_namespace_resource: pulumi.Resource,
+        namespace: pulumi.Input[str],
         repo_url: pulumi.Input[str],
         repo_branch: pulumi.Input[str],
         git_auth_secret_name: pulumi.Input[str],
-        git_auth_secret_resource: pulumi.Resource,
         opts: ResourceOptions | None = None,
     ) -> None:
-        super().__init__("ca4s:pko:FluxGitSource", name, props={}, opts=opts)
+        super().__init__("ca4s:fluxcd:FluxSource", name, props={}, opts=opts)
+
+        self.api_version = FLUX_SOURCE_API_VERSION
+        self.kind = FLUX_SOURCE_KIND
 
         git_repository = k8s.apiextensions.CustomResource(
             f"{name}-git-repository",
-            api_version=FLUX_SOURCE_API_VERSION,
-            kind=FLUX_SOURCE_KIND,
+            api_version=self.api_version,
+            kind=self.kind,
             metadata={
                 "name": FLUX_SOURCE_NAME,
-                "namespace": PKO_NAMESPACE,
+                "namespace": namespace,
             },
             spec={
                 "interval": "30s",
@@ -172,7 +175,6 @@ class FluxGitSource(pulumi.ComponentResource):
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,
-                depends_on=[flux_infrastructure, pko_namespace_resource, git_auth_secret_resource],
             ),
         )
 
@@ -186,7 +188,7 @@ class FluxGitSource(pulumi.ComponentResource):
             f"{name}-receiver-token-secret",
             metadata={
                 "name": FLUX_RECEIVER_TOKEN_SECRET_NAME,
-                "namespace": PKO_NAMESPACE,
+                "namespace": namespace,
                 "labels": {"reconcile.fluxcd.io/watch": "Enabled"},
             },
             type="Opaque",
@@ -194,7 +196,6 @@ class FluxGitSource(pulumi.ComponentResource):
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,
-                depends_on=[pko_namespace_resource],
             ),
         )
         receiver = k8s.apiextensions.CustomResource(
@@ -203,7 +204,7 @@ class FluxGitSource(pulumi.ComponentResource):
             kind=FLUX_RECEIVER_KIND,
             metadata={
                 "name": FLUX_RECEIVER_NAME,
-                "namespace": PKO_NAMESPACE,
+                "namespace": namespace,
             },
             spec={
                 "type": "github",
@@ -221,18 +222,17 @@ class FluxGitSource(pulumi.ComponentResource):
                 parent=self,
                 provider=provider,
                 depends_on=[
-                    flux_infrastructure,
                     receiver_token_secret,
                     git_repository,
                 ],
             ),
         )
 
-        self.namespace = Output.from_input(PKO_NAMESPACE)
+        self.namespace = Output.from_input(namespace)
         self.source_name = Output.from_input(FLUX_SOURCE_NAME)
-        self.receiver_token = receiver_token.result
-        self.receiver_path = receiver_token.result.apply(
-            lambda token: _receiver_path(token, FLUX_RECEIVER_NAME, PKO_NAMESPACE)
+        self.receiver_token = Output.secret(receiver_token.result)
+        self.receiver_path = Output.all(receiver_token.result, self.namespace).apply(
+            lambda args: _receiver_path(args[0], FLUX_RECEIVER_NAME, args[1])
         )
         self.receiver_url = Output.concat(
             "http://webhook-receiver.",
@@ -240,9 +240,12 @@ class FluxGitSource(pulumi.ComponentResource):
             ".svc.cluster.local",
             self.receiver_path,
         )
+        self.resource = git_repository
 
         self.register_outputs(
             {
+                "api_version": self.api_version,
+                "kind": self.kind,
                 "namespace": self.namespace,
                 "source_name": self.source_name,
                 "receiver_token": self.receiver_token,

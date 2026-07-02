@@ -16,6 +16,7 @@ def _stack_spec() -> StackCRSpec:
         pko_namespace="pulumi-kubernetes-operator",
         service_account_name="pulumi-runner",
         flux_source_name="gitops-source",
+        flux_source_namespace="gitea",
         state_pvc_name="pko-state",
         state_backend_url="file:///state",
         passphrase_secret_name="pko-state-passphrase",
@@ -33,6 +34,7 @@ def test_init_stack_config_wraps_shared_spec_and_child_config() -> None:
         "pkoNamespace": "pulumi-kubernetes-operator",
         "serviceAccountName": "pulumi-runner",
         "fluxSourceName": "gitops-source",
+        "fluxSourceNamespace": "gitea",
         "statePvcName": "pko-state",
         "stateBackendUrl": "file:///state",
         "passphraseSecretName": "pko-state-passphrase",
@@ -46,6 +48,22 @@ def test_parse_init_stack_spec_round_trips_config_payload() -> None:
     parsed = parse_init_stack_spec(payload)
 
     assert parsed == _stack_spec()
+
+
+def test_build_stack_spec_uses_flux_source_namespace() -> None:
+    spec = build_stack_spec(
+        spec=_stack_spec(),
+        project_name="ca4s-init",
+        env="local",
+        repo_dir="pulumi/stacks/init",
+    )
+
+    assert spec["fluxSource"]["sourceRef"] == {
+        "apiVersion": "source.toolkit.fluxcd.io/v1",
+        "kind": "GitRepository",
+        "name": "gitops-source",
+        "namespace": "gitea",
+    }
 
 
 def test_parse_init_stack_spec_rejects_missing_required_field() -> None:

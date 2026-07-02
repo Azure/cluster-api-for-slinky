@@ -10,9 +10,8 @@ import pulumi_kubernetes as k8s
 from ctlptl import CloudProviderKind, CtlptlCluster, CtlptlRegistry
 from gitrepo import GitOpsRepository, GitOpsWebhook
 from localenv import LocalEnvironment, discover_local_environment
-from pko import PKOBootstrap
-from pko._flux import FluxInfrastructure
-from pko._release import PKO_NAMESPACE
+from fluxcd import FluxInfrastructure
+from pko import PKOBootstrap, PKO_NAMESPACE
 from stacks.control_plane.control_plane_config import (
     build_control_plane_kind_azure_child_config,
 )
@@ -54,16 +53,15 @@ def run_stack() -> None:
     cluster = CtlptlCluster("mgmt", registry_name=registry.registry_name)
     mgmt_provider = k8s.Provider("mgmt-k8s", kubeconfig=cluster.kubeconfig)
 
-    pko_namespace = k8s.core.v1.Namespace(
-        "pko-ns",
-        metadata={"name": PKO_NAMESPACE},
-        opts=pulumi.ResourceOptions(provider=mgmt_provider),
-    )
     lb = CloudProviderKind(
         "lb",
         enable_lb_port_mapping=config.get_bool("enable_lb_port_mapping", True),
     )
-    flux = FluxInfrastructure("flux", provider=mgmt_provider)
+    flux = FluxInfrastructure(
+        "flux",
+        provider=mgmt_provider,
+        artifact_consumer_namespaces=[PKO_NAMESPACE],
+    )
 
     gitops_provider = config.get("gitops_provider") or "gitea-builtin"
     repo = GitOpsRepository(
@@ -74,7 +72,6 @@ def run_stack() -> None:
             "kubeconfig": cluster.kubeconfig,
             "flux_provider": mgmt_provider,
             "flux_infrastructure": flux,
-            "pko_namespace_resource": pko_namespace,
             "sync_triggers": config.get_object("gitops_sync_triggers") or {},
         },
     )
@@ -82,9 +79,7 @@ def run_stack() -> None:
     pko = PKOBootstrap(
         "pko",
         provider=mgmt_provider,
-        namespace_resource=pko_namespace,
-        flux_source_name=repo.flux_source_name,
-        flux_source_resource=repo.flux_source,
+        flux_source=repo.flux_source,
         env=pulumi.get_stack(),
         config=child_config,
     )
@@ -218,7 +213,8 @@ def _export_common_outputs(
 
     pulumi.export("pko_namespace", pko.namespace)
     pulumi.export("pko_service_account", pko.service_account)
-    pulumi.export("pko_flux_source_name", repo.flux_source_name)
+    pulumi.export("pko_flux_source_name", pko.flux_source_name)
+    pulumi.export("pko_flux_source_namespace", pko.flux_source_namespace)
     pulumi.export("pko_flux_receiver_url", repo.flux_receiver_url)
     pulumi.export("gitops_flux_webhook_id", gitops_webhook.hook_id)
     pulumi.export("pko_init_stack", pko.init_stack)

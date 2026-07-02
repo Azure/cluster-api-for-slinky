@@ -53,6 +53,8 @@ from typing import Any
 import pulumi
 from pulumi import Output
 
+from fluxcd import FluxSource
+
 
 # Single source of truth for the Pulumi resource type token used by the
 # base class. Concrete subclasses must override this with their own
@@ -127,9 +129,8 @@ class GitOpsRepositoryProvider(pulumi.ComponentResource):
     default_branch: "Output[str]"
     ssh_private_key_secret_name: "Output[str]"
     ssh_private_key_secret_namespace: "Output[str]"
-    flux_source: pulumi.Resource
+    flux_source: FluxSource
     flux_source_name: "Output[str]"
-    flux_receiver_token: "Output[str]"
     flux_receiver_url: "Output[str]"
     webhook_args: Mapping[str, Any]
 
@@ -150,9 +151,8 @@ class GitOpsRepository(pulumi.ComponentResource):
     default_branch: "Output[str]"
     ssh_private_key_secret_name: "Output[str]"
     ssh_private_key_secret_namespace: "Output[str]"
-    flux_source: pulumi.Resource
+    flux_source: FluxSource
     flux_source_name: "Output[str]"
-    flux_receiver_token: "Output[str]"
     flux_receiver_url: "Output[str]"
     webhook_args: Mapping[str, Any]
 
@@ -180,7 +180,6 @@ class GitOpsRepository(pulumi.ComponentResource):
         self.ssh_private_key_secret_namespace = concrete.ssh_private_key_secret_namespace
         self.flux_source = concrete.flux_source
         self.flux_source_name = concrete.flux_source_name
-        self.flux_receiver_token = concrete.flux_receiver_token
         self.flux_receiver_url = concrete.flux_receiver_url
         self.webhook_args = concrete.webhook_args
 
@@ -192,9 +191,7 @@ class GitOpsRepository(pulumi.ComponentResource):
                 "ssh_private_key_secret_name": self.ssh_private_key_secret_name,
                 "ssh_private_key_secret_namespace": self.ssh_private_key_secret_namespace,
                 "flux_source_name": self.flux_source_name,
-                "flux_receiver_token": self.flux_receiver_token,
                 "flux_receiver_url": self.flux_receiver_url,
-                "webhook_args": self.webhook_args,
             }
         )
 

@@ -49,6 +49,7 @@ _STACK_SPEC_CONFIG_KEYS = {
     "pkoNamespace": "pko_namespace",
     "serviceAccountName": "service_account_name",
     "fluxSourceName": "flux_source_name",
+    "fluxSourceNamespace": "flux_source_namespace",
     "statePvcName": "state_pvc_name",
     "stateBackendUrl": "state_backend_url",
     "passphraseSecretName": "passphrase_secret_name",
@@ -110,7 +111,7 @@ class InitStack(pulumi.ComponentResource):
 
         control_plane = ControlPlaneKind(
             "control-plane",
-            flux_source_namespace=stack_spec.pko_namespace,
+            flux_source_namespace=stack_spec.flux_source_namespace,
             flux_source_name=stack_spec.flux_source_name,
             spec=ControlPlaneKindSpec(
                 infrastructure_providers=control_plane_config.infrastructure_providers,
@@ -168,6 +169,7 @@ def init_stack_config(
             "pkoNamespace": stack_spec.pko_namespace,
             "serviceAccountName": stack_spec.service_account_name,
             "fluxSourceName": stack_spec.flux_source_name,
+            "fluxSourceNamespace": stack_spec.flux_source_namespace,
             "statePvcName": stack_spec.state_pvc_name,
             "stateBackendUrl": stack_spec.state_backend_url,
             "passphraseSecretName": stack_spec.passphrase_secret_name,
