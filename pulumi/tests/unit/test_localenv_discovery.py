@@ -144,25 +144,6 @@ def test_azure_imds_adds_azure_provider_and_defaults(
     assert env.azure.resource_group == "host-rg"
 
 
-def test_config_hints_override_workload_placement_defaults(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    with _mock_imds(monkeypatch):
-        env = discover_local_environment(
-            azure_subscription_id_hint="55555555-5555-5555-5555-555555555555",
-            azure_location_hint="eastus2",
-            azure_resource_group_hint="workload-rg",
-        )
-
-    assert env.azure is not None
-    assert env.azure.subscription_id == "55555555-5555-5555-5555-555555555555"
-    assert env.azure.location == "eastus2"
-    assert env.azure.resource_group == "workload-rg"
-    assert env.azure.host_subscription_id == _SUBSCRIPTION_ID
-    assert env.azure.host_location == "westus2"
-    assert env.azure.host_resource_group == "host-rg"
-
-
 def test_bad_client_id_hint_falls_back_to_default_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

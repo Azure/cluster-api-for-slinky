@@ -31,11 +31,6 @@ def run_stack() -> None:
 
     local_environment = discover_local_environment(
         azure_client_id_hint=config.get("azureClientId"),
-        azure_principal_id_hint=config.get("azurePrincipalId"),
-        azure_tenant_id_hint=config.get("azureTenantId"),
-        azure_subscription_id_hint=config.get("azureSubscriptionId"),
-        azure_location_hint=config.get("azureLocation"),
-        azure_resource_group_hint=config.get("azureResourceGroup"),
     )
     for warning in local_environment.warnings:
         pulumi.log.warn(warning)
@@ -179,11 +174,6 @@ def _azure_workload_requested(config: pulumi.Config) -> bool:
             "aksKubernetesVersion",
             "aksNodeSku",
             "azureClientId",
-            "azureLocation",
-            "azurePrincipalId",
-            "azureResourceGroup",
-            "azureSubscriptionId",
-            "azureTenantId",
         )
     ) or any(
         config.get_object(key) is not None

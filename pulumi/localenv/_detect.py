@@ -25,7 +25,7 @@ IMDS_TIMEOUT_SECONDS: Final = 5.0
 
 @dataclass(frozen=True)
 class AzureEnvironment:
-    """Azure capability discovered from IMDS plus operator hints."""
+    """Azure capability discovered from IMDS."""
 
     client_id: str
     principal_id: str
@@ -58,11 +58,6 @@ class LocalEnvironment:
 def discover_local_environment(
     *,
     azure_client_id_hint: str | None = None,
-    azure_principal_id_hint: str | None = None,
-    azure_tenant_id_hint: str | None = None,
-    azure_subscription_id_hint: str | None = None,
-    azure_location_hint: str | None = None,
-    azure_resource_group_hint: str | None = None,
 ) -> LocalEnvironment:
     """Discover host capabilities and derive management-plane defaults.
 
@@ -74,11 +69,6 @@ def discover_local_environment(
     warnings: list[str] = []
     azure = _discover_azure_environment(
         azure_client_id_hint=azure_client_id_hint,
-        azure_principal_id_hint=azure_principal_id_hint,
-        azure_tenant_id_hint=azure_tenant_id_hint,
-        azure_subscription_id_hint=azure_subscription_id_hint,
-        azure_location_hint=azure_location_hint,
-        azure_resource_group_hint=azure_resource_group_hint,
         warnings=warnings,
     )
     return LocalEnvironment(
@@ -104,11 +94,6 @@ def _discover_local_username() -> str | None:
 def _discover_azure_environment(
     *,
     azure_client_id_hint: str | None,
-    azure_principal_id_hint: str | None,
-    azure_tenant_id_hint: str | None,
-    azure_subscription_id_hint: str | None,
-    azure_location_hint: str | None,
-    azure_resource_group_hint: str | None,
     warnings: list[str],
 ) -> AzureEnvironment | None:
     try:
@@ -151,10 +136,6 @@ def _discover_azure_environment(
     claims = _decode_jwt_claims(access_token)
     principal_id = claims.get("oid")
     tenant_id = claims.get("tid")
-    if not isinstance(principal_id, str):
-        principal_id = azure_principal_id_hint
-    if not isinstance(tenant_id, str):
-        tenant_id = azure_tenant_id_hint
     if not isinstance(principal_id, str) or not isinstance(tenant_id, str):
         return None
 
@@ -162,9 +143,9 @@ def _discover_azure_environment(
         client_id=client_id,
         principal_id=principal_id,
         tenant_id=tenant_id,
-        subscription_id=azure_subscription_id_hint or host_subscription_id,
-        location=azure_location_hint or host_location,
-        resource_group=azure_resource_group_hint or host_resource_group,
+        subscription_id=host_subscription_id,
+        location=host_location,
+        resource_group=host_resource_group,
         host_subscription_id=host_subscription_id,
         host_location=host_location,
         host_resource_group=host_resource_group,
