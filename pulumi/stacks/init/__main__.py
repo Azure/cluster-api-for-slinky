@@ -14,7 +14,7 @@ _PULUMI_DIR = Path(__file__).resolve().parents[2]
 if str(_PULUMI_DIR) not in sys.path:
     sys.path.insert(0, str(_PULUMI_DIR))
 
-from pko._init_stack import run
+from init_stack import run
 
 
 run()

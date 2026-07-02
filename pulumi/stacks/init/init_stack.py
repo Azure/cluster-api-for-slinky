@@ -1,4 +1,4 @@
-"""PKO init-stack contract and env dispatcher.
+"""Init-stack contract and env dispatcher.
 
 The outer stack should own exactly one ``pulumi.com/v1`` Stack CR after PKO is
 installed: ``ca4s-init``. That init stack then runs inside PKO and builds the
@@ -9,8 +9,8 @@ This module is intentionally shared by both sides of that handoff:
 * :class:`pko.pko_bootstrap.PKOBootstrap` calls :func:`init_stack_config` when it
   creates the single init Stack CR.
 * ``pulumi/stacks/init/__main__.py`` calls :func:`run` from inside the PKO
-    workspace to reconstruct :class:`pko._stack_cr.StackCRSpec` and instantiate
-    the unified init component for the active env.
+  workspace to reconstruct :class:`pko._stack_cr.StackCRSpec` and instantiate
+  the unified init component for the active env.
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ class InitStack(pulumi.ComponentResource):
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
-            "ca4s:pko:InitStack",
+            "ca4s:stacks:init:InitStack",
             name,
             props={},
             opts=opts,

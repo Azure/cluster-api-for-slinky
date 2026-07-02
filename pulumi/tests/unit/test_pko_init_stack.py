@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pko._init_stack import (
+from stacks.init.init_stack import (
     INIT_CHILD_CONFIG_KEY,
     INIT_STACK_SPEC_CONFIG_KEY,
     init_stack_config,

@@ -31,8 +31,8 @@ from pko import PKO_NAMESPACE
 from pko._backend import StateBackend
 from pko._release import PKORelease
 from pko._service_account import WorkspaceServiceAccount
-from pko._init_stack import INIT_PROJECT, INIT_REPO_DIR, init_stack_config
 from pko._stack_cr import StackCRSpec, build_stack_spec
+from stacks.init.init_stack import INIT_PROJECT, INIT_REPO_DIR, init_stack_config
 
 
 # Annotation + timeout for the single outer-owned init Stack CR.
