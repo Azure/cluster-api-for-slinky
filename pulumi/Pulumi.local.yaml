@@ -1,1 +1,11 @@
 encryptionsalt: v1:6rzpxemuQ90=:v1:2AdOEecLqLpId37I:CUJIEmw6x5bSlbrgDwgAxtPkBvtTCQ==
+config:
+  ca4s-infra:initStack:
+    controlPlane:
+      infrastructureProviders:
+        docker:
+          enabled: true
+    tenants:
+      workloadClusters:
+        local:
+          className: local

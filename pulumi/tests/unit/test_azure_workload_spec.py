@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from localenv import AzureResourcePlacement
+import stacks.workload_cluster.workload_cluster_class_aks as aks_config_module
 from stacks.workload_cluster.workload_cluster_class_aks import (
     AKSWorkloadClusterConfig,
     AKSWorkloadSizingConfig,
@@ -17,6 +19,26 @@ from stacks.workload_cluster.tenants import TenantsConfig
 
 _LOCATION = "westus2"
 _RESOURCE_GROUP = "rg-capz-mi-dev2"
+_SUBSCRIPTION_ID = "44444444-4444-4444-4444-444444444444"
+_LOCAL_USERNAME = "t-hernandezc"
+
+
+@pytest.fixture(autouse=True)
+def _mock_local_discovery(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        aks_config_module,
+        "discover_azure_resource_placement",
+        lambda *, raise_on_missing=False: AzureResourcePlacement(
+            subscription_id=_SUBSCRIPTION_ID,
+            location=_LOCATION,
+            resource_group=_RESOURCE_GROUP,
+        ),
+    )
+    monkeypatch.setattr(
+        aks_config_module,
+        "discover_local_username",
+        lambda: _LOCAL_USERNAME,
+    )
 
 
 def _parameters(config: dict[str, object]) -> object:
@@ -47,8 +69,10 @@ def test_build_and_parse_round_trip_defaults() -> None:
                 "caps-aks": {
                     "className": "aks",
                     "parameters": {
+                        "subscriptionId": _SUBSCRIPTION_ID,
                         "location": _LOCATION,
                         "resourceGroup": _RESOURCE_GROUP,
+                        "additionalTags": {"Owner": _LOCAL_USERNAME},
                     },
                 }
             }
@@ -76,8 +100,7 @@ def test_build_omits_aks_block_when_no_overrides() -> None:
     # module defaults. Keeping the wire shape minimal lets an operator revert
     # to "use the default" by removing the config key.
     assert "aks" not in _parameters(built)  # type: ignore[operator]
-    # Likewise, no tags => no ``additionalTags`` key.
-    assert "additionalTags" not in _parameters(built)  # type: ignore[operator]
+    assert _parameters(built)["additionalTags"] == {"Owner": _LOCAL_USERNAME}  # type: ignore[index]
 
 
 def test_build_and_parse_round_trip_additional_tags() -> None:
@@ -90,6 +113,7 @@ def test_build_and_parse_round_trip_additional_tags() -> None:
     )
 
     assert _parameters(built) == {
+        "subscriptionId": _SUBSCRIPTION_ID,
         "location": _LOCATION,
         "resourceGroup": _RESOURCE_GROUP,
         "additionalTags": {"Owner": "t-hernandezc"},
@@ -108,15 +132,15 @@ def test_build_omits_additional_tags_when_empty() -> None:
         )
     )
 
-    assert "additionalTags" not in _parameters(built)  # type: ignore[operator]
+    assert _parameters(built)["additionalTags"] == {}  # type: ignore[index]
 
 
-def test_parse_defaults_additional_tags_to_empty() -> None:
+def test_parse_defaults_additional_tags_to_owner() -> None:
     parsed = AzureWorkloadSpec.model_validate(
         {"location": _LOCATION, "resourceGroup": _RESOURCE_GROUP}
     )
 
-    assert parsed.additional_tags == {}
+    assert parsed.additional_tags == {"Owner": _LOCAL_USERNAME}
 
 
 def test_build_and_parse_round_trip_full_aks_overrides() -> None:
@@ -133,8 +157,10 @@ def test_build_and_parse_round_trip_full_aks_overrides() -> None:
     )
 
     assert _parameters(built) == {
+        "subscriptionId": _SUBSCRIPTION_ID,
         "location": _LOCATION,
         "resourceGroup": _RESOURCE_GROUP,
+        "additionalTags": {"Owner": _LOCAL_USERNAME},
         "aks": {
             "kubernetesVersion": "v1.31.1",
             "nodeSku": "Standard_D4s_v3",
@@ -166,8 +192,10 @@ def test_build_omits_only_unset_aks_keys() -> None:
     # Only the overridden key is serialized; the other two fall back to
     # defaults on the parse side.
     assert _parameters(built) == {
+        "subscriptionId": _SUBSCRIPTION_ID,
         "location": _LOCATION,
         "resourceGroup": _RESOURCE_GROUP,
+        "additionalTags": {"Owner": _LOCAL_USERNAME},
         "aks": {"nodeCount": 5},
     }
 
@@ -196,19 +224,38 @@ def test_parse_rejects_non_mapping_payload() -> None:
         AzureWorkloadSpec.model_validate("not-a-dict")  # type: ignore[arg-type]
 
 
-@pytest.mark.parametrize("missing_key", ["location", "resourceGroup"])
-def test_parse_rejects_missing_required_key(missing_key: str) -> None:
+@pytest.mark.parametrize("omitted_key", ["subscriptionId", "location", "resourceGroup"])
+def test_parse_allows_omitting_discovery_injected_placement(omitted_key: str) -> None:
+    # Placement fields default from local Azure placement discovery, so any one
+    # may be omitted from config.
     payload: dict[str, str] = {
+        "subscriptionId": _SUBSCRIPTION_ID,
         "location": _LOCATION,
         "resourceGroup": _RESOURCE_GROUP,
     }
-    del payload[missing_key]
+    del payload[omitted_key]
 
-    with pytest.raises(
-        ValueError,
-        match=missing_key,
-    ):
-        AzureWorkloadSpec.model_validate(payload)
+    parsed = AzureWorkloadSpec.model_validate(payload)
+
+    if omitted_key == "subscriptionId":
+        assert str(parsed.subscription_id) == _SUBSCRIPTION_ID
+        assert parsed.location == _LOCATION
+        assert parsed.resource_group == _RESOURCE_GROUP
+    elif omitted_key == "location":
+        assert parsed.location == _LOCATION
+        assert parsed.resource_group == _RESOURCE_GROUP
+    else:
+        assert parsed.resource_group == _RESOURCE_GROUP
+        assert parsed.location == _LOCATION
+
+
+def test_parse_allows_omitting_both_placement_fields() -> None:
+    parsed = AzureWorkloadSpec.model_validate({})
+
+    assert str(parsed.subscription_id) == _SUBSCRIPTION_ID
+    assert parsed.location == _LOCATION
+    assert parsed.resource_group == _RESOURCE_GROUP
+    assert parsed.additional_tags == {"Owner": _LOCAL_USERNAME}
 
 
 def test_parse_rejects_non_object_aks_block() -> None:

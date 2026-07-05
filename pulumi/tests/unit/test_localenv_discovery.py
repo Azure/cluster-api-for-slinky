@@ -1,4 +1,4 @@
-"""Unit tests for pure Python local environment discovery."""
+"""Unit tests for pure Python Azure environment discovery."""
 
 from __future__ import annotations
 
@@ -8,17 +8,24 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from threading import Thread
 from typing import Iterator
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
+from uuid import UUID
 
 import pytest
 
-from localenv import discover_local_environment
-import localenv._detect as detect
+import localenv._azure as azure_discovery
 
 
 _CLIENT_ID = "11111111-1111-1111-1111-111111111111"
+_WORKLOAD_CLIENT_ID = "22222222-2222-2222-2222-222222222222"
 _TENANT_ID = "33333333-3333-3333-3333-333333333333"
 _SUBSCRIPTION_ID = "44444444-4444-4444-4444-444444444444"
+
+
+def _clear_azure_discovery_caches() -> None:
+    azure_discovery.discover_azure_credentials.cache_clear()
+    azure_discovery.discover_azure_resource_placement.cache_clear()
+    azure_discovery.discover_azure_environment.cache_clear()
 
 
 class _ImdsServer(ThreadingHTTPServer):
@@ -34,10 +41,6 @@ class _ImdsHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/metadata/instance":
             self._send_instance()
-            return
-
-        if parsed.path == "/metadata/identity/oauth2/token":
-            self._send_token(parse_qs(parsed.query))
             return
 
         self._send_json(404, {"error": "not_found"})
@@ -57,19 +60,6 @@ class _ImdsHandler(BaseHTTPRequestHandler):
                     "location": "westus2",
                     "resourceGroupName": "host-rg",
                 },
-            },
-        )
-
-    def _send_token(self, query: dict[str, list[str]]) -> None:
-        self._send_json(
-            200,
-            {
-                "access_token": _jwt(
-                    {
-                        "tid": _TENANT_ID,
-                    }
-                ),
-                "client_id": _CLIENT_ID,
             },
         )
 
@@ -93,46 +83,134 @@ def _mock_imds(
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     base_url = f"http://127.0.0.1:{server.server_port}"
+    _clear_azure_discovery_caches()
     monkeypatch.setattr(
-        detect,
+        azure_discovery,
         "IMDS_INSTANCE_URL",
         f"{base_url}/metadata/instance?api-version=2021-02-01",
-    )
-    monkeypatch.setattr(
-        detect,
-        "IMDS_TOKEN_URL",
-        f"{base_url}/metadata/identity/oauth2/token"
-        "?api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F",
     )
     try:
         yield
     finally:
+        _clear_azure_discovery_caches()
         server.shutdown()
         thread.join(timeout=5)
         server.server_close()
 
 
-def test_off_azure_discovers_docker_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    with _mock_imds(monkeypatch, instance_status_code=404):
-        env = discover_local_environment()
-
-    assert env.azure is None
-    assert env.management_defaults.infrastructure_providers == ("docker",)
+class _FakeAccessToken:
+    def __init__(self, token: str) -> None:
+        self.token = token
 
 
-def test_azure_imds_adds_azure_provider_and_defaults(
+class _FakeManagedIdentityCredential:
+    client_id: str | None = None
+    instances: list[_FakeManagedIdentityCredential] = []
+    scopes: list[str] = []
+
+    def __init__(self, *, client_id: str | None = None) -> None:
+        self.client_id = client_id
+        self.instances.append(self)
+
+    def get_token(self, scope: str) -> _FakeAccessToken:
+        self.scopes.append(scope)
+        return _FakeAccessToken(
+            _jwt({"tid": _TENANT_ID, "appid": self.client_id or _CLIENT_ID})
+        )
+
+
+class _FakeWorkloadIdentityCredential:
+    scopes: list[str] = []
+
+    def get_token(self, scope: str) -> _FakeAccessToken:
+        self.scopes.append(scope)
+        return _FakeAccessToken(_jwt({"tid": _TENANT_ID, "azp": _WORKLOAD_CLIENT_ID}))
+
+
+def _mock_azure_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_azure_discovery_caches()
+    monkeypatch.setattr(
+        azure_discovery,
+        "ManagedIdentityCredential",
+        _FakeManagedIdentityCredential,
+    )
+    _clear_azure_discovery_caches()
+    monkeypatch.setattr(
+        azure_discovery,
+        "WorkloadIdentityCredential",
+        _FakeWorkloadIdentityCredential,
+    )
+
+
+def test_azure_environment_discovery_returns_none_without_imds(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    with _mock_imds(monkeypatch):
-        env = discover_local_environment()
+    _mock_azure_identity(monkeypatch)
+    with _mock_imds(monkeypatch, instance_status_code=404):
+        env = azure_discovery.discover_azure_environment()
 
-    assert env.azure is not None
-    assert env.management_defaults.infrastructure_providers == ("docker", "azure")
-    assert env.azure.client_ids == (_CLIENT_ID,)
-    assert env.azure.tenant_id == _TENANT_ID
-    assert env.azure.host_subscription_id == _SUBSCRIPTION_ID
-    assert env.azure.host_location == "westus2"
-    assert env.azure.host_resource_group == "host-rg"
+    assert env is None
+
+
+def test_azure_resource_placement_discovery_can_raise_without_imds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with _mock_imds(monkeypatch, instance_status_code=404):
+        with pytest.raises(ValueError, match="azure resource placement discovery"):
+            azure_discovery.discover_azure_resource_placement(raise_on_missing=True)
+
+
+def test_azure_environment_discovery_returns_credentials_and_resource_placement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_azure_identity(monkeypatch)
+    _FakeManagedIdentityCredential.instances = []
+    _FakeManagedIdentityCredential.scopes = []
+    _FakeWorkloadIdentityCredential.scopes = []
+
+    with _mock_imds(monkeypatch):
+        env = azure_discovery.discover_azure_environment()
+
+    assert env is not None
+    assert env.credentials == (
+        azure_discovery.AzureDiscoveredCredential(
+            type="UserAssignedMSI",
+            client_id=_CLIENT_ID,
+            tenant_id=_TENANT_ID,
+        ),
+        azure_discovery.AzureDiscoveredCredential(
+            type="WorkloadIdentity",
+            client_id=_WORKLOAD_CLIENT_ID,
+            tenant_id=_TENANT_ID,
+        ),
+    )
+    assert env.host_subscription_id == _SUBSCRIPTION_ID
+    assert env.host_location == "westus2"
+    assert env.host_resource_group == "host-rg"
+    assert _FakeManagedIdentityCredential.scopes == [
+        azure_discovery.AZURE_MANAGEMENT_SCOPE
+    ]
+    assert _FakeWorkloadIdentityCredential.scopes == [
+        azure_discovery.AZURE_MANAGEMENT_SCOPE
+    ]
+
+
+def test_azure_discovery_passes_client_id_hint_to_managed_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_azure_identity(monkeypatch)
+    _FakeManagedIdentityCredential.instances = []
+    _FakeManagedIdentityCredential.scopes = []
+    _FakeWorkloadIdentityCredential.scopes = []
+    _clear_azure_discovery_caches()
+
+    with _mock_imds(monkeypatch):
+        env = azure_discovery.discover_azure_environment(
+            client_id=UUID(_CLIENT_ID)
+        )
+
+    assert env is not None
+    assert _FakeManagedIdentityCredential.instances[0].client_id == _CLIENT_ID
 
 
 def _jwt(claims: dict[str, object]) -> str:

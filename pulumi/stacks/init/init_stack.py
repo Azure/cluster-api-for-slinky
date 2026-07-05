@@ -1,4 +1,4 @@
-"""Init-stack contract and env dispatcher.
+"""Init-stack contract and config dispatcher.
 
 The outer stack should own exactly one ``pulumi.com/v1`` Stack CR after PKO is
 installed: ``ca4s-init``. That init stack then runs inside PKO and builds the
@@ -15,7 +15,7 @@ This module is intentionally shared by both sides of that handoff:
 
 from __future__ import annotations
 
-from typing import Any, Mapping, cast
+from typing import Any, Mapping
 
 import pulumi
 from pydantic import ValidationError
@@ -23,11 +23,7 @@ from pydantic import ValidationError
 from lib.config import PulumiConfigModel
 
 from stacks.stack_cr import StackCRConfig, stack_cr_config_from_config
-from stacks.control_plane.control_plane_config import (
-    AzureInfrastructureProviderConfig,
-    CONTROL_PLANE_KIND_CHILD_CONFIG_KEY,
-    ControlPlaneKindConfig,
-)
+from stacks.control_plane.control_plane_config import ControlPlaneKindConfig
 from stacks.control_plane.control_plane_kind import ControlPlaneKind
 from stacks.workload_cluster.tenants import (
     Tenants,
@@ -57,7 +53,7 @@ class InitStackInputs(PulumiConfigModel):
 
 
 class InitStack(pulumi.ComponentResource):
-    """Instantiate the env-specific control plane and workload tenants."""
+    """Instantiate the configured control plane and workload tenants."""
 
     control_plane_ready: pulumi.Output[bool]
     workload_clusters: list[dict[str, object]]
@@ -66,7 +62,6 @@ class InitStack(pulumi.ComponentResource):
         self,
         name: str,
         *,
-        env: str,
         inputs: InitStackInputs,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
@@ -78,7 +73,7 @@ class InitStack(pulumi.ComponentResource):
         )
 
         control_plane_config = inputs.init_stack_config.control_plane
-        control_plane, tenants = self._build(env, inputs, control_plane_config)
+        control_plane, tenants = self._build(inputs, control_plane_config)
 
         self.control_plane_ready = control_plane.control_plane_ready
         self.workload_clusters = tenants.workload_clusters
@@ -92,15 +87,14 @@ class InitStack(pulumi.ComponentResource):
 
     def _build(
         self,
-        env: str,
         inputs: InitStackInputs,
         control_plane_config: ControlPlaneKindConfig,
     ) -> tuple[ControlPlaneKind, Tenants]:
         stack_spec = inputs.stack_spec
         azure_provider = control_plane_config.infrastructure_providers.azure
         azure_config = (
-            cast(Any, azure_provider)
-            if isinstance(azure_provider, AzureInfrastructureProviderConfig)
+            azure_provider
+            if azure_provider is not None and azure_provider.enabled
             else None
         )
 
@@ -113,29 +107,23 @@ class InitStack(pulumi.ComponentResource):
         )
 
         tenant_context = None
-        if env == "azure":
-            if (
-                azure_config is None
-                or azure_config.identity is None
-                or azure_config.default_subscription_id is None
-            ):
-                raise ValueError(
-                    "azure init stack requires an enabled azure infrastructure "
-                    "provider with identity and defaultSubscriptionId"
-                )
+        if azure_config is not None:
             azure_outputs = control_plane.azure
-            if azure_outputs is None:
-                raise RuntimeError("InitStack requires Azure control-plane outputs")
             tenant_context = WorkloadClusterContext(
-                subscription_id=str(azure_config.default_subscription_id),
-                identity_name=azure_outputs.cluster_identity_name,
-                identity_namespace=azure_outputs.cluster_identity_namespace,
+                identity_name=(
+                    azure_outputs.cluster_identity_name
+                    if azure_outputs is not None
+                    else None
+                ),
+                identity_namespace=(
+                    azure_outputs.cluster_identity_namespace
+                    if azure_outputs is not None
+                    else None
+                ),
             )
-        elif env != "local":
-            raise ValueError(f"unsupported init stack env {env!r}")
 
         tenants = Tenants(
-            f"tenants-{env}",
+            "tenants",
             spec=inputs.init_stack_config.tenants,
             context=tenant_context,
             opts=pulumi.ResourceOptions(parent=self, depends_on=[control_plane]),
@@ -196,9 +184,8 @@ def load_init_stack_inputs() -> InitStackInputs:
 def run() -> None:
     """Instantiate the init-stack component for the active env."""
     inputs = load_init_stack_inputs()
-    env = pulumi.get_stack()
 
-    init_stack = InitStack("init-stack", env=env, inputs=inputs)
+    init_stack = InitStack("init-stack", inputs=inputs)
 
     pulumi.export("control_plane_ready", init_stack.control_plane_ready)
     pulumi.export("workload_clusters", init_stack.workload_clusters)

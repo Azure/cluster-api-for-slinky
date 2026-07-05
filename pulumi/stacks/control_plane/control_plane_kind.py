@@ -69,7 +69,7 @@ def _enabled_infrastructure_provider_names(
     names: list[str] = []
     if isinstance(providers.docker, DockerInfrastructureProviderConfig):
         names.append("docker")
-    if isinstance(providers.azure, AzureInfrastructureProviderConfig):
+    if providers.azure is not None and providers.azure.enabled:
         names.append("azure")
     return tuple(names)
 
@@ -241,7 +241,7 @@ class ControlPlaneKind(pulumi.ComponentResource):
         azure_provider = config.infrastructure_providers.azure
         azure_config = (
             azure_provider
-            if isinstance(azure_provider, AzureInfrastructureProviderConfig)
+            if azure_provider is not None and azure_provider.enabled
             else None
         )
         azure_spec = (

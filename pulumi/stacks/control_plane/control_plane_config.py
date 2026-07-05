@@ -2,31 +2,25 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, TypeAlias, Union, cast
+from typing import Annotated, Literal, TypeAlias, Union
 from uuid import UUID
 
-from pydantic import Field, StrictBool, field_serializer
+from pydantic import Field, StrictBool, TypeAdapter, field_serializer
 
-from localenv import AzureEnvironment
 from lib.config import (
-    DisabledConfig,
     EnabledConfig,
     NonEmptyStr,
     PulumiConfigModel,
     maybe_disabled,
 )
+from localenv import (
+    AzureResourcePlacement,
+    discover_azure_credentials,
+    discover_azure_resource_placement,
+)
 
 
 CONTROL_PLANE_KIND_CHILD_CONFIG_KEY = "controlPlane"
-
-
-def _single_discovered_client_id(azure_environment: AzureEnvironment) -> UUID:
-    if len(azure_environment.client_ids) != 1:
-        raise ValueError(
-            "azure infrastructure provider discovery requires exactly one "
-            "managed identity clientId when clientId is not explicitly configured"
-        )
-    return UUID(azure_environment.client_ids[0])
 
 
 class AzureClusterIdentityBaseConfig(PulumiConfigModel):
@@ -34,13 +28,36 @@ class AzureClusterIdentityBaseConfig(PulumiConfigModel):
     def serialize_type(self, identity_type: str) -> str:
         return identity_type
 
-    client_id: UUID
-    tenant_id: UUID
+    @field_serializer("client_id", "tenant_id", check_fields=False)
+    def serialize_uuid(self, value: UUID | None) -> str | None:
+        return str(value) if value is not None else None
+
+    client_id: UUID | None = None
+    tenant_id: UUID | None = None
     allowed_namespaces: list[NonEmptyStr] | None = None
 
 
 class UserAssignedMSIClusterIdentityConfig(AzureClusterIdentityBaseConfig):
     type: Literal["UserAssignedMSI"] = "UserAssignedMSI"
+    client_id: UUID | None = Field(
+        default_factory=lambda: UUID(
+            discover_azure_credentials(
+                identity_types=("UserAssignedMSI",),
+                raise_on_missing=True,
+            )[0].client_id
+        )
+    )
+    tenant_id: UUID | None = Field(
+        default_factory=lambda data: UUID(
+            discover_azure_credentials(
+                identity_types=("UserAssignedMSI",),
+                client_id=data["client_id"]
+                if isinstance(data.get("client_id"), UUID)
+                else None,
+                raise_on_missing=True,
+            )[0].tenant_id
+        )
+    )
 
 
 class WorkloadIdentityClusterIdentityConfig(AzureClusterIdentityBaseConfig):
@@ -61,80 +78,83 @@ class DockerInfrastructureProviderConfig(EnabledConfig):
     """Enabled Docker (CAPD) infrastructure provider settings."""
 
 
-@maybe_disabled
-class AzureInfrastructureProviderConfig(EnabledConfig):
+def _discover_default_resource_placement(
+    data: dict[str, object],
+) -> AzureResourcePlacement | None:
+    if data.get("enabled") is not True:
+        return None
+    return discover_azure_resource_placement(raise_on_missing=True)
+
+
+def _discover_default_subscription_id(data: dict[str, object]) -> UUID | None:
+    placement = _discover_default_resource_placement(data)
+    return UUID(placement.subscription_id) if placement is not None else None
+
+
+def _discover_default_location(data: dict[str, object]) -> str | None:
+    placement = _discover_default_resource_placement(data)
+    return placement.location if placement is not None else None
+
+
+def _discover_default_resource_group(data: dict[str, object]) -> str | None:
+    placement = _discover_default_resource_placement(data)
+    return placement.resource_group if placement is not None else None
+
+
+def _discover_default_identity(
+    data: dict[str, object],
+) -> AzureClusterIdentityConfig | None:
+    if data.get("enabled") is not True:
+        return None
+    credentials = discover_azure_credentials()
+    if len(credentials) == 1:
+        credential = credentials[0]
+    elif not credentials:
+        raise ValueError(
+            "azure identity discovery found no usable credential matching "
+            "configured identity"
+        )
+    else:
+        raise ValueError(
+            "azure identity discovery found multiple usable credentials; configure "
+            "identity.type or identity.clientId"
+        )
+    return TypeAdapter(AzureClusterIdentityConfig).validate_python(
+        {
+            "type": credential.type,
+            "clientId": credential.client_id,
+            "tenantId": credential.tenant_id,
+            "allowedNamespaces": [],
+        }
+    )
+
+
+class AzureInfrastructureProviderConfig(PulumiConfigModel):
     """Enabled Azure (CAPZ) infrastructure provider settings and cluster identity."""
 
-    client_id: UUID | None = Field(default=None, exclude=True)
-    default_subscription_id: UUID | None = None
-    identity: AzureClusterIdentityConfig | None = None
+    @field_serializer("enabled")
+    def serialize_enabled(self, enabled: bool) -> bool:
+        return enabled
+
+    enabled: StrictBool = False
+    identity: AzureClusterIdentityConfig | None = Field(
+        default_factory=_discover_default_identity
+    )
+    default_subscription_id: UUID | None = Field(
+        default_factory=_discover_default_subscription_id
+    )
+    default_location: NonEmptyStr | None = Field(
+        default_factory=_discover_default_location
+    )
+    default_resource_group: NonEmptyStr | None = Field(
+        default_factory=_discover_default_resource_group
+    )
     skip_in_cluster_preflight: StrictBool = False
 
 
 class InfrastructureProvidersConfig(PulumiConfigModel):
     docker: DockerInfrastructureProviderConfig | None = None
     azure: AzureInfrastructureProviderConfig | None = None
-
-    def apply_local_environment_discovery(
-        self,
-        *,
-        infrastructure_providers: tuple[str, ...],
-        azure_environment: AzureEnvironment | None = None,
-    ) -> InfrastructureProvidersConfig:
-        docker = self.docker
-        if docker is None:
-            docker = DockerInfrastructureProviderConfig(
-                enabled="docker" in infrastructure_providers
-            )
-
-        azure = self.azure
-        azure_config = (
-            cast(Any, azure)
-            if isinstance(azure, AzureInfrastructureProviderConfig)
-            else None
-        )
-        if azure_config is not None and (
-            azure_config.default_subscription_id is None or azure_config.identity is None
-        ):
-            if azure_environment is None:
-                raise ValueError(
-                    "partial azure infrastructure provider config requires "
-                    "discovered Azure environment"
-                )
-            azure = AzureInfrastructureProviderConfig(
-                enabled=True,
-                default_subscription_id=UUID(azure_environment.host_subscription_id),
-                identity=UserAssignedMSIClusterIdentityConfig(
-                    client_id=(
-                        azure_config.client_id
-                        if azure_config.client_id is not None
-                        else _single_discovered_client_id(azure_environment)
-                    ),
-                    tenant_id=UUID(azure_environment.tenant_id),
-                    allowed_namespaces=[],
-                ),
-                skip_in_cluster_preflight=azure_config.skip_in_cluster_preflight,
-            )
-
-        if (
-            azure is None
-            and azure_environment is not None
-            and "azure" in infrastructure_providers
-        ):
-            azure = AzureInfrastructureProviderConfig(
-                enabled=True,
-                default_subscription_id=UUID(azure_environment.host_subscription_id),
-                identity=UserAssignedMSIClusterIdentityConfig(
-                    client_id=_single_discovered_client_id(azure_environment),
-                    tenant_id=UUID(azure_environment.tenant_id),
-                    allowed_namespaces=[],
-                ),
-            )
-
-        return InfrastructureProvidersConfig(
-            docker=docker,
-            azure=azure,
-        )
 
 
 @maybe_disabled
@@ -149,4 +169,3 @@ class ControlPlaneDeploymentsConfig(PulumiConfigModel):
 class ControlPlaneKindConfig(PulumiConfigModel):
     infrastructure_providers: InfrastructureProvidersConfig = InfrastructureProvidersConfig()
     deployments: ControlPlaneDeploymentsConfig = ControlPlaneDeploymentsConfig()
-

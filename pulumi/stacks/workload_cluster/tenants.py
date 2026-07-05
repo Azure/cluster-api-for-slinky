@@ -45,7 +45,6 @@ class TenantsConfig(PulumiConfigModel):
 
 @dataclass(frozen=True)
 class WorkloadClusterContext:
-    subscription_id: str | None = None
     identity_name: pulumi.Input[str] | None = None
     identity_namespace: pulumi.Input[str] | None = None
 

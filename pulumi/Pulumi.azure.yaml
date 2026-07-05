@@ -1,1 +1,12 @@
 encryptionsalt: v1:0XWG7qpGR14=:v1:xTiXV2lRSRK08/aH:uSyWFK0jMA7tl5l6C8i5LONoIL7w6Q==
+config:
+  ca4s-infra:initStack:
+    controlPlane:
+      infrastructureProviders:
+        azure:
+          enabled: true
+    tenants:
+      workloadClusters:
+        caps-aks:
+          className: aks
+          parameters: {}

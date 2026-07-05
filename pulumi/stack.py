@@ -2,47 +2,21 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Protocol, cast
-
 import pulumi
 import pulumi_kubernetes as k8s
 
 from ctlptl import CloudProviderKind, CloudProviderKindConfig, CtlptlCluster, CtlptlRegistry
 from gitrepo import GitOpsConfig, GitOpsRepository, GitOpsWebhook
-from localenv import LocalEnvironment, discover_local_environment
 from fluxcd import FluxInfrastructure
 from pko import PKOBootstrap, PKO_NAMESPACE
-from stacks.control_plane.control_plane_config import (
-    AzureInfrastructureProviderConfig,
-    ControlPlaneAWXConfig,
-    ControlPlaneDeploymentsConfig,
-    ControlPlaneKindConfig,
-    InfrastructureProvidersConfig,
-)
 from stacks.workload_cluster.registry_setting import (
     LocalPortRegistrySetting,
 )
 from stacks.workload_cluster.tenants import (
     WorkloadClusterConfig,
-    TenantsConfig,
 )
 from stacks.init.init_stack import InitStackConfig
-from stacks.workload_cluster.workload_cluster_class_aks import (
-    AKSWorkloadClusterConfig,
-    AzureWorkloadSpec,
-)
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
-
-
-class _AzureIdentityConfig(Protocol):
-    client_id: object
-    tenant_id: object
-
-
-class _AzureProviderConfig(Protocol):
-    default_subscription_id: object | None
-    identity: _AzureIdentityConfig | None
 
 
 def run_stack() -> None:
@@ -52,10 +26,6 @@ def run_stack() -> None:
         config.get_object("cloudProviderKind") or {}
     )
     gitops_config = GitOpsConfig.model_validate(config.get_object("gitops") or {})
-
-    local_environment = discover_local_environment()
-    for warning in local_environment.warnings:
-        pulumi.log.warn(warning)
 
     registry = CtlptlRegistry("registry")
     cluster = CtlptlCluster("mgmt", registry_name=registry.registry_name)
@@ -81,19 +51,8 @@ def run_stack() -> None:
         },
     )
 
-    init_stack_config = InitStackConfig()
-    if local_environment.azure is not None:
-        init_stack_config = _azure_init_stack_config(
-            config,
-            local_environment,
-        )
-    elif _azure_workload_requested(config):
-        raise ValueError(
-            "Azure workload-cluster config requires an Azure managed identity "
-            "capability. Run from an Azure VM with IMDS available."
-        )
     init_stack_config = _with_local_registry_config(
-        init_stack_config,
+        InitStackConfig.model_validate(config.get_object("initStack") or {}),
         LocalPortRegistrySetting(port=registry.port),
     )
 
@@ -121,51 +80,8 @@ def run_stack() -> None:
         gitops_webhook=gitops_webhook,
         pko=pko,
     )
-    if init_stack_config.control_plane.infrastructure_providers.azure is not None:
+    if _azure_infrastructure_enabled(init_stack_config):
         _export_azure_config_outputs(init_stack_config)
-
-
-def _azure_init_stack_config(
-    config: pulumi.Config,
-    local_environment: LocalEnvironment,
-) -> InitStackConfig:
-    azure_environment = local_environment.azure
-    if azure_environment is None:
-        raise ValueError("Azure child config requires discovered Azure capability")
-
-    azure_config = config.require_object("azure")
-    if not isinstance(azure_config, Mapping):
-        raise ValueError("azure config must be an object")
-    workload_parameters = AzureWorkloadSpec.model_validate(
-        {
-            **azure_config,
-            "location": azure_environment.host_location,
-            "resourceGroup": azure_environment.host_resource_group,
-        }
-    )
-
-    control_plane_config = ControlPlaneKindConfig(
-        infrastructure_providers=InfrastructureProvidersConfig().apply_local_environment_discovery(
-            infrastructure_providers=(
-                local_environment.management_defaults.infrastructure_providers
-            ),
-            azure_environment=local_environment.azure,
-        ),
-        deployments=ControlPlaneDeploymentsConfig(
-            awx=ControlPlaneAWXConfig(enabled=False)
-        ),
-    )
-
-    return InitStackConfig(
-        control_plane=control_plane_config,
-        tenants=TenantsConfig(
-            workload_clusters={
-                "caps-aks": AKSWorkloadClusterConfig(
-                    parameters=workload_parameters,
-                ),
-            },
-        ),
-    )
 
 
 def _with_local_registry_config(
@@ -192,10 +108,9 @@ def _with_local_registry_config(
 def _export_azure_config_outputs(init_stack_config: InitStackConfig) -> None:
     providers = init_stack_config.control_plane.infrastructure_providers
     azure_provider = providers.azure
-    if not isinstance(azure_provider, AzureInfrastructureProviderConfig):
+    if azure_provider is None or not azure_provider.enabled:
         return
-    azure_config = cast(_AzureProviderConfig, azure_provider)
-    if azure_config.identity is None or azure_config.default_subscription_id is None:
+    if azure_provider.identity is None or azure_provider.default_subscription_id is None:
         return
 
     provider_names = [
@@ -207,22 +122,20 @@ def _export_azure_config_outputs(init_stack_config: InitStackConfig) -> None:
         if getattr(provider, "enabled", False)
     ]
     pulumi.export("capi_infrastructure_providers", provider_names)
-    pulumi.export("azure_client_ids", [str(azure_config.identity.client_id)])
-    pulumi.export("azure_tenant_id", str(azure_config.identity.tenant_id))
-    pulumi.export("azure_host_subscription_id", str(azure_config.default_subscription_id))
-
-    for workload_cluster in init_stack_config.tenants.workload_clusters.values():
-        if isinstance(workload_cluster, AKSWorkloadClusterConfig):
-            pulumi.export("azure_host_location", workload_cluster.parameters.location)
-            pulumi.export(
-                "azure_host_resource_group",
-                workload_cluster.parameters.resource_group,
-            )
-            break
+    if azure_provider.identity.client_id is not None:
+        pulumi.export("azure_client_ids", [str(azure_provider.identity.client_id)])
+    if azure_provider.identity.tenant_id is not None:
+        pulumi.export("azure_tenant_id", str(azure_provider.identity.tenant_id))
+    pulumi.export("azure_host_subscription_id", str(azure_provider.default_subscription_id))
+    if azure_provider.default_location is not None:
+        pulumi.export("azure_host_location", azure_provider.default_location)
+    if azure_provider.default_resource_group is not None:
+        pulumi.export("azure_host_resource_group", azure_provider.default_resource_group)
 
 
-def _azure_workload_requested(config: pulumi.Config) -> bool:
-    return config.get_object("azure") is not None
+def _azure_infrastructure_enabled(init_stack_config: InitStackConfig) -> bool:
+    azure_provider = init_stack_config.control_plane.infrastructure_providers.azure
+    return azure_provider is not None and azure_provider.enabled
 
 
 def _export_common_outputs(

@@ -1,15 +1,27 @@
-"""Local host environment discovery for local-kind management stacks."""
+"""Local environment discovery helpers."""
 
-from ._detect import (
+from ._azure import (
+    AZURE_AMBIENT_IDENTITY_TYPES,
+    AZURE_MANAGEMENT_SCOPE,
+    AzureDiscoveredCredential,
     AzureEnvironment,
-    LocalEnvironment,
-    ManagementPlaneDefaults,
-    discover_local_environment,
+    AzureIdentityType,
+    AzureResourcePlacement,
+    discover_azure_credentials,
+    discover_azure_environment,
+    discover_azure_resource_placement,
 )
+from ._host import discover_local_username
 
 __all__ = [
+    "AZURE_AMBIENT_IDENTITY_TYPES",
+    "AZURE_MANAGEMENT_SCOPE",
+    "AzureDiscoveredCredential",
     "AzureEnvironment",
-    "LocalEnvironment",
-    "ManagementPlaneDefaults",
-    "discover_local_environment",
+    "AzureIdentityType",
+    "AzureResourcePlacement",
+    "discover_azure_credentials",
+    "discover_azure_environment",
+    "discover_azure_resource_placement",
+    "discover_local_username",
 ]

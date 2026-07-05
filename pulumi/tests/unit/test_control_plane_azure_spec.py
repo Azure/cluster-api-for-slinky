@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 import pytest
 from pydantic import TypeAdapter
 
-from localenv import AzureEnvironment
+from localenv import (
+    AzureDiscoveredCredential,
+    AzureEnvironment,
+    AzureIdentityType,
+    AzureResourcePlacement,
+)
+import stacks.control_plane.control_plane_config as control_plane_config_module
 from stacks.control_plane.control_plane_config import (
     CONTROL_PLANE_KIND_CHILD_CONFIG_KEY,
     AzureInfrastructureProviderConfig,
@@ -24,9 +32,99 @@ from stacks.control_plane.control_plane_config import (
 # identities. Reused across tests so each one focuses on what it's
 # actually checking.
 _CLIENT_ID = "11111111-1111-1111-1111-111111111111"
-_OTHER_CLIENT_ID = "22222222-2222-2222-2222-222222222222"
 _TENANT_ID = "33333333-3333-3333-3333-333333333333"
 _SUBSCRIPTION_ID = "44444444-4444-4444-4444-444444444444"
+_OTHER_SUBSCRIPTION_ID = "55555555-5555-5555-5555-555555555555"
+_WORKLOAD_CLIENT_ID = "66666666-6666-6666-6666-666666666666"
+_LOCATION = "westus2"
+_RESOURCE_GROUP = "host-rg"
+_DEFAULT_ALLOWED_NAMESPACES = object()
+
+
+def _azure_environment() -> AzureEnvironment:
+    return AzureEnvironment(
+        credentials=(
+            AzureDiscoveredCredential(
+                type="UserAssignedMSI",
+                client_id=_CLIENT_ID,
+                tenant_id=_TENANT_ID,
+            ),
+        ),
+        host_subscription_id=_SUBSCRIPTION_ID,
+        host_location=_LOCATION,
+        host_resource_group=_RESOURCE_GROUP,
+    )
+
+
+def _azure_environment_with_workload_identity() -> AzureEnvironment:
+    return AzureEnvironment(
+        credentials=(
+            AzureDiscoveredCredential(
+                type="UserAssignedMSI",
+                client_id=_CLIENT_ID,
+                tenant_id=_TENANT_ID,
+            ),
+            AzureDiscoveredCredential(
+                type="WorkloadIdentity",
+                client_id=_WORKLOAD_CLIENT_ID,
+                tenant_id=_TENANT_ID,
+            ),
+        ),
+        host_subscription_id=_SUBSCRIPTION_ID,
+        host_location=_LOCATION,
+        host_resource_group=_RESOURCE_GROUP,
+    )
+
+
+def _mock_azure_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    azure_environment: AzureEnvironment | None = None,
+) -> None:
+    environment = azure_environment or _azure_environment()
+
+    def _discover_credentials(
+        *,
+        identity_types: tuple[AzureIdentityType, ...] = (
+            "UserAssignedMSI",
+            "WorkloadIdentity",
+        ),
+        client_id: UUID | None = None,
+        raise_on_missing: bool = False,
+    ) -> tuple[AzureDiscoveredCredential, ...]:
+        credentials = tuple(
+            credential
+            for credential in environment.credentials
+            if credential.type in identity_types
+            and (client_id is None or credential.client_id == str(client_id))
+        )
+        if not credentials and raise_on_missing:
+            raise ValueError(
+                "azure identity discovery found no usable credential matching "
+                "configured identity"
+            )
+        return credentials
+
+    def _discover_resource_placement(
+        *,
+        raise_on_missing: bool = False,
+    ) -> AzureResourcePlacement:
+        return AzureResourcePlacement(
+            subscription_id=environment.host_subscription_id,
+            location=environment.host_location,
+            resource_group=environment.host_resource_group,
+        )
+
+    monkeypatch.setattr(
+        control_plane_config_module,
+        "discover_azure_credentials",
+        _discover_credentials,
+    )
+    monkeypatch.setattr(
+        control_plane_config_module,
+        "discover_azure_resource_placement",
+        _discover_resource_placement,
+    )
 
 
 def _full_payload(**overrides: object) -> dict[str, object]:
@@ -61,6 +159,35 @@ def _azure_provider(config):
     return azure
 
 
+def _assert_user_assigned_identity(
+    identity: object,
+    *,
+    allowed_namespaces: list[str] | None | object = _DEFAULT_ALLOWED_NAMESPACES,
+) -> None:
+    assert isinstance(identity, UserAssignedMSIClusterIdentityConfig)
+    assert str(identity.client_id) == _CLIENT_ID
+    assert str(identity.tenant_id) == _TENANT_ID
+    if allowed_namespaces is _DEFAULT_ALLOWED_NAMESPACES:
+        allowed_namespaces = []
+    assert identity.allowed_namespaces == allowed_namespaces
+
+
+def _assert_workload_identity(
+    identity: object,
+    *,
+    client_id: str | None = _WORKLOAD_CLIENT_ID,
+    tenant_id: str | None = _TENANT_ID,
+    allowed_namespaces: list[str] | None | object = _DEFAULT_ALLOWED_NAMESPACES,
+) -> None:
+    assert isinstance(identity, WorkloadIdentityClusterIdentityConfig)
+    assert (str(identity.client_id) if identity.client_id is not None else None) == client_id
+    assert (str(identity.tenant_id) if identity.tenant_id is not None else None) == tenant_id
+    if allowed_namespaces is _DEFAULT_ALLOWED_NAMESPACES:
+        allowed_namespaces = []
+    assert identity.allowed_namespaces == allowed_namespaces
+
+
+
 def _control_plane_child_config(config: ControlPlaneKindConfig) -> dict[str, object]:
     return {CONTROL_PLANE_KIND_CHILD_CONFIG_KEY: config.to_config()}
 
@@ -73,6 +200,8 @@ def test_build_and_parse_control_plane_kind_round_trip_minimum_fields() -> None:
                 azure=AzureInfrastructureProviderConfig(
                     enabled=True,
                     default_subscription_id=_SUBSCRIPTION_ID,
+                    default_location=_LOCATION,
+                    default_resource_group=_RESOURCE_GROUP,
                     identity=UserAssignedMSIClusterIdentityConfig(
                         client_id=_CLIENT_ID,
                         tenant_id=_TENANT_ID,
@@ -92,6 +221,8 @@ def test_build_and_parse_control_plane_kind_round_trip_minimum_fields() -> None:
                 "azure": {
                     "enabled": True,
                     "defaultSubscriptionId": _SUBSCRIPTION_ID,
+                    "defaultLocation": _LOCATION,
+                    "defaultResourceGroup": _RESOURCE_GROUP,
                     "identity": {
                         "type": "UserAssignedMSI",
                         "clientId": _CLIENT_ID,
@@ -108,84 +239,72 @@ def test_build_and_parse_control_plane_kind_round_trip_minimum_fields() -> None:
     )
     assert parsed.deployments.awx.enabled is False
     azure = _azure_provider(parsed)
-    assert azure.identity == _parse_identity(
-        {
-            "type": "UserAssignedMSI",
-            "clientId": _CLIENT_ID,
-            "tenantId": _TENANT_ID,
-        }
-    )
+    assert isinstance(azure.identity, UserAssignedMSIClusterIdentityConfig)
+    assert str(azure.identity.client_id) == _CLIENT_ID
+    assert str(azure.identity.tenant_id) == _TENANT_ID
     assert azure.identity.type == "UserAssignedMSI"
     assert azure.default_subscription_id is not None
     assert str(azure.default_subscription_id) == _SUBSCRIPTION_ID
+    assert azure.default_location == _LOCATION
+    assert azure.default_resource_group == _RESOURCE_GROUP
 
 
-def test_apply_local_environment_discovery_enables_discovered_azure_provider() -> None:
-    providers = InfrastructureProvidersConfig().apply_local_environment_discovery(
-        infrastructure_providers=("docker", "azure"),
-        azure_environment=AzureEnvironment(
-            client_ids=(_CLIENT_ID,),
-            tenant_id=_TENANT_ID,
-            host_subscription_id=_SUBSCRIPTION_ID,
-            host_location="westus2",
-            host_resource_group="host-rg",
-        ),
+def test_builds_enabled_azure_provider_from_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_azure_discovery(monkeypatch)
+
+    providers = InfrastructureProvidersConfig(
+        docker=DockerInfrastructureProviderConfig(enabled=True),
+        azure=AzureInfrastructureProviderConfig(enabled=True),
     )
 
     assert isinstance(providers.docker, DockerInfrastructureProviderConfig)
     azure = providers.azure
     assert isinstance(azure, AzureInfrastructureProviderConfig)
     assert str(azure.default_subscription_id) == _SUBSCRIPTION_ID
+    assert azure.default_location == _LOCATION
+    assert azure.default_resource_group == _RESOURCE_GROUP
     assert azure.skip_in_cluster_preflight is False
-    assert azure.identity == UserAssignedMSIClusterIdentityConfig(
-        client_id=_CLIENT_ID,
-        tenant_id=_TENANT_ID,
-        allowed_namespaces=[],
-    )
+    _assert_user_assigned_identity(azure.identity)
 
 
-def test_apply_local_environment_discovery_preserves_explicit_azure_provider() -> None:
+def test_provider_config_preserves_explicit_azure_provider() -> None:
     providers = InfrastructureProvidersConfig(
+        docker=DockerInfrastructureProviderConfig(enabled=True),
         azure=AzureInfrastructureProviderConfig(
             enabled=True,
             default_subscription_id=_SUBSCRIPTION_ID,
+            default_location=_LOCATION,
+            default_resource_group=_RESOURCE_GROUP,
             identity=UserAssignedMSIClusterIdentityConfig(
                 client_id=_CLIENT_ID,
                 tenant_id=_TENANT_ID,
             ),
         ),
-    ).apply_local_environment_discovery(
-        infrastructure_providers=("docker",),
     )
 
     assert isinstance(providers.docker, DockerInfrastructureProviderConfig)
     assert isinstance(providers.azure, AzureInfrastructureProviderConfig)
 
 
-def test_apply_local_environment_discovery_leaves_undiscovered_azure_unspecified() -> None:
-    providers = InfrastructureProvidersConfig().apply_local_environment_discovery(
-        infrastructure_providers=("docker",),
+def test_provider_config_leaves_azure_unspecified() -> None:
+    providers = InfrastructureProvidersConfig(
+        docker=DockerInfrastructureProviderConfig(enabled=True),
     )
 
     assert isinstance(providers.docker, DockerInfrastructureProviderConfig)
     assert providers.azure is None
 
 
-def test_apply_local_environment_discovery_preserves_explicit_disabled_azure() -> None:
+def test_provider_config_preserves_explicit_disabled_azure() -> None:
     providers = InfrastructureProvidersConfig(
+        docker=DockerInfrastructureProviderConfig(enabled=True),
         azure=AzureInfrastructureProviderConfig(enabled=False),
-    ).apply_local_environment_discovery(
-        infrastructure_providers=("docker", "azure"),
-        azure_environment=AzureEnvironment(
-            client_ids=(_CLIENT_ID,),
-            tenant_id=_TENANT_ID,
-            host_subscription_id=_SUBSCRIPTION_ID,
-            host_location="westus2",
-            host_resource_group="host-rg",
-        )
     )
 
-    assert not isinstance(providers.azure, AzureInfrastructureProviderConfig)
+    assert isinstance(providers.azure, AzureInfrastructureProviderConfig)
+    assert providers.azure.enabled is False
 
 
 def test_build_omits_allowed_namespaces_when_none() -> None:
@@ -196,6 +315,8 @@ def test_build_omits_allowed_namespaces_when_none() -> None:
                 azure=AzureInfrastructureProviderConfig(
                     enabled=True,
                     default_subscription_id=_SUBSCRIPTION_ID,
+                    default_location=_LOCATION,
+                    default_resource_group=_RESOURCE_GROUP,
                     identity=UserAssignedMSIClusterIdentityConfig(
                         client_id=_CLIENT_ID,
                         tenant_id=_TENANT_ID,
@@ -226,6 +347,8 @@ def test_build_serializes_allowed_namespaces_list() -> None:
                 azure=AzureInfrastructureProviderConfig(
                     enabled=True,
                     default_subscription_id=_SUBSCRIPTION_ID,
+                    default_location=_LOCATION,
+                    default_resource_group=_RESOURCE_GROUP,
                     identity=UserAssignedMSIClusterIdentityConfig(
                         client_id=_CLIENT_ID,
                         tenant_id=_TENANT_ID,
@@ -297,16 +420,58 @@ def test_parse_rejects_missing_identity_type() -> None:
         _parse_identity(payload)
 
 
-@pytest.mark.parametrize(
-    "missing_key",
-    ["clientId", "tenantId"],
-)
-def test_parse_rejects_missing_guid_field(missing_key: str) -> None:
+def test_parse_hydrates_missing_user_assigned_msi_client_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_azure_discovery(monkeypatch)
     payload = _full_payload()
-    del payload[missing_key]
+    del payload["clientId"]
 
-    with pytest.raises(ValueError, match=rf"(?s){missing_key}.*Field required"):
-        _parse_identity(payload)
+    parsed = _parse_identity(payload)
+
+    _assert_user_assigned_identity(parsed, allowed_namespaces=None)
+
+
+def test_parse_hydrates_missing_user_assigned_msi_tenant_id_with_client_id_hint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    discovered_client_ids: list[UUID | None] = []
+
+    def _discover_credentials(
+        *,
+        identity_types: tuple[AzureIdentityType, ...] = (
+            "UserAssignedMSI",
+            "WorkloadIdentity",
+        ),
+        client_id: UUID | None = None,
+        raise_on_missing: bool = False,
+    ) -> tuple[AzureDiscoveredCredential, ...]:
+        discovered_client_ids.append(client_id)
+        credentials = tuple(
+            credential
+            for credential in _azure_environment().credentials
+            if credential.type in identity_types
+            and (client_id is None or credential.client_id == str(client_id))
+        )
+        if not credentials and raise_on_missing:
+            raise ValueError(
+                "azure identity discovery found no usable credential matching "
+                "configured identity"
+            )
+        return credentials
+
+    monkeypatch.setattr(
+        control_plane_config_module,
+        "discover_azure_credentials",
+        _discover_credentials,
+    )
+    payload = _full_payload()
+    del payload["tenantId"]
+
+    parsed = _parse_identity(payload)
+
+    _assert_user_assigned_identity(parsed, allowed_namespaces=None)
+    assert discovered_client_ids == [UUID(_CLIENT_ID)]
 
 
 @pytest.mark.parametrize(
@@ -364,95 +529,184 @@ def test_skip_in_cluster_preflight_defaults_to_false() -> None:
         {
             "enabled": True,
             "defaultSubscriptionId": _SUBSCRIPTION_ID,
+            "defaultLocation": _LOCATION,
+            "defaultResourceGroup": _RESOURCE_GROUP,
             "identity": _full_payload(),
         }
     )
     assert azure.skip_in_cluster_preflight is False
 
 
-def test_apply_local_environment_discovery_completes_partial_azure_provider() -> None:
+def test_provider_config_completes_partial_azure_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_azure_discovery(monkeypatch)
+
     providers = InfrastructureProvidersConfig.model_validate(
         {
             "azure": {
                 "enabled": True,
-                "clientId": _CLIENT_ID,
+                "identity": {
+                    "type": "UserAssignedMSI",
+                    "clientId": _CLIENT_ID,
+                },
             }
         }
-    ).apply_local_environment_discovery(
-        infrastructure_providers=("docker",),
-        azure_environment=AzureEnvironment(
-            client_ids=(_CLIENT_ID,),
-            tenant_id=_TENANT_ID,
-            host_subscription_id=_SUBSCRIPTION_ID,
-            host_location="westus2",
-            host_resource_group="host-rg",
-        ),
     )
 
     azure = providers.azure
     assert isinstance(azure, AzureInfrastructureProviderConfig)
     assert str(azure.default_subscription_id) == _SUBSCRIPTION_ID
-    assert azure.identity == UserAssignedMSIClusterIdentityConfig(
-        client_id=_CLIENT_ID,
-        tenant_id=_TENANT_ID,
-        allowed_namespaces=[],
+    assert azure.default_location == _LOCATION
+    assert azure.default_resource_group == _RESOURCE_GROUP
+    _assert_user_assigned_identity(azure.identity, allowed_namespaces=None)
+
+
+def test_azure_provider_discovery_preserves_explicit_subscription(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_azure_discovery(monkeypatch)
+
+    azure = AzureInfrastructureProviderConfig(
+        enabled=True,
+        default_subscription_id=_OTHER_SUBSCRIPTION_ID,
+        skip_in_cluster_preflight=True,
     )
 
+    assert str(azure.default_subscription_id) == _OTHER_SUBSCRIPTION_ID
+    assert azure.default_location == _LOCATION
+    assert azure.default_resource_group == _RESOURCE_GROUP
+    assert azure.skip_in_cluster_preflight is True
+    _assert_user_assigned_identity(azure.identity)
 
-def test_apply_local_environment_discovery_uses_single_discovered_client_id() -> None:
+
+def test_provider_config_uses_discovered_client_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_azure_discovery(monkeypatch)
+
     providers = InfrastructureProvidersConfig(
         azure=AzureInfrastructureProviderConfig(enabled=True),
-    ).apply_local_environment_discovery(
-        infrastructure_providers=("docker",),
-        azure_environment=AzureEnvironment(
-            client_ids=(_CLIENT_ID,),
-            tenant_id=_TENANT_ID,
-            host_subscription_id=_SUBSCRIPTION_ID,
-            host_location="westus2",
-            host_resource_group="host-rg",
-        ),
     )
 
     azure = providers.azure
     assert isinstance(azure, AzureInfrastructureProviderConfig)
-    assert azure.identity == UserAssignedMSIClusterIdentityConfig(
-        client_id=_CLIENT_ID,
-        tenant_id=_TENANT_ID,
-        allowed_namespaces=[],
+    _assert_user_assigned_identity(azure.identity)
+
+
+def test_provider_config_rejects_ambiguous_ambient_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_azure_discovery(
+        monkeypatch,
+        azure_environment=_azure_environment_with_workload_identity(),
     )
 
-
-def test_apply_local_environment_discovery_rejects_ambiguous_discovered_client_ids() -> None:
-    providers = InfrastructureProvidersConfig(
-        azure=AzureInfrastructureProviderConfig(enabled=True),
-    )
-
-    with pytest.raises(ValueError, match="exactly one managed identity clientId"):
-        providers.apply_local_environment_discovery(
-            infrastructure_providers=("docker",),
-            azure_environment=AzureEnvironment(
-                client_ids=(_CLIENT_ID, _OTHER_CLIENT_ID),
-                tenant_id=_TENANT_ID,
-                host_subscription_id=_SUBSCRIPTION_ID,
-                host_location="westus2",
-                host_resource_group="host-rg",
-            ),
+    with pytest.raises(ValueError, match="multiple usable credentials"):
+        InfrastructureProvidersConfig(
+            azure=AzureInfrastructureProviderConfig(enabled=True),
         )
 
 
-def test_apply_local_environment_discovery_requires_discovery_for_partial_azure_provider() -> None:
+def test_provider_config_keeps_configured_workload_identity_partial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _fail_credential_discovery(
+        *,
+        identity_types: tuple[AzureIdentityType, ...] = (
+            "UserAssignedMSI",
+            "WorkloadIdentity",
+        ),
+        client_id: UUID | None = None,
+        raise_on_missing: bool = False,
+    ) -> tuple[AzureDiscoveredCredential, ...]:
+        raise AssertionError("workload identity must not hydrate from outer Pulumi")
+
+    monkeypatch.setattr(
+        control_plane_config_module,
+        "discover_azure_credentials",
+        _fail_credential_discovery,
+    )
+
     providers = InfrastructureProvidersConfig.model_validate(
         {
             "azure": {
                 "enabled": True,
-                "clientId": _CLIENT_ID,
+                "defaultSubscriptionId": _SUBSCRIPTION_ID,
+                "defaultLocation": _LOCATION,
+                "defaultResourceGroup": _RESOURCE_GROUP,
+                "identity": {"type": "WorkloadIdentity"},
             }
         }
     )
 
-    with pytest.raises(ValueError, match="discovered Azure environment"):
-        providers.apply_local_environment_discovery(
-            infrastructure_providers=("docker",),
+    azure = providers.azure
+    assert isinstance(azure, AzureInfrastructureProviderConfig)
+    _assert_workload_identity(
+        azure.identity,
+        client_id=None,
+        tenant_id=None,
+        allowed_namespaces=None,
+    )
+
+
+def test_apply_local_environment_discovery_requires_discovery_for_partial_azure_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _discover_credentials(
+        *,
+        identity_types: tuple[AzureIdentityType, ...] = (
+            "UserAssignedMSI",
+            "WorkloadIdentity",
+        ),
+        client_id: UUID | None = None,
+        raise_on_missing: bool = False,
+    ) -> tuple[AzureDiscoveredCredential, ...]:
+        credentials = tuple(
+            credential
+            for credential in _azure_environment().credentials
+            if credential.type in identity_types
+            and (client_id is None or credential.client_id == str(client_id))
+        )
+        if not credentials and raise_on_missing:
+            raise ValueError(
+                "azure identity discovery found no usable credential matching "
+                "configured identity"
+            )
+        return credentials
+
+    def _missing_resource_placement(
+        *,
+        raise_on_missing: bool = False,
+    ) -> None:
+        if raise_on_missing:
+            raise ValueError(
+                "azure resource placement discovery found no usable host environment"
+            )
+        return None
+
+    monkeypatch.setattr(
+        control_plane_config_module,
+        "discover_azure_credentials",
+        _discover_credentials,
+    )
+    monkeypatch.setattr(
+        control_plane_config_module,
+        "discover_azure_resource_placement",
+        _missing_resource_placement,
+    )
+
+    with pytest.raises(ValueError, match="azure resource placement discovery"):
+        InfrastructureProvidersConfig.model_validate(
+            {
+                "azure": {
+                    "enabled": True,
+                    "identity": {
+                        "type": "UserAssignedMSI",
+                        "clientId": _CLIENT_ID,
+                    },
+                }
+            }
         )
 
 
@@ -464,6 +718,8 @@ def test_skip_in_cluster_preflight_round_trips_true() -> None:
                 azure=AzureInfrastructureProviderConfig(
                     enabled=True,
                     default_subscription_id=_SUBSCRIPTION_ID,
+                    default_location=_LOCATION,
+                    default_resource_group=_RESOURCE_GROUP,
                     identity=UserAssignedMSIClusterIdentityConfig(
                         client_id=_CLIENT_ID,
                         tenant_id=_TENANT_ID,
@@ -482,6 +738,8 @@ def test_skip_in_cluster_preflight_round_trips_true() -> None:
     assert control_plane["infrastructureProviders"]["azure"] == {
         "enabled": True,
         "defaultSubscriptionId": _SUBSCRIPTION_ID,
+        "defaultLocation": _LOCATION,
+        "defaultResourceGroup": _RESOURCE_GROUP,
         "identity": {
             "type": "UserAssignedMSI",
             "clientId": _CLIENT_ID,
@@ -501,6 +759,8 @@ def test_workload_identity_round_trips_and_keeps_preflight_default() -> None:
                 azure=AzureInfrastructureProviderConfig(
                     enabled=True,
                     default_subscription_id=_SUBSCRIPTION_ID,
+                    default_location=_LOCATION,
+                    default_resource_group=_RESOURCE_GROUP,
                     identity=WorkloadIdentityClusterIdentityConfig(
                         client_id=_CLIENT_ID,
                         tenant_id=_TENANT_ID,
@@ -518,6 +778,8 @@ def test_workload_identity_round_trips_and_keeps_preflight_default() -> None:
     assert control_plane["infrastructureProviders"]["azure"] == {
         "enabled": True,
         "defaultSubscriptionId": _SUBSCRIPTION_ID,
+        "defaultLocation": _LOCATION,
+        "defaultResourceGroup": _RESOURCE_GROUP,
         "identity": {
             "type": "WorkloadIdentity",
             "clientId": _CLIENT_ID,
@@ -543,6 +805,8 @@ def test_build_omits_skip_in_cluster_preflight_when_false() -> None:
                 azure=AzureInfrastructureProviderConfig(
                     enabled=True,
                     default_subscription_id=_SUBSCRIPTION_ID,
+                    default_location=_LOCATION,
+                    default_resource_group=_RESOURCE_GROUP,
                     identity=UserAssignedMSIClusterIdentityConfig(
                         client_id=_CLIENT_ID,
                         tenant_id=_TENANT_ID,
@@ -569,6 +833,8 @@ def test_parse_rejects_non_bool_skip_in_cluster_preflight() -> None:
             {
                 "enabled": True,
                 "defaultSubscriptionId": _SUBSCRIPTION_ID,
+                "defaultLocation": _LOCATION,
+                "defaultResourceGroup": _RESOURCE_GROUP,
                 "identity": _full_payload(),
                 "skipInClusterPreflight": "yes",
             }
@@ -583,6 +849,8 @@ def test_infrastructure_providers_round_trip() -> None:
                 azure=AzureInfrastructureProviderConfig(
                     enabled=True,
                     default_subscription_id=_SUBSCRIPTION_ID,
+                    default_location=_LOCATION,
+                    default_resource_group=_RESOURCE_GROUP,
                     identity=UserAssignedMSIClusterIdentityConfig(
                         client_id=_CLIENT_ID,
                         tenant_id=_TENANT_ID,
@@ -601,6 +869,8 @@ def test_infrastructure_providers_round_trip() -> None:
     assert providers["docker"] == {"enabled": True}
     assert providers["azure"]["enabled"] is True
     assert providers["azure"]["defaultSubscriptionId"] == _SUBSCRIPTION_ID
+    assert providers["azure"]["defaultLocation"] == _LOCATION
+    assert providers["azure"]["defaultResourceGroup"] == _RESOURCE_GROUP
     assert providers["azure"]["identity"]["clientId"] == _CLIENT_ID
     assert "azure" not in control_plane
     parsed = ControlPlaneKindConfig.model_validate(control_plane)

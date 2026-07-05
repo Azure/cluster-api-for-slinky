@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from typing import Any, Literal, Mapping
+from uuid import UUID
 
 import pulumi
-from pydantic import field_serializer
+from pydantic import Field, field_serializer
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
+from localenv import discover_azure_resource_placement, discover_local_username
 
 from stacks.workload_cluster.workload_cluster_deployments import (
     KEDAOutputs,
@@ -44,12 +46,46 @@ class AKSWorkloadSizingConfig(PulumiConfigModel):
 
 
 class AzureWorkloadSpec(PulumiConfigModel):
-    """AKS placement and sizing parameters for one workload-cluster entry."""
+    """AKS placement and sizing parameters for one workload-cluster entry.
 
-    location: NonEmptyStr
-    resource_group: NonEmptyStr
-    additional_tags: Mapping[NonEmptyStr, str] = {}
+    ``subscription_id``, ``location``, and ``resource_group`` may be omitted
+    from config because they default from local Azure resource placement discovery.
+    """
+
+    subscription_id: UUID = Field(
+        default_factory=lambda: UUID(
+            discover_azure_resource_placement(raise_on_missing=True).subscription_id
+        )
+    )
+    location: NonEmptyStr = Field(
+        default_factory=lambda: (
+            discover_azure_resource_placement(raise_on_missing=True).location
+        )
+    )
+    resource_group: NonEmptyStr = Field(
+        default_factory=lambda: (
+            discover_azure_resource_placement(raise_on_missing=True).resource_group
+        )
+    )
+    additional_tags: Mapping[NonEmptyStr, str] = Field(
+        default_factory=lambda: (
+            {"Owner": username}
+            if (username := discover_local_username()) is not None
+            else {}
+        )
+    )
     aks: AKSWorkloadSizingConfig = AKSWorkloadSizingConfig()
+
+    @field_serializer("subscription_id", "location", "resource_group", check_fields=False)
+    def serialize_placement(self, value: UUID | str) -> str:
+        return str(value)
+
+    @field_serializer("additional_tags", check_fields=False)
+    def serialize_additional_tags(
+        self,
+        additional_tags: Mapping[NonEmptyStr, str],
+    ) -> dict[str, str]:
+        return dict(additional_tags)
 
 
 class AKSWorkloadClusterConfig(PulumiConfigModel):
@@ -109,7 +145,6 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
         instance: str,
         config: AKSWorkloadClusterConfig,
         context: Any | None = None,
-        subscription_id: str | None = None,
         identity_name: pulumi.Input[str] | None = None,
         identity_namespace: pulumi.Input[str] | None = None,
         node_pools: tuple[AKSNodePoolSpec, ...] | None = None,
@@ -125,15 +160,14 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
         )
         workload_spec = config.parameters
         if context is not None:
-            subscription_id = subscription_id or context.subscription_id
             identity_name = identity_name or context.identity_name
             identity_namespace = identity_namespace or context.identity_namespace
-        if subscription_id is None:
-            raise ValueError("aks workload cluster class requires subscription_id")
         if identity_name is None:
             raise ValueError("aks workload cluster class requires identity_name")
         if identity_namespace is None:
             raise ValueError("aks workload cluster class requires identity_namespace")
+        location = workload_spec.location
+        resource_group = workload_spec.resource_group
 
         def child_options(
             *,
@@ -149,11 +183,11 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
         infrastructure = AKSWorkloadClusterInfrastructure(
             "infrastructure",
             instance=instance,
-            subscription_id=subscription_id,
+            subscription_id=str(workload_spec.subscription_id),
             identity_name=identity_name,
             identity_namespace=identity_namespace,
-            location=workload_spec.location,
-            resource_group=workload_spec.resource_group,
+            location=location,
+            resource_group=resource_group,
             kubernetes_version=workload_spec.aks.kubernetes_version,
             node_sku=workload_spec.aks.node_sku,
             node_pools=node_pools,
