@@ -3,59 +3,67 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Protocol, cast
 
 import pulumi
 import pulumi_kubernetes as k8s
 
-from ctlptl import CloudProviderKind, CtlptlCluster, CtlptlRegistry
-from gitrepo import GitOpsRepository, GitOpsWebhook
+from ctlptl import CloudProviderKind, CloudProviderKindConfig, CtlptlCluster, CtlptlRegistry
+from gitrepo import GitOpsConfig, GitOpsRepository, GitOpsWebhook
 from localenv import LocalEnvironment, discover_local_environment
 from fluxcd import FluxInfrastructure
 from pko import PKOBootstrap, PKO_NAMESPACE
 from stacks.control_plane.control_plane_config import (
-    build_control_plane_kind_azure_child_config,
+    AzureInfrastructureProviderConfig,
+    ControlPlaneAWXConfig,
+    ControlPlaneDeploymentsConfig,
+    ControlPlaneKindConfig,
+    InfrastructureProvidersConfig,
 )
 from stacks.workload_cluster.registry_setting import (
-    REGISTRY_CONFIG_KEY,
-    local_port_registry_setting,
+    LocalPortRegistrySetting,
 )
+from stacks.workload_cluster.tenants import (
+    WorkloadClusterConfig,
+    TenantsConfig,
+)
+from stacks.init.init_stack import InitStackConfig
 from stacks.workload_cluster.workload_cluster_class_aks import (
-    build_aks_workload_cluster_child_config,
+    AKSWorkloadClusterConfig,
+    AzureWorkloadSpec,
 )
+from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
+
+
+class _AzureIdentityConfig(Protocol):
+    client_id: object
+    tenant_id: object
+
+
+class _AzureProviderConfig(Protocol):
+    default_subscription_id: object | None
+    identity: _AzureIdentityConfig | None
 
 
 def run_stack() -> None:
     """Build the Kind management-cluster graph from config and discovery."""
     config = pulumi.Config()
-
-    local_environment = discover_local_environment(
-        azure_client_id_hint=config.get("azureClientId"),
+    cloud_provider_kind_config = CloudProviderKindConfig.model_validate(
+        config.get_object("cloudProviderKind") or {}
     )
+    gitops_config = GitOpsConfig.model_validate(config.get_object("gitops") or {})
+
+    local_environment = discover_local_environment()
     for warning in local_environment.warnings:
         pulumi.log.warn(warning)
 
-    child_config: dict[str, object] = {}
-    azure_exports: dict[str, object] = {}
-
-    if local_environment.azure is not None:
-        child_config.update(
-            _azure_child_config(config, local_environment, azure_exports)
-        )
-    elif _azure_workload_requested(config):
-        raise ValueError(
-            "Azure workload-cluster config requires an Azure managed identity "
-            "capability. Run from an Azure VM with IMDS available."
-        )
-
     registry = CtlptlRegistry("registry")
-    child_config[REGISTRY_CONFIG_KEY] = local_port_registry_setting(registry.port)
-
     cluster = CtlptlCluster("mgmt", registry_name=registry.registry_name)
     mgmt_provider = k8s.Provider("mgmt-k8s", kubeconfig=cluster.kubeconfig)
 
     lb = CloudProviderKind(
         "lb",
-        enable_lb_port_mapping=config.get_bool("enable_lb_port_mapping", True),
+        config=cloud_provider_kind_config,
     )
     flux = FluxInfrastructure(
         "flux",
@@ -63,17 +71,30 @@ def run_stack() -> None:
         artifact_consumer_namespaces=[PKO_NAMESPACE],
     )
 
-    gitops_provider = config.get("gitops_provider") or "gitea-builtin"
     repo = GitOpsRepository(
         "gitops",
-        gitops_provider_name=gitops_provider,
-        gitops_provider_args={
-            **(config.get_object("gitops_provider_args") or {}),
+        config=gitops_config,
+        runtime_args={
             "kubeconfig": cluster.kubeconfig,
             "flux_provider": mgmt_provider,
             "flux_infrastructure": flux,
-            "sync_triggers": config.get_object("gitops_sync_triggers") or {},
         },
+    )
+
+    init_stack_config = InitStackConfig()
+    if local_environment.azure is not None:
+        init_stack_config = _azure_init_stack_config(
+            config,
+            local_environment,
+        )
+    elif _azure_workload_requested(config):
+        raise ValueError(
+            "Azure workload-cluster config requires an Azure managed identity "
+            "capability. Run from an Azure VM with IMDS available."
+        )
+    init_stack_config = _with_local_registry_config(
+        init_stack_config,
+        LocalPortRegistrySetting(port=registry.port),
     )
 
     pko = PKOBootstrap(
@@ -81,12 +102,12 @@ def run_stack() -> None:
         provider=mgmt_provider,
         flux_source=repo.flux_source,
         env=pulumi.get_stack(),
-        config=child_config,
+        init_stack_config=init_stack_config,
     )
 
     gitops_webhook = GitOpsWebhook(
         "gitops-flux-webhook",
-        gitops_provider_name=gitops_provider,
+        config=gitops_config,
         gitops_webhook_args=repo.webhook_args,
         opts=pulumi.ResourceOptions(depends_on=[pko]),
     )
@@ -96,87 +117,112 @@ def run_stack() -> None:
         cluster=cluster,
         lb=lb,
         repo=repo,
-        gitops_provider=gitops_provider,
+        gitops_provider=gitops_config.provider,
         gitops_webhook=gitops_webhook,
         pko=pko,
     )
-    for name, value in azure_exports.items():
-        pulumi.export(name, value)
+    if init_stack_config.control_plane.infrastructure_providers.azure is not None:
+        _export_azure_config_outputs(init_stack_config)
 
 
-def _azure_child_config(
+def _azure_init_stack_config(
     config: pulumi.Config,
     local_environment: LocalEnvironment,
-    exports: dict[str, object],
-) -> dict[str, object]:
+) -> InitStackConfig:
     azure_environment = local_environment.azure
     if azure_environment is None:
         raise ValueError("Azure child config requires discovered Azure capability")
 
-    azure_location = azure_environment.location
-    azure_resource_group = azure_environment.resource_group
-
-    exports.update(
+    azure_config = config.require_object("azure")
+    if not isinstance(azure_config, Mapping):
+        raise ValueError("azure config must be an object")
+    workload_parameters = AzureWorkloadSpec.model_validate(
         {
-            "capi_infrastructure_providers": list(
-                local_environment.management_defaults.infrastructure_providers
-            ),
-            "azure_client_id": azure_environment.client_id,
-            "azure_principal_id": azure_environment.principal_id,
-            "azure_tenant_id": azure_environment.tenant_id,
-            "azure_subscription_id": azure_environment.subscription_id,
-            "azure_location": azure_location,
-            "azure_resource_group": azure_resource_group,
-            "azure_host_subscription_id": azure_environment.host_subscription_id,
-            "azure_host_location": azure_environment.host_location,
-            "azure_host_resource_group": azure_environment.host_resource_group,
+            **azure_config,
+            "location": azure_environment.host_location,
+            "resourceGroup": azure_environment.host_resource_group,
         }
     )
 
-    return {
-        **build_control_plane_kind_azure_child_config(
-            client_id=azure_environment.client_id,
-            principal_id=azure_environment.principal_id,
-            tenant_id=azure_environment.tenant_id,
-            subscription_id=azure_environment.subscription_id,
-            allowed_namespaces=_normalize_allowed_namespaces(
-                config.get_object("azureClusterIdentityAllowedNamespaces")
-            ),
+    control_plane_config = ControlPlaneKindConfig(
+        infrastructure_providers=InfrastructureProvidersConfig().apply_local_environment_discovery(
             infrastructure_providers=(
                 local_environment.management_defaults.infrastructure_providers
             ),
-            skip_in_cluster_preflight=config.get_bool(
-                "skip_in_cluster_preflight", False
-            ),
+            azure_environment=local_environment.azure,
         ),
-        **build_aks_workload_cluster_child_config(
-            location=azure_location,
-            resource_group=azure_resource_group,
-            additional_tags=_normalize_additional_tags(
-                config.get_object("azureAdditionalTags")
-            ),
-            aks_kubernetes_version=config.get("aksKubernetesVersion"),
-            aks_node_sku=config.get("aksNodeSku"),
-            aks_node_count=config.get_int("aksNodeCount"),
+        deployments=ControlPlaneDeploymentsConfig(
+            awx=ControlPlaneAWXConfig(enabled=False)
         ),
-    }
+    )
+
+    return InitStackConfig(
+        control_plane=control_plane_config,
+        tenants=TenantsConfig(
+            workload_clusters={
+                "caps-aks": AKSWorkloadClusterConfig(
+                    parameters=workload_parameters,
+                ),
+            },
+        ),
+    )
+
+
+def _with_local_registry_config(
+    init_stack_config: InitStackConfig,
+    registry: LocalPortRegistrySetting,
+) -> InitStackConfig:
+    workload_clusters: dict[str, WorkloadClusterConfig] = {}
+    for name, workload_cluster in init_stack_config.tenants.workload_clusters.items():
+        if isinstance(workload_cluster, LocalWorkloadClusterConfig):
+            workload_cluster = workload_cluster.model_copy(
+                update={"registry": registry}
+            )
+        workload_clusters[name] = workload_cluster
+
+    return init_stack_config.model_copy(
+        update={
+            "tenants": init_stack_config.tenants.model_copy(
+                update={"workload_clusters": workload_clusters}
+            )
+        }
+    )
+
+
+def _export_azure_config_outputs(init_stack_config: InitStackConfig) -> None:
+    providers = init_stack_config.control_plane.infrastructure_providers
+    azure_provider = providers.azure
+    if not isinstance(azure_provider, AzureInfrastructureProviderConfig):
+        return
+    azure_config = cast(_AzureProviderConfig, azure_provider)
+    if azure_config.identity is None or azure_config.default_subscription_id is None:
+        return
+
+    provider_names = [
+        name
+        for name, provider in (
+            ("docker", providers.docker),
+            ("azure", providers.azure),
+        )
+        if getattr(provider, "enabled", False)
+    ]
+    pulumi.export("capi_infrastructure_providers", provider_names)
+    pulumi.export("azure_client_ids", [str(azure_config.identity.client_id)])
+    pulumi.export("azure_tenant_id", str(azure_config.identity.tenant_id))
+    pulumi.export("azure_host_subscription_id", str(azure_config.default_subscription_id))
+
+    for workload_cluster in init_stack_config.tenants.workload_clusters.values():
+        if isinstance(workload_cluster, AKSWorkloadClusterConfig):
+            pulumi.export("azure_host_location", workload_cluster.parameters.location)
+            pulumi.export(
+                "azure_host_resource_group",
+                workload_cluster.parameters.resource_group,
+            )
+            break
 
 
 def _azure_workload_requested(config: pulumi.Config) -> bool:
-    return any(
-        config.get(key) is not None
-        for key in (
-            "aksKubernetesVersion",
-            "aksNodeSku",
-            "azureClientId",
-        )
-    ) or any(
-        config.get_object(key) is not None
-        for key in (
-            "azureAdditionalTags",
-            "azureClusterIdentityAllowedNamespaces",
-        )
-    )
+    return config.get_object("azure") is not None
 
 
 def _export_common_outputs(
@@ -220,28 +266,3 @@ def _export_common_outputs(
     pulumi.export("pko_init_stack", pko.init_stack)
 
 
-def _normalize_allowed_namespaces(value: object | None) -> list[str] | None:
-    if value is None:
-        return None
-    if not isinstance(value, list) or not all(
-        isinstance(item, str) and item for item in value
-    ):
-        raise ValueError(
-            "azureClusterIdentityAllowedNamespaces must be a list of "
-            f"non-empty namespace names; got {value!r}"
-        )
-    return list(value)
-
-
-def _normalize_additional_tags(value: object | None) -> dict[str, str] | None:
-    if value is None:
-        return None
-    if not isinstance(value, Mapping) or not all(
-        isinstance(key, str) and key and isinstance(tag_value, str)
-        for key, tag_value in value.items()
-    ):
-        raise ValueError(
-            "azureAdditionalTags must be an object mapping non-empty string "
-            f"tag keys to string values; got {value!r}"
-        )
-    return dict(value)

@@ -2,110 +2,71 @@ from __future__ import annotations
 
 import pytest
 
+from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
 from stacks.workload_cluster.tenants import (
     Tenants,
-    ObjectMeta,
-    WorkloadClusterSpec,
     WorkloadClusterContext,
-    parse_tenants_spec,
+    TenantsConfig,
 )
 
 
-def test_parse_tenants_spec_defaults_to_local_cluster() -> None:
-    spec = parse_tenants_spec(None)
+def test_tenants_config_defaults_to_local_cluster() -> None:
+    spec = TenantsConfig()
 
-    assert spec.workload_clusters == (
-        WorkloadClusterSpec(metadata=ObjectMeta(name="local"), class_name="local"),
-    )
+    assert spec.workload_clusters == {
+        "local": LocalWorkloadClusterConfig(),
+    }
 
 
-def test_parse_tenants_spec_accepts_kubernetes_flavored_shape() -> None:
-    spec = parse_tenants_spec(
+def test_tenants_config_accepts_mapping_shape() -> None:
+    spec = TenantsConfig.model_validate(
         {
-            "workloadClusters": [
-                {
-                    "metadata": {
-                        "name": "local-2",
-                        "labels": {"slinky.slurm.net/environment": "local"},
-                    },
-                    "spec": {
-                        "className": "local",
-                        "parameters": {},
-                    },
+            "workloadClusters": {
+                "local-2": {
+                    "className": "local",
                 },
-                {
-                    "metadata": {"name": "local"},
-                    "spec": {"className": "local"},
+                "local": {
+                    "className": "local",
                 },
-            ],
+            },
         }
     )
 
-    assert spec.workload_clusters == (
-        WorkloadClusterSpec(metadata=ObjectMeta(name="local"), class_name="local"),
-        WorkloadClusterSpec(
-            metadata=ObjectMeta(
-                name="local-2",
-                labels={"slinky.slurm.net/environment": "local"},
-            ),
-            class_name="local",
-        ),
-    )
+    assert spec.workload_clusters == {
+        "local": LocalWorkloadClusterConfig(),
+        "local-2": LocalWorkloadClusterConfig(),
+    }
+    assert spec.to_config() == {
+        "workloadClusters": {
+            "local": {"className": "local"},
+            "local-2": {"className": "local"},
+        }
+    }
 
 
-def test_parse_tenants_spec_rejects_duplicate_cluster_names() -> None:
-    with pytest.raises(ValueError, match="duplicate names: local"):
-        parse_tenants_spec(
-            {
-                "workloadClusters": [
-                    {
-                        "metadata": {"name": "local"},
-                        "spec": {"className": "local"},
-                    },
-                    {
-                        "metadata": {"name": "local"},
-                        "spec": {"className": "local"},
-                    },
-                ],
-            }
-        )
+def test_tenants_config_accepts_empty_mapping() -> None:
+    spec = TenantsConfig.model_validate({"workloadClusters": {}})
+
+    assert spec.workload_clusters == {}
 
 
 @pytest.mark.parametrize(
     "value",
     [
-        {},
         {"workloadClusters": []},
-        {"workloadClusters": [{"metadata": {"name": "local"}}]},
-        {
-            "workloadClusters": [
-                {"metadata": {"name": "not_valid"}, "spec": {"className": "local"}}
-            ]
-        },
-        {
-            "workloadClusters": [
-                {"metadata": {"name": "local"}, "spec": {"className": "not_valid"}}
-            ]
-        },
+        {"workloadClusters": {"local": {}}},
+        {"workloadClusters": {"not_valid": {"className": "local"}}},
+        {"workloadClusters": {"local": {"className": "not_valid"}}},
+        {"workloadClusters": {"local": {"className": "local", "parameters": {}}}},
     ],
 )
-def test_parse_tenants_spec_rejects_invalid_shape(value: object) -> None:
+def test_tenants_config_rejects_invalid_shape(value: object) -> None:
     with pytest.raises(ValueError):
-        parse_tenants_spec(value)
+        TenantsConfig.model_validate(value)
 
 
 def test_tenants_rejects_unsupported_workload_cluster_class() -> None:
-    tenants = object.__new__(Tenants)
-
-    with pytest.raises(
-        ValueError,
-        match="unsupported workload cluster class 'bogus'.*supported classes: aks, local",
-    ):
-        Tenants._instantiate_workload_cluster(
-            tenants,
-            WorkloadClusterSpec(
-                metadata=ObjectMeta(name="sample"),
-                class_name="bogus",
-            ),
-            WorkloadClusterContext(),
+    with pytest.raises(ValueError, match="Input tag 'bogus'"):
+        TenantsConfig.model_validate(
+            {"workloadClusters": {"sample": {"className": "bogus"}}}
         )

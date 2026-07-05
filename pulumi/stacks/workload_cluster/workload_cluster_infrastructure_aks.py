@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import base64
 import re
-from dataclasses import dataclass
 from typing import Mapping
 
 import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
+from pydantic import StrictBool
 
+from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     CONTROLLER_NODE_TYPE,
     NODE_TYPE_LABEL,
@@ -53,13 +54,12 @@ _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 
 
-@dataclass(frozen=True)
-class AKSNodePoolSpec:
-    name: str
-    node_type: str
-    replicas: int
-    controller: bool = False
-    autoscaling_bounds: tuple[int, int] | None = None
+class AKSNodePoolSpec(PulumiConfigModel):
+    name: NonEmptyStr
+    node_type: NonEmptyStr
+    replicas: StrictPositiveInt
+    controller: StrictBool = False
+    autoscaling_bounds: tuple[StrictPositiveInt, StrictPositiveInt] | None = None
 
 
 def _resource_name(instance: str, suffix: str | None = None) -> str:

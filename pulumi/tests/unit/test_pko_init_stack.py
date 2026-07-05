@@ -1,18 +1,25 @@
 from __future__ import annotations
 
+import asyncio
+
+import pulumi
 import pytest
 
 from stacks.init.init_stack import (
-    INIT_CHILD_CONFIG_KEY,
+    INIT_STACK_CONFIG_KEY,
     INIT_STACK_SPEC_CONFIG_KEY,
+    InitStackConfig,
     init_stack_config,
     parse_init_stack_spec,
 )
-from stacks.stack_cr import StackCRSpec, build_stack_spec
+from stacks.workload_cluster.registry_setting import LocalPortRegistrySetting
+from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
+from stacks.workload_cluster.tenants import TenantsConfig
+from stacks.stack_cr import StackCRConfig, build_stack_spec
 
 
-def _stack_spec() -> StackCRSpec:
-    return StackCRSpec(
+def _stack_spec() -> StackCRConfig:
+    return StackCRConfig(
         pko_namespace="pulumi-kubernetes-operator",
         service_account_name="pulumi-runner",
         flux_source_name="gitops-source",
@@ -23,14 +30,23 @@ def _stack_spec() -> StackCRSpec:
     )
 
 
-def test_init_stack_config_wraps_shared_spec_and_child_config() -> None:
-    child_config = {
-        "ca4s-workload-cluster:registry": {"kind": "local-port", "port": 5002},
-    }
+def test_init_stack_config_wraps_shared_spec_and_init_stack_config() -> None:
+    config = InitStackConfig(
+        tenants=TenantsConfig(
+            workload_clusters={
+                "local": LocalWorkloadClusterConfig(
+                    registry=LocalPortRegistrySetting(port=5002),
+                )
+            }
+        ),
+    )
 
-    config = init_stack_config(stack_spec=_stack_spec(), child_config=child_config)
+    payload = init_stack_config(
+        stack_spec=_stack_spec(),
+        init_stack_config=config,
+    )
 
-    assert config[INIT_STACK_SPEC_CONFIG_KEY] == {
+    assert payload[INIT_STACK_SPEC_CONFIG_KEY] == {
         "pkoNamespace": "pulumi-kubernetes-operator",
         "serviceAccountName": "pulumi-runner",
         "fluxSourceName": "gitops-source",
@@ -39,7 +55,16 @@ def test_init_stack_config_wraps_shared_spec_and_child_config() -> None:
         "stateBackendUrl": "file:///state",
         "passphraseSecretName": "pko-state-passphrase",
     }
-    assert config[INIT_CHILD_CONFIG_KEY] is child_config
+    assert payload[INIT_STACK_CONFIG_KEY] == {
+        "tenants": {
+            "workloadClusters": {
+                "local": {
+                    "className": "local",
+                    "registry": {"kind": "local-port", "port": 5002},
+                }
+            }
+        },
+    }
 
 
 def test_parse_init_stack_spec_round_trips_config_payload() -> None:
@@ -48,6 +73,35 @@ def test_parse_init_stack_spec_round_trips_config_payload() -> None:
     parsed = parse_init_stack_spec(payload)
 
     assert parsed == _stack_spec()
+
+
+def test_stack_spec_config_resolves_pulumi_outputs() -> None:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        payload = StackCRConfig(
+            pko_namespace=pulumi.Output.from_input("pulumi-kubernetes-operator"),
+            service_account_name="pulumi-runner",
+            flux_source_name="gitops-source",
+            flux_source_namespace="gitea",
+            state_pvc_name="pko-state",
+            state_backend_url="file:///state",
+            passphrase_secret_name="pko-state-passphrase",
+        ).to_config()
+
+        assert isinstance(payload, pulumi.Output)
+        assert loop.run_until_complete(payload.future()) == {
+            "pkoNamespace": "pulumi-kubernetes-operator",
+            "serviceAccountName": "pulumi-runner",
+            "fluxSourceName": "gitops-source",
+            "fluxSourceNamespace": "gitea",
+            "statePvcName": "pko-state",
+            "stateBackendUrl": "file:///state",
+            "passphraseSecretName": "pko-state-passphrase",
+        }
+    finally:
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        loop.close()
 
 
 def test_build_stack_spec_uses_flux_source_namespace() -> None:

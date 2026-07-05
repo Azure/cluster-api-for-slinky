@@ -7,6 +7,9 @@ pulumi>=3.0,<4.0
 pulumi-kubernetes>=4.0,<5.0
 pulumi-random>=4.0,<5.0
 
+# Runtime validation for JSON-like Pulumi config payloads.
+pydantic>=2.0,<3.0
+
 # Generated Pulumi local-provider SDK used by the workload-cluster inner stack
 # to build an explicit management-cluster provider from projected kubeconfig files.
 -e ./pulumi/sdks/local

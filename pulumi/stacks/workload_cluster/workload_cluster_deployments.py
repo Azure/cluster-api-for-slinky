@@ -8,6 +8,12 @@ from typing import Any
 import pulumi
 import pulumi_kubernetes as k8s
 
+from lib.config import (
+    NonEmptyStr,
+    PulumiConfigModel,
+    StrictNonNegativeInt,
+    StrictPositiveInt,
+)
 from lib.outputs import CompositeOutput
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     CONTROLLER_NODE_TYPE,
@@ -43,18 +49,16 @@ _SLINKY_OPERATOR_NAMESPACE = "slinky"
 _SLURM_NAMESPACE = "slurm"
 
 
-@dataclass(frozen=True)
-class SlurmNodeSetSpec:
-    name: str
-    node_type: str
-    replicas: int
+class SlurmNodeSetSpec(PulumiConfigModel):
+    name: NonEmptyStr
+    node_type: NonEmptyStr
+    replicas: StrictPositiveInt
 
 
-@dataclass(frozen=True)
-class KEDANodeSetScalerSpec:
-    node_set_name: str
-    min_replicas: int
-    max_replicas: int
+class KEDANodeSetScalerSpec(PulumiConfigModel):
+    node_set_name: NonEmptyStr
+    min_replicas: StrictNonNegativeInt
+    max_replicas: StrictPositiveInt
 
 
 @dataclass(frozen=True)

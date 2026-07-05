@@ -25,19 +25,16 @@ import base64
 import os
 import re
 import urllib.request
-from dataclasses import dataclass
 from typing import Any, Mapping
 
 import pulumi
 import pulumi_kubernetes as k8s
 import pulumi_local as local
 import yaml
+from pydantic import StrictBool
 
-from stacks.workload_cluster.registry_setting import (
-    REGISTRY_CONFIG_NAME,
-    RegistrySetting,
-    parse_registry_setting,
-)
+from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
+from stacks.workload_cluster.registry_setting import RegistryConfig
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
     AUTOSCALER_MIN_ANNOTATION,
@@ -96,13 +93,12 @@ _DOCKER_HUB_PUBLIC_MIRROR = "https://mirror.gcr.io"
 _DOCKER_DESKTOP_HOST = "host.docker.internal"
 
 
-@dataclass(frozen=True)
-class LocalMachineDeploymentSpec:
-    name: str
-    node_type: str
-    replicas: int
-    controller: bool = False
-    autoscaler_bounds: tuple[int, int] | None = None
+class LocalMachineDeploymentSpec(PulumiConfigModel):
+    name: NonEmptyStr
+    node_type: NonEmptyStr
+    replicas: StrictPositiveInt
+    controller: StrictBool = False
+    autoscaler_bounds: tuple[StrictPositiveInt, StrictPositiveInt] | None = None
 
 
 def _autoscaler_annotations(
@@ -117,14 +113,8 @@ def _autoscaler_annotations(
     }
 
 
-def _read_registry_setting() -> RegistrySetting | None:
-    return parse_registry_setting(
-        pulumi.Config("ca4s-workload-cluster").get_object(REGISTRY_CONFIG_NAME)
-    )
-
-
 def _containerd_docker_io_mirror_commands(
-    registry_setting: RegistrySetting | None,
+    registry_setting: RegistryConfig | None,
 ) -> list[str]:
     if registry_setting is None:
         hosts_toml = (
@@ -152,7 +142,7 @@ def _containerd_docker_io_mirror_commands(
             "fi\n"
             f"cat >{_DOCKER_IO_HOSTS_DIR}/hosts.toml <<EOF\n"
             f'server = "{_DOCKER_IO_SERVER}"\n\n'
-            f'[host."http://${{_CA4S_REGISTRY_HOST}}:{registry_setting["port"]}"]\n'
+            f'[host."http://${{_CA4S_REGISTRY_HOST}}:{registry_setting.port}"]\n'
             '  capabilities = ["pull", "resolve"]\n'
             "EOF"
         ),
@@ -919,6 +909,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         *,
         instance: str,
         worker_machine_deployments: tuple[LocalMachineDeploymentSpec, ...],
+        registry: RegistryConfig | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -930,9 +921,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
 
         cluster_name = _resource_name(instance, "workload")
         node_image = f"kindest/node:{_KUBERNETES_VERSION}"
-        pre_kubeadm_commands = _containerd_docker_io_mirror_commands(
-            _read_registry_setting()
-        )
+        pre_kubeadm_commands = _containerd_docker_io_mirror_commands(registry)
 
         def child_options(
             *,

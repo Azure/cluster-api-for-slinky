@@ -5,11 +5,11 @@ from __future__ import annotations
 import base64
 import getpass
 import json
-from dataclasses import dataclass
 from typing import Any, Final
-from urllib.parse import quote
 
 import requests
+
+from lib.config import PulumiConfigModel
 
 
 IMDS_INSTANCE_URL: Final = (
@@ -23,30 +23,23 @@ IMDS_HEADERS: Final = {"Metadata": "true"}
 IMDS_TIMEOUT_SECONDS: Final = 5.0
 
 
-@dataclass(frozen=True)
-class AzureEnvironment:
+class AzureEnvironment(PulumiConfigModel):
     """Azure capability discovered from IMDS."""
 
-    client_id: str
-    principal_id: str
+    client_ids: tuple[str, ...]
     tenant_id: str
-    subscription_id: str
-    location: str
-    resource_group: str
     host_subscription_id: str
     host_location: str
     host_resource_group: str
 
 
-@dataclass(frozen=True)
-class ManagementPlaneDefaults:
+class ManagementPlaneDefaults(PulumiConfigModel):
     """Resource-graph defaults derived from local host capabilities."""
 
     infrastructure_providers: tuple[str, ...]
 
 
-@dataclass(frozen=True)
-class LocalEnvironment:
+class LocalEnvironment(PulumiConfigModel):
     """Local-kind host discovery result."""
 
     local_username: str | None
@@ -55,10 +48,7 @@ class LocalEnvironment:
     warnings: tuple[str, ...] = ()
 
 
-def discover_local_environment(
-    *,
-    azure_client_id_hint: str | None = None,
-) -> LocalEnvironment:
+def discover_local_environment() -> LocalEnvironment:
     """Discover host capabilities and derive management-plane defaults.
 
     The result is intentionally made of plain Python values so stack modules can
@@ -67,10 +57,7 @@ def discover_local_environment(
     with a usable managed identity gets CAPZ added to the provider list.
     """
     warnings: list[str] = []
-    azure = _discover_azure_environment(
-        azure_client_id_hint=azure_client_id_hint,
-        warnings=warnings,
-    )
+    azure = _discover_azure_environment()
     return LocalEnvironment(
         local_username=_discover_local_username(),
         azure=azure,
@@ -91,11 +78,7 @@ def _discover_local_username() -> str | None:
     return username or None
 
 
-def _discover_azure_environment(
-    *,
-    azure_client_id_hint: str | None,
-    warnings: list[str],
-) -> AzureEnvironment | None:
+def _discover_azure_environment() -> AzureEnvironment | None:
     try:
         instance_response = requests.get(
             IMDS_INSTANCE_URL,
@@ -121,10 +104,7 @@ def _discover_azure_environment(
     if not (host_subscription_id and host_location and host_resource_group):
         return None
 
-    token_payload = _mint_token(
-        client_id=azure_client_id_hint,
-        warnings=warnings,
-    )
+    token_payload = _request_token()
     if token_payload is None:
         return None
 
@@ -134,47 +114,23 @@ def _discover_azure_environment(
         return None
 
     claims = _decode_jwt_claims(access_token)
-    principal_id = claims.get("oid")
     tenant_id = claims.get("tid")
-    if not isinstance(principal_id, str) or not isinstance(tenant_id, str):
+    if not isinstance(tenant_id, str):
         return None
 
     return AzureEnvironment(
-        client_id=client_id,
-        principal_id=principal_id,
+        client_ids=(client_id,),
         tenant_id=tenant_id,
-        subscription_id=host_subscription_id,
-        location=host_location,
-        resource_group=host_resource_group,
         host_subscription_id=host_subscription_id,
         host_location=host_location,
         host_resource_group=host_resource_group,
     )
 
 
-def _mint_token(
-    *,
-    client_id: str | None,
-    warnings: list[str],
-) -> dict[str, Any] | None:
-    if client_id:
-        payload = _request_token(client_id=client_id)
-        if payload is not None:
-            return payload
-        warnings.append(
-            "Configured azureClientId could not mint an IMDS token; falling "
-            "back to the default managed identity selected by IMDS."
-        )
-    return _request_token(client_id=None)
-
-
-def _request_token(*, client_id: str | None) -> dict[str, Any] | None:
-    url = IMDS_TOKEN_URL
-    if client_id:
-        url = f"{url}&client_id={quote(client_id)}"
+def _request_token() -> dict[str, Any] | None:
     try:
         response = requests.get(
-            url,
+            IMDS_TOKEN_URL,
             headers=IMDS_HEADERS,
             timeout=IMDS_TIMEOUT_SECONDS,
         )

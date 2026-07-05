@@ -17,8 +17,13 @@ management cluster for both local-only and Azure-capable configurations, so it
 shares this package through ``stack.py``.
 """
 
-from ctlptl.cloud_provider_kind import CloudProviderKind
+from ctlptl.cloud_provider_kind import CloudProviderKind, CloudProviderKindConfig
 from ctlptl.ctlptl_cluster import CtlptlCluster
 from ctlptl.ctlptl_registry import CtlptlRegistry
 
-__all__ = ["CloudProviderKind", "CtlptlCluster", "CtlptlRegistry"]
+__all__ = [
+  "CloudProviderKind",
+  "CloudProviderKindConfig",
+  "CtlptlCluster",
+  "CtlptlRegistry",
+]

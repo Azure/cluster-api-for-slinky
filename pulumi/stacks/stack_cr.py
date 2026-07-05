@@ -30,6 +30,8 @@ from typing import Any
 
 import pulumi
 
+from lib.config import NonEmptyStr, PulumiConfigModel
+
 from stacks.workspace_env import (
     PULUMI_DELETE_UNREACHABLE_ENV,
     PULUMI_DELETE_UNREACHABLE_SECRET_NAME,
@@ -57,9 +59,24 @@ _STATE_VOLUME_NAME = "state"
 # URL in :mod:`pko._backend`.
 _STATE_MOUNT_PATH = "/state"
 
+_DEFAULT_FLUX_SOURCE_API_VERSION = "source.toolkit.fluxcd.io/v1"
+_DEFAULT_FLUX_SOURCE_KIND = "GitRepository"
+
+
+class _StackCRConfigPayload(PulumiConfigModel):
+    pko_namespace: NonEmptyStr
+    service_account_name: NonEmptyStr
+    flux_source_name: NonEmptyStr
+    flux_source_namespace: NonEmptyStr
+    state_pvc_name: NonEmptyStr
+    state_backend_url: NonEmptyStr
+    passphrase_secret_name: NonEmptyStr
+    flux_source_api_version: NonEmptyStr = _DEFAULT_FLUX_SOURCE_API_VERSION
+    flux_source_kind: NonEmptyStr = _DEFAULT_FLUX_SOURCE_KIND
+
 
 @dataclass(frozen=True)
-class StackCRSpec:
+class StackCRConfig:
     """Bundle of inputs every Stack CR we emit needs.
 
     Pure Python-side data carrier. ``PKOBootstrap`` builds one instance and
@@ -94,13 +111,48 @@ class StackCRSpec:
     state_backend_url: pulumi.Input[str]
     passphrase_secret_name: pulumi.Input[str]
 
-    flux_source_api_version: str = "source.toolkit.fluxcd.io/v1"
-    flux_source_kind: str = "GitRepository"
+    flux_source_api_version: pulumi.Input[str] = _DEFAULT_FLUX_SOURCE_API_VERSION
+    flux_source_kind: pulumi.Input[str] = _DEFAULT_FLUX_SOURCE_KIND
+
+    def to_config(self) -> pulumi.Input[dict[str, object]]:
+        values = {
+            "pko_namespace": self.pko_namespace,
+            "service_account_name": self.service_account_name,
+            "flux_source_name": self.flux_source_name,
+            "flux_source_namespace": self.flux_source_namespace,
+            "state_pvc_name": self.state_pvc_name,
+            "state_backend_url": self.state_backend_url,
+            "passphrase_secret_name": self.passphrase_secret_name,
+            "flux_source_api_version": self.flux_source_api_version,
+            "flux_source_kind": self.flux_source_kind,
+        }
+        if any(isinstance(value, pulumi.Output) for value in values.values()):
+            return pulumi.Output.all(**values).apply(
+                lambda resolved: _StackCRConfigPayload.model_validate(
+                    resolved
+                ).to_config()
+            )
+        return _StackCRConfigPayload.model_validate(values).to_config()
+
+
+def stack_cr_config_from_config(value: dict[str, object]) -> StackCRConfig:
+    config = _StackCRConfigPayload.model_validate(value)
+    return StackCRConfig(
+        pko_namespace=config.pko_namespace,
+        service_account_name=config.service_account_name,
+        flux_source_name=config.flux_source_name,
+        flux_source_namespace=config.flux_source_namespace,
+        state_pvc_name=config.state_pvc_name,
+        state_backend_url=config.state_backend_url,
+        passphrase_secret_name=config.passphrase_secret_name,
+        flux_source_api_version=config.flux_source_api_version,
+        flux_source_kind=config.flux_source_kind,
+    )
 
 
 def build_stack_spec(
     *,
-    spec: StackCRSpec,
+    spec: StackCRConfig,
     project_name: str,
     env: pulumi.Input[str],
     repo_dir: str,
@@ -115,7 +167,7 @@ def build_stack_spec(
     the returned dict before shipping; nothing here holds a reference.
 
     Args:
-        spec:           Shared shape; see :class:`StackCRSpec`.
+        spec:           Shared shape; see :class:`StackCRConfig`.
         project_name:   Kebab-case Pulumi project name (e.g.
                 ``ca4s-init``). Becomes the second
                         segment of ``spec.stack``.

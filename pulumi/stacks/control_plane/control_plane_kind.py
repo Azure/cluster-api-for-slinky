@@ -6,8 +6,17 @@ from dataclasses import dataclass
 from typing import Any
 
 import pulumi
+from pydantic import StrictBool
 
+from lib.config import PulumiConfigModel
 from lib.outputs import CompositeOutput
+from stacks.control_plane.control_plane_config import (
+    AzureClusterIdentityConfig,
+    AzureInfrastructureProviderConfig,
+    ControlPlaneKindConfig,
+    DockerInfrastructureProviderConfig,
+    InfrastructureProvidersConfig,
+)
 from stacks.control_plane.awx import AWXInstance, AWXOperator, AWXProviderConfig
 from stacks.control_plane.awx._configuration import AWXConfiguration
 from stacks.control_plane.azure import (
@@ -39,14 +48,9 @@ class ManagementAWXControlPlaneOutputs(CompositeOutput):
     ready: pulumi.Output[bool]
 
 
-@dataclass(frozen=True)
-class KindAzureControlPlaneSpec:
-    client_id: str
-    principal_id: str
-    tenant_id: str
-    subscription_id: str
-    allowed_namespaces: list[str] | None = None
-    skip_in_cluster_preflight: bool = False
+class KindAzureControlPlaneSpec(PulumiConfigModel):
+    identity: AzureClusterIdentityConfig
+    skip_in_cluster_preflight: StrictBool = False
 
 
 @dataclass(frozen=True)
@@ -55,17 +59,19 @@ class KindAzureControlPlaneOutputs(CompositeOutput):
     cluster_identity_namespace: pulumi.Output[str]
     imds_preflight_job: IMDSPreflightJobOutputs | None
     client_id: pulumi.Output[str]
-    principal_id: pulumi.Output[str]
     tenant_id: pulumi.Output[str]
-    subscription_id: pulumi.Output[str]
     ready: pulumi.Output[bool]
 
 
-@dataclass(frozen=True)
-class ControlPlaneKindSpec:
-    infrastructure_providers: tuple[str, ...] = ("docker",)
-    enable_awx: bool = True
-    azure: KindAzureControlPlaneSpec | None = None
+def _enabled_infrastructure_provider_names(
+    providers: InfrastructureProvidersConfig,
+) -> tuple[str, ...]:
+    names: list[str] = []
+    if isinstance(providers.docker, DockerInfrastructureProviderConfig):
+        names.append("docker")
+    if isinstance(providers.azure, AzureInfrastructureProviderConfig):
+        names.append("azure")
+    return tuple(names)
 
 
 class ManagementAWXControlPlane(pulumi.ComponentResource):
@@ -166,17 +172,18 @@ class KindAzureControlPlane(pulumi.ComponentResource):
 
         azure_cluster_identity = AzureClusterIdentity(
             "cluster-identity",
-            client_id=spec.client_id,
-            tenant_id=spec.tenant_id,
-            allowed_namespaces=spec.allowed_namespaces,
+            identity_type=spec.identity.type,
+            client_id=str(spec.identity.client_id),
+            tenant_id=str(spec.identity.tenant_id),
+            allowed_namespaces=spec.identity.allowed_namespaces,
             opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
         )
         imds_preflight_job = (
             None
-            if spec.skip_in_cluster_preflight
+            if spec.skip_in_cluster_preflight or spec.identity.type != "UserAssignedMSI"
             else IMDSPreflightJob(
                 "imds-preflight",
-                client_id=spec.client_id,
+                client_id=str(spec.identity.client_id),
                 opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
             )
         )
@@ -194,10 +201,8 @@ class KindAzureControlPlane(pulumi.ComponentResource):
             cluster_identity_name=azure_cluster_identity.identity_name,
             cluster_identity_namespace=azure_cluster_identity.identity_namespace,
             imds_preflight_job=imds_preflight_outputs,
-            client_id=pulumi.Output.from_input(spec.client_id),
-            principal_id=pulumi.Output.from_input(spec.principal_id),
-            tenant_id=pulumi.Output.from_input(spec.tenant_id),
-            subscription_id=pulumi.Output.from_input(spec.subscription_id),
+            client_id=pulumi.Output.from_input(str(spec.identity.client_id)),
+            tenant_id=pulumi.Output.from_input(str(spec.identity.tenant_id)),
             ready=pulumi.Output.all(*ready_inputs).apply(lambda _: True),
         )
 
@@ -224,7 +229,7 @@ class ControlPlaneKind(pulumi.ComponentResource):
         *,
         flux_source_namespace: pulumi.Input[str] = "",
         flux_source_name: pulumi.Input[str] = "",
-        spec: ControlPlaneKindSpec | None = None,
+        config: ControlPlaneKindConfig = ControlPlaneKindConfig(),
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -233,7 +238,20 @@ class ControlPlaneKind(pulumi.ComponentResource):
             props={},
             opts=opts,
         )
-        spec = spec or ControlPlaneKindSpec()
+        azure_provider = config.infrastructure_providers.azure
+        azure_config = (
+            azure_provider
+            if isinstance(azure_provider, AzureInfrastructureProviderConfig)
+            else None
+        )
+        azure_spec = (
+            KindAzureControlPlaneSpec(
+                identity=azure_config.identity,
+                skip_in_cluster_preflight=azure_config.skip_in_cluster_preflight,
+            )
+            if azure_config is not None and azure_config.identity is not None
+            else None
+        )
 
         def child_options() -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(parent=self)
@@ -242,7 +260,9 @@ class ControlPlaneKind(pulumi.ComponentResource):
         capi = ClusterAPIOperator(
             "cluster-api",
             cert_manager=cert_manager,
-            infrastructure_providers=spec.infrastructure_providers,
+            infrastructure_providers=_enabled_infrastructure_provider_names(
+                config.infrastructure_providers
+            ),
             opts=child_options(),
         )
 
@@ -253,17 +273,17 @@ class ControlPlaneKind(pulumi.ComponentResource):
                 flux_source_name=flux_source_name,
                 opts=child_options(),
             )
-            if spec.enable_awx
+            if config.deployments.awx.enabled
             else None
         )
         azure = (
             KindAzureControlPlane(
                 "azure",
-                spec=spec.azure,
+                spec=azure_spec,
                 capi=capi,
                 opts=child_options(),
             )
-            if spec.azure is not None
+            if azure_spec is not None
             else None
         )
 
@@ -272,9 +292,9 @@ class ControlPlaneKind(pulumi.ComponentResource):
         self.capi_provider_version = capi.provider_version
         self.capi_provider_namespaces = capi.provider_namespaces
         self.infrastructure_providers = pulumi.Output.from_input(
-            list(spec.infrastructure_providers)
+            list(_enabled_infrastructure_provider_names(config.infrastructure_providers))
         )
-        self.awx_enabled = pulumi.Output.from_input(spec.enable_awx)
+        self.awx_enabled = pulumi.Output.from_input(config.deployments.awx.enabled)
         self.awx = awx.outputs if awx else None
         self.azure = azure.outputs if azure else None
 

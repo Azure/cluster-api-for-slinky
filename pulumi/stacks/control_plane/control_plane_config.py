@@ -2,261 +2,151 @@
 
 from __future__ import annotations
 
-import re
-from collections.abc import Mapping
-from dataclasses import dataclass
+from typing import Annotated, Any, Literal, TypeAlias, Union, cast
+from uuid import UUID
+
+from pydantic import Field, StrictBool, field_serializer
+
+from localenv import AzureEnvironment
+from lib.config import (
+    DisabledConfig,
+    EnabledConfig,
+    NonEmptyStr,
+    PulumiConfigModel,
+    maybe_disabled,
+)
 
 
 CONTROL_PLANE_KIND_CHILD_CONFIG_KEY = "controlPlane"
 
-_CONFIG_AZURE = "azure"
-_CONFIG_AWX = "awx"
-_CONFIG_ENABLED = "enabled"
-_CONFIG_CLIENT_ID = "clientId"
-_CONFIG_PRINCIPAL_ID = "principalId"
-_CONFIG_TENANT_ID = "tenantId"
-_CONFIG_SUBSCRIPTION_ID = "subscriptionId"
-_CONFIG_ALLOWED_NAMESPACES = "allowedNamespaces"
-_CONFIG_SKIP_IN_CLUSTER_PREFLIGHT = "skipInClusterPreflight"
-_CONFIG_INFRASTRUCTURE_PROVIDERS = "infrastructureProviders"
-_GUID_PATTERN = re.compile(
-    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-)
 
-
-@dataclass(frozen=True)
-class ControlPlaneAWXConfig:
-    enable_awx: bool = True
-
-
-@dataclass(frozen=True)
-class ControlPlaneAzureConfig:
-    client_id: str
-    principal_id: str
-    tenant_id: str
-    subscription_id: str
-    allowed_namespaces: list[str] | None = None
-    infrastructure_providers: tuple[str, ...] = ("azure",)
-    skip_in_cluster_preflight: bool = False
-
-
-@dataclass(frozen=True)
-class ControlPlaneKindConfig:
-    infrastructure_providers: tuple[str, ...] = ("docker",)
-    enable_awx: bool = True
-    azure: ControlPlaneAzureConfig | None = None
-
-
-def _require_mapping(field_path: str, value: object) -> Mapping[str, object]:
-    if not isinstance(value, Mapping):
-        raise ValueError(f"{field_path} must be an object")
-    return value
-
-
-def _parse_control_plane_awx_config(value: object | None) -> ControlPlaneAWXConfig:
-    if value is None:
-        return ControlPlaneAWXConfig()
-    if isinstance(value, ControlPlaneAWXConfig):
-        return value
-
-    spec = _require_mapping(CONTROL_PLANE_KIND_CHILD_CONFIG_KEY, value)
-    awx_value = spec.get(_CONFIG_AWX)
-    if awx_value is None:
-        return ControlPlaneAWXConfig()
-
-    awx = _require_mapping(
-        f"{CONTROL_PLANE_KIND_CHILD_CONFIG_KEY}.{_CONFIG_AWX}",
-        awx_value,
-    )
-    enabled = awx.get(_CONFIG_ENABLED, True)
-    if not isinstance(enabled, bool):
+def _single_discovered_client_id(azure_environment: AzureEnvironment) -> UUID:
+    if len(azure_environment.client_ids) != 1:
         raise ValueError(
-            f"{CONTROL_PLANE_KIND_CHILD_CONFIG_KEY}.{_CONFIG_AWX}.{_CONFIG_ENABLED} "
-            "must be a boolean"
+            "azure infrastructure provider discovery requires exactly one "
+            "managed identity clientId when clientId is not explicitly configured"
         )
-    return ControlPlaneAWXConfig(enable_awx=enabled)
+    return UUID(azure_environment.client_ids[0])
 
 
-def parse_control_plane_kind_config(value: object | None) -> ControlPlaneKindConfig:
-    if value is None:
-        return ControlPlaneKindConfig()
-    if isinstance(value, ControlPlaneKindConfig):
-        return value
+class AzureClusterIdentityBaseConfig(PulumiConfigModel):
+    @field_serializer("type", check_fields=False)
+    def serialize_type(self, identity_type: str) -> str:
+        return identity_type
 
-    spec = _require_mapping(CONTROL_PLANE_KIND_CHILD_CONFIG_KEY, value)
-    awx_config = _parse_control_plane_awx_config(spec)
-    azure_value = spec.get(_CONFIG_AZURE)
-    azure = (
-        _parse_control_plane_azure_config(azure_value)
-        if azure_value is not None
-        else None
-    )
-    return ControlPlaneKindConfig(
-        infrastructure_providers=(
-            azure.infrastructure_providers if azure is not None else ("docker",)
-        ),
-        enable_awx=awx_config.enable_awx,
-        azure=azure,
-    )
+    client_id: UUID
+    tenant_id: UUID
+    allowed_namespaces: list[NonEmptyStr] | None = None
 
 
-def _require_guid(field_path: str, value: object) -> str:
-    if not isinstance(value, str) or not value:
-        raise ValueError(f"{field_path} must be a non-empty string")
-    if not _GUID_PATTERN.match(value):
-        raise ValueError(
-            f"{field_path} must be a GUID in 8-4-4-4-12 hex layout; got {value!r}"
-        )
-    return value
+class UserAssignedMSIClusterIdentityConfig(AzureClusterIdentityBaseConfig):
+    type: Literal["UserAssignedMSI"] = "UserAssignedMSI"
 
 
-def _parse_allowed_namespaces(
-    field_path: str, value: object | None
-) -> list[str] | None:
-    if value is None:
-        return None
-    if not isinstance(value, (list, tuple)):
-        raise ValueError(f"{field_path} must be a list of namespace names")
-    parsed: list[str] = []
-    for index, entry in enumerate(value):
-        if not isinstance(entry, str) or not entry:
-            raise ValueError(
-                f"{field_path}[{index}] must be a non-empty string"
+class WorkloadIdentityClusterIdentityConfig(AzureClusterIdentityBaseConfig):
+    type: Literal["WorkloadIdentity"] = "WorkloadIdentity"
+
+
+AzureClusterIdentityConfig: TypeAlias = Annotated[
+    Union[
+        UserAssignedMSIClusterIdentityConfig,
+        WorkloadIdentityClusterIdentityConfig,
+    ],
+    Field(discriminator="type"),
+]
+
+
+@maybe_disabled
+class DockerInfrastructureProviderConfig(EnabledConfig):
+    """Enabled Docker (CAPD) infrastructure provider settings."""
+
+
+@maybe_disabled
+class AzureInfrastructureProviderConfig(EnabledConfig):
+    """Enabled Azure (CAPZ) infrastructure provider settings and cluster identity."""
+
+    client_id: UUID | None = Field(default=None, exclude=True)
+    default_subscription_id: UUID | None = None
+    identity: AzureClusterIdentityConfig | None = None
+    skip_in_cluster_preflight: StrictBool = False
+
+
+class InfrastructureProvidersConfig(PulumiConfigModel):
+    docker: DockerInfrastructureProviderConfig | None = None
+    azure: AzureInfrastructureProviderConfig | None = None
+
+    def apply_local_environment_discovery(
+        self,
+        *,
+        infrastructure_providers: tuple[str, ...],
+        azure_environment: AzureEnvironment | None = None,
+    ) -> InfrastructureProvidersConfig:
+        docker = self.docker
+        if docker is None:
+            docker = DockerInfrastructureProviderConfig(
+                enabled="docker" in infrastructure_providers
             )
-        parsed.append(entry)
-    return parsed
 
-
-def _parse_infrastructure_providers(
-    field_path: str, value: object | None
-) -> tuple[str, ...]:
-    if value is None:
-        return ("azure",)
-    if not isinstance(value, (list, tuple)):
-        raise ValueError(f"{field_path} must be a list of provider names")
-    parsed: list[str] = []
-    for index, entry in enumerate(value):
-        if not isinstance(entry, str) or not entry:
-            raise ValueError(
-                f"{field_path}[{index}] must be a non-empty string"
+        azure = self.azure
+        azure_config = (
+            cast(Any, azure)
+            if isinstance(azure, AzureInfrastructureProviderConfig)
+            else None
+        )
+        if azure_config is not None and (
+            azure_config.default_subscription_id is None or azure_config.identity is None
+        ):
+            if azure_environment is None:
+                raise ValueError(
+                    "partial azure infrastructure provider config requires "
+                    "discovered Azure environment"
+                )
+            azure = AzureInfrastructureProviderConfig(
+                enabled=True,
+                default_subscription_id=UUID(azure_environment.host_subscription_id),
+                identity=UserAssignedMSIClusterIdentityConfig(
+                    client_id=(
+                        azure_config.client_id
+                        if azure_config.client_id is not None
+                        else _single_discovered_client_id(azure_environment)
+                    ),
+                    tenant_id=UUID(azure_environment.tenant_id),
+                    allowed_namespaces=[],
+                ),
+                skip_in_cluster_preflight=azure_config.skip_in_cluster_preflight,
             )
-        parsed.append(entry)
-    if "azure" not in parsed:
-        raise ValueError(f"{field_path} must include 'azure'")
-    return tuple(parsed)
 
+        if (
+            azure is None
+            and azure_environment is not None
+            and "azure" in infrastructure_providers
+        ):
+            azure = AzureInfrastructureProviderConfig(
+                enabled=True,
+                default_subscription_id=UUID(azure_environment.host_subscription_id),
+                identity=UserAssignedMSIClusterIdentityConfig(
+                    client_id=_single_discovered_client_id(azure_environment),
+                    tenant_id=UUID(azure_environment.tenant_id),
+                    allowed_namespaces=[],
+                ),
+            )
 
-def _parse_control_plane_azure_config(
-    value: object | None,
-    *,
-    field_path: str = "controlPlane.azure",
-) -> ControlPlaneAzureConfig:
-    if value is None:
-        raise ValueError(
-            "missing required Azure control-plane config under "
-            f"{field_path!r}; childConfig.controlPlane must include an "
-            f"{field_path!r} entry"
-        )
-    if not isinstance(value, Mapping):
-        raise ValueError(
-            f"{field_path!r} config must be an "
-            f"object; got {type(value).__name__}"
+        return InfrastructureProvidersConfig(
+            docker=docker,
+            azure=azure,
         )
 
-    fields: dict[str, str] = {}
-    for config_key, field_name in (
-        (_CONFIG_CLIENT_ID, "client_id"),
-        (_CONFIG_PRINCIPAL_ID, "principal_id"),
-        (_CONFIG_TENANT_ID, "tenant_id"),
-        (_CONFIG_SUBSCRIPTION_ID, "subscription_id"),
-    ):
-        fields[field_name] = _require_guid(
-            f"{field_path}.{config_key}",
-            value.get(config_key),
-        )
 
-    allowed_namespaces = _parse_allowed_namespaces(
-        f"{field_path}.{_CONFIG_ALLOWED_NAMESPACES}",
-        value.get(_CONFIG_ALLOWED_NAMESPACES),
-    )
-    infrastructure_providers = _parse_infrastructure_providers(
-        f"{field_path}.{_CONFIG_INFRASTRUCTURE_PROVIDERS}",
-        value.get(_CONFIG_INFRASTRUCTURE_PROVIDERS),
-    )
-
-    skip_field = value.get(_CONFIG_SKIP_IN_CLUSTER_PREFLIGHT)
-    if skip_field is not None and not isinstance(skip_field, bool):
-        raise ValueError(
-            f"{field_path}.{_CONFIG_SKIP_IN_CLUSTER_PREFLIGHT} must be a boolean; "
-            f"got {type(skip_field).__name__}"
-        )
-
-    return ControlPlaneAzureConfig(
-        **fields,
-        allowed_namespaces=allowed_namespaces,
-        infrastructure_providers=infrastructure_providers,
-        skip_in_cluster_preflight=bool(skip_field),
-    )
+@maybe_disabled
+class ControlPlaneAWXConfig(EnabledConfig):
+    """Enabled AWX deployment settings."""
 
 
-def _build_control_plane_azure_payload(
-    *,
-    client_id: str,
-    principal_id: str,
-    tenant_id: str,
-    subscription_id: str,
-    allowed_namespaces: list[str] | None = None,
-    infrastructure_providers: tuple[str, ...] = ("azure",),
-    skip_in_cluster_preflight: bool = False,
-) -> dict[str, object]:
-    child: dict[str, object] = {
-        _CONFIG_CLIENT_ID: client_id,
-        _CONFIG_PRINCIPAL_ID: principal_id,
-        _CONFIG_TENANT_ID: tenant_id,
-        _CONFIG_SUBSCRIPTION_ID: subscription_id,
-    }
-    if allowed_namespaces is not None:
-        child[_CONFIG_ALLOWED_NAMESPACES] = list(allowed_namespaces)
-    if infrastructure_providers != ("azure",):
-        child[_CONFIG_INFRASTRUCTURE_PROVIDERS] = list(infrastructure_providers)
-    if skip_in_cluster_preflight:
-        child[_CONFIG_SKIP_IN_CLUSTER_PREFLIGHT] = True
-    return child
+class ControlPlaneDeploymentsConfig(PulumiConfigModel):
+    awx: ControlPlaneAWXConfig = ControlPlaneAWXConfig(enabled=True)
 
 
-def build_control_plane_kind_child_config(
-    *,
-    enable_awx: bool = True,
-    azure: dict[str, object] | None = None,
-) -> dict[str, object]:
-    control_plane: dict[str, object] = {}
-    if not enable_awx:
-        control_plane[_CONFIG_AWX] = {_CONFIG_ENABLED: False}
-    if azure is not None:
-        control_plane[_CONFIG_AZURE] = azure
-    return {CONTROL_PLANE_KIND_CHILD_CONFIG_KEY: control_plane}
+class ControlPlaneKindConfig(PulumiConfigModel):
+    infrastructure_providers: InfrastructureProvidersConfig = InfrastructureProvidersConfig()
+    deployments: ControlPlaneDeploymentsConfig = ControlPlaneDeploymentsConfig()
 
-
-def build_control_plane_kind_azure_child_config(
-    *,
-    client_id: str,
-    principal_id: str,
-    tenant_id: str,
-    subscription_id: str,
-    allowed_namespaces: list[str] | None = None,
-    infrastructure_providers: tuple[str, ...] = ("azure",),
-    skip_in_cluster_preflight: bool = False,
-    enable_awx: bool = False,
-) -> dict[str, object]:
-    return build_control_plane_kind_child_config(
-        enable_awx=enable_awx,
-        azure=_build_control_plane_azure_payload(
-            client_id=client_id,
-            principal_id=principal_id,
-            tenant_id=tenant_id,
-            subscription_id=subscription_id,
-            allowed_namespaces=allowed_namespaces,
-            infrastructure_providers=infrastructure_providers,
-            skip_in_cluster_preflight=skip_in_cluster_preflight,
-        ),
-    )

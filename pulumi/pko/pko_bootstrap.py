@@ -20,8 +20,6 @@ the supplied Flux source via ``spec.fluxSource`` instead of cloning Git directly
 
 from __future__ import annotations
 
-from typing import Any
-
 import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
@@ -31,8 +29,13 @@ from pko import PKO_NAMESPACE
 from pko._backend import StateBackend
 from pko._release import PKORelease
 from pko._service_account import WorkspaceServiceAccount
-from stacks.init.init_stack import INIT_PROJECT, INIT_REPO_DIR, init_stack_config
-from stacks.stack_cr import StackCRSpec, build_stack_spec
+from stacks.init.init_stack import (
+    INIT_PROJECT,
+    INIT_REPO_DIR,
+    InitStackConfig,
+    init_stack_config as build_init_stack_config,
+)
+from stacks.stack_cr import StackCRConfig, build_stack_spec
 
 
 # Annotation + timeout for the single outer-owned init Stack CR.
@@ -102,7 +105,7 @@ class PKOBootstrap(pulumi.ComponentResource):
         provider: k8s.Provider,
         flux_source: FluxSource,
         env: str,
-        config: dict[str, Any] | None = None,
+        init_stack_config: InitStackConfig | None = None,
         opts: ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:pko:PKOBootstrap", name, props={}, opts=opts)
@@ -137,7 +140,7 @@ class PKOBootstrap(pulumi.ComponentResource):
         # Bundle the shared shape once. PKOBootstrap passes it as init-stack
         # config; the PKO-owned init stack reconstructs it and uses it for all
         # child Stack CRs.
-        stack_spec = StackCRSpec(
+        stack_spec = StackCRConfig(
             pko_namespace=release.namespace,
             service_account_name=sa.service_account_name,
             flux_source_name=flux_source.source_name,
@@ -165,9 +168,9 @@ class PKOBootstrap(pulumi.ComponentResource):
             project_name=INIT_PROJECT,
             env=env,
             repo_dir=INIT_REPO_DIR,
-            config=init_stack_config(
+            config=build_init_stack_config(
                 stack_spec=stack_spec,
-                child_config=config,
+                init_stack_config=init_stack_config,
             ),
         )
         init_stack = k8s.apiextensions.CustomResource(

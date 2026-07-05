@@ -2,12 +2,11 @@
 
 Phase 1 contents:
 
-* :class:`AzureClusterIdentity` -- ``UserAssignedMSI``-flavored
-  ``AzureClusterIdentity`` CR. No backing Secret -- the CAPZ controller
-  fetches Azure AD tokens from the host VM's IMDS endpoint at reconcile
-  time using the UAMI's clientID. See :mod:`.azure._cluster_identity`
-  for the IMDS reachability prerequisite and the comparison against
-  ServicePrincipal and WorkloadIdentity flavors.
+* :class:`AzureClusterIdentity` -- ``AzureClusterIdentity`` CR for the
+  secretless CAPZ identity flavors this stack supports: ``UserAssignedMSI``
+  and ``WorkloadIdentity``. ``UserAssignedMSI`` uses the host VM's IMDS
+  endpoint at reconcile time; ``WorkloadIdentity`` relies on the
+  management cluster's OIDC/federated-credential setup.
 * :class:`IMDSPreflightJob` -- one-shot ``batch/v1`` Job in
   ``capz-system`` that probes IMDS for a UAMI-bound token from inside
   the same network namespace CAPZ runs in. Gates

@@ -54,6 +54,7 @@ import pulumi
 from pulumi import Output
 
 from fluxcd import FluxSource
+from lib.config import NonEmptyStr, PulumiConfigModel
 
 
 # Single source of truth for the Pulumi resource type token used by the
@@ -65,6 +66,12 @@ from fluxcd import FluxSource
 _BASE_TYPE = "ca4s:gitrepo:GitOpsRepository"
 _WEBHOOK_BASE_TYPE = "ca4s:gitrepo:GitOpsWebhook"
 _PROVIDER_MODULE_PREFIX = "gitrepo."
+
+
+class GitOpsConfig(PulumiConfigModel):
+    provider: NonEmptyStr = "gitea-builtin"
+    provider_args: Mapping[str, Any] = {}
+    sync_triggers: Mapping[str, Any] = {}
 
 
 def _provider_module_name(provider_name: str) -> str:
@@ -160,16 +167,20 @@ class GitOpsRepository(pulumi.ComponentResource):
         self,
         name: str,
         *,
-        gitops_provider_name: str,
-        gitops_provider_args: Mapping[str, Any],
+        config: GitOpsConfig,
+        runtime_args: Mapping[str, Any],
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(_BASE_TYPE, name, props={}, opts=opts)
 
-        concrete_cls = _load_provider_class(gitops_provider_name, "Repository")
+        concrete_cls = _load_provider_class(config.provider, "Repository")
         concrete = concrete_cls(
             name,
-            **dict(gitops_provider_args),
+            **{
+                **config.provider_args,
+                **runtime_args,
+                "sync_triggers": config.sync_triggers,
+            },
             opts=pulumi.ResourceOptions(parent=self),
         )
 
@@ -219,13 +230,13 @@ class GitOpsWebhook(pulumi.ComponentResource):
         self,
         name: str,
         *,
-        gitops_provider_name: str,
+        config: GitOpsConfig,
         gitops_webhook_args: Mapping[str, Any],
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(_WEBHOOK_BASE_TYPE, name, props={}, opts=opts)
 
-        concrete_cls = _load_provider_class(gitops_provider_name, "Webhook")
+        concrete_cls = _load_provider_class(config.provider, "Webhook")
         concrete = concrete_cls(
             name,
             **dict(gitops_webhook_args),

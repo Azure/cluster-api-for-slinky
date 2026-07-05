@@ -19,6 +19,6 @@ each one lives in its own module here next to ``gitea_builtin.py`` and exposes
 lives in :mod:`gitrepo._base` and is intentionally cloud-agnostic.
 """
 
-from gitrepo._base import GitOpsRepository, GitOpsWebhook
+from gitrepo._base import GitOpsConfig, GitOpsRepository, GitOpsWebhook
 
-__all__ = ["GitOpsRepository", "GitOpsWebhook"]
+__all__ = ["GitOpsConfig", "GitOpsRepository", "GitOpsWebhook"]

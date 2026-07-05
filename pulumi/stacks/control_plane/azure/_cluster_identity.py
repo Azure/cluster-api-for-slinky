@@ -1,29 +1,27 @@
-"""AzureClusterIdentity component (UserAssignedMSI flavor).
+"""AzureClusterIdentity component for secretless CAPZ identity flavors.
 
 This component creates a **single** Kubernetes object that CAPZ needs in
 order to know which Azure identity to use when reconciling workload
-clusters: an ``AzureClusterIdentity`` CR of
-``spec.type: UserAssignedMSI``.
+clusters: an ``AzureClusterIdentity`` CR.
 
 Visually::
 
     +---------------------------+
-    | AzureClusterIdentity CR   |       no Secret -- IMDS provides
-    |   spec.type=              |       tokens at runtime via:
-    |     UserAssignedMSI       |       http://169.254.169.254/...
-    |   spec.tenantID           |       ?client_id=<UAMI clientID>
-    |   spec.clientID  (= UAMI) |
+    | AzureClusterIdentity CR   |       no Secret; token source
+    |   spec.type=              |       depends on identity type
+    |     UserAssignedMSI       |
+    |     or WorkloadIdentity   |
+    |   spec.tenantID           |
+    |   spec.clientID           |
     +---------------------------+
 
 Unlike the ServicePrincipal flavor, there is NO backing Kubernetes
-Secret. The UAMI's credential material never lives in the cluster.
-The CAPZ controller pod (in ``capz-system``) calls the Azure Instance
-Metadata Service (IMDS) endpoint and asks for a token bound to the
-UAMI identified by ``clientID``. IMDS responds with a short-lived
-Azure AD token that CAPZ then uses to call ARM.
+Secret. For ``UserAssignedMSI``, the CAPZ controller pod calls IMDS and
+asks for a token bound to ``clientID``. For ``WorkloadIdentity``, CAPZ
+uses the management cluster's OIDC/federated-credential setup.
 
-Why UserAssignedMSI was picked here
------------------------------------
+Why UserAssignedMSI remains the default
+---------------------------------------
 CAPZ supports four identity flavors. Compare:
 
 ==================  =================  ============================
@@ -51,9 +49,9 @@ JWKS to host, just the UAMI's clientID + tenantID in a CR.
 
 Networking prerequisite: IMDS reachability
 ------------------------------------------
-For this flavor to actually work at reconcile time, the CAPZ controller
-pod must be able to send HTTP to ``169.254.169.254``. The traffic path
-on a standard kind-on-Azure-VM topology is:
+For ``UserAssignedMSI`` to actually work at reconcile time, the CAPZ
+controller pod must be able to send HTTP to ``169.254.169.254``. The
+traffic path on a standard kind-on-Azure-VM topology is:
 
 * CAPZ pod → kind node container's CNI (kindnet/Calico) → kind node
   container's eth0 (Docker bridge interface).
@@ -130,7 +128,7 @@ _AZURE_CLUSTER_IDENTITY_KIND = "AzureClusterIdentity"
 
 
 class AzureClusterIdentity(pulumi.ComponentResource):
-    """``UserAssignedMSI``-flavored ``AzureClusterIdentity`` CR.
+    """``AzureClusterIdentity`` CR.
 
     Args:
         name:
@@ -140,14 +138,9 @@ class AzureClusterIdentity(pulumi.ComponentResource):
             (e.g. an ``AzureCluster``'s ``spec.identityRef.name``) stay
             stable across Pulumi resource renames.
         client_id:
-            ``clientId`` of the user-assigned managed identity (UAMI).
-            NOT the ``principalId`` -- those are two different GUIDs on
-            the same identity. Confirm with::
-
-                az identity show -g <rg> -n <uami-name> --query clientId
+            ``clientId`` of the Azure identity.
         tenant_id:
-            Entra tenant ID the UAMI lives in. Same tenant as the
-            subscription that owns the UAMI. Confirm with::
+            Entra tenant ID the identity lives in. Confirm with::
 
                 az account show --query tenantId -o tsv
         allowed_namespaces:
@@ -198,6 +191,7 @@ class AzureClusterIdentity(pulumi.ComponentResource):
         self,
         name: str,
         *,
+        identity_type: pulumi.Input[str] = "UserAssignedMSI",
         client_id: pulumi.Input[str],
         tenant_id: pulumi.Input[str],
         allowed_namespaces: list[str] | None = None,
@@ -225,11 +219,10 @@ class AzureClusterIdentity(pulumi.ComponentResource):
         else:
             allowed_namespaces_spec = {"list": allowed_namespaces}
 
-        # UserAssignedMSI carries NO ``spec.clientSecret`` field -- CAPZ
-        # obtains tokens at runtime from IMDS at 169.254.169.254 using
-        # the UAMI selected by ``spec.clientID``. There is therefore no
-        # backing Kubernetes Secret to create or wire up; the CR alone
-        # is sufficient.
+        # UserAssignedMSI and WorkloadIdentity both carry NO
+        # ``spec.clientSecret`` field. The CR alone is sufficient once
+        # the management-cluster credential path for the selected type
+        # is configured outside this object.
         identity = k8s.apiextensions.CustomResource(
             f"{name}-cr",
             api_version=_AZURE_CLUSTER_IDENTITY_API_VERSION,
@@ -239,7 +232,7 @@ class AzureClusterIdentity(pulumi.ComponentResource):
                 "namespace": namespace,
             },
             spec={
-                "type": "UserAssignedMSI",
+                "type": identity_type,
                 "tenantID": tenant_id,
                 "clientID": client_id,
                 "allowedNamespaces": allowed_namespaces_spec,

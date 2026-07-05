@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Literal
 
 import pulumi
+from pydantic import field_serializer
+
+from lib.config import PulumiConfigModel
+from stacks.workload_cluster.registry_setting import RegistryConfig
 
 from stacks.workload_cluster.workload_cluster_deployments import (
     KEDAOutputs,
@@ -49,6 +53,15 @@ _LOCAL_KEDA_SCALED_NODE_SETS = (
 )
 
 
+class LocalWorkloadClusterConfig(PulumiConfigModel):
+    class_name: Literal["local"] = _CLUSTER_CLASS
+    registry: RegistryConfig | None = None
+
+    @field_serializer("class_name")
+    def serialize_class_name(self, class_name: str) -> str:
+        return class_name
+
+
 class LocalWorkloadClusterClass(pulumi.ComponentResource):
     """Reusable local workload-cluster class.
 
@@ -77,7 +90,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
         name: str,
         *,
         instance: str,
-        parameters: Mapping[str, object] | None = None,
+        config: LocalWorkloadClusterConfig,
         context: Any | None = None,
         machine_deployments: tuple[LocalMachineDeploymentSpec, ...] = _LOCAL_MACHINE_DEPLOYMENTS,
         slurm_node_sets: tuple[SlurmNodeSetSpec, ...] = _LOCAL_SLURM_NODE_SETS,
@@ -105,6 +118,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             "infrastructure",
             instance=instance,
             worker_machine_deployments=machine_deployments,
+            registry=config.registry,
             opts=child_options(),
         )
         deployments = WorkloadClusterDeployments(
