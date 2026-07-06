@@ -172,10 +172,7 @@ class KindAzureControlPlane(pulumi.ComponentResource):
 
         azure_cluster_identity = AzureClusterIdentity(
             "cluster-identity",
-            identity_type=spec.identity.type,
-            client_id=str(spec.identity.client_id),
-            tenant_id=str(spec.identity.tenant_id),
-            allowed_namespaces=spec.identity.allowed_namespaces,
+            identity=spec.identity,
             opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
         )
         imds_preflight_job = (

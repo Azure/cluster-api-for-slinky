@@ -234,7 +234,5 @@ def test_ammp_spec_can_autoscale_user_pool() -> None:
         "name": "compute",
         "sku": "Standard_D2s_v3",
         "nodeLabels": {NODE_TYPE_LABEL: COMPUTE_NODE_TYPE},
-        "enableAutoScaling": True,
-        "minCount": 1,
-        "maxCount": 10,
+        "scaling": {"minSize": 1, "maxSize": 10},
     }

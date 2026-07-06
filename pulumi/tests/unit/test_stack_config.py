@@ -10,6 +10,7 @@ from stack import (
     _with_owner_tag_config,
 )
 from stacks.control_plane.control_plane_config import (
+    AllowedNamespacesConfig,
     AzureInfrastructureProviderConfig,
     ControlPlaneKindConfig,
     InfrastructureProvidersConfig,
@@ -105,7 +106,7 @@ def test_explicit_stack_config_enables_azure() -> None:
     assert isinstance(azure.identity, UserAssignedMSIClusterIdentityConfig)
     assert str(azure.identity.client_id) == _CLIENT_ID
     assert str(azure.identity.tenant_id) == _TENANT_ID
-    assert azure.identity.allowed_namespaces is None
+    assert azure.identity.allowed_namespaces == AllowedNamespacesConfig()
 
     workload_cluster = config.tenants.workload_clusters["caps-aks"]
     assert isinstance(workload_cluster, AKSWorkloadClusterConfig)

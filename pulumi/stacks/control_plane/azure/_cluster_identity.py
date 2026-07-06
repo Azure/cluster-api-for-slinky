@@ -114,9 +114,14 @@ resources until then).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
+
+from lib.config import PulumiConfigModel
+from stacks.control_plane.control_plane_config import AzureClusterIdentityBaseConfig
 
 
 # CAPZ v1.24.1 still serves AzureClusterIdentity on the v1beta1 API
@@ -125,6 +130,29 @@ from pulumi import Output, ResourceOptions
 # v1beta2 version doesn't silently switch us behind the scenes.
 _AZURE_CLUSTER_IDENTITY_API_VERSION = "infrastructure.cluster.x-k8s.io/v1beta1"
 _AZURE_CLUSTER_IDENTITY_KIND = "AzureClusterIdentity"
+
+
+def _allowed_namespaces_spec(
+    allowed_namespaces: Mapping[str, object] | PulumiConfigModel | None,
+) -> dict[str, object]:
+    if allowed_namespaces is None:
+        return {}
+    if isinstance(allowed_namespaces, PulumiConfigModel):
+        return allowed_namespaces.to_config()
+    return {
+        key: value
+        for key, value in dict(allowed_namespaces).items()
+        if value is not None
+    }
+
+
+def _identity_spec(identity: AzureClusterIdentityBaseConfig) -> dict[str, object]:
+    return {
+        "type": identity.type,
+        "tenantID": str(identity.tenant_id),
+        "clientID": str(identity.client_id),
+        "allowedNamespaces": _allowed_namespaces_spec(identity.allowed_namespaces),
+    }
 
 
 class AzureClusterIdentity(pulumi.ComponentResource):
@@ -137,25 +165,19 @@ class AzureClusterIdentity(pulumi.ComponentResource):
             ``identity_name`` parameter below so external references
             (e.g. an ``AzureCluster``'s ``spec.identityRef.name``) stay
             stable across Pulumi resource renames.
-        client_id:
-            ``clientId`` of the Azure identity.
-        tenant_id:
-            Entra tenant ID the identity lives in. Confirm with::
+        identity:
+            Parsed control-plane Azure identity config. The component
+            renders the CAPZ ``spec.type``, ``spec.clientID``,
+            ``spec.tenantID``, and ``spec.allowedNamespaces`` fields
+            from this object. Confirm tenant ID with::
 
                 az account show --query tenantId -o tsv
-        allowed_namespaces:
-            Namespaces whose workload-cluster CRs may reference this
-            identity. CAPZ admission enforces this list. ``None`` (the
-            default) emits the CR with ``spec.allowedNamespaces`` set
-            to an empty object -- the CAPZ convention for \"any
-            namespace may reference this identity\" -- which is the
-            right default for multi-tenant Phase 2 where each tenant
-            lands its CRs in its own namespace. Pass an explicit list
-            to restrict to those namespaces only. Note: an empty list
-            is NOT the same as ``None`` -- ``[]`` means \"no namespace
-            may reference this identity\", per the upstream
-            ``AzureClusterIdentity.spec.allowedNamespaces.list``
-            schema.
+
+            ``identity.allowed_namespaces`` controls which namespaces'
+            workload-cluster CRs may reference this identity. CAPZ
+            admission treats the empty object as "any namespace may
+            reference this identity". ``{"list": []}`` means "no
+            namespace may reference this identity".
         namespace:
             Namespace for the AzureClusterIdentity CR. There is no
             backing Secret to keep co-located with it for the UAMI
@@ -191,10 +213,7 @@ class AzureClusterIdentity(pulumi.ComponentResource):
         self,
         name: str,
         *,
-        identity_type: pulumi.Input[str] = "UserAssignedMSI",
-        client_id: pulumi.Input[str],
-        tenant_id: pulumi.Input[str],
-        allowed_namespaces: list[str] | None = None,
+        identity: AzureClusterIdentityBaseConfig,
         namespace: str = "default",
         identity_name: str = "cluster-identity",
         provider: k8s.Provider | None = None,
@@ -206,18 +225,15 @@ class AzureClusterIdentity(pulumi.ComponentResource):
 
         # CAPZ schema for ``AzureClusterIdentity.spec.allowedNamespaces``:
         #
-        #   * ``None`` (field absent)               -> same-namespace only
-        #   * ``{}``   (empty struct)               -> ALL namespaces
-        #   * ``{list: [\"a\", \"b\"]}``               -> only \"a\", \"b\"
+        #   * ``{}``                    -> ALL namespaces
+        #   * ``{list: [\"a\", \"b\"]}``   -> only \"a\", \"b\"
+        #   * ``{list: []}``            -> no namespaces
         #
         # We default to the empty-struct \"allow all\" form so multi-tenant
         # Phase 2 (per-tenant namespaces) works without a Phase 1
         # restriction needing to be relaxed later. Callers can still pass
-        # an explicit list to tighten things.
-        if allowed_namespaces is None:
-            allowed_namespaces_spec: dict[str, object] = {}
-        else:
-            allowed_namespaces_spec = {"list": allowed_namespaces}
+        # an explicit list or selector to tighten things.
+        spec = _identity_spec(identity)
 
         # UserAssignedMSI and WorkloadIdentity both carry NO
         # ``spec.clientSecret`` field. The CR alone is sufficient once
@@ -231,12 +247,7 @@ class AzureClusterIdentity(pulumi.ComponentResource):
                 "name": identity_name,
                 "namespace": namespace,
             },
-            spec={
-                "type": identity_type,
-                "tenantID": tenant_id,
-                "clientID": client_id,
-                "allowedNamespaces": allowed_namespaces_spec,
-            },
+            spec=spec,
             opts=ResourceOptions(parent=self, provider=provider),
         )
 

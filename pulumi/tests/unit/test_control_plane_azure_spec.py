@@ -16,6 +16,7 @@ from localenv import (
 import stacks.control_plane.control_plane_config as control_plane_config_module
 from stacks.control_plane.control_plane_config import (
     CONTROL_PLANE_KIND_CHILD_CONFIG_KEY,
+    AllowedNamespacesConfig,
     AzureInfrastructureProviderConfig,
     AzureClusterIdentityConfig,
     ControlPlaneAWXConfig,
@@ -162,13 +163,13 @@ def _azure_provider(config):
 def _assert_user_assigned_identity(
     identity: object,
     *,
-    allowed_namespaces: list[str] | None | object = _DEFAULT_ALLOWED_NAMESPACES,
+    allowed_namespaces: AllowedNamespacesConfig | object = _DEFAULT_ALLOWED_NAMESPACES,
 ) -> None:
     assert isinstance(identity, UserAssignedMSIClusterIdentityConfig)
     assert str(identity.client_id) == _CLIENT_ID
     assert str(identity.tenant_id) == _TENANT_ID
     if allowed_namespaces is _DEFAULT_ALLOWED_NAMESPACES:
-        allowed_namespaces = []
+        allowed_namespaces = AllowedNamespacesConfig()
     assert identity.allowed_namespaces == allowed_namespaces
 
 
@@ -177,13 +178,13 @@ def _assert_workload_identity(
     *,
     client_id: str | None = _WORKLOAD_CLIENT_ID,
     tenant_id: str | None = _TENANT_ID,
-    allowed_namespaces: list[str] | None | object = _DEFAULT_ALLOWED_NAMESPACES,
+    allowed_namespaces: AllowedNamespacesConfig | object = _DEFAULT_ALLOWED_NAMESPACES,
 ) -> None:
     assert isinstance(identity, WorkloadIdentityClusterIdentityConfig)
     assert (str(identity.client_id) if identity.client_id is not None else None) == client_id
     assert (str(identity.tenant_id) if identity.tenant_id is not None else None) == tenant_id
     if allowed_namespaces is _DEFAULT_ALLOWED_NAMESPACES:
-        allowed_namespaces = []
+        allowed_namespaces = AllowedNamespacesConfig()
     assert identity.allowed_namespaces == allowed_namespaces
 
 
@@ -306,7 +307,7 @@ def test_provider_config_preserves_explicit_disabled_azure() -> None:
     assert providers.azure.enabled is False
 
 
-def test_build_omits_allowed_namespaces_when_none() -> None:
+def test_build_omits_default_allowed_namespaces_object() -> None:
     built = _control_plane_child_config(
         ControlPlaneKindConfig(
             infrastructure_providers=InfrastructureProvidersConfig(
@@ -319,7 +320,6 @@ def test_build_omits_allowed_namespaces_when_none() -> None:
                     identity=UserAssignedMSIClusterIdentityConfig(
                         client_id=_CLIENT_ID,
                         tenant_id=_TENANT_ID,
-                        allowed_namespaces=None,
                     ),
                 ),
             ),
@@ -329,13 +329,19 @@ def test_build_omits_allowed_namespaces_when_none() -> None:
         )
     )
 
-    # The CR side treats absence as "allow all"; omitting the key keeps
-    # the wire shape minimal and matches what the parser expects.
+    # The config carrier omits default empty objects. Parsing rehydrates
+    # the empty CAPZ allowedNamespaces object, which renders as allow-all
+    # on the CR side.
     control_plane = built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
     assert isinstance(control_plane, dict)
     identity = control_plane["infrastructureProviders"]["azure"]["identity"]
     assert isinstance(identity, dict)
     assert "allowedNamespaces" not in identity
+
+    parsed = ControlPlaneKindConfig.model_validate(control_plane)
+    azure = _azure_provider(parsed)
+    assert azure.identity is not None
+    assert azure.identity.allowed_namespaces == AllowedNamespacesConfig()
 
 
 def test_build_serializes_allowed_namespaces_list() -> None:
@@ -351,7 +357,9 @@ def test_build_serializes_allowed_namespaces_list() -> None:
                     identity=UserAssignedMSIClusterIdentityConfig(
                         client_id=_CLIENT_ID,
                         tenant_id=_TENANT_ID,
-                        allowed_namespaces=["default", "tenant-a"],
+                        allowed_namespaces=AllowedNamespacesConfig(
+                            list=("default", "tenant-a")
+                        ),
                     ),
                 ),
             ),
@@ -368,13 +376,48 @@ def test_build_serializes_allowed_namespaces_list() -> None:
         "type": "UserAssignedMSI",
         "clientId": _CLIENT_ID,
         "tenantId": _TENANT_ID,
-        "allowedNamespaces": ["default", "tenant-a"],
+        "allowedNamespaces": {"list": ["default", "tenant-a"]},
     }
 
     parsed = ControlPlaneKindConfig.model_validate(control_plane)
     azure = _azure_provider(parsed)
     assert azure.identity is not None
-    assert azure.identity.allowed_namespaces == ["default", "tenant-a"]
+    assert azure.identity.allowed_namespaces == AllowedNamespacesConfig(
+        list=("default", "tenant-a")
+    )
+
+
+def test_build_serializes_allowed_namespaces_selector() -> None:
+    built = _control_plane_child_config(
+        ControlPlaneKindConfig(
+            infrastructure_providers=InfrastructureProvidersConfig(
+                docker=DockerInfrastructureProviderConfig(enabled=False),
+                azure=AzureInfrastructureProviderConfig(
+                    enabled=True,
+                    default_subscription_id=_SUBSCRIPTION_ID,
+                    default_location=_LOCATION,
+                    default_resource_group=_RESOURCE_GROUP,
+                    identity=UserAssignedMSIClusterIdentityConfig(
+                        client_id=_CLIENT_ID,
+                        tenant_id=_TENANT_ID,
+                        allowed_namespaces=AllowedNamespacesConfig(
+                            selector={"matchLabels": {"team": "slinky"}}
+                        ),
+                    ),
+                ),
+            ),
+            deployments=ControlPlaneDeploymentsConfig(
+                awx=ControlPlaneAWXConfig(enabled=False)
+            ),
+        )
+    )
+
+    control_plane = built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
+    assert isinstance(control_plane, dict)
+    identity = control_plane["infrastructureProviders"]["azure"]["identity"]
+    assert identity["allowedNamespaces"] == {
+        "selector": {"matchLabels": {"team": "slinky"}}
+    }
 
 
 def test_parse_kind_config_without_azure_leaves_config_none() -> None:
@@ -428,7 +471,7 @@ def test_parse_hydrates_missing_user_assigned_msi_client_id(
 
     parsed = _parse_identity(payload)
 
-    _assert_user_assigned_identity(parsed, allowed_namespaces=None)
+    _assert_user_assigned_identity(parsed)
 
 
 def test_parse_hydrates_missing_user_assigned_msi_tenant_id_with_client_id_hint(
@@ -469,7 +512,7 @@ def test_parse_hydrates_missing_user_assigned_msi_tenant_id_with_client_id_hint(
 
     parsed = _parse_identity(payload)
 
-    _assert_user_assigned_identity(parsed, allowed_namespaces=None)
+    _assert_user_assigned_identity(parsed)
     assert discovered_client_ids == [UUID(_CLIENT_ID)]
 
 
@@ -504,7 +547,7 @@ def test_parse_rejects_non_list_allowed_namespaces() -> None:
 
 
 def test_parse_rejects_empty_allowed_namespace_entry() -> None:
-    payload = _full_payload(allowedNamespaces=["default", ""])
+    payload = _full_payload(allowedNamespaces={"list": ["default", ""]})
 
     with pytest.raises(ValueError, match="allowedNamespaces"):
         _parse_identity(payload)
@@ -515,10 +558,10 @@ def test_parse_allows_empty_allowed_namespaces_list() -> None:
     # identity" per the upstream CRD; we shouldn't *reject* it at parse
     # time because the contract has to round-trip cleanly, but we do
     # surface it as an empty list (not None) so callers can tell.
-    payload = _full_payload(allowedNamespaces=[])
+    payload = _full_payload(allowedNamespaces={"list": []})
 
     parsed = _parse_identity(payload)
-    assert parsed.allowed_namespaces == []
+    assert parsed.allowed_namespaces == AllowedNamespacesConfig(list=())
 
 
 def test_skip_in_cluster_preflight_defaults_to_false() -> None:
@@ -558,7 +601,7 @@ def test_provider_config_completes_partial_azure_provider(
     assert str(azure.default_subscription_id) == _SUBSCRIPTION_ID
     assert azure.default_location == _LOCATION
     assert azure.default_resource_group == _RESOURCE_GROUP
-    _assert_user_assigned_identity(azure.identity, allowed_namespaces=None)
+    _assert_user_assigned_identity(azure.identity)
 
 
 def test_azure_provider_discovery_preserves_explicit_subscription(
@@ -645,7 +688,6 @@ def test_provider_config_keeps_configured_workload_identity_partial(
         azure.identity,
         client_id=None,
         tenant_id=None,
-        allowed_namespaces=None,
     )
 
 

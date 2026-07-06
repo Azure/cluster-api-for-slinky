@@ -7,6 +7,7 @@ import pytest
 
 from stacks.control_plane import control_plane_kind
 from stacks.control_plane.control_plane_config import (
+    AllowedNamespacesConfig,
     ControlPlaneDeploymentsConfig,
     ControlPlaneKindConfig,
     UserAssignedMSIClusterIdentityConfig,
@@ -236,7 +237,9 @@ def test_kind_azure_control_plane_runs_imds_preflight_for_user_assigned_msi(
         ),
     )
 
-    assert _FakeAzureClusterIdentity.calls[0]["identity_type"] == "UserAssignedMSI"
+    identity = _FakeAzureClusterIdentity.calls[0]["identity"]
+    assert isinstance(identity, UserAssignedMSIClusterIdentityConfig)
+    assert identity.allowed_namespaces == AllowedNamespacesConfig()
     assert len(_FakeIMDSPreflightJob.calls) == 1
     assert control_plane.outputs.imds_preflight_job is not None
 
@@ -261,6 +264,7 @@ def test_kind_azure_control_plane_skips_imds_preflight_for_workload_identity(
         ),
     )
 
-    assert _FakeAzureClusterIdentity.calls[0]["identity_type"] == "WorkloadIdentity"
+    identity = _FakeAzureClusterIdentity.calls[0]["identity"]
+    assert isinstance(identity, WorkloadIdentityClusterIdentityConfig)
     assert _FakeIMDSPreflightJob.calls == []
     assert control_plane.outputs.imds_preflight_job is None

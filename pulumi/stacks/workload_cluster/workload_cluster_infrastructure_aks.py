@@ -48,7 +48,8 @@ _USER_NODE_POOL_MODE = "User"
 _AKS_CONTROLLER_NODE_LABELS = {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
 
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
-_WAIT_FOR_READY = "condition=Ready"
+_WAIT_FOR_STATUS_READY = "jsonpath={.status.ready}=true"
+_AKS_CONTROL_PLANE_TIMEOUT = "60m"
 
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
@@ -206,9 +207,7 @@ def _azure_managed_machine_pool_spec(
         spec["additionalTags"] = dict(additional_tags)
     if autoscaling_bounds is not None:
         min_count, max_count = autoscaling_bounds
-        spec["enableAutoScaling"] = True
-        spec["minCount"] = min_count
-        spec["maxCount"] = max_count
+        spec["scaling"] = {"minSize": min_count, "maxSize": max_count}
     return spec
 
 
@@ -330,7 +329,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_READY},
+                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_STATUS_READY},
             },
             spec=_azure_managed_control_plane_spec(
                 identity_name=identity_name,
@@ -341,7 +340,16 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 version=kubernetes_version,
                 additional_tags=dict(additional_tags or {}),
             ),
-            opts=child_opts(depends_on=[cluster, *machine_pools]),
+            opts=pulumi.ResourceOptions.merge(
+                child_opts(depends_on=[cluster, *machine_pools]),
+                pulumi.ResourceOptions(
+                    custom_timeouts=pulumi.CustomTimeouts(
+                        create=_AKS_CONTROL_PLANE_TIMEOUT,
+                        update=_AKS_CONTROL_PLANE_TIMEOUT,
+                        delete=_AKS_CONTROL_PLANE_TIMEOUT,
+                    )
+                ),
+            ),
         )
 
         workload_kubeconfig_secret = k8s.core.v1.Secret.get(

@@ -12,6 +12,12 @@ from stacks.init.init_stack import (
     init_stack_config,
     parse_init_stack_spec,
 )
+from stacks.control_plane.control_plane_config import (
+    AzureInfrastructureProviderConfig,
+    ControlPlaneKindConfig,
+    InfrastructureProvidersConfig,
+    UserAssignedMSIClusterIdentityConfig,
+)
 from stacks.workload_cluster.registry_setting import LocalPortRegistrySetting
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
 from stacks.workload_cluster.tenants import TenantsConfig
@@ -64,6 +70,46 @@ def test_init_stack_config_wraps_shared_spec_and_init_stack_config() -> None:
                 }
             }
         },
+    }
+
+
+def test_init_stack_config_serializes_azure_uuid_fields_as_strings() -> None:
+    config = InitStackConfig(
+        control_plane=ControlPlaneKindConfig(
+            infrastructure_providers=InfrastructureProvidersConfig(
+                azure=AzureInfrastructureProviderConfig(
+                    enabled=True,
+                    identity=UserAssignedMSIClusterIdentityConfig(
+                        client_id="11111111-1111-1111-1111-111111111111",
+                        tenant_id="22222222-2222-2222-2222-222222222222",
+                    ),
+                    default_subscription_id="33333333-3333-3333-3333-333333333333",
+                    default_location="westus2",
+                    default_resource_group="ZHEYUSWESTUS2",
+                )
+            )
+        )
+    )
+
+    payload = init_stack_config(
+        stack_spec=_stack_spec(),
+        init_stack_config=config,
+    )
+
+    assert payload[INIT_STACK_CONFIG_KEY]["controlPlane"] == {
+        "infrastructureProviders": {
+            "azure": {
+                "enabled": True,
+                "identity": {
+                    "type": "UserAssignedMSI",
+                    "clientId": "11111111-1111-1111-1111-111111111111",
+                    "tenantId": "22222222-2222-2222-2222-222222222222",
+                },
+                "defaultSubscriptionId": "33333333-3333-3333-3333-333333333333",
+                "defaultLocation": "westus2",
+                "defaultResourceGroup": "ZHEYUSWESTUS2",
+            }
+        }
     }
 
 

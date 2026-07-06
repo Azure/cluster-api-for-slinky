@@ -23,6 +23,11 @@ from localenv import (
 CONTROL_PLANE_KIND_CHILD_CONFIG_KEY = "controlPlane"
 
 
+class AllowedNamespacesConfig(PulumiConfigModel):
+    list: tuple[NonEmptyStr, ...] | None = None
+    selector: dict[str, object] | None = None
+
+
 class AzureClusterIdentityBaseConfig(PulumiConfigModel):
     @field_serializer("type", check_fields=False)
     def serialize_type(self, identity_type: str) -> str:
@@ -34,7 +39,9 @@ class AzureClusterIdentityBaseConfig(PulumiConfigModel):
 
     client_id: UUID | None = None
     tenant_id: UUID | None = None
-    allowed_namespaces: list[NonEmptyStr] | None = None
+    allowed_namespaces: AllowedNamespacesConfig = Field(
+        default_factory=AllowedNamespacesConfig
+    )
 
 
 class UserAssignedMSIClusterIdentityConfig(AzureClusterIdentityBaseConfig):
@@ -124,7 +131,6 @@ def _discover_default_identity(
             "type": credential.type,
             "clientId": credential.client_id,
             "tenantId": credential.tenant_id,
-            "allowedNamespaces": [],
         }
     )
 

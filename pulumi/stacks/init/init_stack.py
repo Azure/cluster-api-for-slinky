@@ -142,12 +142,7 @@ def init_stack_config(
     return {
         INIT_STACK_SPEC_CONFIG_KEY: stack_spec.to_config(),
         INIT_STACK_CONFIG_KEY: (
-            init_stack_config.model_dump(
-                by_alias=True,
-                mode="python",
-                exclude_none=True,
-                exclude_defaults=True,
-            )
+            init_stack_config.to_config()
             if init_stack_config is not None
             else {}
         ),
