@@ -50,6 +50,7 @@ _AKS_CONTROLLER_NODE_LABELS = {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_STATUS_READY = "jsonpath={.status.ready}=true"
 _AKS_CONTROL_PLANE_TIMEOUT = "60m"
+_AKS_DELETE_TIMEOUT = "60m"
 _AMCP_IMMUTABLE_DEFAULTED_FIELDS = ["spec.sshPublicKey"]
 
 _DNS_LABEL_MAX_LENGTH = 63
@@ -273,44 +274,6 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             opts=child_opts(),
         )
 
-        machine_pools: list[k8s.apiextensions.CustomResource] = []
-        machine_pool_names: list[Output[str]] = []
-        for pool in node_pools:
-            cr_pool_name = _resource_name(instance, pool.name)
-            aks_pool_name = _aks_pool_name(pool)
-            pool_mode = _SYSTEM_NODE_POOL_MODE if pool.controller else _USER_NODE_POOL_MODE
-            azure_managed_machine_pool = k8s.apiextensions.CustomResource(
-                f"{name}-{pool.name}-managed-machine-pool",
-                api_version=_INFRASTRUCTURE_API_VERSION,
-                kind=_AMMP_KIND,
-                metadata={"name": cr_pool_name, "namespace": _NAMESPACE},
-                spec=_azure_managed_machine_pool_spec(
-                    mode=pool_mode,
-                    pool_name=aks_pool_name,
-                    sku=node_sku,
-                    additional_tags=dict(additional_tags or {}),
-                    node_labels=node_labels(pool.node_type),
-                    autoscaling_bounds=pool.autoscaling_bounds,
-                ),
-                opts=child_opts(),
-            )
-
-            machine_pool = k8s.apiextensions.CustomResource(
-                f"{name}-{pool.name}-machine-pool",
-                api_version=_CAPI_API_VERSION,
-                kind=_MACHINE_POOL_KIND,
-                metadata={"name": cr_pool_name, "namespace": _NAMESPACE},
-                spec=_machine_pool_spec(
-                    cluster_name=cluster_name,
-                    pool_name=cr_pool_name,
-                    version=kubernetes_version,
-                    replicas=pool.replicas,
-                ),
-                opts=child_opts(depends_on=[azure_managed_machine_pool]),
-            )
-            machine_pools.append(machine_pool)
-            machine_pool_names.append(Output.from_input(cr_pool_name))
-
         cluster = k8s.apiextensions.CustomResource(
             f"{name}-cluster",
             api_version=_CAPI_API_VERSION,
@@ -320,7 +283,12 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 control_plane_name=cluster_name,
                 infrastructure_name=cluster_name,
             ),
-            opts=child_opts(depends_on=[azure_managed_cluster]),
+            opts=pulumi.ResourceOptions.merge(
+                child_opts(depends_on=[azure_managed_cluster]),
+                pulumi.ResourceOptions(
+                    custom_timeouts=pulumi.CustomTimeouts(delete=_AKS_DELETE_TIMEOUT)
+                ),
+            ),
         )
 
         azure_managed_control_plane = k8s.apiextensions.CustomResource(
@@ -342,7 +310,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 additional_tags=dict(additional_tags or {}),
             ),
             opts=pulumi.ResourceOptions.merge(
-                child_opts(depends_on=[cluster, *machine_pools]),
+                child_opts(depends_on=[cluster]),
                 pulumi.ResourceOptions(
                     ignore_changes=_AMCP_IMMUTABLE_DEFAULTED_FIELDS,
                     custom_timeouts=pulumi.CustomTimeouts(
@@ -353,6 +321,64 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 ),
             ),
         )
+
+        machine_pools: list[k8s.apiextensions.CustomResource] = []
+        machine_pool_names: list[Output[str]] = []
+        for pool in node_pools:
+            cr_pool_name = _resource_name(instance, pool.name)
+            aks_pool_name = _aks_pool_name(pool)
+            pool_mode = _SYSTEM_NODE_POOL_MODE if pool.controller else _USER_NODE_POOL_MODE
+            azure_managed_machine_pool = k8s.apiextensions.CustomResource(
+                f"{name}-{pool.name}-managed-machine-pool",
+                api_version=_INFRASTRUCTURE_API_VERSION,
+                kind=_AMMP_KIND,
+                metadata={"name": cr_pool_name, "namespace": _NAMESPACE},
+                spec=_azure_managed_machine_pool_spec(
+                    mode=pool_mode,
+                    pool_name=aks_pool_name,
+                    sku=node_sku,
+                    additional_tags=dict(additional_tags or {}),
+                    node_labels=node_labels(pool.node_type),
+                    autoscaling_bounds=pool.autoscaling_bounds,
+                ),
+                opts=pulumi.ResourceOptions.merge(
+                    child_opts(depends_on=[azure_managed_control_plane]),
+                    pulumi.ResourceOptions(
+                        custom_timeouts=pulumi.CustomTimeouts(
+                            delete=_AKS_DELETE_TIMEOUT
+                        )
+                    ),
+                ),
+            )
+
+            machine_pool = k8s.apiextensions.CustomResource(
+                f"{name}-{pool.name}-machine-pool",
+                api_version=_CAPI_API_VERSION,
+                kind=_MACHINE_POOL_KIND,
+                metadata={"name": cr_pool_name, "namespace": _NAMESPACE},
+                spec=_machine_pool_spec(
+                    cluster_name=cluster_name,
+                    pool_name=cr_pool_name,
+                    version=kubernetes_version,
+                    replicas=pool.replicas,
+                ),
+                opts=pulumi.ResourceOptions.merge(
+                    child_opts(
+                        depends_on=[
+                            cluster,
+                            azure_managed_control_plane,
+                            azure_managed_machine_pool,
+                        ]
+                    ),
+                    pulumi.ResourceOptions(
+                        custom_timeouts=pulumi.CustomTimeouts(
+                            delete=_AKS_DELETE_TIMEOUT
+                        )
+                    ),
+                ),
+            )
+            machine_pools.append(machine_pool)
+            machine_pool_names.append(Output.from_input(cr_pool_name))
 
         workload_kubeconfig_secret = k8s.core.v1.Secret.get(
             "workload-kubeconfig-secret",
