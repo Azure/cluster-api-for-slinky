@@ -50,6 +50,16 @@ _ORG_PLACEHOLDER = "organization"
 # this constant is the single place to update.
 _WORKSPACE_CONTAINER = "pulumi"
 
+# PKO defaults to the all-language Pulumi image. The init/control-plane/workload
+# stacks in this repo are Python-only, so use the smaller pinned Python runtime.
+_WORKSPACE_IMAGE = "pulumi/pulumi-python:3.202.0"
+
+# PKO runs workspace pods as UID 1000 without HOME/USER entries in the Python
+# image. Point Pulumi's plugin/cache root at PKO's writable shared workspace
+# volume, and set USER so Pulumi's stack creation path can resolve an identity.
+_PULUMI_HOME = "/share/.pulumi"
+_PULUMI_USER = "pulumi"
+
 # Volume name used inside the workspace pod for the file:// backend's
 # PVC mount. Arbitrary string, just has to match between volume and
 # volumeMount entries.
@@ -213,6 +223,18 @@ def build_stack_spec(
                 "key": PULUMI_DELETE_UNREACHABLE_ENV,
             },
         },
+        "PULUMI_HOME": {
+            "type": "Literal",
+            "literal": {
+                "value": _PULUMI_HOME,
+            },
+        },
+        "USER": {
+            "type": "Literal",
+            "literal": {
+                "value": _PULUMI_USER,
+            },
+        },
     }
 
     # Strategic merge patch onto PKO's default workspace pod template. PKO
@@ -226,6 +248,7 @@ def build_stack_spec(
                     "containers": [
                         {
                             "name": _WORKSPACE_CONTAINER,
+                            "image": _WORKSPACE_IMAGE,
                             "volumeMounts": [
                                 {
                                     "name": _STATE_VOLUME_NAME,
@@ -254,7 +277,6 @@ def build_stack_spec(
                 "apiVersion": spec.flux_source_api_version,
                 "kind": spec.flux_source_kind,
                 "name": spec.flux_source_name,
-                "namespace": spec.flux_source_namespace,
             },
             "dir": repo_dir,
         },

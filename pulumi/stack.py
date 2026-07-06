@@ -31,6 +31,12 @@ def run_stack() -> None:
     cluster = CtlptlCluster("mgmt", registry_name=registry.registry_name)
     mgmt_provider = k8s.Provider("mgmt-k8s", kubeconfig=cluster.kubeconfig)
 
+    pko_namespace = k8s.core.v1.Namespace(
+        "pko-ns",
+        metadata={"name": PKO_NAMESPACE},
+        opts=pulumi.ResourceOptions(provider=mgmt_provider),
+    )
+
     lb = CloudProviderKind(
         "lb",
         config=cloud_provider_kind_config,
@@ -48,6 +54,8 @@ def run_stack() -> None:
             "kubeconfig": cluster.kubeconfig,
             "flux_provider": mgmt_provider,
             "flux_infrastructure": flux,
+            "flux_source_namespace": pko_namespace.metadata["name"],
+            "flux_source_namespace_resource": pko_namespace,
         },
     )
 
@@ -59,6 +67,7 @@ def run_stack() -> None:
     pko = PKOBootstrap(
         "pko",
         provider=mgmt_provider,
+        namespace_resource=pko_namespace,
         flux_source=repo.flux_source,
         env=pulumi.get_stack(),
         init_stack_config=init_stack_config,

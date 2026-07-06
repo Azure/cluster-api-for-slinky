@@ -119,7 +119,7 @@ def test_local_registry_config_is_applied_to_local_workload_clusters_only() -> N
                 "local": LocalWorkloadClusterConfig(),
                 "caps-aks": AKSWorkloadClusterConfig(
                     parameters=AzureWorkloadSpec(
-                            subscription_id=_SUBSCRIPTION_ID,
+                        subscription_id=_SUBSCRIPTION_ID,
                         location="westus2",
                         resource_group="rg-capz-mi-dev2",
                         additional_tags={},
@@ -143,7 +143,7 @@ def test_local_registry_config_is_applied_to_local_workload_clusters_only() -> N
             "caps-aks": {
                 "className": "aks",
                 "parameters": {
-                        "subscriptionId": _SUBSCRIPTION_ID,
+                    "subscriptionId": _SUBSCRIPTION_ID,
                     "location": "westus2",
                     "resourceGroup": "rg-capz-mi-dev2",
                     "additionalTags": {},

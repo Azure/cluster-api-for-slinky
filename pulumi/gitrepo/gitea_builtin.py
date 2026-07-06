@@ -404,6 +404,8 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         *,
         flux_provider: k8s.Provider,
         flux_infrastructure: pulumi.Resource,
+        flux_source_namespace: pulumi.Input[str] = _GITEA_NAMESPACE,
+        flux_source_namespace_resource: pulumi.Resource | None = None,
         admin_username: str = _DEFAULT_ADMIN_USERNAME,
         admin_email: str = _DEFAULT_ADMIN_EMAIL,
         repo_owner: Optional[str] = None,
@@ -882,12 +884,22 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             user_private_key_key=_USER_PRIVATE_KEY_SECRET_KEY,
             host_secret_name=_HOST_KEY_SECRET,
             host_public_key_key=_HOST_PUBLIC_KEY_SECRET_KEY,
-            target_namespace=_GITEA_NAMESPACE,
+            target_namespace=flux_source_namespace,
             target_name=_FLUX_GIT_AUTH_SECRET,
             known_hosts_hostname=_in_cluster_ssh_host(),
             opts=ResourceOptions(
                 parent=self,
-                depends_on=[sync, gitea_ns, host_key_secret, user_key_secret],
+                depends_on=[
+                    dep
+                    for dep in [
+                        sync,
+                        gitea_ns,
+                        flux_source_namespace_resource,
+                        host_key_secret,
+                        user_key_secret,
+                    ]
+                    if dep is not None
+                ],
             ),
         )
 
@@ -905,7 +917,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         flux_source = FluxSource(
             f"{name}-flux-source",
             provider=flux_provider,
-            namespace=gitea_ns.metadata["name"],
+            namespace=flux_source_namespace,
             repo_url=self.url,
             repo_branch=self.default_branch,
             git_auth_secret_name=flux_git_auth.name,

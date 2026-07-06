@@ -9,7 +9,7 @@ import pulumi
 from pydantic import Field, field_serializer
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
-from localenv import discover_azure_resource_placement, discover_local_username
+from localenv import discover_azure_resource_placement
 
 from stacks.workload_cluster.workload_cluster_deployments import (
     KEDAOutputs,
@@ -67,13 +67,7 @@ class AzureWorkloadSpec(PulumiConfigModel):
             discover_azure_resource_placement(raise_on_missing=True).resource_group
         )
     )
-    additional_tags: Mapping[NonEmptyStr, str] = Field(
-        default_factory=lambda: (
-            {"Owner": username}
-            if (username := discover_local_username()) is not None
-            else {}
-        )
-    )
+    additional_tags: Mapping[NonEmptyStr, str] = Field(default_factory=dict)
     aks: AKSWorkloadSizingConfig = AKSWorkloadSizingConfig()
 
     @field_serializer("subscription_id", "location", "resource_group", check_fields=False)

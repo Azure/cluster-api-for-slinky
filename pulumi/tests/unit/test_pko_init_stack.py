@@ -116,8 +116,22 @@ def test_build_stack_spec_uses_flux_source_namespace() -> None:
         "apiVersion": "source.toolkit.fluxcd.io/v1",
         "kind": "GitRepository",
         "name": "gitops-source",
-        "namespace": "gitea",
     }
+    assert spec["envRefs"]["PULUMI_HOME"] == {
+        "type": "Literal",
+        "literal": {"value": "/share/.pulumi"},
+    }
+    assert spec["envRefs"]["USER"] == {
+        "type": "Literal",
+        "literal": {"value": "pulumi"},
+    }
+    assert spec["workspaceTemplate"]["spec"]["podTemplate"]["spec"]["containers"] == [
+        {
+            "name": "pulumi",
+            "image": "pulumi/pulumi-python:3.202.0",
+            "volumeMounts": [{"name": "state", "mountPath": "/state"}],
+        }
+    ]
 
 
 def test_parse_init_stack_spec_rejects_missing_required_field() -> None:

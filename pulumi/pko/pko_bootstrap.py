@@ -103,6 +103,7 @@ class PKOBootstrap(pulumi.ComponentResource):
         name: str,
         *,
         provider: k8s.Provider,
+        namespace_resource: pulumi.Resource | None = None,
         flux_source: FluxSource,
         env: str,
         init_stack_config: InitStackConfig | None = None,
@@ -110,11 +111,12 @@ class PKOBootstrap(pulumi.ComponentResource):
     ) -> None:
         super().__init__("ca4s:pko:PKOBootstrap", name, props={}, opts=opts)
 
-        namespace_resource = k8s.core.v1.Namespace(
-            f"{name}-ns",
-            metadata={"name": PKO_NAMESPACE},
-            opts=ResourceOptions(parent=self, provider=provider),
-        )
+        if namespace_resource is None:
+            namespace_resource = k8s.core.v1.Namespace(
+                f"{name}-ns",
+                metadata={"name": PKO_NAMESPACE},
+                opts=ResourceOptions(parent=self, provider=provider),
+            )
 
         release = PKORelease(
             f"{name}-release",
@@ -157,6 +159,7 @@ class PKOBootstrap(pulumi.ComponentResource):
         # blocks the Release on its readiness before emitting the
         # ``status`` Output.
         cr_deps: list[pulumi.Resource] = [
+            namespace_resource,
             release,
             sa,
             backend,
