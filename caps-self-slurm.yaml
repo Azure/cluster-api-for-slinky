@@ -1,10 +1,12 @@
 # Slinky Slurm cluster values for the `caps-self` self-managed workload cluster.
 #
 # Differs from slurm-cluster.yaml (the CAPD/Slinky dev path): caps-self has 1 k8s
-# control-plane node (tainted) + 2 HPC workers labeled
-# `slinky.slurm.net/node-type=compute`. There is NO dedicated controller node, so
-# the lightweight control-plane components (slurmctld, slurmrestd) use default
-# placement and land on the workers; only slurmd is pinned to the compute nodes.
+# control-plane node (tainted) + 1 non-GPU in-cluster controller node labeled
+# `slinky.slurm.net/node-type=controller` (the caps-self-md-ctrl MachineDeployment)
+# + 2 HPC workers labeled `slinky.slurm.net/node-type=compute` and tainted
+# `slinky.slurm.net/compute:NoSchedule`. The lightweight control-plane components
+# (slurmctld, slurmrestd) are pinned to the controller node; slurmd is pinned to
+# the compute nodes and tolerates their taint.
 #
 # slurmd runs as a DaemonSet (one per compute worker) and BIND-MOUNTS the host HPC
 # image's HPC-X tree at /opt/hpcx, so an MPI job can `source /opt/hpcx/hpcx-init.sh;
@@ -31,12 +33,41 @@ configFiles:
     CgroupPlugin=disabled
 
 controller:
+  # Pin slurmctld to the dedicated in-cluster controller node (the non-GPU
+  # caps-self-md-ctrl MachineDeployment), keeping it off the tainted GPU/IB
+  # compute nodes and off the k8s control-plane node. Its local-path statesave
+  # PVC binds on this node (WaitForFirstConsumer); the node is a single always-on
+  # replica so the node-local PV is stable.
+  podSpec:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: "slinky.slurm.net/node-type"
+                  operator: In
+                  values:
+                    - "controller"
   persistence:
     enabled: true
     # uses the default StorageClass (local-path)
     resources:
       requests:
         storage: 2Gi
+
+# slurmrestd (REST API, default-enabled in the chart) shares the controller-node
+# placement so the compute-node taint does not evict it.
+restapi:
+  podSpec:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: "slinky.slurm.net/node-type"
+                  operator: In
+                  values:
+                    - "controller"
 
 # Accounting (slurmdbd) — REQUIRED for durable `sacct` job history, which is how
 # the Slurm benchmark harness (scripts/nccl-slurm/) detects NCCL/MPI job failures
@@ -125,6 +156,14 @@ nodesets:
       nodeSelector:
         kubernetes.io/os: linux
         slinky.slurm.net/node-type: compute
+      # Tolerate the compute-node taint (slinky.slurm.net/compute:NoSchedule, set
+      # in the caps-self-md-0 KubeadmConfigTemplate) so slurmd — the ONLY workload
+      # meant for the GPU/IB nodes — still schedules there. The nodeSelector above
+      # already restricts slurmd to node-type=compute.
+      tolerations:
+        - key: slinky.slurm.net/compute
+          operator: Exists
+          effect: NoSchedule
       volumes:
         - name: hpcx
           hostPath:
