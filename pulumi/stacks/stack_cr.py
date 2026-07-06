@@ -55,8 +55,9 @@ _WORKSPACE_CONTAINER = "pulumi"
 _WORKSPACE_IMAGE = "pulumi/pulumi-python:3.202.0"
 
 # PKO runs workspace pods as UID 1000 without HOME/USER entries in the Python
-# image. Point Pulumi's plugin/cache root at PKO's writable shared workspace
-# volume, and set USER so Pulumi's stack creation path can resolve an identity.
+# image. Point home/cache paths at PKO's writable shared workspace volume, and
+# set USER so Pulumi's stack creation path can resolve an identity.
+_HOME = "/share"
 _PULUMI_HOME = "/share/.pulumi"
 _PULUMI_USER = "pulumi"
 
@@ -227,6 +228,12 @@ def build_stack_spec(
             "type": "Literal",
             "literal": {
                 "value": _PULUMI_HOME,
+            },
+        },
+        "HOME": {
+            "type": "Literal",
+            "literal": {
+                "value": _HOME,
             },
         },
         "USER": {

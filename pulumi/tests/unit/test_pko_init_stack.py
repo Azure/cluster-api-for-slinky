@@ -121,6 +121,10 @@ def test_build_stack_spec_uses_flux_source_namespace() -> None:
         "type": "Literal",
         "literal": {"value": "/share/.pulumi"},
     }
+    assert spec["envRefs"]["HOME"] == {
+        "type": "Literal",
+        "literal": {"value": "/share"},
+    }
     assert spec["envRefs"]["USER"] == {
         "type": "Literal",
         "literal": {"value": "pulumi"},
