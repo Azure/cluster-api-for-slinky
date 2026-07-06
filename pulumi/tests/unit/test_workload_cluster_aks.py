@@ -23,6 +23,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_aks import (
     _AKS_CONTROLLER_NODE_LABELS,
     _AMC_KIND,
     _AMCP_KIND,
+    _AMCP_IMMUTABLE_DEFAULTED_FIELDS,
     _AMMP_KIND,
     _AKS_POOL_NAME_MAX_LENGTH,
     _AZURE_CLUSTER_IDENTITY_KIND,
@@ -106,6 +107,10 @@ def test_amcp_spec_carries_identity_and_placement() -> None:
     assert spec["oidcIssuerProfile"] == {"enabled": True}
     # No tags supplied => no additionalTags key.
     assert "additionalTags" not in spec
+
+
+def test_amcp_ignores_capz_defaulted_immutable_fields() -> None:
+    assert _AMCP_IMMUTABLE_DEFAULTED_FIELDS == ["spec.sshPublicKey"]
 
 
 def test_amcp_spec_stamps_additional_tags_for_node_rg_policy() -> None:

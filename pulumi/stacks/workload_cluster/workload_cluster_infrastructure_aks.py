@@ -50,6 +50,7 @@ _AKS_CONTROLLER_NODE_LABELS = {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_STATUS_READY = "jsonpath={.status.ready}=true"
 _AKS_CONTROL_PLANE_TIMEOUT = "60m"
+_AMCP_IMMUTABLE_DEFAULTED_FIELDS = ["spec.sshPublicKey"]
 
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
@@ -343,6 +344,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions.merge(
                 child_opts(depends_on=[cluster, *machine_pools]),
                 pulumi.ResourceOptions(
+                    ignore_changes=_AMCP_IMMUTABLE_DEFAULTED_FIELDS,
                     custom_timeouts=pulumi.CustomTimeouts(
                         create=_AKS_CONTROL_PLANE_TIMEOUT,
                         update=_AKS_CONTROL_PLANE_TIMEOUT,
