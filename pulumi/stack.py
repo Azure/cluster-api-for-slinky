@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import getpass
+import os
+
 import pulumi
 import pulumi_kubernetes as k8s
 
@@ -16,7 +19,11 @@ from stacks.workload_cluster.tenants import (
     WorkloadClusterConfig,
 )
 from stacks.init.init_stack import InitStackConfig
+from stacks.workload_cluster.workload_cluster_class_aks import AKSWorkloadClusterConfig
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
+
+
+_OWNER_TAG = "Owner"
 
 
 def run_stack() -> None:
@@ -59,9 +66,11 @@ def run_stack() -> None:
         },
     )
 
-    init_stack_config = _with_local_registry_config(
-        InitStackConfig.model_validate(config.get_object("initStack") or {}),
-        LocalPortRegistrySetting(port=registry.port),
+    init_stack_config = _with_owner_tag_config(
+        _with_local_registry_config(
+            InitStackConfig.model_validate(config.get_object("initStack") or {}),
+            LocalPortRegistrySetting(port=registry.port),
+        )
     )
 
     pko = PKOBootstrap(
@@ -112,6 +121,60 @@ def _with_local_registry_config(
             )
         }
     )
+
+
+def _with_owner_tag_config(
+    init_stack_config: InitStackConfig,
+    owner: str | None = None,
+) -> InitStackConfig:
+    owner = owner or _discover_username()
+    if owner is None:
+        return init_stack_config
+
+    workload_clusters: dict[str, WorkloadClusterConfig] = {}
+    for name, workload_cluster in init_stack_config.tenants.workload_clusters.items():
+        if isinstance(workload_cluster, AKSWorkloadClusterConfig):
+            parameters = workload_cluster.parameters
+            additional_tags = dict(parameters.additional_tags)
+            if not _has_owner_tag(additional_tags):
+                workload_cluster = workload_cluster.model_copy(
+                    update={
+                        "parameters": parameters.model_copy(
+                            update={
+                                "additional_tags": {
+                                    **additional_tags,
+                                    _OWNER_TAG: owner,
+                                }
+                            }
+                        )
+                    }
+                )
+        workload_clusters[name] = workload_cluster
+
+    return init_stack_config.model_copy(
+        update={
+            "tenants": init_stack_config.tenants.model_copy(
+                update={"workload_clusters": workload_clusters}
+            )
+        }
+    )
+
+
+def _discover_username() -> str | None:
+    for env_var in ("USER", "LOGNAME", "USERNAME"):
+        value = os.environ.get(env_var)
+        if value is not None and value.strip():
+            return value.strip()
+
+    try:
+        value = getpass.getuser()
+    except Exception:
+        return None
+    return value.strip() or None
+
+
+def _has_owner_tag(additional_tags: dict[str, str]) -> bool:
+    return any(tag.casefold() == _OWNER_TAG.casefold() for tag in additional_tags)
 
 
 def _export_azure_config_outputs(init_stack_config: InitStackConfig) -> None:

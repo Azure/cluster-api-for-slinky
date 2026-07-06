@@ -5,7 +5,9 @@ from __future__ import annotations
 import pytest
 from stack import (
     _azure_infrastructure_enabled,
+    _discover_username,
     _with_local_registry_config,
+    _with_owner_tag_config,
 )
 from stacks.control_plane.control_plane_config import (
     AzureInfrastructureProviderConfig,
@@ -151,3 +153,78 @@ def test_local_registry_config_is_applied_to_local_workload_clusters_only() -> N
             },
         }
     }
+
+
+def test_owner_tag_config_is_applied_to_aks_workload_clusters_only() -> None:
+    config = InitStackConfig(
+        tenants=TenantsConfig(
+            workload_clusters={
+                "local": LocalWorkloadClusterConfig(),
+                "caps-aks": AKSWorkloadClusterConfig(
+                    parameters=AzureWorkloadSpec(
+                        subscription_id=_SUBSCRIPTION_ID,
+                        location="westus2",
+                        resource_group="rg-capz-mi-dev2",
+                        additional_tags={"costCenter": "hpc"},
+                    )
+                ),
+            }
+        )
+    )
+
+    updated = _with_owner_tag_config(config, owner="zheyushen")
+
+    assert updated.tenants.to_config() == {
+        "workloadClusters": {
+            "local": {"className": "local"},
+            "caps-aks": {
+                "className": "aks",
+                "parameters": {
+                    "subscriptionId": _SUBSCRIPTION_ID,
+                    "location": "westus2",
+                    "resourceGroup": "rg-capz-mi-dev2",
+                    "additionalTags": {
+                        "costCenter": "hpc",
+                        "Owner": "zheyushen",
+                    },
+                },
+            },
+        }
+    }
+
+
+def test_owner_tag_config_preserves_explicit_owner_tag() -> None:
+    config = InitStackConfig(
+        tenants=TenantsConfig(
+            workload_clusters={
+                "caps-aks": AKSWorkloadClusterConfig(
+                    parameters=AzureWorkloadSpec(
+                        subscription_id=_SUBSCRIPTION_ID,
+                        location="westus2",
+                        resource_group="rg-capz-mi-dev2",
+                        additional_tags={"owner": "platform"},
+                    )
+                ),
+            }
+        )
+    )
+
+    updated = _with_owner_tag_config(config, owner="zheyushen")
+
+    workload_cluster = updated.tenants.workload_clusters["caps-aks"]
+    assert isinstance(workload_cluster, AKSWorkloadClusterConfig)
+    assert workload_cluster.parameters.additional_tags == {"owner": "platform"}
+
+
+def test_discover_username_prefers_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("USER", " zheyushen ")
+    monkeypatch.setenv("LOGNAME", "someone-else")
+
+    assert _discover_username() == "zheyushen"
+
+
+def test_discover_username_falls_back_to_logname(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("USER", raising=False)
+    monkeypatch.setenv("LOGNAME", "zheyushen")
+
+    assert _discover_username() == "zheyushen"
