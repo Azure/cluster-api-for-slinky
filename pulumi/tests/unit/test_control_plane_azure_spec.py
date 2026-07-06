@@ -230,7 +230,6 @@ def test_build_and_parse_control_plane_kind_round_trip_minimum_fields() -> None:
                     },
                 },
             },
-            "deployments": {"awx": {"enabled": False}},
         },
     }
 

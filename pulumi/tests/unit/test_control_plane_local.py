@@ -21,23 +21,23 @@ from stacks.control_plane.control_plane_kind import (
 from stacks.control_plane.azure._imds_preflight_job import IMDSPreflightJobOutputs
 
 
-def test_control_plane_kind_config_defaults_awx_enabled() -> None:
-    assert ControlPlaneKindConfig() == ControlPlaneKindConfig()
+def test_control_plane_kind_config_defaults_awx_disabled() -> None:
+    assert ControlPlaneKindConfig().deployments.awx.enabled is False
 
 
 def test_control_plane_kind_config_reads_awx_enabled() -> None:
     parsed = ControlPlaneKindConfig.model_validate(
-        {"deployments": {"awx": {"enabled": False}}}
+        {"deployments": {"awx": {"enabled": True}}}
     )
 
     assert parsed == ControlPlaneKindConfig.model_validate(
         {
             "deployments": ControlPlaneDeploymentsConfig.model_validate(
-                {"awx": {"enabled": False}}
+                {"awx": {"enabled": True}}
             )
         }
     )
-    assert parsed.deployments.awx.enabled is False
+    assert parsed.deployments.awx.enabled is True
 
 
 def test_control_plane_kind_config_rejects_non_bool_awx_enabled() -> None:
@@ -193,7 +193,7 @@ def test_control_plane_local_skips_awx_when_disabled(monkeypatch: Any) -> None:
     assert control_plane._test_outputs["awx"] is None
 
 
-def test_control_plane_local_instantiates_awx_by_default(monkeypatch: Any) -> None:
+def test_control_plane_local_instantiates_awx_when_enabled(monkeypatch: Any) -> None:
     _patch_pulumi_component(monkeypatch)
     _patch_local_children(monkeypatch)
 
@@ -201,7 +201,9 @@ def test_control_plane_local_instantiates_awx_by_default(monkeypatch: Any) -> No
         "control-plane",
         flux_source_namespace="pko-system",
         flux_source_name="gitops-source",
-        config=ControlPlaneKindConfig(),
+        config=ControlPlaneKindConfig.model_validate(
+            {"deployments": {"awx": {"enabled": True}}}
+        ),
     )
 
     assert len(_FakeManagementAWXControlPlane.calls) == 1

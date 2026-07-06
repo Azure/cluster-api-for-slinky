@@ -163,7 +163,7 @@ class ControlPlaneAWXConfig(EnabledConfig):
 
 
 class ControlPlaneDeploymentsConfig(PulumiConfigModel):
-    awx: ControlPlaneAWXConfig = ControlPlaneAWXConfig(enabled=True)
+    awx: ControlPlaneAWXConfig = ControlPlaneAWXConfig(enabled=False)
 
 
 class ControlPlaneKindConfig(PulumiConfigModel):
