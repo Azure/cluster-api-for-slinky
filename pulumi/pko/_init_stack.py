@@ -125,6 +125,7 @@ class InitStack(pulumi.ComponentResource):
                         skip_in_cluster_preflight=(
                             azure_config.skip_in_cluster_preflight
                         ),
+                        capz_vmss_flex_image=azure_config.capz_vmss_flex_image,
                     )
                     if azure_config is not None
                     else None

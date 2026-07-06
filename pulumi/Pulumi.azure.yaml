@@ -6,3 +6,8 @@ config:
   ca4s-infra:azureSubscriptionId: d2c9544f-4329-4642-b73d-020e7fef844f
   ca4s-infra:azureLocation: westus2
   ca4s-infra:azureResourceGroup: rg-capz-mi-dev2
+  # Opt-in CAPZ VMSS-Flex fork: build+preload the image with
+  # scripts/build-capz-vmss-flex.sh, then the azure InfrastructureProvider keeps
+  # upstream v1.24.1 but runs this fork image + patches virtualMachineScaleSetID
+  # into the AzureMachine(Template) CRDs. Remove this key for plain upstream CAPZ.
+  ca4s-infra:capzVmssFlexImage: local/capz-vmss-flex-amd64:v1.24.1-vmss

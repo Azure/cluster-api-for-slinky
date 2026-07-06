@@ -53,11 +53,13 @@ class _FakeClusterAPIOperator:
         *,
         cert_manager: _FakeCertManager,
         infrastructure_providers: tuple[str, ...] = ("docker",),
+        azure_vmss_flex_image: str | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         self.name = name
         self.cert_manager = cert_manager
         self.infrastructure_providers = infrastructure_providers
+        self.azure_vmss_flex_image = azure_vmss_flex_image
         self.opts = opts
 
 

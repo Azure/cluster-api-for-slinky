@@ -18,6 +18,8 @@ present.
 
 from __future__ import annotations
 
+import json
+
 import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
@@ -115,6 +117,69 @@ _INFRASTRUCTURE_PROVIDERS: dict[str, dict[str, object]] = {
     },
 }
 
+# --- CAPZ VMSS-Flex fork overlay -------------------------------------------------
+# The mentor's fork adds ``AzureMachine(.Template).spec.virtualMachineScaleSetID`` so
+# self-managed worker VMs can be placed into a pre-existing BYO VMSS *Flexible* (for
+# single-partition InfiniBand co-location). Rather than fight the operator (scale it
+# to 0, hand-swap the image, jq-inject the CRD field -- see
+# scripts/deploy-capz-vmss-flex.sh), we let the operator install the fork
+# declaratively: keep the upstream CAPZ fetch/version and only (a) point the manager
+# container at the preloaded fork image and (b) patch the field into the two CAPZ
+# CRDs. The image is built + preloaded out-of-band by scripts/build-capz-vmss-flex.sh.
+_AZUREMACHINE_CRD = "azuremachines.infrastructure.cluster.x-k8s.io"
+_AZUREMACHINETEMPLATE_CRD = "azuremachinetemplates.infrastructure.cluster.x-k8s.io"
+_VMSS_FLEX_FIELD: dict[str, object] = {
+    "type": "string",
+    "description": (
+        "VirtualMachineScaleSetID specifies the VMSS Flex resource id that the "
+        "virtual machine should be created in (CAPZ VMSS-Flex backport)."
+    ),
+}
+# Both CRDs expose a single served/stored version (v1beta1), so the JSON pointer
+# ``/spec/versions/0/...`` is stable. The AzureMachineTemplate path is one level
+# deeper (``spec.template.spec``) than AzureMachine (``spec``).
+_VMSS_FLEX_FIELD_PATHS: dict[str, str] = {
+    _AZUREMACHINE_CRD: (
+        "/spec/versions/0/schema/openAPIV3Schema/properties/spec/properties"
+        "/virtualMachineScaleSetID"
+    ),
+    _AZUREMACHINETEMPLATE_CRD: (
+        "/spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/template"
+        "/properties/spec/properties/virtualMachineScaleSetID"
+    ),
+}
+
+
+def _azure_vmss_flex_provider_spec(image_ref: str) -> dict[str, object]:
+    """Extra ``InfrastructureProvider`` spec that swaps in the VMSS-Flex fork.
+
+    Returns the ``deployment`` (manager image override) and ``patches`` (RFC6902
+    ``add`` of ``virtualMachineScaleSetID`` into the AzureMachine + AzureMachineTemplate
+    CRDs) to merge onto the upstream azure provider CR. ``spec.version`` stays on the
+    upstream pin so the operator still fetches the real release's components/metadata;
+    only the manager image and the two CRD schemas are altered.
+    """
+
+    return {
+        "deployment": {
+            "containers": [
+                {"name": "manager", "imageUrl": image_ref},
+            ],
+        },
+        "patches": [
+            {
+                "target": {
+                    "kind": "CustomResourceDefinition",
+                    "name": crd_name,
+                },
+                "patch": json.dumps(
+                    [{"op": "add", "path": path, "value": _VMSS_FLEX_FIELD}]
+                ),
+            }
+            for crd_name, path in _VMSS_FLEX_FIELD_PATHS.items()
+        ],
+    }
+
 
 class ClusterAPIOperator(pulumi.ComponentResource):
     """Install Cluster API Operator and the requested CAPI providers.
@@ -126,6 +191,12 @@ class ClusterAPIOperator(pulumi.ComponentResource):
         :data:`_INFRASTRUCTURE_PROVIDERS`. Defaults to ``("docker",)`` so
         the existing local control plane keeps its current behavior
         without any callsite change.
+      * ``azure_vmss_flex_image`` — optional container image reference for the
+        CAPZ VMSS-Flex fork. When set (and ``"azure"`` is among the requested
+        infrastructure providers), the azure ``InfrastructureProvider`` keeps the
+        upstream version/fetch but overrides the manager image and patches
+        ``virtualMachineScaleSetID`` into the AzureMachine(Template) CRDs. Defaults
+        to ``None`` (plain upstream CAPZ).
 
     Outputs:
       * ``namespace`` — namespace containing the operator deployment.
@@ -151,6 +222,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
         *,
         cert_manager: pulumi.Resource | None = None,
         infrastructure_providers: tuple[str, ...] = ("docker",),
+        azure_vmss_flex_image: str | None = None,
         provider: k8s.Provider | None = None,
         opts: ResourceOptions | None = None,
     ) -> None:
@@ -273,6 +345,11 @@ class ClusterAPIOperator(pulumi.ComponentResource):
                 namespace_resource=infrastructure_namespaces[infra_name],
                 dependencies=[release, *operator_webhooks],
                 provider=provider,
+                extra_spec=(
+                    _azure_vmss_flex_provider_spec(azure_vmss_flex_image)
+                    if infra_name == "azure" and azure_vmss_flex_image
+                    else None
+                ),
             )
             for infra_name in infrastructure_providers
         }
@@ -383,7 +460,16 @@ class ClusterAPIOperator(pulumi.ComponentResource):
         dependencies: list[pulumi.Resource],
         provider: k8s.Provider | None,
         version: str = CAPI_PROVIDER_VERSION,
+        extra_spec: dict[str, object] | None = None,
     ) -> k8s.apiextensions.CustomResource:
+        spec: dict[str, object] = {
+            "version": version,
+            "manager": {
+                "featureGates": _PROVIDER_FEATURE_GATES,
+            },
+        }
+        if extra_spec:
+            spec.update(extra_spec)
         return k8s.apiextensions.CustomResource(
             f"{parent_name}-{resource_name}",
             api_version=_PROVIDER_API_VERSION,
@@ -393,12 +479,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
                 "namespace": namespace,
                 "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_READY},
             },
-            spec={
-                "version": version,
-                "manager": {
-                    "featureGates": _PROVIDER_FEATURE_GATES,
-                },
-            },
+            spec=spec,
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,

@@ -47,6 +47,7 @@ class KindAzureControlPlaneSpec:
     subscription_id: str
     allowed_namespaces: list[str] | None = None
     skip_in_cluster_preflight: bool = False
+    capz_vmss_flex_image: str | None = None
 
 
 @dataclass(frozen=True)
@@ -243,6 +244,9 @@ class ControlPlaneKind(pulumi.ComponentResource):
             "cluster-api",
             cert_manager=cert_manager,
             infrastructure_providers=spec.infrastructure_providers,
+            azure_vmss_flex_image=(
+                spec.azure.capz_vmss_flex_image if spec.azure is not None else None
+            ),
             opts=child_options(),
         )
 

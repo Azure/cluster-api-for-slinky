@@ -247,6 +247,97 @@ def test_parse_rejects_non_bool_skip_in_cluster_preflight() -> None:
         _parse_azure_payload(payload)
 
 
+def test_capz_vmss_flex_image_defaults_to_none() -> None:
+    # Absent means "plain upstream CAPZ" — the fork overlay is opt-in.
+    parsed = _parse_azure_payload(_full_payload())
+    assert parsed.capz_vmss_flex_image is None
+
+
+def test_capz_vmss_flex_image_round_trips() -> None:
+    image = "local/capz-vmss-flex-amd64:v1.24.1-vmss"
+    built = build_control_plane_kind_azure_child_config(
+        client_id=_CLIENT_ID,
+        principal_id=_PRINCIPAL_ID,
+        tenant_id=_TENANT_ID,
+        subscription_id=_SUBSCRIPTION_ID,
+        capz_vmss_flex_image=image,
+    )
+
+    control_plane = built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
+    assert isinstance(control_plane, dict)
+    assert control_plane["azure"] == {
+        "clientId": _CLIENT_ID,
+        "principalId": _PRINCIPAL_ID,
+        "tenantId": _TENANT_ID,
+        "subscriptionId": _SUBSCRIPTION_ID,
+        "capzVmssFlexImage": image,
+    }
+    parsed = parse_control_plane_kind_config(control_plane)
+    assert parsed.azure is not None
+    assert parsed.azure.capz_vmss_flex_image == image
+
+
+def test_build_omits_capz_vmss_flex_image_when_none() -> None:
+    built = build_control_plane_kind_azure_child_config(
+        client_id=_CLIENT_ID,
+        principal_id=_PRINCIPAL_ID,
+        tenant_id=_TENANT_ID,
+        subscription_id=_SUBSCRIPTION_ID,
+        capz_vmss_flex_image=None,
+    )
+
+    control_plane = built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
+    assert isinstance(control_plane, dict)
+    azure = control_plane["azure"]
+    assert isinstance(azure, dict)
+    assert "capzVmssFlexImage" not in azure
+
+
+@pytest.mark.parametrize("bad_value", ["", 123])
+def test_parse_rejects_invalid_capz_vmss_flex_image(bad_value: object) -> None:
+    payload = _full_payload(capzVmssFlexImage=bad_value)
+
+    with pytest.raises(
+        ValueError, match=r"capzVmssFlexImage must be a non-empty string"
+    ):
+        _parse_azure_payload(payload)
+
+
+def test_azure_vmss_flex_provider_spec_overlay_shape() -> None:
+    # The fork overlay must override only the manager image and inject the
+    # virtualMachineScaleSetID field into the two CAPZ CRDs (single v1beta1
+    # version => stable /spec/versions/0/... pointer). ``version`` is left to
+    # the upstream pin, so it is not part of this overlay.
+    import json
+
+    from stacks.control_plane.capi._operator import (
+        _AZUREMACHINE_CRD,
+        _AZUREMACHINETEMPLATE_CRD,
+        _azure_vmss_flex_provider_spec,
+    )
+
+    image = "local/capz-vmss-flex-amd64:v1.24.1-vmss"
+    overlay = _azure_vmss_flex_provider_spec(image)
+
+    assert overlay["deployment"] == {
+        "containers": [{"name": "manager", "imageUrl": image}],
+    }
+
+    patches = overlay["patches"]
+    assert isinstance(patches, list)
+    assert {p["target"]["name"] for p in patches} == {
+        _AZUREMACHINE_CRD,
+        _AZUREMACHINETEMPLATE_CRD,
+    }
+    for patch in patches:
+        assert patch["target"]["kind"] == "CustomResourceDefinition"
+        ops = json.loads(patch["patch"])
+        assert len(ops) == 1
+        assert ops[0]["op"] == "add"
+        assert ops[0]["path"].endswith("/virtualMachineScaleSetID")
+        assert ops[0]["value"]["type"] == "string"
+
+
 def test_infrastructure_providers_round_trip() -> None:
     built = build_control_plane_kind_azure_child_config(
         client_id=_CLIENT_ID,

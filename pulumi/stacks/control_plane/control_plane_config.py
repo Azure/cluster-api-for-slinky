@@ -19,6 +19,7 @@ _CONFIG_SUBSCRIPTION_ID = "subscriptionId"
 _CONFIG_ALLOWED_NAMESPACES = "allowedNamespaces"
 _CONFIG_SKIP_IN_CLUSTER_PREFLIGHT = "skipInClusterPreflight"
 _CONFIG_INFRASTRUCTURE_PROVIDERS = "infrastructureProviders"
+_CONFIG_CAPZ_VMSS_FLEX_IMAGE = "capzVmssFlexImage"
 _GUID_PATTERN = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
@@ -38,6 +39,7 @@ class ControlPlaneAzureConfig:
     allowed_namespaces: list[str] | None = None
     infrastructure_providers: tuple[str, ...] = ("azure",)
     skip_in_cluster_preflight: bool = False
+    capz_vmss_flex_image: str | None = None
 
 
 @dataclass(frozen=True)
@@ -191,11 +193,20 @@ def _parse_control_plane_azure_config(
             f"got {type(skip_field).__name__}"
         )
 
+    capz_vmss_flex_image = value.get(_CONFIG_CAPZ_VMSS_FLEX_IMAGE)
+    if capz_vmss_flex_image is not None and (
+        not isinstance(capz_vmss_flex_image, str) or not capz_vmss_flex_image
+    ):
+        raise ValueError(
+            f"{field_path}.{_CONFIG_CAPZ_VMSS_FLEX_IMAGE} must be a non-empty string"
+        )
+
     return ControlPlaneAzureConfig(
         **fields,
         allowed_namespaces=allowed_namespaces,
         infrastructure_providers=infrastructure_providers,
         skip_in_cluster_preflight=bool(skip_field),
+        capz_vmss_flex_image=capz_vmss_flex_image,
     )
 
 
@@ -208,6 +219,7 @@ def _build_control_plane_azure_payload(
     allowed_namespaces: list[str] | None = None,
     infrastructure_providers: tuple[str, ...] = ("azure",),
     skip_in_cluster_preflight: bool = False,
+    capz_vmss_flex_image: str | None = None,
 ) -> dict[str, object]:
     child: dict[str, object] = {
         _CONFIG_CLIENT_ID: client_id,
@@ -221,6 +233,8 @@ def _build_control_plane_azure_payload(
         child[_CONFIG_INFRASTRUCTURE_PROVIDERS] = list(infrastructure_providers)
     if skip_in_cluster_preflight:
         child[_CONFIG_SKIP_IN_CLUSTER_PREFLIGHT] = True
+    if capz_vmss_flex_image is not None:
+        child[_CONFIG_CAPZ_VMSS_FLEX_IMAGE] = capz_vmss_flex_image
     return child
 
 
@@ -246,6 +260,7 @@ def build_control_plane_kind_azure_child_config(
     allowed_namespaces: list[str] | None = None,
     infrastructure_providers: tuple[str, ...] = ("azure",),
     skip_in_cluster_preflight: bool = False,
+    capz_vmss_flex_image: str | None = None,
     enable_awx: bool = False,
 ) -> dict[str, object]:
     return build_control_plane_kind_child_config(
@@ -258,5 +273,6 @@ def build_control_plane_kind_azure_child_config(
             allowed_namespaces=allowed_namespaces,
             infrastructure_providers=infrastructure_providers,
             skip_in_cluster_preflight=skip_in_cluster_preflight,
+            capz_vmss_flex_image=capz_vmss_flex_image,
         ),
     )

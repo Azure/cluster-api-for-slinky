@@ -158,6 +158,7 @@ def _azure_child_config(
             skip_in_cluster_preflight=config.get_bool(
                 "skip_in_cluster_preflight", False
             ),
+            capz_vmss_flex_image=config.get("capzVmssFlexImage"),
         ),
         **build_aks_workload_cluster_child_config(
             location=azure_location,
