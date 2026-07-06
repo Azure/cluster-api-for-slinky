@@ -15,6 +15,7 @@ This module is intentionally shared by both sides of that handoff:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 import pulumi
@@ -47,7 +48,8 @@ class InitStackConfig(PulumiConfigModel):
     tenants: TenantsConfig = TenantsConfig()
 
 
-class InitStackInputs(PulumiConfigModel):
+@dataclass(frozen=True)
+class InitStackInputs:
     stack_spec: StackCRConfig
     init_stack_config: InitStackConfig
 
