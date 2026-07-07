@@ -85,9 +85,9 @@ def _pull_images(cluster_name: str, images: Sequence[str]) -> dict[str, object]:
     return {
         "cluster_name": cluster_name,
         "kind_cluster_name": kind_cluster_name,
-        "images": tuple(images),
-        "node_names": tuple(nodes),
-        "pulled_images": tuple(pulled_images),
+        "images": list(images),
+        "node_names": list(nodes),
+        "pulled_images": pulled_images,
     }
 
 
@@ -135,7 +135,7 @@ class _KindImageCacheProvider(ResourceProvider):
         except RuntimeError:
             return ReadResult(id_=None, outs={})
         outs = dict(props)
-        outs["node_names"] = tuple(nodes)
+        outs["node_names"] = nodes
         return ReadResult(id_=id_, outs=outs)
 
 
@@ -143,8 +143,8 @@ class KindImageCache(Resource):
     """Pull images into all kind nodes so later pod scheduling is cache-hot."""
 
     kind_cluster_name: Output[str]
-    node_names: Output[tuple[str, ...]]
-    pulled_images: Output[tuple[str, ...]]
+    node_names: Output[list[str]]
+    pulled_images: Output[list[str]]
 
     def __init__(
         self,
