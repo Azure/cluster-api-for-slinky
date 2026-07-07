@@ -59,6 +59,7 @@ from __future__ import annotations
 import os
 import base64
 import time
+from collections.abc import Sequence
 from typing import Any, Mapping, Optional
 
 import pulumi
@@ -363,6 +364,82 @@ def _decode_secret_data_key(data: Mapping[str, str] | None, key: str) -> str:
         available = sorted(data.keys()) if data else []
         raise ValueError(f"Secret is missing key {key!r}; available keys: {available!r}")
     return base64.b64decode(data[key]).decode("utf-8")
+
+
+def _secret_data_key_output(
+    name: str,
+    *,
+    secret_name: str,
+    secret_key: str,
+    provider: k8s.Provider,
+    parent: pulumi.Resource,
+    depends_on: Sequence[pulumi.Resource],
+    strip: bool = False,
+    secret: bool = False,
+) -> Output[str]:
+    if pulumi.runtime.is_dry_run():
+        value = Output.from_input(pulumi.UNKNOWN)
+    else:
+        lookup = k8s.core.v1.Secret.get(
+            name,
+            id=f"{_GITEA_NAMESPACE}/{secret_name}",
+            opts=ResourceOptions(
+                parent=parent,
+                provider=provider,
+                depends_on=list(depends_on),
+            ),
+        )
+        value = lookup.data.apply(
+            lambda data: _decode_secret_data_key(data, secret_key).strip()
+            if strip
+            else _decode_secret_data_key(data, secret_key)
+        )
+    return Output.secret(value) if secret else value
+
+
+def _gitea_external_endpoints(
+    name: str,
+    *,
+    provider: k8s.Provider,
+    parent: pulumi.Resource,
+    depends_on: pulumi.Resource,
+) -> tuple[Output[str], Output[str]]:
+    if pulumi.runtime.is_dry_run():
+        return (
+            Output.from_input(pulumi.UNKNOWN),
+            Output.from_input(pulumi.UNKNOWN),
+        )
+
+    gitea_http_svc = k8s.core.v1.Service.get(
+        f"{name}-gitea-http-lookup",
+        id=f"{_GITEA_NAMESPACE}/{_GITEA_HTTP_SERVICE}",
+        opts=ResourceOptions(
+            parent=parent,
+            provider=provider,
+            depends_on=[depends_on],
+        ),
+    )
+    gitea_ssh_svc = k8s.core.v1.Service.get(
+        f"{name}-gitea-ssh-lookup",
+        id=f"{_GITEA_NAMESPACE}/{_GITEA_SSH_SERVICE}",
+        opts=ResourceOptions(
+            parent=parent,
+            provider=provider,
+            depends_on=[depends_on],
+        ),
+    )
+
+    def _build_external_base(status: Any) -> str:
+        return f"http://{_load_balancer_host(status)}:{_GITEA_HTTP_PORT}"
+
+    def _load_balancer_host(status: Any) -> str:
+        entry = status.load_balancer.ingress[0]
+        return entry.ip or entry.hostname
+
+    return (
+        gitea_http_svc.status.apply(_build_external_base),
+        gitea_ssh_svc.status.apply(_load_balancer_host),
+    )
 
 
 class _GiteaAPIReadinessProvider(ResourceProvider):
@@ -812,45 +889,15 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             ),
         )
 
-        # Look the chart-created Service up so we can read the LoadBalancer
-        # IP that cloud-provider-kind assigned to it. ``Service.get`` is
-        # the canonical "import existing k8s resource into Pulumi state"
-        # call; combined with ``depends_on=[gitea]`` it correctly defers
-        # the lookup until after the Helm release has finished. The chart
-        # annotates both LoadBalancer Services with ``pulumi.com/waitFor``
-        # so the Helm release does not complete until the host-reachable IPs
-        # are assigned.
-        gitea_http_svc = k8s.core.v1.Service.get(
-            f"{name}-gitea-http-lookup",
-            id=f"{_GITEA_NAMESPACE}/{_GITEA_HTTP_SERVICE}",
-            opts=ResourceOptions(
-                parent=self,
-                provider=k8s_provider,
-                depends_on=[gitea],
-            ),
+        # Resolve the LB ingress to host-reachable endpoints. During preview,
+        # the chart-created Services may not exist yet after an atomic rollback;
+        # real updates still read them after the Helm release completes.
+        external_base, external_ssh_host = _gitea_external_endpoints(
+            name,
+            provider=k8s_provider,
+            parent=self,
+            depends_on=gitea,
         )
-        gitea_ssh_svc = k8s.core.v1.Service.get(
-            f"{name}-gitea-ssh-lookup",
-            id=f"{_GITEA_NAMESPACE}/{_GITEA_SSH_SERVICE}",
-            opts=ResourceOptions(
-                parent=self,
-                provider=k8s_provider,
-                depends_on=[gitea],
-            ),
-        )
-
-        # Resolve the LB ingress to host-reachable endpoints. The chart-level
-        # ``pulumi.com/waitFor`` annotations make missing ingress data a hard
-        # contract violation here rather than something to paper over.
-        def _build_external_base(status: Any) -> str:
-            return f"http://{_load_balancer_host(status)}:{_GITEA_HTTP_PORT}"
-
-        def _load_balancer_host(status: Any) -> str:
-            entry = status.load_balancer.ingress[0]
-            return entry.ip or entry.hostname
-
-        external_base = gitea_http_svc.status.apply(_build_external_base)
-        external_ssh_host = gitea_ssh_svc.status.apply(_load_balancer_host)
 
         gitea_api_ready = GiteaAPIReadiness(
             f"{name}-api-ready",
@@ -885,17 +932,14 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             ),
         )
 
-        user_public_key_lookup = k8s.core.v1.Secret.get(
+        user_public_key = _secret_data_key_output(
             f"{name}-ssh-user-public-key-lookup",
-            id=f"{_GITEA_NAMESPACE}/{_USER_PUBLIC_KEY_SECRET}",
-            opts=ResourceOptions(
-                parent=self,
-                provider=k8s_provider,
-                depends_on=[user_public_key_secret],
-            ),
-        )
-        user_public_key = user_public_key_lookup.data.apply(
-            lambda data: _decode_secret_data_key(data, _USER_PUBLIC_KEY_SECRET_KEY).strip()
+            secret_name=_USER_PUBLIC_KEY_SECRET,
+            secret_key=_USER_PUBLIC_KEY_SECRET_KEY,
+            provider=k8s_provider,
+            parent=self,
+            depends_on=[user_public_key_secret],
+            strip=True,
         )
 
         # Upload the ESO-projected public key through the generated Gitea SDK.
@@ -914,31 +958,22 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             ),
         )
 
-        user_key_lookup = k8s.core.v1.Secret.get(
+        user_private_key = _secret_data_key_output(
             f"{name}-ssh-user-key-lookup",
-            id=f"{_GITEA_NAMESPACE}/{_USER_KEY_SECRET}",
-            opts=ResourceOptions(
-                parent=self,
-                provider=k8s_provider,
-                depends_on=[user_key_secret],
-            ),
+            secret_name=_USER_KEY_SECRET,
+            secret_key=_USER_PRIVATE_KEY_SECRET_KEY,
+            provider=k8s_provider,
+            parent=self,
+            depends_on=[user_key_secret],
+            secret=True,
         )
-        host_key_lookup = k8s.core.v1.Secret.get(
+        host_public_key = _secret_data_key_output(
             f"{name}-ssh-host-key-lookup",
-            id=f"{_GITEA_NAMESPACE}/{_HOST_KEY_SECRET}",
-            opts=ResourceOptions(
-                parent=self,
-                provider=k8s_provider,
-                depends_on=[host_key_secret],
-            ),
-        )
-        user_private_key = Output.secret(
-            user_key_lookup.data.apply(
-                lambda data: _decode_secret_data_key(data, _USER_PRIVATE_KEY_SECRET_KEY)
-            )
-        )
-        host_public_key = host_key_lookup.data.apply(
-            lambda data: _decode_secret_data_key(data, _HOST_PUBLIC_KEY_SECRET_KEY)
+            secret_name=_HOST_KEY_SECRET,
+            secret_key=_HOST_PUBLIC_KEY_SECRET_KEY,
+            provider=k8s_provider,
+            parent=self,
+            depends_on=[host_key_secret],
         )
 
         sync = GitSync(
