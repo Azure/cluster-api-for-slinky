@@ -374,17 +374,19 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     replicas=pool.replicas,
                 ),
                 opts=pulumi.ResourceOptions.merge(
-                    child_opts(
-                        depends_on=[
-                            cluster,
-                            azure_managed_control_plane,
-                            azure_managed_machine_pool,
-                        ]
-                    ),
-                    pulumi.ResourceOptions(
-                        custom_timeouts=pulumi.CustomTimeouts(
-                            delete=_AKS_DELETE_TIMEOUT
-                        )
+                    pulumi.ResourceOptions.merge(
+                        child_opts(
+                            depends_on=[
+                                cluster,
+                                azure_managed_control_plane,
+                                azure_managed_machine_pool,
+                            ]
+                        ),
+                        pulumi.ResourceOptions(
+                            custom_timeouts=pulumi.CustomTimeouts(
+                                delete=_AKS_DELETE_TIMEOUT
+                            )
+                        ),
                     ),
                     delete_with_cluster_opts,
                 ),
