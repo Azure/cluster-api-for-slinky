@@ -181,6 +181,7 @@ class PKOBootstrap(pulumi.ComponentResource):
             api_version="pulumi.com/v1",
             kind="Stack",
             metadata={
+                "name": f"{name}-init",
                 "namespace": PKO_NAMESPACE,
                 "annotations": {
                     _WAIT_FOR_ANNOTATION: _WAIT_FOR_READY,
