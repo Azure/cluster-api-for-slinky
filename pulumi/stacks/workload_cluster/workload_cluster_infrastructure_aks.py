@@ -12,6 +12,11 @@ from pulumi import Output, ResourceOptions
 from pydantic import StrictBool
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
+from stacks.kubernetes_annotations import (
+    PULUMI_SKIP_AWAIT_ANNOTATION,
+    foreground_delete_annotations,
+    pulumi_wait_for,
+)
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     CONTROLLER_NODE_TYPE,
     NODE_TYPE_LABEL,
@@ -47,11 +52,7 @@ _SYSTEM_NODE_POOL_MODE = "System"
 _USER_NODE_POOL_MODE = "User"
 _AKS_CONTROLLER_NODE_LABELS = {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
 
-_SKIP_AWAIT_ANNOTATION = "pulumi.com/skipAwait"
-_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_STATUS_READY = "jsonpath={.status.ready}=true"
-_DELETION_PROPAGATION_ANNOTATION = "pulumi.com/deletionPropagationPolicy"
-_DELETE_FOREGROUND = "Foreground"
 _AKS_CONTROL_PLANE_TIMEOUT = "60m"
 _AKS_DELETE_TIMEOUT = "60m"
 _AMCP_IMMUTABLE_DEFAULTED_FIELDS = ["spec.sshPublicKey"]
@@ -66,15 +67,6 @@ class AKSNodePoolSpec(PulumiConfigModel):
     replicas: StrictPositiveInt
     controller: StrictBool = False
     autoscaling_bounds: tuple[StrictPositiveInt, StrictPositiveInt] | None = None
-
-
-def _foreground_delete_annotations(
-    annotations: Mapping[str, str] | None = None,
-) -> dict[str, str]:
-    return {
-        **(dict(annotations) if annotations else {}),
-        _DELETION_PROPAGATION_ANNOTATION: _DELETE_FOREGROUND,
-    }
 
 
 def _resource_name(instance: str, suffix: str | None = None) -> str:
@@ -284,7 +276,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": _foreground_delete_annotations(),
+                "annotations": foreground_delete_annotations(),
             },
             spec={},
             opts=child_opts(),
@@ -299,8 +291,8 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "namespace": _NAMESPACE,
                 # CAPZ cannot make AMCP ready until at least one System AMMP exists.
                 # The explicit ready patch below waits after machine pools are created.
-                "annotations": _foreground_delete_annotations(
-                    {_SKIP_AWAIT_ANNOTATION: "true"}
+                "annotations": foreground_delete_annotations(
+                    {PULUMI_SKIP_AWAIT_ANNOTATION: "true"}
                 ),
             },
             spec=_azure_managed_control_plane_spec(
@@ -332,7 +324,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": _foreground_delete_annotations(),
+                "annotations": foreground_delete_annotations(),
             },
             spec=_cluster_spec(
                 control_plane_name=cluster_name,
@@ -367,7 +359,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 metadata={
                     "name": cr_pool_name,
                     "namespace": _NAMESPACE,
-                    "annotations": _foreground_delete_annotations(),
+                    "annotations": foreground_delete_annotations(),
                 },
                 spec=_azure_managed_machine_pool_spec(
                     mode=pool_mode,
@@ -397,7 +389,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 metadata={
                     "name": cr_pool_name,
                     "namespace": _NAMESPACE,
-                    "annotations": _foreground_delete_annotations(),
+                    "annotations": foreground_delete_annotations(),
                 },
                 spec=_machine_pool_spec(
                     cluster_name=cluster_name,
@@ -433,7 +425,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_STATUS_READY},
+                "annotations": pulumi_wait_for(_WAIT_FOR_STATUS_READY),
             },
             opts=pulumi.ResourceOptions.merge(
                 child_opts(depends_on=machine_pools),

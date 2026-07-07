@@ -22,6 +22,8 @@ import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
+from stacks.kubernetes_annotations import pulumi_wait_for
+
 from ._operator import AWX_NAMESPACE
 
 
@@ -33,7 +35,6 @@ AWX_LOADBALANCER_PORT = 80
 # AWX Operator defaults to an 8Gi Postgres PVC. That's sensible for a
 # persistent install but unnecessarily chunky for the local kind loop.
 AWX_POSTGRES_STORAGE_SIZE = "2Gi"
-_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_AWX_SUCCESSFUL = "condition=Successful"
 
 
@@ -72,7 +73,7 @@ class AWXInstance(pulumi.ComponentResource):
             metadata={
                 "name": AWX_INSTANCE_NAME,
                 "namespace": AWX_NAMESPACE,
-                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_AWX_SUCCESSFUL},
+                "annotations": pulumi_wait_for(_WAIT_FOR_AWX_SUCCESSFUL),
             },
             spec={
                 "admin_user": AWX_ADMIN_USER,

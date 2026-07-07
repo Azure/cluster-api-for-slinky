@@ -80,6 +80,7 @@ import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
 from lib.outputs import CompositeOutput
+from stacks.kubernetes_annotations import pulumi_wait_for
 
 
 # Image pinned by tag (not digest) to match what the host-side runbook
@@ -108,7 +109,6 @@ _CAPZ_SYSTEM_NAMESPACE = "capz-system"
 # successful completion (vs. ``Failed`` on terminal failure). With
 # ``backoffLimit: 0`` + ``restartPolicy: Never`` there is no retry, so
 # the first pod's exit code is decisive.
-_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_COMPLETE = "condition=Complete"
 
 # IMDS endpoint + parameters. Same shape the host-side preflight uses;
@@ -240,7 +240,7 @@ class IMDSPreflightJob(pulumi.ComponentResource):
             metadata={
                 "name": "imds-preflight",
                 "namespace": namespace,
-                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_COMPLETE},
+                "annotations": pulumi_wait_for(_WAIT_FOR_COMPLETE),
                 "labels": {
                     "app.kubernetes.io/name": "imds-preflight",
                     "app.kubernetes.io/component": "control-plane-azure",

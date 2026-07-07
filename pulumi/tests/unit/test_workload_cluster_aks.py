@@ -10,6 +10,12 @@ from __future__ import annotations
 
 import pytest
 
+from stacks.kubernetes_annotations import (
+    DELETE_PROPAGATION_FOREGROUND,
+    PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION,
+    PULUMI_SKIP_AWAIT_ANNOTATION,
+    foreground_delete_annotations,
+)
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
     AUTOSCALER_MIN_ANNOTATION,
@@ -28,8 +34,6 @@ from stacks.workload_cluster.workload_cluster_infrastructure_aks import (
     _AKS_POOL_NAME_MAX_LENGTH,
     _AZURE_CLUSTER_IDENTITY_KIND,
     _CAPI_API_VERSION,
-    _DELETE_FOREGROUND,
-    _DELETION_PROPAGATION_ANNOTATION,
     _INFRASTRUCTURE_API_VERSION,
     _NETWORK_PLUGIN,
     _SERVICE_CIDR,
@@ -39,7 +43,6 @@ from stacks.workload_cluster.workload_cluster_infrastructure_aks import (
     _azure_managed_control_plane_spec,
     _azure_managed_machine_pool_spec,
     _cluster_spec,
-    _foreground_delete_annotations,
     _machine_pool_spec,
     _resource_name,
 )
@@ -58,11 +61,13 @@ def test_resource_name_rejects_empty() -> None:
 
 
 def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
-    annotations = _foreground_delete_annotations({"pulumi.com/skipAwait": "true"})
+    annotations = foreground_delete_annotations({PULUMI_SKIP_AWAIT_ANNOTATION: "true"})
 
     assert annotations == {
-        "pulumi.com/skipAwait": "true",
-        _DELETION_PROPAGATION_ANNOTATION: _DELETE_FOREGROUND,
+        PULUMI_SKIP_AWAIT_ANNOTATION: "true",
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: (
+            DELETE_PROPAGATION_FOREGROUND
+        ),
     }
 
 

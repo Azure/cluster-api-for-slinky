@@ -22,6 +22,10 @@ import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
+from stacks.kubernetes_annotations import (
+    pulumi_wait_for,
+)
+
 
 CAPI_OPERATOR_CHART_REPO = "https://kubernetes-sigs.github.io/cluster-api-operator"
 CAPI_OPERATOR_CHART_NAME = "cluster-api-operator"
@@ -54,7 +58,6 @@ _PROVIDER_API_VERSION = "operator.cluster.x-k8s.io/v1alpha2"
 _PROVIDER_FEATURE_GATES = {
     "ClusterTopology": True,
 }
-_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_READY = "condition=Ready"
 _WAIT_FOR_AVAILABLE = "condition=Available"
 _WAIT_FOR_WEBHOOK_CA_BUNDLE = "jsonpath={.webhooks[*].clientConfig.caBundle}"
@@ -450,7 +453,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             metadata={
                 "name": provider_name,
                 "namespace": namespace,
-                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_READY},
+                "annotations": pulumi_wait_for(_WAIT_FOR_READY),
             },
             spec={
                 "version": version,
@@ -480,7 +483,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             metadata={
                 "name": deployment_name,
                 "namespace": namespace,
-                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_AVAILABLE},
+                "annotations": pulumi_wait_for(_WAIT_FOR_AVAILABLE),
             },
             opts=ResourceOptions(
                 parent=self,
@@ -498,7 +501,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
         dependency: pulumi.Resource,
         provider: k8s.Provider | None,
     ) -> list[pulumi.Resource]:
-        annotations = {_WAIT_FOR_ANNOTATION: _WAIT_FOR_WEBHOOK_CA_BUNDLE}
+        annotations = pulumi_wait_for(_WAIT_FOR_WEBHOOK_CA_BUNDLE)
         mutating = k8s.admissionregistration.v1.MutatingWebhookConfigurationPatch(
             f"{parent_name}-{resource_name}-mutating-webhook-ready",
             metadata={"name": names["mutating"], "annotations": annotations},

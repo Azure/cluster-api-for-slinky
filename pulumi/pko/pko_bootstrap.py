@@ -35,6 +35,11 @@ from stacks.init.init_stack import (
     InitStackConfig,
     init_stack_config as build_init_stack_config,
 )
+from stacks.kubernetes_annotations import (
+    DELETE_PROPAGATION_ORPHAN,
+    PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION,
+    pulumi_wait_for,
+)
 from stacks.stack_cr import StackCRConfig, build_stack_spec
 
 
@@ -47,10 +52,7 @@ from stacks.stack_cr import StackCRConfig, build_stack_spec
 # CR has been applied). Without this gate, ``pulumi up`` returns the
 # moment the Stack CR is submitted and operators must poll for the init
 # stack themselves — brittle for CI and for our test runbook.
-_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_READY = "condition=Ready"
-_DELETION_PROPAGATION_ANNOTATION = "pulumi.com/deletionPropagationPolicy"
-_DELETE_ORPHAN = "Orphan"
 _INIT_STACK_TIMEOUT = "60m"
 
 
@@ -184,7 +186,7 @@ class PKOBootstrap(pulumi.ComponentResource):
                 "name": f"{name}-init",
                 "namespace": PKO_NAMESPACE,
                 "annotations": {
-                    _WAIT_FOR_ANNOTATION: _WAIT_FOR_READY,
+                    **pulumi_wait_for(_WAIT_FOR_READY),
                     # PKO's Stack finalizer runs ``pulumi destroy`` through the
                     # generated Workspace pod. Foreground cascading deletion can
                     # delete that Workspace/pod first, interrupting destroy with
@@ -192,7 +194,9 @@ class PKOBootstrap(pulumi.ComponentResource):
                     # finalizers (pulumi-kubernetes-operator/#1181).
                     # Orphan propagation keeps PKO's Workspace alive long enough
                     # for ``destroyOnFinalize`` to finish its own cleanup path.
-                    _DELETION_PROPAGATION_ANNOTATION: _DELETE_ORPHAN,
+                    PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: (
+                        DELETE_PROPAGATION_ORPHAN
+                    ),
                 },
             },
             spec=init_spec,

@@ -75,6 +75,7 @@ from gitrepo._base import GitOpsRepositoryProvider, GitOpsWebhookProvider
 from gitrepo.external_secrets import ExternalSecretsOperator
 from gitrepo.flux_git_auth import FluxGitAuthSecret
 from gitrepo.git_sync import GitSync
+from stacks.kubernetes_annotations import pulumi_wait_for
 
 
 # Pinned upstream chart. Bump this together with ``_GITEA_APP_VERSION``
@@ -115,6 +116,7 @@ _DEFAULT_BRANCH = "main"
 _GITEA_HTTP_SERVICE = "gitea-http"
 _GITEA_HTTP_PORT = 3000
 _WAIT_FOR_LOAD_BALANCER_IP = "jsonpath={.status.loadBalancer.ingress[0].ip}"
+_WAIT_FOR_READY = "condition=Ready"
 _GITEA_API_READY_TIMEOUT_SECONDS = 300
 _GITEA_API_READY_POLL_INTERVAL_SECONDS = 5
 _BOOTSTRAP_HELM_TIMEOUT_SECONDS = 30 * 60
@@ -268,16 +270,12 @@ def _chart_values(
             "http": {
                 "type": "LoadBalancer",
                 "clusterIP": "",
-                "annotations": {
-                    "pulumi.com/waitFor": _WAIT_FOR_LOAD_BALANCER_IP,
-                },
+                "annotations": pulumi_wait_for(_WAIT_FOR_LOAD_BALANCER_IP),
             },
             "ssh": {
                 "type": "LoadBalancer",
                 "clusterIP": "",
-                "annotations": {
-                    "pulumi.com/waitFor": _WAIT_FOR_LOAD_BALANCER_IP,
-                },
+                "annotations": pulumi_wait_for(_WAIT_FOR_LOAD_BALANCER_IP),
             },
         },
         # Mount the pre-generated host keypair Secret onto the Gitea
@@ -679,7 +677,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             metadata={
                 "name": _HOST_KEY_SECRET,
                 "namespace": _GITEA_NAMESPACE,
-                "annotations": {"pulumi.com/waitFor": "condition=Ready"},
+                "annotations": pulumi_wait_for(_WAIT_FOR_READY),
             },
             spec={
                 "refreshPolicy": "CreatedOnce",
@@ -710,7 +708,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             metadata={
                 "name": _USER_KEY_SECRET,
                 "namespace": _GITEA_NAMESPACE,
-                "annotations": {"pulumi.com/waitFor": "condition=Ready"},
+                "annotations": pulumi_wait_for(_WAIT_FOR_READY),
             },
             spec={
                 "refreshPolicy": "CreatedOnce",
@@ -828,7 +826,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             metadata={
                 "name": _USER_PUBLIC_KEY_SECRET,
                 "namespace": _GITEA_NAMESPACE,
-                "annotations": {"pulumi.com/waitFor": "condition=Ready"},
+                "annotations": pulumi_wait_for(_WAIT_FOR_READY),
             },
             spec={
                 "refreshPolicy": "CreatedOnce",
