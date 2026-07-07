@@ -274,23 +274,6 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             opts=child_opts(),
         )
 
-        cluster = k8s.apiextensions.CustomResource(
-            f"{name}-cluster",
-            api_version=_CAPI_API_VERSION,
-            kind=_CLUSTER_KIND,
-            metadata={"name": cluster_name, "namespace": _NAMESPACE},
-            spec=_cluster_spec(
-                control_plane_name=cluster_name,
-                infrastructure_name=cluster_name,
-            ),
-            opts=pulumi.ResourceOptions.merge(
-                child_opts(depends_on=[azure_managed_cluster]),
-                pulumi.ResourceOptions(
-                    custom_timeouts=pulumi.CustomTimeouts(delete=_AKS_DELETE_TIMEOUT)
-                ),
-            ),
-        )
-
         azure_managed_control_plane = k8s.apiextensions.CustomResource(
             f"{name}-control-plane",
             api_version=_INFRASTRUCTURE_API_VERSION,
@@ -309,7 +292,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 additional_tags=dict(additional_tags or {}),
             ),
             opts=pulumi.ResourceOptions.merge(
-                child_opts(depends_on=[cluster]),
+                child_opts(depends_on=[azure_managed_cluster]),
                 pulumi.ResourceOptions(
                     ignore_changes=_AMCP_IMMUTABLE_DEFAULTED_FIELDS,
                     custom_timeouts=pulumi.CustomTimeouts(
@@ -321,12 +304,34 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             ),
         )
 
+        cluster = k8s.apiextensions.CustomResource(
+            f"{name}-cluster",
+            api_version=_CAPI_API_VERSION,
+            kind=_CLUSTER_KIND,
+            metadata={"name": cluster_name, "namespace": _NAMESPACE},
+            spec=_cluster_spec(
+                control_plane_name=cluster_name,
+                infrastructure_name=cluster_name,
+            ),
+            opts=pulumi.ResourceOptions.merge(
+                child_opts(depends_on=[azure_managed_control_plane]),
+                pulumi.ResourceOptions(
+                    custom_timeouts=pulumi.CustomTimeouts(delete=_AKS_DELETE_TIMEOUT)
+                ),
+            ),
+        )
+
         machine_pools: list[k8s.apiextensions.CustomResource] = []
         machine_pool_names: list[Output[str]] = []
         for pool in node_pools:
             cr_pool_name = _resource_name(instance, pool.name)
             aks_pool_name = _aks_pool_name(pool)
             pool_mode = _SYSTEM_NODE_POOL_MODE if pool.controller else _USER_NODE_POOL_MODE
+            delete_with_cluster_opts = (
+                pulumi.ResourceOptions(deleted_with=cluster)
+                if pool.controller
+                else pulumi.ResourceOptions()
+            )
             azure_managed_machine_pool = k8s.apiextensions.CustomResource(
                 f"{name}-{pool.name}-managed-machine-pool",
                 api_version=_INFRASTRUCTURE_API_VERSION,
@@ -341,12 +346,13 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     autoscaling_bounds=pool.autoscaling_bounds,
                 ),
                 opts=pulumi.ResourceOptions.merge(
-                    child_opts(depends_on=[azure_managed_control_plane]),
+                    child_opts(depends_on=[cluster, azure_managed_control_plane]),
                     pulumi.ResourceOptions(
                         custom_timeouts=pulumi.CustomTimeouts(
                             delete=_AKS_DELETE_TIMEOUT
                         )
                     ),
+                    delete_with_cluster_opts,
                 ),
             )
 
@@ -374,6 +380,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                             delete=_AKS_DELETE_TIMEOUT
                         )
                     ),
+                    delete_with_cluster_opts,
                 ),
             )
             machine_pools.append(machine_pool)
