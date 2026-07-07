@@ -116,6 +116,8 @@ _GITEA_HTTP_PORT = 3000
 _WAIT_FOR_LOAD_BALANCER_IP = "jsonpath={.status.loadBalancer.ingress[0].ip}"
 _GITEA_API_READY_TIMEOUT_SECONDS = 300
 _GITEA_API_READY_POLL_INTERVAL_SECONDS = 5
+_BOOTSTRAP_HELM_TIMEOUT_SECONDS = 30 * 60
+_BOOTSTRAP_HELM_TIMEOUT = "30m"
 
 # SSH endpoint. The chart's default ``service.ssh`` is a *headless*
 # ClusterIP (``clusterIP: None``), which we explicitly override below
@@ -794,7 +796,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             cleanup_on_fail=True,
             atomic=True,
             wait_for_jobs=True,
-            timeout=600,
+            timeout=_BOOTSTRAP_HELM_TIMEOUT_SECONDS,
             values=_chart_values(
                 _CREDENTIALS_SECRET, admin_email, _HOST_KEY_SECRET
             ),
@@ -803,7 +805,9 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
                 provider=k8s_provider,
                 depends_on=[credentials_secret, host_key_secret],
                 custom_timeouts=pulumi.CustomTimeouts(
-                    create="10m", update="10m", delete="10m"
+                    create=_BOOTSTRAP_HELM_TIMEOUT,
+                    update=_BOOTSTRAP_HELM_TIMEOUT,
+                    delete=_BOOTSTRAP_HELM_TIMEOUT,
                 ),
             ),
         )

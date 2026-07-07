@@ -23,6 +23,8 @@ FLUX_RECEIVER_API_VERSION = "notification.toolkit.fluxcd.io/v1"
 FLUX_RECEIVER_KIND = "Receiver"
 FLUX_RECEIVER_NAME = "gitops-source"
 FLUX_RECEIVER_TOKEN_SECRET_NAME = "gitops-source-webhook-token"
+_BOOTSTRAP_HELM_TIMEOUT_SECONDS = 30 * 60
+_BOOTSTRAP_HELM_TIMEOUT = "30m"
 
 
 def _secret_data(value: str) -> str:
@@ -64,7 +66,7 @@ class FluxInfrastructure(pulumi.ComponentResource):
             cleanup_on_fail=True,
             atomic=True,
             wait_for_jobs=True,
-            timeout=600,
+            timeout=_BOOTSTRAP_HELM_TIMEOUT_SECONDS,
             values={
                 "installCRDs": True,
                 "helmController": {"create": False},
@@ -79,7 +81,9 @@ class FluxInfrastructure(pulumi.ComponentResource):
                 provider=provider,
                 depends_on=[flux_ns],
                 custom_timeouts=pulumi.CustomTimeouts(
-                    create="10m", update="10m", delete="10m"
+                    create=_BOOTSTRAP_HELM_TIMEOUT,
+                    update=_BOOTSTRAP_HELM_TIMEOUT,
+                    delete=_BOOTSTRAP_HELM_TIMEOUT,
                 ),
             ),
         )

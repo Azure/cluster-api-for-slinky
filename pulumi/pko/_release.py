@@ -29,6 +29,8 @@ from pko import PKO_NAMESPACE
 # for the release matrix. v2.x is the current major.
 PKO_CHART_OCI = "oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator"
 PKO_CHART_VERSION = "2.7.0"
+_BOOTSTRAP_HELM_TIMEOUT_SECONDS = 30 * 60
+_BOOTSTRAP_HELM_TIMEOUT = "30m"
 
 
 class PKORelease(pulumi.ComponentResource):
@@ -72,7 +74,7 @@ class PKORelease(pulumi.ComponentResource):
             cleanup_on_fail=True,
             atomic=True,
             wait_for_jobs=True,
-            timeout=600,
+            timeout=_BOOTSTRAP_HELM_TIMEOUT_SECONDS,
             values={
                 "rbac": {
                     "extraRules": [
@@ -89,7 +91,9 @@ class PKORelease(pulumi.ComponentResource):
                 provider=provider,
                 depends_on=[namespace_resource],
                 custom_timeouts=pulumi.CustomTimeouts(
-                    create="10m", update="10m", delete="10m"
+                    create=_BOOTSTRAP_HELM_TIMEOUT,
+                    update=_BOOTSTRAP_HELM_TIMEOUT,
+                    delete=_BOOTSTRAP_HELM_TIMEOUT,
                 ),
             ),
         )

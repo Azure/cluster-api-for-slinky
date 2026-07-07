@@ -11,6 +11,8 @@ EXTERNAL_SECRETS_CHART_REPO = "https://charts.external-secrets.io"
 EXTERNAL_SECRETS_CHART_NAME = "external-secrets"
 EXTERNAL_SECRETS_CHART_VERSION = "2.6.0"
 EXTERNAL_SECRETS_NAMESPACE = "external-secrets"
+_BOOTSTRAP_HELM_TIMEOUT_SECONDS = 30 * 60
+_BOOTSTRAP_HELM_TIMEOUT = "30m"
 
 
 class ExternalSecretsOperator(pulumi.ComponentResource):
@@ -43,14 +45,16 @@ class ExternalSecretsOperator(pulumi.ComponentResource):
             cleanup_on_fail=True,
             atomic=True,
             wait_for_jobs=True,
-            timeout=600,
+            timeout=_BOOTSTRAP_HELM_TIMEOUT_SECONDS,
             values={"installCRDs": True},
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=[ns],
                 custom_timeouts=pulumi.CustomTimeouts(
-                    create="10m", update="10m", delete="10m"
+                    create=_BOOTSTRAP_HELM_TIMEOUT,
+                    update=_BOOTSTRAP_HELM_TIMEOUT,
+                    delete=_BOOTSTRAP_HELM_TIMEOUT,
                 ),
             ),
         )
