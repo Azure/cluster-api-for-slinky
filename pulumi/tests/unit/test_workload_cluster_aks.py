@@ -43,6 +43,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_aks import (
     _azure_managed_control_plane_spec,
     _azure_managed_machine_pool_spec,
     _cluster_spec,
+    _machine_pool_delete_annotations,
     _machine_pool_spec,
     _resource_name,
 )
@@ -170,6 +171,16 @@ def test_machine_pool_spec_references_ammp_and_version() -> None:
             },
             "version": "v1.30.6",
         },
+    }
+
+
+def test_system_machine_pool_has_no_foreground_delete_annotation() -> None:
+    assert _machine_pool_delete_annotations(controller=True) == {}
+
+
+def test_user_machine_pool_uses_foreground_delete_annotation() -> None:
+    assert _machine_pool_delete_annotations(controller=False) == {
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_FOREGROUND,
     }
 
 

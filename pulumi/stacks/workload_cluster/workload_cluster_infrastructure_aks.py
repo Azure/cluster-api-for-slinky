@@ -224,6 +224,12 @@ def _decode_secret_data_value(data: Mapping[str, str], key: str) -> str:
     return base64.b64decode(encoded_value).decode("utf-8")
 
 
+def _machine_pool_delete_annotations(*, controller: bool) -> dict[str, str]:
+    if controller:
+        return {}
+    return foreground_delete_annotations()
+
+
 class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
     """Provision AKS managed infrastructure via the CAPZ managed CR set."""
 
@@ -347,6 +353,9 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
         for pool, cr_pool_name in zip(node_pools, machine_pool_cr_names, strict=True):
             aks_pool_name = _aks_pool_name(pool)
             pool_mode = _SYSTEM_NODE_POOL_MODE if pool.controller else _USER_NODE_POOL_MODE
+            pool_delete_annotations = _machine_pool_delete_annotations(
+                controller=pool.controller
+            )
             delete_with_cluster_opts = (
                 pulumi.ResourceOptions(deleted_with=cluster)
                 if pool.controller
@@ -359,7 +368,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 metadata={
                     "name": cr_pool_name,
                     "namespace": _NAMESPACE,
-                    "annotations": foreground_delete_annotations(),
+                    "annotations": pool_delete_annotations,
                 },
                 spec=_azure_managed_machine_pool_spec(
                     mode=pool_mode,
@@ -389,7 +398,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 metadata={
                     "name": cr_pool_name,
                     "namespace": _NAMESPACE,
-                    "annotations": foreground_delete_annotations(),
+                    "annotations": pool_delete_annotations,
                 },
                 spec=_machine_pool_spec(
                     cluster_name=cluster_name,
