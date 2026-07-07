@@ -175,6 +175,10 @@ def test_build_stack_spec_uses_flux_source_namespace() -> None:
         "type": "Literal",
         "literal": {"value": "pulumi"},
     }
+    assert spec["envRefs"]["PYTHONPATH"] == {
+        "type": "Literal",
+        "literal": {"value": "/share/source/pulumi"},
+    }
     assert spec["workspaceTemplate"]["spec"]["podTemplate"]["spec"]["containers"] == [
         {
             "name": "pulumi",

@@ -60,6 +60,7 @@ _WORKSPACE_IMAGE = "pulumi/pulumi-python:3.202.0"
 _HOME = "/share"
 _PULUMI_HOME = "/share/.pulumi"
 _PULUMI_USER = "pulumi"
+_PYTHONPATH = "/share/source/pulumi"
 
 # Volume name used inside the workspace pod for the file:// backend's
 # PVC mount. Arbitrary string, just has to match between volume and
@@ -240,6 +241,12 @@ def build_stack_spec(
             "type": "Literal",
             "literal": {
                 "value": _PULUMI_USER,
+            },
+        },
+        "PYTHONPATH": {
+            "type": "Literal",
+            "literal": {
+                "value": _PYTHONPATH,
             },
         },
     }
