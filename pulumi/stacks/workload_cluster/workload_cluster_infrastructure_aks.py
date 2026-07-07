@@ -311,7 +311,6 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions.merge(
                 child_opts(depends_on=[cluster]),
                 pulumi.ResourceOptions(
-                    deleted_with=cluster,
                     ignore_changes=_AMCP_IMMUTABLE_DEFAULTED_FIELDS,
                     custom_timeouts=pulumi.CustomTimeouts(
                         create=_AKS_CONTROL_PLANE_TIMEOUT,
@@ -344,9 +343,6 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 opts=pulumi.ResourceOptions.merge(
                     child_opts(depends_on=[azure_managed_control_plane]),
                     pulumi.ResourceOptions(
-                        # Cluster deletion drives CAPZ finalization for managed
-                        # pools; AKS removes the pools with the managed cluster.
-                        deleted_with=cluster,
                         custom_timeouts=pulumi.CustomTimeouts(
                             delete=_AKS_DELETE_TIMEOUT
                         )
@@ -374,7 +370,6 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                         ]
                     ),
                     pulumi.ResourceOptions(
-                        deleted_with=cluster,
                         custom_timeouts=pulumi.CustomTimeouts(
                             delete=_AKS_DELETE_TIMEOUT
                         )
