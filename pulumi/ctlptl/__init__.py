@@ -20,12 +20,10 @@ shares this package through ``stack.py``.
 from ctlptl.cloud_provider_kind import CloudProviderKind, CloudProviderKindConfig
 from ctlptl.ctlptl_cluster import CtlptlCluster
 from ctlptl.ctlptl_registry import CtlptlRegistry
-from ctlptl.kind_image_cache import KindImageCache
 
 __all__ = [
   "CloudProviderKind",
   "CloudProviderKindConfig",
   "CtlptlCluster",
   "CtlptlRegistry",
-  "KindImageCache",
 ]

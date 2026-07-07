@@ -13,7 +13,6 @@ from ctlptl import (
     CloudProviderKindConfig,
     CtlptlCluster,
     CtlptlRegistry,
-    KindImageCache,
 )
 from gitrepo import GitOpsConfig, GitOpsRepository, GitOpsWebhook
 from fluxcd import FluxInfrastructure
@@ -31,17 +30,6 @@ from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadCl
 
 _OWNER_TAG = "Owner"
 
-_BOOTSTRAP_IMAGES = (
-    "ghcr.io/external-secrets/external-secrets:v2.6.0",
-    "ghcr.io/fluxcd/notification-controller:v1.8.4",
-    "ghcr.io/fluxcd/source-controller:v1.8.5",
-    "docker.io/pulumi/pulumi-kubernetes-operator:v2.7.0",
-    "docker.io/pulumi/pulumi-python:3.202.0",
-    "docker.gitea.com/gitea:1.26.1-rootless",
-    "docker.io/library/busybox:latest",
-    "curlimages/curl:8.10.1",
-)
-
 
 def run_stack() -> None:
     """Build the Kind management-cluster graph from config and discovery."""
@@ -53,19 +41,10 @@ def run_stack() -> None:
 
     registry = CtlptlRegistry("registry")
     cluster = CtlptlCluster("mgmt", registry_name=registry.registry_name)
-    bootstrap_images = KindImageCache(
-        "bootstrap-images",
-        cluster_name=cluster.context,
-        images=_BOOTSTRAP_IMAGES,
-        opts=pulumi.ResourceOptions(
-            depends_on=[cluster],
-            custom_timeouts=pulumi.CustomTimeouts(create="30m", update="30m"),
-        ),
-    )
     mgmt_provider = k8s.Provider(
         "mgmt-k8s",
         kubeconfig=cluster.kubeconfig,
-        opts=pulumi.ResourceOptions(depends_on=[bootstrap_images]),
+        opts=pulumi.ResourceOptions(depends_on=[cluster]),
     )
 
     pko_namespace = k8s.core.v1.Namespace(
