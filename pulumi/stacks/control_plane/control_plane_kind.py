@@ -170,11 +170,6 @@ class KindAzureControlPlane(pulumi.ComponentResource):
             opts=opts,
         )
 
-        azure_cluster_identity = AzureClusterIdentity(
-            "cluster-identity",
-            identity=spec.identity,
-            opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
-        )
         imds_preflight_job = (
             None
             if spec.skip_in_cluster_preflight or spec.identity.type != "UserAssignedMSI"
@@ -183,6 +178,17 @@ class KindAzureControlPlane(pulumi.ComponentResource):
                 client_id=str(spec.identity.client_id),
                 opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
             )
+        )
+        identity_dependencies: list[pulumi.Resource] = [capi]
+        if imds_preflight_job is not None:
+            identity_dependencies.append(imds_preflight_job)
+        azure_cluster_identity = AzureClusterIdentity(
+            "cluster-identity",
+            identity=spec.identity,
+            opts=pulumi.ResourceOptions(
+                parent=self,
+                depends_on=identity_dependencies,
+            ),
         )
         imds_preflight_outputs = (
             imds_preflight_job.outputs if imds_preflight_job is not None else None

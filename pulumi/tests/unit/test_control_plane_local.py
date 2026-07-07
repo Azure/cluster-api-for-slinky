@@ -115,7 +115,8 @@ class _FakeIMDSPreflightJob:
     calls: list[dict[str, object]] = []
 
     def __init__(self, name: str, **kwargs: object) -> None:
-        self.calls.append({"name": name, **kwargs})
+        self.name = name
+        self.calls.append({"name": name, "instance": self, **kwargs})
         self.outputs = IMDSPreflightJobOutputs(
             job_name=pulumi.Output.from_input("imds-preflight"),
             job_namespace=pulumi.Output.from_input("capz-system"),
@@ -241,6 +242,9 @@ def test_kind_azure_control_plane_runs_imds_preflight_for_user_assigned_msi(
     assert isinstance(identity, UserAssignedMSIClusterIdentityConfig)
     assert identity.allowed_namespaces == AllowedNamespacesConfig()
     assert len(_FakeIMDSPreflightJob.calls) == 1
+    identity_opts = _FakeAzureClusterIdentity.calls[0]["opts"]
+    assert isinstance(identity_opts, pulumi.ResourceOptions)
+    assert _FakeIMDSPreflightJob.calls[0]["instance"] in identity_opts.depends_on
     assert control_plane.outputs.imds_preflight_job is not None
 
 

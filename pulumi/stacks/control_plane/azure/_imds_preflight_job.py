@@ -120,6 +120,10 @@ _IMDS_TOKEN_URL = (
     "&resource=https%3A%2F%2Fmanagement.azure.com%2F"
 )
 _IMDS_CURL_TIMEOUT_SECONDS = 5
+_CAPZ_WEBHOOK_READY_URL = (
+    "https://capz-webhook-service.capz-system.svc"
+    "/validate-infrastructure-cluster-x-k8s-io-v1beta1-azureclusteridentity"
+)
 
 # Job-level safety net. Kubernetes counts image pull and scheduling
 # time against activeDeadlineSeconds, so this must allow cold pulls of
@@ -139,6 +143,11 @@ def _probe_command(client_id: str) -> list[str]:
     url = f"{_IMDS_TOKEN_URL}&client_id={client_id}"
     script = (
         "set -e\n"
+        'echo "[preflight] probing CAPZ webhook service"\n'
+        f"webhook_status=$(curl -sS -k -m {_IMDS_CURL_TIMEOUT_SECONDS} "
+        "-o /dev/null -w '%{http_code}' "
+        f"'{_CAPZ_WEBHOOK_READY_URL}')\n"
+        'echo "[preflight] CAPZ webhook HTTP status: $webhook_status"\n'
         'echo "[preflight] curling IMDS for client_id ' + client_id + '"\n'
         f"response=$(curl -sS -m {_IMDS_CURL_TIMEOUT_SECONDS} "
         "-H 'Metadata: true' --noproxy '*' "
