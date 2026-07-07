@@ -47,6 +47,7 @@ _SYSTEM_NODE_POOL_MODE = "System"
 _USER_NODE_POOL_MODE = "User"
 _AKS_CONTROLLER_NODE_LABELS = {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
 
+_SKIP_AWAIT_ANNOTATION = "pulumi.com/skipAwait"
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_STATUS_READY = "jsonpath={.status.ready}=true"
 _AKS_CONTROL_PLANE_TIMEOUT = "60m"
@@ -281,6 +282,9 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
+                # CAPZ cannot make AMCP ready until at least one System AMMP exists.
+                # The explicit ready patch below waits after machine pools are created.
+                "annotations": {_SKIP_AWAIT_ANNOTATION: "true"},
             },
             spec=_azure_managed_control_plane_spec(
                 identity_name=identity_name,
