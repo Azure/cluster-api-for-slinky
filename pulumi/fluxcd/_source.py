@@ -78,6 +78,9 @@ class FluxInfrastructure(pulumi.ComponentResource):
                 parent=self,
                 provider=provider,
                 depends_on=[flux_ns],
+                custom_timeouts=pulumi.CustomTimeouts(
+                    create="10m", update="10m", delete="10m"
+                ),
             ),
         )
 

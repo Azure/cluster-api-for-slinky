@@ -45,7 +45,14 @@ class ExternalSecretsOperator(pulumi.ComponentResource):
             wait_for_jobs=True,
             timeout=600,
             values={"installCRDs": True},
-            opts=ResourceOptions(parent=self, provider=provider, depends_on=[ns]),
+            opts=ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=[ns],
+                custom_timeouts=pulumi.CustomTimeouts(
+                    create="10m", update="10m", delete="10m"
+                ),
+            ),
         )
 
         self.namespace = Output.from_input(EXTERNAL_SECRETS_NAMESPACE)

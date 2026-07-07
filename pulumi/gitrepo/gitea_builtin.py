@@ -802,6 +802,9 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
                 parent=self,
                 provider=k8s_provider,
                 depends_on=[credentials_secret, host_key_secret],
+                custom_timeouts=pulumi.CustomTimeouts(
+                    create="10m", update="10m", delete="10m"
+                ),
             ),
         )
 
