@@ -298,7 +298,6 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_STATUS_READY},
             },
             spec=_azure_managed_control_plane_spec(
                 identity_name=identity_name,
@@ -380,10 +379,31 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             machine_pools.append(machine_pool)
             machine_pool_names.append(Output.from_input(cr_pool_name))
 
+        azure_managed_control_plane_ready = k8s.apiextensions.CustomResourcePatch(
+            f"{name}-control-plane-ready",
+            api_version=_INFRASTRUCTURE_API_VERSION,
+            kind=_AMCP_KIND,
+            metadata={
+                "name": cluster_name,
+                "namespace": _NAMESPACE,
+                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_STATUS_READY},
+            },
+            opts=pulumi.ResourceOptions.merge(
+                child_opts(depends_on=machine_pools),
+                pulumi.ResourceOptions(
+                    custom_timeouts=pulumi.CustomTimeouts(
+                        create=_AKS_CONTROL_PLANE_TIMEOUT,
+                        update=_AKS_CONTROL_PLANE_TIMEOUT,
+                        delete=_AKS_CONTROL_PLANE_TIMEOUT,
+                    )
+                ),
+            ),
+        )
+
         workload_kubeconfig_secret = k8s.core.v1.Secret.get(
             "workload-kubeconfig-secret",
             id=f"{_NAMESPACE}/{cluster_name}-kubeconfig",
-            opts=child_opts(depends_on=[azure_managed_control_plane]),
+            opts=child_opts(depends_on=[azure_managed_control_plane_ready]),
         )
         workload_kubeconfig = pulumi.Output.secret(
             workload_kubeconfig_secret.data.apply(
@@ -404,7 +424,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.control_plane_name = Output.from_input(cluster_name)
         self.machine_pool_names = machine_pool_names
         self.machine_pool_name = machine_pool_names[0]
-        self.control_plane_ready = azure_managed_control_plane.id.apply(
+        self.control_plane_ready = azure_managed_control_plane_ready.id.apply(
             lambda _: True
         )
         self.workload_kubeconfig = workload_kubeconfig

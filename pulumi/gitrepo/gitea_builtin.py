@@ -58,13 +58,16 @@ from __future__ import annotations
 
 import os
 import base64
+import time
 from typing import Any, Mapping, Optional
 
 import pulumi
 import pulumi_gitea as gitea_sdk
 import pulumi_kubernetes as k8s
 import pulumi_random as random
+import requests
 from pulumi import Output, ResourceOptions
+from pulumi.dynamic import CreateResult, DiffResult, Resource, ResourceProvider, UpdateResult
 
 from fluxcd import FluxSource
 from gitrepo._base import GitOpsRepositoryProvider, GitOpsWebhookProvider
@@ -111,6 +114,8 @@ _DEFAULT_BRANCH = "main"
 _GITEA_HTTP_SERVICE = "gitea-http"
 _GITEA_HTTP_PORT = 3000
 _WAIT_FOR_LOAD_BALANCER_IP = "jsonpath={.status.loadBalancer.ingress[0].ip}"
+_GITEA_API_READY_TIMEOUT_SECONDS = 300
+_GITEA_API_READY_POLL_INTERVAL_SECONDS = 5
 
 # SSH endpoint. The chart's default ``service.ssh`` is a *headless*
 # ClusterIP (``clusterIP: None``), which we explicitly override below
@@ -356,6 +361,71 @@ def _decode_secret_data_key(data: Mapping[str, str] | None, key: str) -> str:
         available = sorted(data.keys()) if data else []
         raise ValueError(f"Secret is missing key {key!r}; available keys: {available!r}")
     return base64.b64decode(data[key]).decode("utf-8")
+
+
+class _GiteaAPIReadinessProvider(ResourceProvider):
+    def _wait(self, props: dict[str, Any]) -> dict[str, Any]:
+        base_url = str(props["base_url"]).rstrip("/")
+        timeout_seconds = int(
+            props.get("timeout_seconds") or _GITEA_API_READY_TIMEOUT_SECONDS
+        )
+        deadline = time.monotonic() + timeout_seconds
+        last_error = "Gitea API has not been checked yet"
+
+        while True:
+            try:
+                response = requests.get(f"{base_url}/api/v1/version", timeout=10)
+                response.raise_for_status()
+                payload = response.json()
+                version = payload.get("version")
+                if isinstance(version, str) and version:
+                    return {
+                        "base_url": base_url,
+                        "timeout_seconds": timeout_seconds,
+                        "version": version,
+                    }
+                last_error = f"unexpected version payload: {payload!r}"
+            except (ValueError, requests.RequestException) as exc:
+                last_error = str(exc)
+
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    "timed out waiting for Gitea API readiness: " + last_error
+                )
+            time.sleep(_GITEA_API_READY_POLL_INTERVAL_SECONDS)
+
+    def create(self, props: dict[str, Any]) -> CreateResult:
+        outs = self._wait(props)
+        return CreateResult(id_=f"{outs['base_url']}/api-ready", outs=outs)
+
+    def diff(self, _id: str, old: dict[str, Any], new: dict[str, Any]) -> DiffResult:
+        keys = ("base_url", "timeout_seconds")
+        return DiffResult(changes=any(old.get(key) != new.get(key) for key in keys))
+
+    def update(self, _id: str, _old: dict[str, Any], new: dict[str, Any]) -> UpdateResult:
+        return UpdateResult(outs=self._wait(new))
+
+
+class GiteaAPIReadiness(Resource):
+    version: pulumi.Output[str]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        base_url: pulumi.Input[str],
+        timeout_seconds: pulumi.Input[int] = _GITEA_API_READY_TIMEOUT_SECONDS,
+        opts: ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            _GiteaAPIReadinessProvider(),
+            name,
+            {
+                "base_url": base_url,
+                "timeout_seconds": timeout_seconds,
+            },
+            opts,
+        )
 
 
 class GiteaBuiltinRepository(GitOpsRepositoryProvider):
@@ -775,12 +845,18 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         external_base = gitea_http_svc.status.apply(_build_external_base)
         external_ssh_host = gitea_ssh_svc.status.apply(_load_balancer_host)
 
+        gitea_api_ready = GiteaAPIReadiness(
+            f"{name}-api-ready",
+            base_url=external_base,
+            opts=ResourceOptions(parent=self, depends_on=[gitea]),
+        )
+
         gitea_provider = gitea_sdk.Provider(
             f"{name}-provider",
             base_url=external_base,
             username=admin_username,
             password=admin_password.result,
-            opts=ResourceOptions(parent=self, depends_on=[gitea]),
+            opts=ResourceOptions(parent=self, depends_on=[gitea_api_ready]),
         )
 
         # Create the actual repo through Gitea's REST API, then push the
@@ -797,7 +873,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             opts=ResourceOptions(
                 parent=self,
                 provider=gitea_provider,
-                depends_on=[gitea],
+                depends_on=[gitea_api_ready],
                 delete_before_replace=True,
             ),
         )
