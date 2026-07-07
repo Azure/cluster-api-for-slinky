@@ -56,6 +56,7 @@ _PROVIDER_FEATURE_GATES = {
 }
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_READY = "condition=Ready"
+_WAIT_FOR_AVAILABLE = "condition=Available"
 _WAIT_FOR_WEBHOOK_CA_BUNDLE = "jsonpath={.webhooks[*].clientConfig.caBundle}"
 
 _CAPI_OPERATOR_WEBHOOK_CONFIGURATIONS = {
@@ -81,6 +82,12 @@ _PROVIDER_WEBHOOK_CONFIGURATIONS = {
     },
 }
 
+_PROVIDER_CONTROLLER_DEPLOYMENTS = {
+    "core": "capi-controller-manager",
+    "bootstrap": "capi-kubeadm-bootstrap-controller-manager",
+    "control_plane": "capi-kubeadm-control-plane-controller-manager",
+}
+
 # Per-infrastructure-provider metadata. Keyed by the ``InfrastructureProvider``
 # ``spec.name`` (which is also the upstream provider name the CAPI Operator
 # uses to resolve the right release artifacts). Each entry pins:
@@ -91,6 +98,8 @@ _PROVIDER_WEBHOOK_CONFIGURATIONS = {
 #     ``CAPI_PROVIDER_VERSION`` because each infrastructure provider has its
 #     own release cadence; the pairing rules are documented next to the
 #     version constant for each provider.
+#   * ``deployment`` — provider controller Deployment name; this must
+#     be Available before dependents create CRs that hit its webhook.
 #   * ``webhooks``  — the names of the mutating/validating webhook
 #     configurations the provider's controller installs, so we can attach the
 #     usual ``waitFor=caBundle`` patch and gate dependents on webhook
@@ -100,6 +109,7 @@ _INFRASTRUCTURE_PROVIDERS: dict[str, dict[str, object]] = {
         "namespace": CAPI_DOCKER_INFRASTRUCTURE_NAMESPACE,
         # CAPD ships within the CAPI repo, so it shares the CAPI pin.
         "version": CAPI_PROVIDER_VERSION,
+        "deployment": "capd-controller-manager",
         "webhooks": {
             "mutating": "capd-mutating-webhook-configuration",
             "validating": "capd-validating-webhook-configuration",
@@ -108,6 +118,7 @@ _INFRASTRUCTURE_PROVIDERS: dict[str, dict[str, object]] = {
     "azure": {
         "namespace": CAPI_AZURE_INFRASTRUCTURE_NAMESPACE,
         "version": CAPZ_PROVIDER_VERSION,
+        "deployment": "capz-controller-manager",
         "webhooks": {
             "mutating": "capz-mutating-webhook-configuration",
             "validating": "capz-validating-webhook-configuration",
@@ -276,25 +287,62 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             )
             for infra_name in infrastructure_providers
         }
+        core_deployment_ready = self._provider_deployment_ready_patch(
+            name,
+            resource_name="core",
+            deployment_name=_PROVIDER_CONTROLLER_DEPLOYMENTS["core"],
+            namespace=CAPI_CORE_NAMESPACE,
+            dependency=core_provider,
+            provider=provider,
+        )
+        bootstrap_deployment_ready = self._provider_deployment_ready_patch(
+            name,
+            resource_name="bootstrap",
+            deployment_name=_PROVIDER_CONTROLLER_DEPLOYMENTS["bootstrap"],
+            namespace=CAPI_BOOTSTRAP_NAMESPACE,
+            dependency=bootstrap_provider,
+            provider=provider,
+        )
+        control_plane_deployment_ready = self._provider_deployment_ready_patch(
+            name,
+            resource_name="control-plane",
+            deployment_name=_PROVIDER_CONTROLLER_DEPLOYMENTS["control_plane"],
+            namespace=CAPI_CONTROL_PLANE_NAMESPACE,
+            dependency=control_plane_provider,
+            provider=provider,
+        )
+        infrastructure_deployment_ready: dict[str, pulumi.Resource] = {
+            infra_name: self._provider_deployment_ready_patch(
+                name,
+                resource_name=f"infrastructure-{infra_name}",
+                deployment_name=str(
+                    _INFRASTRUCTURE_PROVIDERS[infra_name]["deployment"]
+                ),
+                namespace=str(_INFRASTRUCTURE_PROVIDERS[infra_name]["namespace"]),
+                dependency=cr,
+                provider=provider,
+            )
+            for infra_name, cr in infrastructure_provider_crs.items()
+        }
         core_webhooks = self._webhook_configuration_patches(
             name,
             resource_name="core",
             names=_PROVIDER_WEBHOOK_CONFIGURATIONS["core"],
-            dependency=core_provider,
+            dependency=core_deployment_ready,
             provider=provider,
         )
         bootstrap_webhooks = self._webhook_configuration_patches(
             name,
             resource_name="bootstrap",
             names=_PROVIDER_WEBHOOK_CONFIGURATIONS["bootstrap"],
-            dependency=bootstrap_provider,
+            dependency=bootstrap_deployment_ready,
             provider=provider,
         )
         control_plane_webhooks = self._webhook_configuration_patches(
             name,
             resource_name="control-plane",
             names=_PROVIDER_WEBHOOK_CONFIGURATIONS["control_plane"],
-            dependency=control_plane_provider,
+            dependency=control_plane_deployment_ready,
             provider=provider,
         )
         infrastructure_webhook_patches: dict[str, list[pulumi.Resource]] = {
@@ -302,7 +350,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
                 name,
                 resource_name=f"infrastructure-{infra_name}",
                 names=_INFRASTRUCTURE_PROVIDERS[infra_name]["webhooks"],  # type: ignore[arg-type]
-                dependency=cr,
+                dependency=infrastructure_deployment_ready[infra_name],
                 provider=provider,
             )
             for infra_name, cr in infrastructure_provider_crs.items()
@@ -351,6 +399,17 @@ class ClusterAPIOperator(pulumi.ComponentResource):
                 "provider_version": self.provider_version,
                 "provider_namespaces": self.provider_namespaces,
                 "providers": providers_output,
+                "deployment_readiness": {
+                    "core": core_deployment_ready.metadata["name"],
+                    "bootstrap": bootstrap_deployment_ready.metadata["name"],
+                    "control_plane": control_plane_deployment_ready.metadata[
+                        "name"
+                    ],
+                    **{
+                        f"infrastructure_{infra_name}": patch.metadata["name"]
+                        for infra_name, patch in infrastructure_deployment_ready.items()
+                    },
+                },
                 "webhook_patches": {
                     group: [patch.metadata["name"] for patch in patches]
                     for group, patches in webhook_patches.items()
@@ -403,6 +462,30 @@ class ClusterAPIOperator(pulumi.ComponentResource):
                 parent=self,
                 provider=provider,
                 depends_on=[*dependencies, namespace_resource],
+            ),
+        )
+
+    def _provider_deployment_ready_patch(
+        self,
+        parent_name: str,
+        *,
+        resource_name: str,
+        deployment_name: str,
+        namespace: str,
+        dependency: pulumi.Resource,
+        provider: k8s.Provider | None,
+    ) -> k8s.apps.v1.DeploymentPatch:
+        return k8s.apps.v1.DeploymentPatch(
+            f"{parent_name}-{resource_name}-controller-ready",
+            metadata={
+                "name": deployment_name,
+                "namespace": namespace,
+                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_AVAILABLE},
+            },
+            opts=ResourceOptions(
+                parent=self,
+                provider=provider,
+                depends_on=[dependency],
             ),
         )
 

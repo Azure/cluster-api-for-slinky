@@ -46,8 +46,8 @@ The Job pod uses ``curlimages/curl:8.10.1`` (a 3MB Alpine image with
 
 Why no retries
 --------------
-``restartPolicy: Never`` + ``backoffLimit: 0`` + ``activeDeadlineSeconds:
-60``. We deliberately do not want the Job to retry on failure:
+``restartPolicy: Never`` + ``backoffLimit: 0``. We deliberately do not
+want the Job to retry on failure:
 
 * Host-side discovery already smoke-tested the clientId, so a failure
     here is a real signal (CNI drift / proxy / etc.), not flake.
@@ -121,11 +121,13 @@ _IMDS_TOKEN_URL = (
 )
 _IMDS_CURL_TIMEOUT_SECONDS = 5
 
-# Job-level safety net. 60s is generous -- host-side preflight against
-# IMDS in our measurements responds in <100ms; if the in-cluster path
-# takes more than 60s we want to know about it (something is genuinely
-# wrong, not just slow).
-_JOB_ACTIVE_DEADLINE_SECONDS = 60
+# Job-level safety net. Kubernetes counts image pull and scheduling
+# time against activeDeadlineSeconds, so this must allow cold pulls of
+# curlimages/curl on a fresh kind worker. The actual IMDS network probe
+# still fails fast via _IMDS_CURL_TIMEOUT_SECONDS once the container
+# starts.
+_JOB_ACTIVE_DEADLINE_SECONDS = 10 * 60
+_JOB_CREATE_TIMEOUT = "11m"
 
 # Shell script the probe container runs. Single shell command so we can
 # fit it on one ``-c`` argv element. The grep -q at the end is the
@@ -239,8 +241,8 @@ class IMDSPreflightJob(pulumi.ComponentResource):
             spec={
                 # No retries (see module docstring "Why no retries").
                 "backoffLimit": 0,
-                # Catches a hung curl / unreachable IMDS that would
-                # otherwise block the outer pulumi up indefinitely.
+                # Catches a hung pod / image pull / unreachable IMDS
+                # that would otherwise block pulumi up indefinitely.
                 "activeDeadlineSeconds": _JOB_ACTIVE_DEADLINE_SECONDS,
                 # Keep the failed pod around for kubectl logs after a
                 # bad apply. Successful pods are garbage-collected by
@@ -304,7 +306,9 @@ class IMDSPreflightJob(pulumi.ComponentResource):
                 # than activeDeadlineSeconds so a Job that hits its
                 # own deadline reports as Failed (clean error) rather
                 # than as a Pulumi create-timeout (less clean).
-                custom_timeouts=pulumi.CustomTimeouts(create="2m"),
+                custom_timeouts=pulumi.CustomTimeouts(
+                    create=_JOB_CREATE_TIMEOUT
+                ),
             ),
         )
 
