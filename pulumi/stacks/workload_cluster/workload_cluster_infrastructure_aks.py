@@ -4,16 +4,11 @@ from __future__ import annotations
 
 import base64
 import re
-import ssl
-import time
 from typing import Mapping, Sequence
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
 
 import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
-from pulumi.dynamic import CreateResult, DiffResult, Resource, ResourceProvider
 from pydantic import StrictBool
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
@@ -55,14 +50,11 @@ _AKS_CONTROLLER_NODE_LABELS = {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
 _SKIP_AWAIT_ANNOTATION = "pulumi.com/skipAwait"
 _WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 _WAIT_FOR_STATUS_READY = "jsonpath={.status.ready}=true"
+_DELETION_PROPAGATION_ANNOTATION = "pulumi.com/deletionPropagationPolicy"
+_DELETE_FOREGROUND = "Foreground"
 _AKS_CONTROL_PLANE_TIMEOUT = "60m"
 _AKS_DELETE_TIMEOUT = "60m"
-_AKS_DELETE_TIMEOUT_SECONDS = 60 * 60
 _AMCP_IMMUTABLE_DEFAULTED_FIELDS = ["spec.sshPublicKey"]
-_SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-_SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-_KUBERNETES_API_TIMEOUT_SECONDS = 10
-_DELETION_POLL_INTERVAL_SECONDS = 10
 
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
@@ -76,92 +68,13 @@ class AKSNodePoolSpec(PulumiConfigModel):
     autoscaling_bounds: tuple[StrictPositiveInt, StrictPositiveInt] | None = None
 
 
-class _AMMPDeletionBarrierProvider(ResourceProvider):
-    def create(self, props: dict) -> CreateResult:
-        names = sorted(str(name) for name in props["names"])
-        return CreateResult(
-            id_=f"{props['namespace']}/{'/'.join(names)}",
-            outs={**props, "names": names},
-        )
-
-    def diff(self, _id: str, old: dict, new: dict) -> DiffResult:
-        replaces = []
-        if old.get("namespace") != new.get("namespace"):
-            replaces.append("namespace")
-        if sorted(old.get("names") or []) != sorted(new.get("names") or []):
-            replaces.append("names")
-        return DiffResult(changes=bool(replaces), replaces=replaces or None)
-
-    def delete(self, _id: str, props: dict) -> None:
-        deadline = time.monotonic() + int(props["timeout_seconds"])
-        namespace = str(props["namespace"])
-        names = [str(name) for name in props["names"]]
-
-        while True:
-            remaining = [
-                name for name in names if self._resource_exists(namespace, name)
-            ]
-            if not remaining:
-                return
-            if time.monotonic() >= deadline:
-                raise TimeoutError(
-                    "Timed out waiting for AzureManagedMachinePool deletion: "
-                    + ", ".join(remaining)
-                )
-            time.sleep(_DELETION_POLL_INTERVAL_SECONDS)
-
-    def _resource_exists(self, namespace: str, name: str) -> bool:
-        host = _require_env("KUBERNETES_SERVICE_HOST")
-        port = _require_env("KUBERNETES_SERVICE_PORT")
-        url = (
-            f"https://{host}:{port}/apis/infrastructure.cluster.x-k8s.io/v1beta1/"
-            f"namespaces/{namespace}/azuremanagedmachinepools/{name}"
-        )
-        with open(_SERVICE_ACCOUNT_TOKEN_PATH, encoding="utf-8") as token_file:
-            token = token_file.read().strip()
-        request = Request(url, headers={"Authorization": f"Bearer {token}"})
-        context = ssl.create_default_context(cafile=_SERVICE_ACCOUNT_CA_PATH)
-        try:
-            with urlopen(
-                request,
-                context=context,
-                timeout=_KUBERNETES_API_TIMEOUT_SECONDS,
-            ):
-                return True
-        except HTTPError as exc:
-            if exc.code == 404:
-                return False
-            raise
-
-
-class _AMMPDeletionBarrier(Resource):
-    def __init__(
-        self,
-        name: str,
-        *,
-        namespace: str,
-        names: Sequence[str],
-        opts: ResourceOptions | None = None,
-    ) -> None:
-        super().__init__(
-            _AMMPDeletionBarrierProvider(),
-            name,
-            {
-                "namespace": namespace,
-                "names": sorted(names),
-                "timeout_seconds": _AKS_DELETE_TIMEOUT_SECONDS,
-            },
-            opts,
-        )
-
-
-def _require_env(name: str) -> str:
-    import os
-
-    value = os.environ.get(name)
-    if not value:
-        raise RuntimeError(f"{name} is not set")
-    return value
+def _foreground_delete_annotations(
+    annotations: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    return {
+        **(dict(annotations) if annotations else {}),
+        _DELETION_PROPAGATION_ANNOTATION: _DELETE_FOREGROUND,
+    }
 
 
 def _resource_name(instance: str, suffix: str | None = None) -> str:
@@ -368,7 +281,11 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             f"{name}-managed-cluster",
             api_version=_INFRASTRUCTURE_API_VERSION,
             kind=_AMC_KIND,
-            metadata={"name": cluster_name, "namespace": _NAMESPACE},
+            metadata={
+                "name": cluster_name,
+                "namespace": _NAMESPACE,
+                "annotations": _foreground_delete_annotations(),
+            },
             spec={},
             opts=child_opts(),
         )
@@ -382,7 +299,9 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "namespace": _NAMESPACE,
                 # CAPZ cannot make AMCP ready until at least one System AMMP exists.
                 # The explicit ready patch below waits after machine pools are created.
-                "annotations": {_SKIP_AWAIT_ANNOTATION: "true"},
+                "annotations": _foreground_delete_annotations(
+                    {_SKIP_AWAIT_ANNOTATION: "true"}
+                ),
             },
             spec=_azure_managed_control_plane_spec(
                 identity_name=identity_name,
@@ -410,7 +329,11 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             f"{name}-cluster",
             api_version=_CAPI_API_VERSION,
             kind=_CLUSTER_KIND,
-            metadata={"name": cluster_name, "namespace": _NAMESPACE},
+            metadata={
+                "name": cluster_name,
+                "namespace": _NAMESPACE,
+                "annotations": _foreground_delete_annotations(),
+            },
             spec=_cluster_spec(
                 control_plane_name=cluster_name,
                 infrastructure_name=cluster_name,
@@ -426,12 +349,6 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
         machine_pool_cr_names = [
             _resource_name(instance, pool.name) for pool in node_pools
         ]
-        managed_machine_pool_deletion_barrier = _AMMPDeletionBarrier(
-            f"{name}-managed-machine-pool-deletion-barrier",
-            namespace=_NAMESPACE,
-            names=machine_pool_cr_names,
-            opts=child_opts(depends_on=[azure_managed_control_plane]),
-        )
 
         machine_pools: list[k8s.apiextensions.CustomResource] = []
         machine_pool_names: list[Output[str]] = []
@@ -447,7 +364,11 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 f"{name}-{pool.name}-managed-machine-pool",
                 api_version=_INFRASTRUCTURE_API_VERSION,
                 kind=_AMMP_KIND,
-                metadata={"name": cr_pool_name, "namespace": _NAMESPACE},
+                metadata={
+                    "name": cr_pool_name,
+                    "namespace": _NAMESPACE,
+                    "annotations": _foreground_delete_annotations(),
+                },
                 spec=_azure_managed_machine_pool_spec(
                     mode=pool_mode,
                     pool_name=aks_pool_name,
@@ -458,7 +379,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 ),
                 opts=pulumi.ResourceOptions.merge(
                     pulumi.ResourceOptions.merge(
-                        child_opts(depends_on=[managed_machine_pool_deletion_barrier]),
+                        child_opts(depends_on=[azure_managed_control_plane]),
                         pulumi.ResourceOptions(
                             custom_timeouts=pulumi.CustomTimeouts(
                                 delete=_AKS_DELETE_TIMEOUT
@@ -473,7 +394,11 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 f"{name}-{pool.name}-machine-pool",
                 api_version=_CAPI_API_VERSION,
                 kind=_MACHINE_POOL_KIND,
-                metadata={"name": cr_pool_name, "namespace": _NAMESPACE},
+                metadata={
+                    "name": cr_pool_name,
+                    "namespace": _NAMESPACE,
+                    "annotations": _foreground_delete_annotations(),
+                },
                 spec=_machine_pool_spec(
                     cluster_name=cluster_name,
                     pool_name=cr_pool_name,
