@@ -350,11 +350,13 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     autoscaling_bounds=pool.autoscaling_bounds,
                 ),
                 opts=pulumi.ResourceOptions.merge(
-                    child_opts(depends_on=[azure_managed_control_plane]),
-                    pulumi.ResourceOptions(
-                        custom_timeouts=pulumi.CustomTimeouts(
-                            delete=_AKS_DELETE_TIMEOUT
-                        )
+                    pulumi.ResourceOptions.merge(
+                        child_opts(depends_on=[azure_managed_control_plane]),
+                        pulumi.ResourceOptions(
+                            custom_timeouts=pulumi.CustomTimeouts(
+                                delete=_AKS_DELETE_TIMEOUT
+                            )
+                        ),
                     ),
                     delete_with_cluster_opts,
                 ),
