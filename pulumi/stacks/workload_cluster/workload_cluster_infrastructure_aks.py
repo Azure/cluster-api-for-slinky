@@ -332,6 +332,10 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             ),
         )
 
+        # Workaround until CAPZ owns this teardown transition itself. The
+        # reconciler keeps System pool ASO children on detach-on-delete so ASO
+        # does not issue a child agent-pool delete while AKS parent cluster
+        # deletion owns cleanup. Root-cause fix: kubernetes-sigs/CAPZ#6447.
         aso_detach_reconciler = ASODetachReconciler(
             f"{name}-aso-detach-reconciler",
             namespace=_NAMESPACE,

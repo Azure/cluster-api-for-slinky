@@ -1,4 +1,11 @@
-"""In-cluster reconciler that keeps selected ASO resources detached on delete."""
+"""In-cluster reconciler that keeps selected ASO resources detached on delete.
+
+This is a workaround for CAPZ managed AKS teardown: CAPZ skips direct agent-pool
+deletion when the owning CAPI Cluster is deleting, but its generated ASO
+ManagedClustersAgentPool can still try the child Azure delete unless its ASO
+reconcile policy is reset to detach-on-delete. The root-cause fix is tracked in
+CAPZ PR https://github.com/kubernetes-sigs/cluster-api-provider-azure/pull/6447.
+"""
 
 from __future__ import annotations
 
