@@ -25,19 +25,20 @@
 #     scripts/azure-remote.sh bridge-experiment [all|install|demo|teardown]
 #
 # Reuses the kubeconfig-from-secret + helm-to-~/.local/bin bootstrap from
-# day2-selfmanaged.sh. Fully reversible: `teardown` helm-uninstalls the bridge,
+# selfmanaged-3-addons.sh. Fully reversible: `teardown` helm-uninstalls the bridge,
 # removes the token + workload namespace, and leaves the Slurm cluster untouched
 # (the experiment never modifies caps-self-slurm.yaml — it reuses the existing
 # `all` partition).
 #
-# !! TOPOLOGY WARNING (learned the hard way): slurm-bridge's controllers taint
-# EVERY node in the managed partition with `slinky.slurm.net/managed-node:NoExecute`
-# so that only Slurm-placed pods run there. On caps-self the Slurm control plane
-# (slurmctld/slurmrestd/operator) and slurmd are CO-LOCATED on the only worker
-# nodes, which ARE the managed partition — so that NoExecute taint EVICTS Slurm
-# itself and takes the cluster down. `install` therefore refuses unless slurmd
-# tolerates the taint (or BRIDGE_ACK_UNSAFE=1). Making it work needs a dedicated
-# non-managed node for the control planes + a slurmd toleration (Slurm chart edit).
+# !! TOPOLOGY NOTE: slurm-bridge's controllers taint every node in the managed
+# partition with `slinky.slurm.net/managed-node=slurm-bridge-scheduler:NoExecute`
+# so that only Slurm-placed pods run there. This is now SAFE on caps-self because
+# (1) the Slurm control plane (slurmctld/slurmrestd) + the three bridge components
+# run on the dedicated, UNTAINTED controller node (caps-self-md-ctrl,
+# slinky.slurm.net/node-type=controller — pinned via slurm-bridge-values.yaml
+# affinity), and (2) slurmd on the compute nodes tolerates the managed-node taint
+# (added to caps-self-slurm.yaml nodesets.slinky.podSpec.tolerations). `install`
+# still refuses if that slurmd toleration is missing (or set BRIDGE_ACK_UNSAFE=1).
 #
 # Env overrides:
 #   CLUSTER=caps-self     workload cluster name (kubeconfig secret <CLUSTER>-kubeconfig)
@@ -55,7 +56,7 @@ CLUSTER="${CLUSTER:-caps-self}"
 NAMESPACE="${NAMESPACE:-default}"
 SLURM_NS="${SLURM_NS:-slurm}"
 WL_NS="${WL_NS:-slurm-bridge}"
-BRIDGE_VERSION="${BRIDGE_VERSION:-}"
+BRIDGE_VERSION="${BRIDGE_VERSION:-1.1.1}"
 HOLD_SECS="${HOLD_SECS:-45}"
 BRIDGE_CHART="oci://ghcr.io/slinkyproject/charts/slurm-bridge"
 # Taint the bridge controllers imperatively stamp on every managed-partition node.
@@ -86,6 +87,50 @@ ensure_helm() {
   mkdir -p "$HOME/.local/bin"
   curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
     | HELM_INSTALL_DIR="$HOME/.local/bin" USE_SUDO=false bash
+}
+
+# --- slurm-bridge prerequisite charts (upstream hack/kind.sh parity) ------------
+# The bridge scheduler embeds the scheduler-plugins CoScheduling plugin and
+# watches JobSet / LeaderWorkerSet CRDs, so those must exist before it starts.
+# cert-manager is already installed on caps-self (selfmanaged-3-addons.sh). All three
+# are additive and helm-uninstalled on teardown.
+JOBSET_VERSION="${JOBSET_VERSION:-0.12.0}"
+LWS_VERSION="${LWS_VERSION:-0.8.0}"
+ensure_prereqs() {
+  ensure_helm
+  echo ">> installing bridge prerequisites (scheduler-plugins, jobset, lws)"
+  if ! helmw -n scheduler-plugins status scheduler-plugins >/dev/null 2>&1; then
+    helmw install scheduler-plugins scheduler-plugins \
+      --repo https://scheduler-plugins.sigs.k8s.io \
+      -n scheduler-plugins --create-namespace \
+      --set 'plugins.enabled={CoScheduling}' --set 'scheduler.replicaCount=0' \
+      --wait --timeout 5m || echo "##[warning]scheduler-plugins install had issues"
+  else echo "   scheduler-plugins already installed"; fi
+  if ! helmw -n jobset-system status jobset >/dev/null 2>&1; then
+    helmw install jobset oci://registry.k8s.io/jobset/charts/jobset \
+      --version "$JOBSET_VERSION" -n jobset-system --create-namespace \
+      --wait --timeout 5m || echo "##[warning]jobset install had issues"
+  else echo "   jobset already installed"; fi
+  if ! helmw -n lws-system status lws >/dev/null 2>&1; then
+    helmw install lws oci://registry.k8s.io/lws/charts/lws \
+      --version "$LWS_VERSION" -n lws-system --create-namespace \
+      --wait --timeout 5m || echo "##[warning]lws install had issues"
+  else echo "   lws already installed"; fi
+}
+
+# Label the compute (hybrid slurmd) nodes so slurm-bridge recognises them as
+# bridge worker nodes (upstream `scheduler.slinky.slurm.net/slurm-bridge=worker`).
+# Additive + idempotent; removed on teardown.
+BRIDGE_WORKER_LABEL="scheduler.slinky.slurm.net/slurm-bridge"
+label_bridge_nodes() {
+  local nodes
+  nodes="$(k get nodes -l slinky.slurm.net/node-type=compute \
+             -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)"
+  [ -n "$nodes" ] || { echo "##[warning]no node-type=compute nodes to label"; return 0; }
+  for n in $nodes; do
+    k label node "$n" "${BRIDGE_WORKER_LABEL}=worker" --overwrite >/dev/null && \
+      echo "   labelled $n ${BRIDGE_WORKER_LABEL}=worker"
+  done
 }
 
 # --- slurmctld pod/container discovery + exec helper ----------------------------
@@ -175,6 +220,11 @@ install() {
   guard_topology
   ensure_helm
   echo ">> helm: $(helm version --short)"
+
+  # 0. Prerequisite charts (scheduler-plugins CoScheduling + jobset + lws) and
+  #    bridge worker-node labels — upstream slurm-bridge hack/ parity.
+  ensure_prereqs
+  label_bridge_nodes
 
   # 1. JWT token Secret for slurmrestd auth — prefer the operator Token CR.
   echo ">> detecting Slurm JWT signing-key secret in ns ${SLURM_NS}"
@@ -375,6 +425,18 @@ teardown() {
       echo "   untainted $n"
     fi
   done
+  # Remove the bridge worker-node labels we added in install().
+  for n in $(k get nodes -l "${BRIDGE_WORKER_LABEL}=worker" \
+               -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    k label node "$n" "${BRIDGE_WORKER_LABEL}-" 2>/dev/null && echo "   unlabelled $n"
+  done
+  # Prerequisite charts (scheduler-plugins/jobset/lws) are potentially shared
+  # cluster infra, so only remove them when explicitly asked.
+  if [ "${TEARDOWN_PREREQS:-0}" = "1" ]; then
+    for r in "lws:lws-system" "jobset:jobset-system" "scheduler-plugins:scheduler-plugins"; do
+      helmw uninstall "${r%%:*}" -n "${r##*:}" 2>/dev/null && echo ">> uninstalled ${r%%:*}"
+    done
+  fi
   k delete token slurm-bridge-token -n "$SLURM_NS" --ignore-not-found 2>/dev/null || true
   k delete secret slurm-bridge-token -n "$SLURM_NS" --ignore-not-found 2>/dev/null || true
   k delete ns "$WL_NS" --ignore-not-found 2>/dev/null || true

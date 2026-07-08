@@ -117,8 +117,8 @@ the manifest / Day-2 script:
 
 ## 5. Day-2 add-ons **[up]**
 
-Installed by [scripts/day2-selfmanaged.sh](../scripts/day2-selfmanaged.sh)
-(`./scripts/azure-remote.sh day2`). Idempotent.
+Installed by [scripts/selfmanaged-3-addons.sh](../scripts/selfmanaged-3-addons.sh)
+(`./scripts/azure-remote.sh addons`). Idempotent.
 
 | Add-on | How | Notes |
 |---|---|---|

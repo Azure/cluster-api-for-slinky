@@ -23,7 +23,7 @@
 #   azure-remote.sh up                   sync, then `pulumi up -s azure`
 #   azure-remote.sh apply-selfmanaged    sync, then apply the self-managed manifest
 #   azure-remote.sh delete-selfmanaged   delete the self-managed cluster CRs
-#   azure-remote.sh day2                 install Day-2 addons (cloud-provider-azure + Calico)
+#   azure-remote.sh addons               install Day-2 addons (cloud-provider-azure + Calico)
 #   azure-remote.sh bridge-experiment [all|install|demo|teardown]  CPU-only slurm-bridge demo
 #   azure-remote.sh watch                list CAPI/CAPZ workload-cluster CRs
 #   azure-remote.sh describe             clusterctl describe cluster caps-self
@@ -82,10 +82,10 @@ case "$cmd" in
     kube "apply -f '$REMOTE_REPO/$MANIFEST'" ;;
   delete-selfmanaged)
     kube "delete -f '$REMOTE_REPO/$MANIFEST'" ;;
-  day2)
+  addons)
     sync_repo
     echo ">> installing Day-2 addons (cloud-provider-azure + Calico) on caps-self"
-    ssh_run "cd '$REMOTE_REPO' && bash scripts/day2-selfmanaged.sh" ;;
+    ssh_run "cd '$REMOTE_REPO' && bash scripts/selfmanaged-3-addons.sh" ;;
   bridge-experiment)
     sync_repo
     echo ">> running CPU-only slurm-bridge experiment on caps-self (${*:-all})"

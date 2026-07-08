@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# day2-selfmanaged.sh - install the Day-2 addons on the self-managed workload
+# selfmanaged-3-addons.sh - install the Day-2 addons on the self-managed workload
 # cluster `caps-self`, so its nodes leave NotReady.
 #
 # Runs ON the CAPZ management VM (needs kubectl + line-of-sight to the workload
 # API server). Drive it from a workstation with:
-#     scripts/azure-remote.sh day2
+#     scripts/azure-remote.sh addons
 #
 # Why these two, in this order:
 #   1. cloud-provider-azure (CCM + cloud-node-manager) - the cluster runs with
@@ -69,7 +69,31 @@ kubectl --kubeconfig "$WORKLOAD_KCFG" get nodes -o wide || true
 # own IP via kube-proxy hostAliases (kubelet honors hostAliases even for
 # hostNetwork pods). Single-CP only; revisit for an HA control plane.
 APISERVER_HOST="$(kubectl --context "$CTX" -n "$NAMESPACE" get azurecluster "$CLUSTER" -o jsonpath='{.spec.controlPlaneEndpoint.host}' 2>/dev/null || true)"
-CP_IP="$(kubectl --context "$CTX" -n "$NAMESPACE" get machine -l cluster.x-k8s.io/control-plane -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)"
+# Scope BOTH labels to THIS cluster: `cluster.x-k8s.io/control-plane` alone is
+# cluster-agnostic, so with more than one workload cluster in the namespace
+# `.items[0]` can return a DIFFERENT cluster's CP IP (e.g. caps-self's 10.1.1.4
+# instead of caps-val's 10.2.1.4), mis-pinning kube-proxy's apiserver hostAlias.
+# RETRY: the CP Machine's status InternalIP can lag a few seconds behind the
+# control plane reporting Initialized (CAPZ populates addresses asynchronously),
+# so poll rather than skip — else the single-CP hairpin fix is missed and the CP
+# node never goes Ready.
+CP_IP=""
+for _ in $(seq 1 20); do
+  CP_IP="$(kubectl --context "$CTX" -n "$NAMESPACE" get machine -l cluster.x-k8s.io/control-plane,cluster.x-k8s.io/cluster-name="$CLUSTER" -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)"
+  [[ -n "$CP_IP" ]] && break
+  sleep 3
+done
+# FALLBACK: CAPI can take SEVERAL MINUTES to copy the address into Machine.status
+# on a fresh CP. The VM NIC has the private IP immediately, so ask Azure directly
+# (mgmt VM has az). RG comes from the AzureCluster so no extra env is needed.
+if [[ -z "$CP_IP" ]] && command -v az >/dev/null 2>&1; then
+  WL_RG="$(kubectl --context "$CTX" -n "$NAMESPACE" get azurecluster "$CLUSTER" -o jsonpath='{.spec.resourceGroup}' 2>/dev/null || true)"
+  if [[ -n "$WL_RG" ]]; then
+    echo ">> CP IP not in Machine status yet; querying Azure (rg=$WL_RG)"
+    az account show >/dev/null 2>&1 || az login --identity -o none 2>/dev/null || true
+    CP_IP="$(az vm list-ip-addresses -g "$WL_RG" --query "[?contains(virtualMachine.name, 'control-plane')].virtualMachine.network.privateIpAddresses" -o tsv 2>/dev/null | head -1 || true)"
+  fi
+fi
 if [[ -n "$APISERVER_HOST" && -n "$CP_IP" ]]; then
   echo ">> pinning kube-proxy apiserver $APISERVER_HOST -> $CP_IP (internal-LB hairpin workaround)"
   kubectl --kubeconfig "$WORKLOAD_KCFG" -n kube-system patch ds kube-proxy --type=merge \

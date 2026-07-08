@@ -1,0 +1,91 @@
+# =============================================================================
+# Slinky Slurm values for the caps-val CPU VALIDATION cluster.
+# =============================================================================
+#
+# A CPU-only, no-HPC-X mirror of caps-self-slurm.yaml, used to validate the
+# TWO-MachineDeployment topology end-to-end: slurmctld + slurmrestd pinned to the
+# node-type=controller node (caps-val-md-ctrl), and a slurmd DaemonSet on the
+# node-type=compute nodes (caps-val-md-0, in the Flex VMSS).
+#
+# Differences vs caps-self-slurm.yaml (deliberate, for a plain-Ubuntu/D2as_v5
+# validation with no GPU/IB):
+#   * clusterName caps-self -> caps-val
+#   * DROP the HPC-X (/opt/hpcx, hostPath type: Directory) + InfiniBand
+#     (/dev/infiniband) host mounts — those require the ubuntu-hpc image + a GPU/IB
+#     SKU; on plain Ubuntu the `type: Directory` mount would fail (FailedMount).
+#   * DROP hostNetwork (not needed without the host-NIC/IB path; slurmd uses the
+#     Calico overlay, as the original caps-self TCP validation did).
+# RESULT: sinfo / srun hostname work (topology proven); MPI/RDMA jobs do NOT (no
+# HPC-X) — this file is for the SCHEDULER TOPOLOGY validation only.
+clusterName: caps-val
+
+# slurmd runs in a container without its own cgroup hierarchy.
+configFiles:
+  cgroup.conf: |
+    CgroupPlugin=disabled
+
+# slurmctld -> the dedicated controller node.
+controller:
+  podSpec:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: "slinky.slurm.net/node-type"
+                  operator: In
+                  values:
+                    - "controller"
+  persistence:
+    enabled: true
+    resources:
+      requests:
+        storage: 2Gi
+
+# slurmrestd -> controller node (off the tainted compute nodes).
+restapi:
+  podSpec:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: "slinky.slurm.net/node-type"
+                  operator: In
+                  values:
+                    - "controller"
+
+# Accounting needs an external MariaDB (not bundled in chart v1.1.1); off for the
+# validation so slurmctld starts and the slurmd NodeSet registers.
+accounting:
+  enabled: false
+
+loginsets:
+  slinky:
+    enabled: false
+
+nodesets:
+  slinky:
+    enabled: true
+    # One slurmd per compute node.
+    scalingMode: DaemonSet
+    podSpec:
+      nodeSelector:
+        kubernetes.io/os: linux
+        slinky.slurm.net/node-type: compute
+      # Tolerate the compute taint (slinky.slurm.net/compute:NoSchedule set in the
+      # caps-val-md-0 KubeadmConfigTemplate) so slurmd still schedules there.
+      tolerations:
+        - key: slinky.slurm.net/compute
+          operator: Exists
+          effect: NoSchedule
+
+partitions:
+  all:
+    enabled: true
+    nodesets:
+      - ALL
+    configMap:
+      State: UP
+      Default: "YES"
+      MaxTime: UNLIMITED

@@ -30,7 +30,7 @@
 #   TEARDOWN=1   (delete the test cluster and exit; skips everything else)
 set -euo pipefail
 
-# On the mgmt VM helm is installed under ~/.local/bin (day2-selfmanaged.sh), which is
+# On the mgmt VM helm is installed under ~/.local/bin (selfmanaged-3-addons.sh), which is
 # not on the non-interactive ssh PATH. Make sure user-local tools are found.
 export PATH="$HOME/.local/bin:$PATH"
 

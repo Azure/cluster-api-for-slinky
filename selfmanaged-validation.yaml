@@ -1,0 +1,294 @@
+# =============================================================================
+# CPU-cheap VALIDATION cluster (`caps-val`) — reproducibility proof.
+# =============================================================================
+#
+# A parameterized, GPU-free copy of selfmanaged-workload-cluster.yaml used to
+# prove the self-managed setup path is reproducible FROM SCRATCH, side-by-side
+# with the live caps-self cluster (which it never touches). Differences vs the
+# production manifest:
+#   * cluster name  caps-self  -> caps-val
+#   * resource group rg-capz-mi-scus -> rg-capz-mi-val   (own RG => trivial teardown)
+#   * VNet 10.1.0.0/16 -> vnet-capz-mi-val 10.2.0.0/16   (no CIDR overlap w/ mgmt/caps-self)
+#   * worker/CP SKU  Standard_ND40rs_v2 / ubuntu-hpc -> Standard_D2as_v5 / plain
+#     Canonical ubuntu-24_04-lts:server  (cheap CPU, no GPU/IB, no marketplace plan)
+#   * workers stay a Uniform MachinePool (no Flex VMSS / CAPZ fork needed)
+#   * BOTH subnets declare an explicit natGateway so CAPZ references deterministic
+#     names that scripts/selfmanaged-1-networking.sh pre-creates.
+#
+# Bring up (uniform mode), all env-driven so the scripts target caps-val:
+#   CLUSTER=caps-val RG=rg-capz-mi-val LOCATION=southcentralus \
+#   VNET=vnet-capz-mi-val VNET_CIDR=10.2.0.0/16 \
+#   CP_SUBNET=caps-val-cp-subnet CP_CIDR=10.2.1.0/24 \
+#   NODE_SUBNET=caps-val-node-subnet NODE_CIDR=10.2.2.0/24 \
+#   NODE_NATGW=caps-val-node-natgw \
+#   BASE_MANIFEST=$PWD/selfmanaged-validation.yaml WORKER_MODE=uniform \
+#   bash scripts/selfmanaged-setup.sh
+#
+# Teardown = delete the CRs then the RG:
+#   kubectl delete -f selfmanaged-validation.yaml
+#   az group delete -n rg-capz-mi-val --yes
+# =============================================================================
+
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: caps-val
+  namespace: default
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+        - 192.168.0.0/16
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KubeadmControlPlane
+    name: caps-val-control-plane
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AzureCluster
+    name: caps-val
+
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureCluster
+metadata:
+  name: caps-val
+  namespace: default
+spec:
+  identityRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: AzureClusterIdentity
+    name: cluster-identity
+    namespace: default
+  location: southcentralus
+  resourceGroup: rg-capz-mi-val
+  subscriptionID: d2c9544f-4329-4642-b73d-020e7fef844f
+  networkSpec:
+    vnet:
+      name: vnet-capz-mi-val
+      resourceGroup: rg-capz-mi-val
+    # Internal API LB => private IP in the control-plane subnet, reachable from
+    # the mgmt VM over the global VNet peering created by the networking script.
+    apiServerLB:
+      type: Internal
+      frontendIPs:
+        - name: caps-val-internal-lb-frontend
+          privateIP: 10.2.1.100
+    subnets:
+      - name: caps-val-cp-subnet
+        role: control-plane
+        cidrBlocks:
+          - 10.2.1.0/24
+        # CP node has no public IP + Internal API LB => needs a NAT gateway for
+        # egress (else addon images ImagePullBackOff). Pre-created by the script.
+        natGateway:
+          name: caps-val-cp-natgw
+      - name: caps-val-node-subnet
+        role: node
+        cidrBlocks:
+          - 10.2.2.0/24
+        # Explicit so CAPZ references a deterministic name the script pre-creates
+        # (workers have no public IP; they need egress to pull images/packages).
+        natGateway:
+          name: caps-val-node-natgw
+  additionalTags:
+    Owner: t-hernandezc
+
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  name: caps-val-control-plane
+  namespace: default
+spec:
+  replicas: 1
+  version: v1.36.1
+  machineTemplate:
+    infrastructureRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      kind: AzureMachineTemplate
+      name: caps-val-control-plane
+  kubeadmConfigSpec:
+    clusterConfiguration:
+      controllerManager:
+        extraArgs:
+          allocate-node-cidrs: "false"
+          cloud-provider: external
+          cluster-name: caps-val
+    files:
+      - contentFrom:
+          secret:
+            name: caps-val-control-plane-azure-json
+            key: control-plane-azure.json
+        owner: root:root
+        path: /etc/kubernetes/azure.json
+        permissions: "0644"
+    # Plain Canonical Ubuntu 24.04 carries no Kubernetes, so install containerd +
+    # kubelet/kubeadm/kubectl (v1.36.1) before kubeadm init. Same list as workers.
+    preKubeadmCommands:
+      - set -eux
+      - export DEBIAN_FRONTEND=noninteractive
+      - apt-get -o DPkg::Lock::Timeout=600 update -y
+      - apt-get -o DPkg::Lock::Timeout=600 install -y apt-transport-https ca-certificates curl gpg
+      - command -v containerd >/dev/null 2>&1 || apt-get -o DPkg::Lock::Timeout=600 install -y containerd
+      - mkdir -p /etc/containerd
+      - containerd config default > /etc/containerd/config.toml
+      - sed -ri 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+      - systemctl restart containerd
+      - systemctl enable containerd
+      - modprobe overlay
+      - modprobe br_netfilter
+      - printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/k8s.conf
+      - printf 'net.bridge.bridge-nf-call-iptables=1\nnet.bridge.bridge-nf-call-ip6tables=1\nnet.ipv4.ip_forward=1\n' > /etc/sysctl.d/k8s.conf
+      - sysctl --system
+      - swapoff -a
+      - sed -ri '/\sswap\s/s/^/#/' /etc/fstab
+      - mkdir -p /etc/apt/keyrings
+      - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      - echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.36/deb/ /' > /etc/apt/sources.list.d/kubernetes.list
+      - apt-get -o DPkg::Lock::Timeout=600 update -y
+      - apt-get -o DPkg::Lock::Timeout=600 install -y kubelet=1.36.1-1.1 kubeadm=1.36.1-1.1 kubectl=1.36.1-1.1
+      - apt-mark hold kubelet kubeadm kubectl
+      - systemctl enable kubelet
+    initConfiguration:
+      nodeRegistration:
+        name: '{{ ds.meta_data["local_hostname"] }}'
+        kubeletExtraArgs:
+          cloud-provider: external
+    joinConfiguration:
+      nodeRegistration:
+        name: '{{ ds.meta_data["local_hostname"] }}'
+        kubeletExtraArgs:
+          cloud-provider: external
+
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureMachineTemplate
+metadata:
+  name: caps-val-control-plane
+  namespace: default
+spec:
+  template:
+    spec:
+      vmSize: Standard_D2as_v5
+      image:
+        marketplace:
+          publisher: Canonical
+          offer: ubuntu-24_04-lts
+          sku: server
+          version: latest
+      osDisk:
+        diskSizeGB: 64
+        managedDisk:
+          storageAccountType: Premium_LRS
+        osType: Linux
+      identity: UserAssigned
+      userAssignedIdentities:
+        - providerID: azure:///subscriptions/d2c9544f-4329-4642-b73d-020e7fef844f/resourceGroups/rg-capz-mi-dev2/providers/Microsoft.ManagedIdentity/userAssignedIdentities/rg-capz-mi-dev2
+      sshPublicKey: c3NoLXJzYSBBQUFBQjNOemFDMXljMkVBQUFBREFRQUJBQUFCQVFEaFUyKzg2clArMHYyeTE4WURNMEZORTArd0xYR1JYd2ZvQlNnM2hJbHFRanBuUk5lU3luT3k5K20xUHZ4WVNtdWM3eGM0V2dVTWhTZ2FMclYyc3pPQnBQNlNlblM5QlRzazJYM1l4ejBlVTFPNmlTZHMyZi8xUmFoUTR5SHdVRndFWVFtVWVCbnhSUmc2Yzd3enNVZk1KQlIvc3FrYXBIc1ErS1FpMEx3TjZRR2ppSHdWYWVkYXZ0Qkw4YXpVNzAxRGRpTXhGdWhENkdpU0hVVjNWQTUra2FpS053aTFEb2R3U3EzUXZRUEUrT1J0WlBRU1d6N256bzYvRC9HeUdWYUZGL2JjYXlkMFpEc3ZxOFpldnRDOXVZbUluajIzVEtGdVlMendaTU9PNW1xZTM5SU1USzhMREx6bmFIazk5K2xvYnQyWEdhNXl2SnhZMkRZaGd4RmIgYXp1cmV1c2VyQHZtLWNhcHotbWktZGV2Cg==
+      additionalTags:
+        Owner: t-hernandezc
+
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachinePool
+metadata:
+  name: caps-val-mp-0
+  namespace: default
+spec:
+  clusterName: caps-val
+  replicas: 2
+  failureDomains:
+    - "1"
+  template:
+    spec:
+      clusterName: caps-val
+      version: v1.36.1
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: KubeadmConfig
+          name: caps-val-mp-0
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: AzureMachinePool
+        name: caps-val-mp-0
+
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: AzureMachinePool
+metadata:
+  name: caps-val-mp-0
+  namespace: default
+spec:
+  location: southcentralus
+  identity: UserAssigned
+  userAssignedIdentities:
+    - providerID: azure:///subscriptions/d2c9544f-4329-4642-b73d-020e7fef844f/resourceGroups/rg-capz-mi-dev2/providers/Microsoft.ManagedIdentity/userAssignedIdentities/rg-capz-mi-dev2
+  template:
+    image:
+      marketplace:
+        publisher: Canonical
+        offer: ubuntu-24_04-lts
+        sku: server
+        version: latest
+    vmSize: Standard_D2as_v5
+    osDisk:
+      diskSizeGB: 64
+      managedDisk:
+        storageAccountType: Premium_LRS
+      osType: Linux
+    sshPublicKey: c3NoLXJzYSBBQUFBQjNOemFDMXljMkVBQUFBREFRQUJBQUFCQVFEaFUyKzg2clArMHYyeTE4WURNMEZORTArd0xYR1JYd2ZvQlNnM2hJbHFRanBuUk5lU3luT3k5K20xUHZ4WVNtdWM3eGM0V2dVTWhTZ2FMclYyc3pPQnBQNlNlblM5QlRzazJYM1l4ejBlVTFPNmlTZHMyZi8xUmFoUTR5SHdVRndFWVFtVWVCbnhSUmc2Yzd3enNVZk1KQlIvc3FrYXBIc1ErS1FpMEx3TjZRR2ppSHdWYWVkYXZ0Qkw4YXpVNzAxRGRpTXhGdWhENkdpU0hVVjNWQTUra2FpS053aTFEb2R3U3EzUXZRUEUrT1J0WlBRU1d6N256bzYvRC9HeUdWYUZGL2JjYXlkMFpEc3ZxOFpldnRDOXVZbUluajIzVEtGdVlMendaTU9PNW1xZTM5SU1USzhMREx6bmFIazk5K2xvYnQyWEdhNXl2SnhZMkRZaGd4RmIgYXp1cmV1c2VyQHZtLWNhcHotbWktZGV2Cg==
+  additionalTags:
+    Owner: t-hernandezc
+    AzSecPackAutoConfigReady: "true"
+
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+kind: KubeadmConfig
+metadata:
+  name: caps-val-mp-0
+  namespace: default
+spec:
+  files:
+    - contentFrom:
+        secret:
+          name: caps-val-mp-0-azure-json
+          key: worker-node-azure.json
+      owner: root:root
+      path: /etc/kubernetes/azure.json
+      permissions: "0644"
+  # Plain Canonical Ubuntu has no container runtime + no Kubernetes, so the
+  # `command -v containerd || apt-get install containerd` installs the distro
+  # containerd (no moby-containerd conflict, unlike the HPC image).
+  preKubeadmCommands:
+    - set -eux
+    - export DEBIAN_FRONTEND=noninteractive
+    - apt-get -o DPkg::Lock::Timeout=600 update -y
+    - apt-get -o DPkg::Lock::Timeout=600 install -y apt-transport-https ca-certificates curl gpg
+    - command -v containerd >/dev/null 2>&1 || apt-get -o DPkg::Lock::Timeout=600 install -y containerd
+    - mkdir -p /etc/containerd
+    - containerd config default > /etc/containerd/config.toml
+    - sed -ri 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+    - systemctl restart containerd
+    - systemctl enable containerd
+    - modprobe overlay
+    - modprobe br_netfilter
+    - printf 'overlay\nbr_netfilter\n' > /etc/modules-load.d/k8s.conf
+    - printf 'net.bridge.bridge-nf-call-iptables=1\nnet.bridge.bridge-nf-call-ip6tables=1\nnet.ipv4.ip_forward=1\n' > /etc/sysctl.d/k8s.conf
+    - sysctl --system
+    - swapoff -a
+    - sed -ri '/\sswap\s/s/^/#/' /etc/fstab
+    - mkdir -p /etc/apt/keyrings
+    - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    - echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.36/deb/ /' > /etc/apt/sources.list.d/kubernetes.list
+    - apt-get -o DPkg::Lock::Timeout=600 update -y
+    - apt-get -o DPkg::Lock::Timeout=600 install -y kubelet=1.36.1-1.1 kubeadm=1.36.1-1.1 kubectl=1.36.1-1.1
+    - apt-mark hold kubelet kubeadm kubectl
+    - systemctl enable kubelet
+  joinConfiguration:
+    nodeRegistration:
+      name: '{{ ds.meta_data["local_hostname"] }}'
+      kubeletExtraArgs:
+        cloud-provider: external

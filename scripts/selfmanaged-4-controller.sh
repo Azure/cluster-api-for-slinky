@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 #
-# apply-controller-md.sh — bring up the dedicated in-cluster controller node
-# (the `caps-self-md-ctrl` MachineDeployment), then optionally repin the Slurm
+# selfmanaged-4-controller.sh — bring up the dedicated in-cluster controller node
+# (the `<cluster>-md-ctrl` MachineDeployment), then optionally repin the Slurm
 # head pods onto it and taint the GPU compute nodes.
 #
-# Runs ON the mgmt VM (default kubectl context = the mgmt kind cluster). The
-# workload-cluster steps use the caps-self kubeconfig pulled from the
-# `caps-self-kubeconfig` secret. Idempotent + safe to re-run (e.g. if the
-# node-provisioning wait times out, just run it again).
+# Parameterized by cluster (default caps-self). Runs ON the mgmt VM (default
+# kubectl context = the mgmt kind cluster); workload-cluster steps use the
+# `<cluster>-kubeconfig` secret. Idempotent + safe to re-run (e.g. if the
+# node-provisioning wait times out, just run it again). Override for e.g. the
+# caps-val validation:
+#   CLUSTER=caps-val FLEX_MANIFEST=$PWD/selfmanaged-validation.flex.yaml \
+#   VALUES=$PWD/selfmanaged-validation-slurm.yaml \
+#   bash scripts/selfmanaged-4-controller.sh
 #
 #   bash scripts/azure-remote.sh sync
-#   bash scripts/azure-remote.sh ssh 'bash scripts/apply-controller-md.sh'            # PHASE 1 (safe/additive)
-#   bash scripts/azure-remote.sh ssh 'DO_REPIN=1 bash scripts/apply-controller-md.sh' # PHASE 2 (disruptive)
+#   bash scripts/azure-remote.sh ssh 'bash scripts/selfmanaged-4-controller.sh'            # PHASE 1 (safe/additive)
+#   bash scripts/azure-remote.sh ssh 'DO_REPIN=1 bash scripts/selfmanaged-4-controller.sh' # PHASE 2 (disruptive)
 #
 # PHASE 1 (default): CAPI label-sync patch + `kubectl apply` the flex manifest +
 #   wait for the controller VM to provision, join, and become Ready, and ensure
@@ -27,14 +31,17 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-FLEX="$REPO/selfmanaged-workload-cluster.flex.yaml"
-SLURM_VALUES="$REPO/caps-self-slurm.yaml"
-KC="${KC:-/tmp/caps-self.kubeconfig}"
+CLUSTER="${CLUSTER:-caps-self}"
+NAMESPACE="${NAMESPACE:-default}"
+FLEX_MANIFEST="${FLEX_MANIFEST:-$REPO/selfmanaged-workload-cluster.flex.yaml}"
+# VALUES aligns with selfmanaged-5-slurm.sh; SLURM_VALUES kept as a fallback alias.
+SLURM_VALUES="${VALUES:-${SLURM_VALUES:-$REPO/caps-self-slurm.yaml}}"
+KC="${KC:-/tmp/${CLUSTER}.kubeconfig}"
 SLURM_NS="${SLURM_NS:-slurm}"
 SLURM_RELEASE="${SLURM_RELEASE:-slurm}"
 SLURM_CHART="oci://ghcr.io/slinkyproject/charts/slurm"
 SLURM_CHART_VERSION="${SLURM_CHART_VERSION:-1.1.1}"
-MD_LABEL="cluster.x-k8s.io/deployment-name=caps-self-md-ctrl"
+MD_LABEL="cluster.x-k8s.io/deployment-name=${CLUSTER}-md-ctrl"
 DO_REPIN="${DO_REPIN:-0}"
 
 # helm is installed under ~/.local/bin on the mgmt VM; a non-login ssh shell may
@@ -56,11 +63,11 @@ else
 fi
 
 echo "############ STEP 2: apply flex manifest (mgmt) ############"
-# Creates the caps-self-md-ctrl trio and updates the caps-self-md-0
+# Creates the <cluster>-md-ctrl trio and updates the <cluster>-md-0
 # KubeadmConfigTemplate with the compute taint (affects FUTURE compute VMs only;
 # live workers are tainted in PHASE 2). The compute MachineDeployment spec is
 # unchanged, so no compute rollout happens.
-kubectl apply -f "$FLEX"
+kubectl apply -f "$FLEX_MANIFEST"
 
 echo "############ STEP 3: wait for the controller Machine to reach Running ############"
 # The MachineDeployment -> MachineSet -> Machine chain takes a moment to appear,
@@ -75,7 +82,7 @@ done
 kubectl get machine -l "$MD_LABEL" -o wide || true
 
 echo "############ STEP 4: fetch workload kubeconfig ############"
-kubectl -n default get secret caps-self-kubeconfig -o jsonpath='{.data.value}' | base64 -d > "$KC"
+kubectl -n "$NAMESPACE" get secret "${CLUSTER}-kubeconfig" -o jsonpath='{.data.value}' | base64 -d > "$KC"
 chmod 600 "$KC"
 
 echo "############ STEP 5: wait for controller node Ready + ensure label ############"

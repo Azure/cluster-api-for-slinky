@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# create-vmss-flex-ib.sh - Phase 2 (non-destructive): pre-create the BYO VMSS Flex
+# selfmanaged-2-flexvmss.sh - Phase 2 (non-destructive): pre-create the BYO VMSS Flex
 # that the backported CAPZ `virtualMachineScaleSetID` field places workers into, so
 # both ND40rs_v2 land in ONE InfiniBand partition (matching pkeys) and cross-node
 # RDMA works.
