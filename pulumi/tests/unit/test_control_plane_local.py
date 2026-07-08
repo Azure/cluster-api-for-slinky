@@ -19,7 +19,6 @@ from stacks.control_plane.control_plane_kind import (
     KindAzureControlPlaneSpec,
     ManagementAWXControlPlaneOutputs,
 )
-from stacks.control_plane.azure._imds_preflight_job import IMDSPreflightJobOutputs
 
 
 def test_control_plane_kind_config_defaults_awx_disabled() -> None:
@@ -111,18 +110,6 @@ class _FakeAzureClusterIdentity:
         self.identity_namespace = pulumi.Output.from_input("default")
 
 
-class _FakeIMDSPreflightJob:
-    calls: list[dict[str, object]] = []
-
-    def __init__(self, name: str, **kwargs: object) -> None:
-        self.name = name
-        self.calls.append({"name": name, "instance": self, **kwargs})
-        self.outputs = IMDSPreflightJobOutputs(
-            job_name=pulumi.Output.from_input("imds-preflight"),
-            job_namespace=pulumi.Output.from_input("capz-system"),
-        )
-
-
 def _patch_pulumi_component(monkeypatch: Any) -> None:
     def init(
         self: pulumi.ComponentResource,
@@ -163,16 +150,10 @@ def _patch_local_children(monkeypatch: Any) -> None:
 
 def _patch_azure_children(monkeypatch: Any) -> None:
     _FakeAzureClusterIdentity.calls = []
-    _FakeIMDSPreflightJob.calls = []
     monkeypatch.setattr(
         control_plane_kind,
         "AzureClusterIdentity",
         _FakeAzureClusterIdentity,
-    )
-    monkeypatch.setattr(
-        control_plane_kind,
-        "IMDSPreflightJob",
-        _FakeIMDSPreflightJob,
     )
 
 
@@ -218,7 +199,7 @@ def test_control_plane_local_instantiates_awx_when_enabled(monkeypatch: Any) -> 
     assert "provider" not in control_plane._test_outputs["awx"]
 
 
-def test_kind_azure_control_plane_runs_imds_preflight_for_user_assigned_msi(
+def test_kind_azure_control_plane_creates_identity_for_user_assigned_msi(
     monkeypatch: Any,
 ) -> None:
     _patch_pulumi_component(monkeypatch)
@@ -241,14 +222,12 @@ def test_kind_azure_control_plane_runs_imds_preflight_for_user_assigned_msi(
     identity = _FakeAzureClusterIdentity.calls[0]["identity"]
     assert isinstance(identity, UserAssignedMSIClusterIdentityConfig)
     assert identity.allowed_namespaces == AllowedNamespacesConfig()
-    assert len(_FakeIMDSPreflightJob.calls) == 1
     identity_opts = _FakeAzureClusterIdentity.calls[0]["opts"]
     assert isinstance(identity_opts, pulumi.ResourceOptions)
-    assert _FakeIMDSPreflightJob.calls[0]["instance"] in identity_opts.depends_on
-    assert control_plane.outputs.imds_preflight_job is not None
+    assert control_plane.outputs.cluster_identity_name is not None
 
 
-def test_kind_azure_control_plane_skips_imds_preflight_for_workload_identity(
+def test_kind_azure_control_plane_creates_identity_for_workload_identity(
     monkeypatch: Any,
 ) -> None:
     _patch_pulumi_component(monkeypatch)
@@ -270,5 +249,4 @@ def test_kind_azure_control_plane_skips_imds_preflight_for_workload_identity(
 
     identity = _FakeAzureClusterIdentity.calls[0]["identity"]
     assert isinstance(identity, WorkloadIdentityClusterIdentityConfig)
-    assert _FakeIMDSPreflightJob.calls == []
-    assert control_plane.outputs.imds_preflight_job is None
+    assert control_plane.outputs.cluster_identity_name is not None

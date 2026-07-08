@@ -155,7 +155,6 @@ class AzureInfrastructureProviderConfig(PulumiConfigModel):
     default_resource_group: NonEmptyStr | None = Field(
         default_factory=_discover_default_resource_group
     )
-    skip_in_cluster_preflight: StrictBool = False
 
 
 class InfrastructureProvidersConfig(PulumiConfigModel):

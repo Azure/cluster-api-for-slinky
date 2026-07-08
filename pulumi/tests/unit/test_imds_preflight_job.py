@@ -53,12 +53,12 @@ def test_probe_command_requires_metadata_header_and_bypasses_proxy() -> None:
     assert "--noproxy '*'" in script
 
 
-def test_probe_command_probes_capz_webhook_before_imds() -> None:
+def test_probe_command_does_not_probe_capz_webhook() -> None:
     script = _probe_command(_CLIENT_ID)[2]
 
-    assert "capz-webhook-service.capz-system.svc" in script
-    assert "validate-infrastructure-cluster-x-k8s-io-v1beta1-azureclusteridentity" in script
-    assert script.index("CAPZ webhook") < script.index("curling IMDS")
+    assert "capz-webhook-service.capz-system.svc" not in script
+    assert "validate-infrastructure-cluster-x-k8s-io-v1beta1-azureclusteridentity" not in script
+    assert "CAPZ webhook" not in script
 
 
 def test_probe_command_enforces_curl_timeout() -> None:

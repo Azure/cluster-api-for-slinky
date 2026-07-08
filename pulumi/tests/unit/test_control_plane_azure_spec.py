@@ -265,7 +265,6 @@ def test_builds_enabled_azure_provider_from_discovery(
     assert str(azure.default_subscription_id) == _SUBSCRIPTION_ID
     assert azure.default_location == _LOCATION
     assert azure.default_resource_group == _RESOURCE_GROUP
-    assert azure.skip_in_cluster_preflight is False
     _assert_user_assigned_identity(azure.identity)
 
 
@@ -564,21 +563,6 @@ def test_parse_allows_empty_allowed_namespaces_list() -> None:
     assert parsed.allowed_namespaces == AllowedNamespacesConfig(list=())
 
 
-def test_skip_in_cluster_preflight_defaults_to_false() -> None:
-    # ``skipInClusterPreflight`` is optional; absent in the wire shape
-    # means "run the preflight" so the safe default is False.
-    azure = _parse_azure_provider(
-        {
-            "enabled": True,
-            "defaultSubscriptionId": _SUBSCRIPTION_ID,
-            "defaultLocation": _LOCATION,
-            "defaultResourceGroup": _RESOURCE_GROUP,
-            "identity": _full_payload(),
-        }
-    )
-    assert azure.skip_in_cluster_preflight is False
-
-
 def test_provider_config_completes_partial_azure_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -612,13 +596,11 @@ def test_azure_provider_discovery_preserves_explicit_subscription(
     azure = AzureInfrastructureProviderConfig(
         enabled=True,
         default_subscription_id=_OTHER_SUBSCRIPTION_ID,
-        skip_in_cluster_preflight=True,
     )
 
     assert str(azure.default_subscription_id) == _OTHER_SUBSCRIPTION_ID
     assert azure.default_location == _LOCATION
     assert azure.default_resource_group == _RESOURCE_GROUP
-    assert azure.skip_in_cluster_preflight is True
     _assert_user_assigned_identity(azure.identity)
 
 
@@ -751,48 +733,7 @@ def test_apply_local_environment_discovery_requires_discovery_for_partial_azure_
         )
 
 
-def test_skip_in_cluster_preflight_round_trips_true() -> None:
-    built = _control_plane_child_config(
-        ControlPlaneKindConfig(
-            infrastructure_providers=InfrastructureProvidersConfig(
-                docker=DockerInfrastructureProviderConfig(enabled=False),
-                azure=AzureInfrastructureProviderConfig(
-                    enabled=True,
-                    default_subscription_id=_SUBSCRIPTION_ID,
-                    default_location=_LOCATION,
-                    default_resource_group=_RESOURCE_GROUP,
-                    identity=UserAssignedMSIClusterIdentityConfig(
-                        client_id=_CLIENT_ID,
-                        tenant_id=_TENANT_ID,
-                    ),
-                    skip_in_cluster_preflight=True,
-                ),
-            ),
-            deployments=ControlPlaneDeploymentsConfig(
-                awx=ControlPlaneAWXConfig(enabled=False)
-            ),
-        )
-    )
-
-    control_plane = built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
-    assert isinstance(control_plane, dict)
-    assert control_plane["infrastructureProviders"]["azure"] == {
-        "enabled": True,
-        "defaultSubscriptionId": _SUBSCRIPTION_ID,
-        "defaultLocation": _LOCATION,
-        "defaultResourceGroup": _RESOURCE_GROUP,
-        "identity": {
-            "type": "UserAssignedMSI",
-            "clientId": _CLIENT_ID,
-            "tenantId": _TENANT_ID,
-        },
-        "skipInClusterPreflight": True,
-    }
-    parsed = ControlPlaneKindConfig.model_validate(control_plane)
-    assert _azure_provider(parsed).skip_in_cluster_preflight is True
-
-
-def test_workload_identity_round_trips_and_keeps_preflight_default() -> None:
+def test_workload_identity_round_trips() -> None:
     built = _control_plane_child_config(
         ControlPlaneKindConfig(
             infrastructure_providers=InfrastructureProvidersConfig(
@@ -832,43 +773,9 @@ def test_workload_identity_round_trips_and_keeps_preflight_default() -> None:
     azure = _azure_provider(parsed)
     assert azure.identity is not None
     assert azure.identity.type == "WorkloadIdentity"
-    assert azure.skip_in_cluster_preflight is False
 
 
-def test_build_omits_skip_in_cluster_preflight_when_false() -> None:
-    # The default-False case must produce the minimal wire shape so
-    # operators can flip the flag back to "use the default" by removing
-    # the config key, not by setting it to false explicitly.
-    built = _control_plane_child_config(
-        ControlPlaneKindConfig(
-            infrastructure_providers=InfrastructureProvidersConfig(
-                docker=DockerInfrastructureProviderConfig(enabled=False),
-                azure=AzureInfrastructureProviderConfig(
-                    enabled=True,
-                    default_subscription_id=_SUBSCRIPTION_ID,
-                    default_location=_LOCATION,
-                    default_resource_group=_RESOURCE_GROUP,
-                    identity=UserAssignedMSIClusterIdentityConfig(
-                        client_id=_CLIENT_ID,
-                        tenant_id=_TENANT_ID,
-                    ),
-                    skip_in_cluster_preflight=False,
-                ),
-            ),
-            deployments=ControlPlaneDeploymentsConfig(
-                awx=ControlPlaneAWXConfig(enabled=False)
-            ),
-        )
-    )
-
-    control_plane = built[CONTROL_PLANE_KIND_CHILD_CONFIG_KEY]
-    assert isinstance(control_plane, dict)
-    azure = control_plane["infrastructureProviders"]["azure"]
-    assert isinstance(azure, dict)
-    assert "skipInClusterPreflight" not in azure
-
-
-def test_parse_rejects_non_bool_skip_in_cluster_preflight() -> None:
+def test_parse_rejects_removed_skip_in_cluster_preflight() -> None:
     with pytest.raises(ValueError, match="skipInClusterPreflight"):
         _parse_azure_provider(
             {
@@ -877,7 +784,7 @@ def test_parse_rejects_non_bool_skip_in_cluster_preflight() -> None:
                 "defaultLocation": _LOCATION,
                 "defaultResourceGroup": _RESOURCE_GROUP,
                 "identity": _full_payload(),
-                "skipInClusterPreflight": "yes",
+                "skipInClusterPreflight": True,
             }
         )
 

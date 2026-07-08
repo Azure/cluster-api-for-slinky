@@ -11,9 +11,9 @@ the network path is broken, the Job exits non-zero and Pulumi surfaces
 the failure as a stack error.
 
 The local-kind stack performs host-side IMDS discovery in plain Python before
-declaring resources. This in-cluster preflight runs *after* CAPI Operator +
-CAPZ have rolled out, in the same namespace CAPZ itself runs in, and catches
-drift the host-side discovery cannot see:
+declaring resources. This optional in-cluster preflight runs in the same
+namespace CAPZ itself runs in, and can catch drift the host-side discovery
+cannot see:
 
     * a CNI swap (e.g. kindnet -> Cilium with strict default-deny)
       that drops link-local egress from pods,
@@ -67,8 +67,9 @@ treats the control plane as ready.
 Skipping
 --------
 ``IMDSPreflightJob(..., skip=True)`` returns immediately without creating the
-Job. This is intended only for targeted tests or one-off debugging; the normal
-Azure stack path runs the in-cluster probe.
+Job. The normal Azure stack path skips this probe because CAPZ's controller will
+exercise the same UserAssignedMSI identity once workload resources are applied;
+the Job is available only as an opt-in diagnostic.
 """
 
 from __future__ import annotations
@@ -120,11 +121,6 @@ _IMDS_TOKEN_URL = (
     "&resource=https%3A%2F%2Fmanagement.azure.com%2F"
 )
 _IMDS_CURL_TIMEOUT_SECONDS = 5
-_CAPZ_WEBHOOK_READY_URL = (
-    "https://capz-webhook-service.capz-system.svc"
-    "/validate-infrastructure-cluster-x-k8s-io-v1beta1-azureclusteridentity"
-)
-
 # Job-level safety net. Kubernetes counts image pull and scheduling
 # time against activeDeadlineSeconds, so this must allow cold pulls of
 # curlimages/curl on a fresh kind worker. The actual IMDS network probe
@@ -143,11 +139,6 @@ def _probe_command(client_id: str) -> list[str]:
     url = f"{_IMDS_TOKEN_URL}&client_id={client_id}"
     script = (
         "set -e\n"
-        'echo "[preflight] probing CAPZ webhook service"\n'
-        f"webhook_status=$(curl -sS -k -m {_IMDS_CURL_TIMEOUT_SECONDS} "
-        "-o /dev/null -w '%{http_code}' "
-        f"'{_CAPZ_WEBHOOK_READY_URL}')\n"
-        'echo "[preflight] CAPZ webhook HTTP status: $webhook_status"\n'
         'echo "[preflight] curling IMDS for client_id ' + client_id + '"\n'
         f"response=$(curl -sS -m {_IMDS_CURL_TIMEOUT_SECONDS} "
         "-H 'Metadata: true' --noproxy '*' "

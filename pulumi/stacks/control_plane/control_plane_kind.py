@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import pulumi
-from pydantic import StrictBool
 
 from lib.config import PulumiConfigModel
 from lib.outputs import CompositeOutput
@@ -19,11 +18,7 @@ from stacks.control_plane.control_plane_config import (
 )
 from stacks.control_plane.awx import AWXInstance, AWXOperator, AWXProviderConfig
 from stacks.control_plane.awx._configuration import AWXConfiguration
-from stacks.control_plane.azure import (
-    AzureClusterIdentity,
-    IMDSPreflightJob,
-    IMDSPreflightJobOutputs,
-)
+from stacks.control_plane.azure import AzureClusterIdentity
 from stacks.control_plane.capi import ClusterAPIOperator
 from stacks.control_plane.certmanager import CertManager
 
@@ -50,14 +45,12 @@ class ManagementAWXControlPlaneOutputs(CompositeOutput):
 
 class KindAzureControlPlaneSpec(PulumiConfigModel):
     identity: AzureClusterIdentityConfig
-    skip_in_cluster_preflight: StrictBool = False
 
 
 @dataclass(frozen=True)
 class KindAzureControlPlaneOutputs(CompositeOutput):
     cluster_identity_name: pulumi.Output[str]
     cluster_identity_namespace: pulumi.Output[str]
-    imds_preflight_job: IMDSPreflightJobOutputs | None
     client_id: pulumi.Output[str]
     tenant_id: pulumi.Output[str]
     ready: pulumi.Output[bool]
@@ -170,43 +163,21 @@ class KindAzureControlPlane(pulumi.ComponentResource):
             opts=opts,
         )
 
-        imds_preflight_job = (
-            None
-            if spec.skip_in_cluster_preflight or spec.identity.type != "UserAssignedMSI"
-            else IMDSPreflightJob(
-                "imds-preflight",
-                client_id=str(spec.identity.client_id),
-                opts=pulumi.ResourceOptions(parent=self, depends_on=[capi]),
-            )
-        )
-        identity_dependencies: list[pulumi.Resource] = [capi]
-        if imds_preflight_job is not None:
-            identity_dependencies.append(imds_preflight_job)
         azure_cluster_identity = AzureClusterIdentity(
             "cluster-identity",
             identity=spec.identity,
             opts=pulumi.ResourceOptions(
                 parent=self,
-                depends_on=identity_dependencies,
+                depends_on=[capi],
             ),
         )
-        imds_preflight_outputs = (
-            imds_preflight_job.outputs if imds_preflight_job is not None else None
-        )
-
-        ready_inputs: list[pulumi.Input[object]] = [
-            azure_cluster_identity.identity_name,
-        ]
-        if imds_preflight_outputs is not None:
-            ready_inputs.append(imds_preflight_outputs.job_name)
 
         self.outputs = KindAzureControlPlaneOutputs(
             cluster_identity_name=azure_cluster_identity.identity_name,
             cluster_identity_namespace=azure_cluster_identity.identity_namespace,
-            imds_preflight_job=imds_preflight_outputs,
             client_id=pulumi.Output.from_input(str(spec.identity.client_id)),
             tenant_id=pulumi.Output.from_input(str(spec.identity.tenant_id)),
-            ready=pulumi.Output.all(*ready_inputs).apply(lambda _: True),
+            ready=azure_cluster_identity.identity_name.apply(lambda _: True),
         )
 
         self.register_outputs(self.outputs.to_outputs())
@@ -250,7 +221,6 @@ class ControlPlaneKind(pulumi.ComponentResource):
         azure_spec = (
             KindAzureControlPlaneSpec(
                 identity=azure_config.identity,
-                skip_in_cluster_preflight=azure_config.skip_in_cluster_preflight,
             )
             if azure_config is not None and azure_config.identity is not None
             else None

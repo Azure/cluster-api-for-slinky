@@ -67,12 +67,10 @@ traffic path on a standard kind-on-Azure-VM topology is:
 Things that break this path (and the failure mode for each):
 
 * **Off-Azure host** — ``169.254.169.254`` is unreachable.
-    The Azure-capable config path's host-side IMDS discovery catches this at
-    plan time and
-    aborts with a clear message.
+    Azure auto-discovery cannot hydrate UserAssignedMSI defaults from IMDS.
 * **CNI that drops link-local egress** (e.g. some Cilium policies
-  with strict default-deny) — the preflight passes (host-side path is
-  fine) but the CAPZ pod fails to acquire tokens. Symptom: CAPZ
+    with strict default-deny) — auto-discovery can still pass because
+    the host path is fine, but the CAPZ pod fails to acquire tokens. Symptom: CAPZ
   controller logs ``ManagedIdentityCredential: ... no available
   identities``. Mitigation: add an explicit allow rule for
   ``169.254.169.254/32:80`` in your CNI policy, or fall back to
@@ -87,12 +85,10 @@ Things that break this path (and the failure mode for each):
   above. Switch to ServicePrincipal (carries a clientSecret) or
   WorkloadIdentity (needs an OIDC issuer Entra can reach).
 
-The host-side preflight in the Azure outer stack is a *necessary but not
-sufficient* signal: if it passes, the kind nodes on the same host
-typically also work, but a CNI install between Phase 1 and the first
-workload-cluster reconcile can silently break the in-cluster path.
-When Phase 2 lands, add an in-cluster preflight Job (curl IMDS from
-inside ``capz-system``) to catch this drift.
+Azure auto-discovery hydrates the default UAMI identity and resource placement
+from the local environment. After that, CAPZ exercises the identity during the
+first workload-cluster reconcile; the control-plane graph does not add a
+separate host-side or in-cluster IMDS preflight gate.
 
 Resource ownership / reconciliation
 -----------------------------------
