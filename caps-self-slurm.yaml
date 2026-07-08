@@ -164,6 +164,16 @@ nodesets:
         - key: slinky.slurm.net/compute
           operator: Exists
           effect: NoSchedule
+        # slurm-bridge taints every node in its managed partition with
+        # slinky.slurm.net/managed-node=slurm-bridge-scheduler:NoExecute so that
+        # ONLY Slurm-placed pods run there. slurmd is itself the Slurm agent on
+        # those nodes and MUST survive that taint, so it tolerates it too. This is
+        # a no-op until slurm-bridge is installed (scripts/bridge-experiment/);
+        # keeping it here makes the bridge install non-disruptive to Slurm.
+        - key: slinky.slurm.net/managed-node
+          operator: Equal
+          value: slurm-bridge-scheduler
+          effect: NoExecute
       volumes:
         - name: hpcx
           hostPath:

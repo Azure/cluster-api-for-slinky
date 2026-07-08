@@ -1,19 +1,19 @@
 # Team Demo Runbook — CAPS self-managed HPC cluster
 
-Live demo driver: `scripts/demo-presentation.sh {clusters|nodes|slurm|job|bw|all}`
+Live demo driver: `scripts/demo-presentation.sh {clusters|nodes|slurm|job|bw|nccl|all}`
 
 ## One-line story
 "I stood up a **self-managed Kubernetes cluster on Azure with Cluster API (CAPZ)**,
 running an **HPC image** with **Slurm + HPC-X MPI**, and I can launch real
-**cross-node MPI jobs** through the scheduler — the foundation for PBS→Slurm
-HPC migration."
+**cross-node MPI jobs over RDMA/InfiniBand** through the scheduler — the
+foundation for PBS→Slurm HPC migration."
 
 ## Pre-demo checklist (run 10 min before)
 ```bash
 cd ~/CAPS/caps-pulumi
 bash scripts/azure-remote.sh sync          # push latest
-./scripts/demo-presentation.sh clusters    # confirm 3 machines Running
-./scripts/demo-presentation.sh slurm       # confirm 2 nodes idle
+./scripts/demo-presentation.sh clusters    # confirm all machines Running
+./scripts/demo-presentation.sh slurm       # confirm 2 compute nodes idle
 ```
 
 > The demo script is **self-narrating**: each section prints `context` →
@@ -22,18 +22,24 @@ bash scripts/azure-remote.sh sync          # push latest
 > `PAUSE=1 ./scripts/demo-presentation.sh all`
 
 ## Demo flow (~6 min)
-1. **clusters** — "Cluster API provisioned this: 1 control plane + 2-node worker
-   MachinePool, all `Running`, ~2 days uptime. Fully self-managed on Azure."
-2. **nodes** — "Workers are **Standard_ND40rs_v2** (8× V100 GPU + 100Gb EDR
-   InfiniBand) on the `ubuntu-hpc` image — HPC-X, OFED, CUDA baked in. 1
-   control-plane + 2 HPC workers, all `Ready`."
-3. **slurm** — "Slurm (slinky operator) on top: controller + 2 compute nodes
-   `idle`, ready for jobs."
-4. **job** — "Live: OSU MPI latency across both nodes via Slurm/PMIx + HPC-X.
-   ~23 µs cross-node **over TCP**." (then **bw** → ~3.1 GB/s)
-   > Demoing the **TCP** transport (`UCX_TLS=tcp`) on purpose: it's the proven,
-   > reliable path. The hardware has real InfiniBand — enabling RDMA
-   > (`UCX_TLS=rc`) is the very next step, not a hardware change.
+1. **clusters** — "Cluster API provisioned this: 1 control plane + 3 worker
+   MachineDeployment VMs (2 GPU compute + 1 Slurm-controller), all `Running`.
+   Fully self-managed on Azure."
+2. **nodes** — "The 2 compute nodes are **Standard_ND40rs_v2** (8× V100 GPU +
+   100Gb EDR InfiniBand) on the `ubuntu-hpc` image — HPC-X, OFED, CUDA baked in.
+   A separate small node hosts the Slurm controller. All `Ready`."
+3. **slurm** — "Slurm (slinky operator) on top: slurmctld on its own node + 2
+   compute nodes `idle`, ready for jobs."
+4. **job** — "Live: OSU MPI latency across both nodes, run **twice** — TCP then
+   RDMA — via Slurm/PMIx + HPC-X. **~22 µs over TCP vs ~1.8 µs over RDMA**,
+   ~12× faster, same hardware, only the UCX transport changed." (then **bw** →
+   TCP ~3 GB/s vs **RDMA ~11 GB/s**)
+   > The comparison is the money shot: identical `srun` job, flip `UCX_TLS=tcp`
+   > → `rc` and the InfiniBand fabric lights up. No hardware change.
+5. **nccl** — "Finale: multi-GPU **NCCL all-reduce** across **16 V100s** (8/node)
+   over InfiniBand — **host-launch** (Slurm allocates, mpirun runs on the worker
+   host over SSH). Peak **~15.7 GB/s** bus bandwidth, correctness `#wrong=0`."
+   > The real GPU collective HPC/AI training scales on — not just point-to-point MPI.
 
 ## What to highlight as progress
 - Self-managed CAPZ cluster on a BYO Azure VNet (worked around corp NRMS + NSG constraints).
@@ -41,17 +47,20 @@ bash scripts/azure-remote.sh sync          # push latest
 - HPC-X MPI launched through Slurm — the team's PBS NCCL flow mapped to Slurm prototype.
 
 ## Next steps slide
-- Already on GPU + InfiniBand hardware (ND40rs_v2, V100 + EDR IB). Immediate next
-  step: flip the transport `UCX_TLS=tcp`→`rc` for real RDMA (no hardware change).
-- NCCL all-reduce across the 8×V100 nodes once RDMA is enabled.
-- Custom slurmd image w/ HPC-X for IB/production; mentor folds manifest into Pulumi.
+- RDMA over InfiniBand + multi-GPU NCCL all-reduce both working now.
+- Next: scale to more nodes; port real validation-pipeline workloads onto this.
+- Fleet-repair health checks + node replacement; custom slurmd image for production.
 
-## Demo numbers (captured 2026-06-29)
-- Cross-node MPI latency: ~23 µs (small msg) | Bandwidth: ~3.1 GB/s peak (TCP).
+## Demo numbers (captured 2026-07-08)
+- MPI latency: TCP ~22 µs vs **RDMA ~1.8 µs** (small msg) — ~12× faster.
+- MPI bandwidth: TCP ~3.1 GB/s vs **RDMA ~11 GB/s** peak — ~3.5× (near 100Gb EDR line-rate).
+- NCCL all-reduce (16× V100 over IB): peak **~15.7 GB/s** bus bandwidth, `#wrong=0`.
 
 ## Gotcha if MPI errors live
-"No route to host" → UCX grabbed a stale Calico iface. The script already pins
-`UCX_NET_DEVICES=eth0`. If a node shows `down`: `scontrol update node=<n> state=resume`.
+- TCP path: "No route to host" → UCX grabbed a stale Calico iface; the script pins
+  `UCX_NET_DEVICES=eth0`. RDMA path pins `UCX_NET_DEVICES=mlx5_ib0:1`; if the IB
+  device name differs, override `UCX_RDMA="UCX_TLS=rc UCX_NET_DEVICES=<dev>:1"`.
+- If a node shows `down`: `scontrol update node=<n> state=resume`.
 
 ---
 
@@ -67,7 +76,7 @@ CAPS is the same workloads on **CAPI/CAPZ + Kubernetes + Slurm (slinky)**.
   launcher changes. I already mapped `queue-nccl-pbs.sh`/`run-nccl.pbs` →
   `scripts/nccl-slurm/` (drop-in, same positional args, `%x.o%j` keeps ingestion identical).
 - **"What replaces the headnode + VMSS?"** Control-plane = CAPI mgmt; compute = a
-  MachinePool over a VMSS (same ubuntu-hpc image you publish). Scaling = bump
+  MachineDeployment of VMs (same ubuntu-hpc image you publish). Scaling = bump
   `replicas`, non-destructive. No bespoke `build_cluster.sh` retry/backoff —
   CAPZ reconciles capacity.
 - **"Same image?"** Yes — `microsoft-dsvm:ubuntu-hpc` (HPC-X, OFED, CUDA, NCCL).
@@ -76,15 +85,16 @@ CAPS is the same workloads on **CAPI/CAPZ + Kubernetes + Slurm (slinky)**.
   `sacct` catches NODE_FAIL/TIMEOUT/OOM, not just exit code — stronger than PBS.
 
 ### Benchmarks / MPI
-- **"Why TCP if you have IB?"** Deliberate for the demo — TCP is the proven path.
-  Workers are V100 + EDR IB already; flipping `UCX_TLS=tcp`→`rc` for RDMA is the
-  next step, not a hardware change. Today: OSU over TCP ~23 µs, ~3.1 GB/s.
-- **"NCCL on this?"** Prototyped (`scripts/nccl-slurm/`); runs once RDMA is enabled
-  on these 8×V100 nodes. MPI/OSU over TCP works now.
+- **"Does RDMA/InfiniBand actually work?"** Yes — live in the demo. Same `srun`
+  job over TCP (~22 µs) vs RDMA `UCX_TLS=rc` on `mlx5_ib0` (~1.8 µs); bandwidth
+  ~3 GB/s → ~11 GB/s. `/dev/infiniband` mounted, UCX shows `rc_verbs` transport.
+- **"NCCL on this?"** Yes — live: 16× V100 all-reduce over IB via **host-launch**
+  (`scripts/nccl-slurm/submit-nccl-host.sh`), ~15.7 GB/s bus bw, `#wrong=0`. Slurm
+  allocates the nodes; mpirun runs on the worker host over SSH (native /dev/infiniband).
 - **"HPC-X getting in?"** Bind-mounted host `/opt/hpcx` for the dev path;
   production = custom slurmd image FROM ubuntu-hpc pushed to ACR (your team's pattern).
-- **"InfiniBand?"** Hardware is here (ND40rs_v2, EDR IB). Privileged + hostNetwork
-  pods + `/dev/infiniband` (matches your nccl-test.yaml); RDMA enablement in progress.
+- **"InfiniBand setup?"** Privileged + hostNetwork slurmd pods + `/dev/infiniband`
+  (matches your nccl-test.yaml). No RDMA device plugin needed on this SKU.
 
 ### Telemetry / validation (your Kusto + NHC story)
 - **"Goes to ImagePerf/ADX?"** Wrappers keep PBS output filenames identical so
@@ -98,7 +108,7 @@ CAPS is the same workloads on **CAPI/CAPZ + Kubernetes + Slurm (slinky)**.
 - **Not** replacing image-build/Packer/SBOM — sits where `hpc-image-val2` does (perf/bench).
 
 ### Likely "gotcha" questions
-- **"GPU/IB demoed?"** Running on it (2× ND40rs_v2, V100 + EDR IB). Demoing MPI
-  over TCP today; RDMA (`UCX_TLS=rc`) + NCCL is the immediate next step.
+- **"GPU/IB demoed?"** Yes — live: RDMA MPI (~1.8 µs / ~11 GB/s) AND multi-GPU
+  NCCL all-reduce over IB (~15.7 GB/s, 16× V100) on 2× ND40rs_v2.
 - **"Pulumi reconciled?"** Self-managed manifest is manual; mentor folds into Pulumi later.
-- **"Multi-tenant scale?"** 2-node proof; topology/PPG mostly works through CAPI MachinePool.
+- **"Multi-tenant scale?"** 2-compute-node proof; scale via MachineDeployment `replicas`.

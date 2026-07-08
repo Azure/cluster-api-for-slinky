@@ -200,6 +200,11 @@ case ${SKU} in
             /opt/nccl-tests/build/${TEST} -b 1K -e 4G -f 2 -g 1 -n 50
 	;;
     "Standard_ND40rs_v2")
+        # 8x V100 + 100Gb EDR IB. TCP by design: this in-container sbatch model is
+        # the TCP path (UCX_TLS=tcp, NCCL over sockets). Cross-node RDMA on caps-self
+        # is PROVEN only via the HOST-LAUNCH path — use
+        # scripts/nccl-slurm/run-nccl-host.sh (UCX_TLS=rc,sm,self,
+        # NCCL_IB_HCA=mlx5_ib0) for InfiniBand.
         echo "# SKU: ${SKU}"
         mpirun \
             -np $(( $NUM_NODES * $DEVICES )) \
