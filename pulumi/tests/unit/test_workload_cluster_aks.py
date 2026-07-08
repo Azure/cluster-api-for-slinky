@@ -11,6 +11,8 @@ from __future__ import annotations
 import pytest
 
 from stacks.kubernetes_annotations import (
+    ASO_RECONCILE_POLICY_ANNOTATION,
+    ASO_RECONCILE_POLICY_DETACH_ON_DELETE,
     DELETE_PROPAGATION_FOREGROUND,
     PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION,
     PULUMI_SKIP_AWAIT_ANNOTATION,
@@ -46,6 +48,13 @@ from stacks.workload_cluster.workload_cluster_infrastructure_aks import (
     _machine_pool_delete_annotations,
     _machine_pool_spec,
     _resource_name,
+)
+from stacks.workload_cluster.aso_detach_reconciler import (
+    ASO_DETACH_ON_DELETE_CLUSTER_LABEL,
+    ASO_DETACH_ON_DELETE_LABEL,
+    aso_agent_pool_detach_label_patch,
+    aso_detach_reconciler_label_selector,
+    aso_detach_reconciler_script,
 )
 
 
@@ -184,6 +193,30 @@ def test_user_machine_pool_uses_foreground_delete_annotation() -> None:
     }
 
 
+def test_aso_detach_reconciler_labels_system_agent_pool() -> None:
+    assert aso_agent_pool_detach_label_patch(cluster_name="caps-aks") == (
+        '{"metadata": {"labels": {'
+        '"ca4s.azure.com/aso-detach-on-delete": "true", '
+        '"ca4s.azure.com/cluster": "caps-aks"}}}'
+    )
+
+
+def test_aso_detach_reconciler_label_selector_targets_cluster() -> None:
+    assert aso_detach_reconciler_label_selector(cluster_name="caps-aks") == (
+        f"{ASO_DETACH_ON_DELETE_LABEL}=true,"
+        f"{ASO_DETACH_ON_DELETE_CLUSTER_LABEL}=caps-aks"
+    )
+
+
+def test_aso_detach_reconciler_script_watches_and_patches() -> None:
+    script = aso_detach_reconciler_script()
+
+    assert "watch=\"true\"" in script
+    assert "managedclustersagentpools" in script
+    assert ASO_RECONCILE_POLICY_ANNOTATION in script
+    assert ASO_RECONCILE_POLICY_DETACH_ON_DELETE in script
+
+
 def test_node_pool_helpers_map_controller_and_user_pools() -> None:
     controller = AKSNodePoolSpec(
         name="head",
@@ -250,6 +283,20 @@ def test_ammp_spec_stamps_additional_tags() -> None:
         "nodeLabels": {NODE_TYPE_LABEL: COMPUTE_NODE_TYPE},
         "additionalTags": {"Owner": "t-hernandezc"},
     }
+
+
+def test_ammp_spec_can_label_aso_agent_pool_for_detach_reconciler() -> None:
+    patch = aso_agent_pool_detach_label_patch(cluster_name="caps-aks")
+    spec = _azure_managed_machine_pool_spec(
+        mode=_SYSTEM_NODE_POOL_MODE,
+        pool_name="syshead",
+        sku="Standard_D2s_v3",
+        additional_tags={},
+        node_labels=_AKS_CONTROLLER_NODE_LABELS,
+        aso_managed_clusters_agent_pool_patches=[patch],
+    )
+
+    assert spec["asoManagedClustersAgentPoolPatches"] == [patch]
 
 
 def test_ammp_spec_can_autoscale_user_pool() -> None:

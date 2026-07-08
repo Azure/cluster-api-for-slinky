@@ -10,9 +10,11 @@ PULUMI_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
 PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION = (
     "pulumi.com/deletionPropagationPolicy"
 )
+ASO_RECONCILE_POLICY_ANNOTATION = "serviceoperator.azure.com/reconcile-policy"
 
 DELETE_PROPAGATION_FOREGROUND = "Foreground"
 DELETE_PROPAGATION_ORPHAN = "Orphan"
+ASO_RECONCILE_POLICY_DETACH_ON_DELETE = "detach-on-delete"
 
 
 def pulumi_wait_for(*expressions: str) -> dict[str, str]:

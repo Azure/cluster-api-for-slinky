@@ -17,6 +17,10 @@ from stacks.kubernetes_annotations import (
     foreground_delete_annotations,
     pulumi_wait_for,
 )
+from stacks.workload_cluster.aso_detach_reconciler import (
+    ASODetachReconciler,
+    aso_agent_pool_detach_label_patch,
+)
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     CONTROLLER_NODE_TYPE,
     NODE_TYPE_LABEL,
@@ -195,6 +199,7 @@ def _azure_managed_machine_pool_spec(
     additional_tags: Mapping[str, str],
     node_labels: Mapping[str, str],
     autoscaling_bounds: tuple[int, int] | None = None,
+    aso_managed_clusters_agent_pool_patches: Sequence[str] = (),
 ) -> dict[str, object]:
     """``AzureManagedMachinePool.spec`` for one AKS managed node pool.
 
@@ -214,6 +219,10 @@ def _azure_managed_machine_pool_spec(
     if autoscaling_bounds is not None:
         min_count, max_count = autoscaling_bounds
         spec["scaling"] = {"minSize": min_count, "maxSize": max_count}
+    if aso_managed_clusters_agent_pool_patches:
+        spec["asoManagedClustersAgentPoolPatches"] = list(
+            aso_managed_clusters_agent_pool_patches
+        )
     return spec
 
 
@@ -323,6 +332,14 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             ),
         )
 
+        aso_detach_reconciler = ASODetachReconciler(
+            f"{name}-aso-detach-reconciler",
+            namespace=_NAMESPACE,
+            cluster_name=cluster_name,
+            provider=provider,
+            opts=ResourceOptions(parent=self),
+        )
+
         cluster = k8s.apiextensions.CustomResource(
             f"{name}-cluster",
             api_version=_CAPI_API_VERSION,
@@ -337,7 +354,9 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 infrastructure_name=cluster_name,
             ),
             opts=pulumi.ResourceOptions.merge(
-                child_opts(depends_on=[azure_managed_control_plane]),
+                child_opts(
+                    depends_on=[azure_managed_control_plane, aso_detach_reconciler]
+                ),
                 pulumi.ResourceOptions(
                     custom_timeouts=pulumi.CustomTimeouts(delete=_AKS_DELETE_TIMEOUT)
                 ),
@@ -355,6 +374,11 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             pool_mode = _SYSTEM_NODE_POOL_MODE if pool.controller else _USER_NODE_POOL_MODE
             pool_delete_annotations = _machine_pool_delete_annotations(
                 controller=pool.controller
+            )
+            aso_agent_pool_patches = (
+                [aso_agent_pool_detach_label_patch(cluster_name=cluster_name)]
+                if pool.controller
+                else []
             )
             delete_with_cluster_opts = (
                 pulumi.ResourceOptions(deleted_with=cluster)
@@ -377,10 +401,16 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     additional_tags=dict(additional_tags or {}),
                     node_labels=node_labels(pool.node_type),
                     autoscaling_bounds=pool.autoscaling_bounds,
+                    aso_managed_clusters_agent_pool_patches=aso_agent_pool_patches,
                 ),
                 opts=pulumi.ResourceOptions.merge(
                     pulumi.ResourceOptions.merge(
-                        child_opts(depends_on=[azure_managed_control_plane]),
+                        child_opts(
+                            depends_on=[
+                                azure_managed_control_plane,
+                                aso_detach_reconciler,
+                            ]
+                        ),
                         pulumi.ResourceOptions(
                             custom_timeouts=pulumi.CustomTimeouts(
                                 delete=_AKS_DELETE_TIMEOUT
