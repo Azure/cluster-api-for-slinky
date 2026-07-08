@@ -211,7 +211,10 @@ def test_aso_detach_reconciler_label_selector_targets_cluster() -> None:
 def test_aso_detach_reconciler_script_watches_and_patches() -> None:
     script = aso_detach_reconciler_script()
 
+    compile(script, "aso_detach_reconciler.py", "exec")
     assert "watch=\"true\"" in script
+    assert "v1api20230201" in script
+    assert "v1api20231001" in script
     assert "managedclustersagentpools" in script
     assert ASO_RECONCILE_POLICY_ANNOTATION in script
     assert ASO_RECONCILE_POLICY_DETACH_ON_DELETE in script

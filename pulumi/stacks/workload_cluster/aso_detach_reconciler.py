@@ -33,6 +33,7 @@ _DEPLOYMENT_NAME_SUFFIX = "aso-detach-reconciler"
 _RECONCILER_IMAGE = "python:3.13-alpine"
 _WATCH_TIMEOUT_SECONDS = 300
 _WATCH_RETRY_SECONDS = 5
+_ASO_AGENT_POOL_API_VERSIONS = ("v1api20230201", "v1api20231001")
 
 
 def aso_agent_pool_detach_label_patch(*, cluster_name: str) -> str:
@@ -69,7 +70,7 @@ import urllib.request
 
 
 API_GROUP = "containerservice.azure.com"
-API_VERSION = "v1api20231001"
+API_VERSIONS = {list(_ASO_AGENT_POOL_API_VERSIONS)!r}
 PLURAL = "managedclustersagentpools"
 ANNOTATION = "{ASO_RECONCILE_POLICY_ANNOTATION}"
 DETACH_ON_DELETE = "{ASO_RECONCILE_POLICY_DETACH_ON_DELETE}"
@@ -112,8 +113,8 @@ def request(method, path, body=None, content_type=None, timeout=60):
     return urllib.request.urlopen(req, timeout=timeout, context=ssl_context())
 
 
-def resource_path(namespace, name=None, **query):
-    path = f"/apis/{{API_GROUP}}/{{API_VERSION}}/namespaces/{{namespace}}/{{PLURAL}}"
+def resource_path(api_version, namespace, name=None, **query):
+    path = f"/apis/{{API_GROUP}}/{{api_version}}/namespaces/{{namespace}}/{{PLURAL}}"
     if name:
         path = f"{{path}}/{{name}}"
     clean_query = {{key: value for key, value in query.items() if value is not None}}
@@ -122,15 +123,15 @@ def resource_path(namespace, name=None, **query):
     return path
 
 
-def list_resources(namespace, label_selector):
+def list_resources(api_version, namespace, label_selector):
     with request(
         "GET",
-        resource_path(namespace, labelSelector=label_selector),
+        resource_path(api_version, namespace, labelSelector=label_selector),
     ) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
-def patch_detach_on_delete(resource):
+def patch_detach_on_delete(api_version, resource):
     metadata = resource.get("metadata") or {{}}
     name = metadata.get("name")
     namespace = metadata.get("namespace")
@@ -142,25 +143,26 @@ def patch_detach_on_delete(resource):
     patch = {{"metadata": {{"annotations": {{ANNOTATION: DETACH_ON_DELETE}}}}}}
     with request(
         "PATCH",
-        resource_path(namespace, name),
+        resource_path(api_version, namespace, name),
         body=patch,
         content_type="application/merge-patch+json",
     ):
         pass
-    log(f"set {{ANNOTATION}}={{DETACH_ON_DELETE}} on {{namespace}}/{{name}}")
+    log(f"set {{ANNOTATION}}={{DETACH_ON_DELETE}} on {{api_version}} {{namespace}}/{{name}}")
 
 
-def reconcile_existing(namespace, label_selector):
-    payload = list_resources(namespace, label_selector)
+def reconcile_existing(api_version, namespace, label_selector):
+    payload = list_resources(api_version, namespace, label_selector)
     for resource in payload.get("items", []):
-        patch_detach_on_delete(resource)
+        patch_detach_on_delete(api_version, resource)
     return payload.get("metadata", {{}}).get("resourceVersion")
 
 
-def watch(namespace, label_selector, resource_version):
+def watch(api_version, namespace, label_selector, resource_version):
     with request(
         "GET",
         resource_path(
+            api_version,
             namespace,
             labelSelector=label_selector,
             resourceVersion=resource_version,
@@ -174,25 +176,30 @@ def watch(namespace, label_selector, resource_version):
                 continue
             event = json.loads(line.decode("utf-8"))
             if event.get("type") in ("ADDED", "MODIFIED"):
-                patch_detach_on_delete(event.get("object") or {{}})
+                patch_detach_on_delete(api_version, event.get("object") or {{}})
 
 
 def main():
     namespace = os.environ["WATCH_NAMESPACE"]
     label_selector = os.environ["LABEL_SELECTOR"]
-    log(f"watching {{namespace}} {{PLURAL}} with selector {{label_selector}}")
-    resource_version = None
+    log(f"watching {{namespace}} {{PLURAL}} {{API_VERSIONS}} with selector {{label_selector}}")
+    resource_versions = {{api_version: None for api_version in API_VERSIONS}}
     while True:
-        try:
-            resource_version = reconcile_existing(namespace, label_selector)
-            watch(namespace, label_selector, resource_version)
-        except urllib.error.HTTPError as exc:
-            if exc.code == 410:
-                resource_version = None
-            else:
-                log(f"Kubernetes API error: {{exc}}"); time.sleep(WATCH_RETRY_SECONDS)
-        except Exception as exc:
-            log(f"watch failed: {{exc}}"); time.sleep(WATCH_RETRY_SECONDS)
+        for api_version in API_VERSIONS:
+            try:
+                resource_versions[api_version] = reconcile_existing(
+                    api_version,
+                    namespace,
+                    label_selector,
+                )
+                watch(api_version, namespace, label_selector, resource_versions[api_version])
+            except urllib.error.HTTPError as exc:
+                if exc.code == 410:
+                    resource_versions[api_version] = None
+                else:
+                    log(f"Kubernetes API error for {{api_version}}: {{exc}}"); time.sleep(WATCH_RETRY_SECONDS)
+            except Exception as exc:
+                log(f"watch failed for {{api_version}}: {{exc}}"); time.sleep(WATCH_RETRY_SECONDS)
 
 
 if __name__ == "__main__":
