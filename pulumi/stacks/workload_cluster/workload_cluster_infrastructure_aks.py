@@ -239,6 +239,10 @@ def _machine_pool_delete_annotations(*, controller: bool) -> dict[str, str]:
     return foreground_delete_annotations()
 
 
+def _aso_agent_pool_detach_patches(*, cluster_name: str) -> list[str]:
+    return [aso_agent_pool_detach_label_patch(cluster_name=cluster_name)]
+
+
 class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
     """Provision AKS managed infrastructure via the CAPZ managed CR set."""
 
@@ -333,7 +337,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
         )
 
         # Workaround until CAPZ owns this teardown transition itself. The
-        # reconciler keeps System pool ASO children on detach-on-delete so ASO
+        # reconciler keeps ASO agent-pool children on detach-on-delete so ASO
         # does not issue a child agent-pool delete while AKS parent cluster
         # deletion owns cleanup. Root-cause fix: kubernetes-sigs/CAPZ#6447.
         aso_detach_reconciler = ASODetachReconciler(
@@ -379,10 +383,8 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             pool_delete_annotations = _machine_pool_delete_annotations(
                 controller=pool.controller
             )
-            aso_agent_pool_patches = (
-                [aso_agent_pool_detach_label_patch(cluster_name=cluster_name)]
-                if pool.controller
-                else []
+            aso_agent_pool_patches = _aso_agent_pool_detach_patches(
+                cluster_name=cluster_name
             )
             delete_with_cluster_opts = (
                 pulumi.ResourceOptions(deleted_with=cluster)

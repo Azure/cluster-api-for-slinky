@@ -41,6 +41,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_aks import (
     _SERVICE_CIDR,
     _SYSTEM_NODE_POOL_MODE,
     _USER_NODE_POOL_MODE,
+    _aso_agent_pool_detach_patches,
     _aks_pool_name,
     _azure_managed_control_plane_spec,
     _azure_managed_machine_pool_spec,
@@ -193,12 +194,18 @@ def test_user_machine_pool_uses_foreground_delete_annotation() -> None:
     }
 
 
-def test_aso_detach_reconciler_labels_system_agent_pool() -> None:
+def test_aso_detach_reconciler_labels_agent_pool() -> None:
     assert aso_agent_pool_detach_label_patch(cluster_name="caps-aks") == (
         '{"metadata": {"labels": {'
         '"ca4s.azure.com/aso-detach-on-delete": "true", '
         '"ca4s.azure.com/cluster": "caps-aks"}}}'
     )
+
+
+def test_aso_detach_reconciler_patches_every_agent_pool() -> None:
+    patch = aso_agent_pool_detach_label_patch(cluster_name="caps-aks")
+
+    assert _aso_agent_pool_detach_patches(cluster_name="caps-aks") == [patch]
 
 
 def test_aso_detach_reconciler_label_selector_targets_cluster() -> None:
