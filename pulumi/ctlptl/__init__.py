@@ -4,6 +4,7 @@ Three Pulumi dynamic providers that wrap the ``ctlptl`` and
 ``cloud-provider-kind`` CLIs:
 
 * :class:`CtlptlRegistry` — Docker-backed image registry.
+* :class:`CtlptlRegistryImage` — source-ref image built into that registry.
 * :class:`CtlptlCluster` — kind cluster wired to the registry.
 * :class:`CloudProviderKind` — host-side daemon that turns ``type:
   LoadBalancer`` Services on kind into host-reachable IPs.
@@ -20,10 +21,12 @@ shares this package through ``stack.py``.
 from ctlptl.cloud_provider_kind import CloudProviderKind, CloudProviderKindConfig
 from ctlptl.ctlptl_cluster import CtlptlCluster
 from ctlptl.ctlptl_registry import CtlptlRegistry
+from ctlptl.ctlptl_registry_image import CtlptlRegistryImage
 
 __all__ = [
   "CloudProviderKind",
   "CloudProviderKindConfig",
   "CtlptlCluster",
   "CtlptlRegistry",
+  "CtlptlRegistryImage",
 ]
