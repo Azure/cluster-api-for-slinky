@@ -8,6 +8,7 @@ to surface the cluster's kubeconfig as a Pulumi Output.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -37,6 +38,78 @@ def test_render_generates_docker_hub_hosts_for_registry_cache(
     assert 'server = "https://registry-1.docker.io"' in hosts_toml
     assert '[host."http://registry-test:5000"]' in hosts_toml
     assert 'capabilities = ["pull", "resolve"]' in hosts_toml
+
+
+def test_render_mounts_additional_http_registries(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "ctlptl"
+    monkeypatch.setattr(ctlptl_cluster, "_GENERATED_CONFIG_DIR", state_dir)
+
+    rendered = ctlptl_cluster._render(
+        "kind-mgmt-test",
+        "registry-test",
+        ["additional-images-registry"],
+    )
+
+    hosts_path = (
+        state_dir
+        / "kind-mgmt-test"
+        / "additional-images-registry:5000"
+        / "hosts.toml"
+    )
+    hosts_toml = hosts_path.read_text(encoding="utf-8")
+
+    assert f"hostPath: {hosts_path}" in rendered
+    assert (
+        "containerPath: "
+        "/etc/containerd/certs.d/additional-images-registry:5000/hosts.toml"
+    ) in rendered
+    assert 'server = "http://additional-images-registry:5000"' in hosts_toml
+    assert '[host."http://additional-images-registry:5000"]' in hosts_toml
+    assert 'capabilities = ["pull", "resolve"]' in hosts_toml
+
+
+def test_create_connects_cache_and_additional_registries(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "ctlptl"
+    connected_registries: list[str] = []
+    applied_manifests: list[str] = []
+
+    monkeypatch.setattr(ctlptl_cluster, "_GENERATED_CONFIG_DIR", state_dir)
+    monkeypatch.setattr(ctlptl_cluster, "_require_binary", lambda _name: _name)
+    monkeypatch.setattr(ctlptl_cluster, "_fetch_kubeconfig", lambda _context: "kubeconfig")
+    monkeypatch.setattr(
+        ctlptl_cluster,
+        "_connect_registry_to_kind_network",
+        connected_registries.append,
+    )
+
+    def fake_run(
+        cmd: list[str],
+        *,
+        stdin: str | None = None,
+        check: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
+        applied_manifests.append(stdin or "")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(ctlptl_cluster, "_run", fake_run)
+
+    result = ctlptl_cluster._CtlptlClusterProvider().create(
+        {
+            "cluster_name": "kind-mgmt-test",
+            "registry_name": "registry-test",
+            "additional_registry_names": ["additional-images-registry"],
+        }
+    )
+
+    assert result.outs["additional_registry_names"] == ["additional-images-registry"]
+    assert connected_registries == ["registry-test", "additional-images-registry"]
+    assert "additional-images-registry:5000/hosts.toml" in applied_manifests[0]
 
 
 def test_render_requires_registry_name(monkeypatch: pytest.MonkeyPatch) -> None:

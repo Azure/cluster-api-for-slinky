@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import getpass
 import os
+from collections.abc import Mapping
 
 import pulumi
 import pulumi_kubernetes as k8s
@@ -13,9 +14,11 @@ from ctlptl import (
     CloudProviderKindConfig,
     CtlptlCluster,
     CtlptlRegistry,
+    CtlptlRegistryImage,
 )
 from gitrepo import GitOpsConfig, GitOpsRepository, GitOpsWebhook
 from fluxcd import FluxInfrastructure
+from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from pko import PKOBootstrap, PKO_NAMESPACE
 from stacks.workload_cluster.registry_setting import (
     LocalPortRegistrySetting,
@@ -29,6 +32,24 @@ from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadCl
 
 
 _OWNER_TAG = "Owner"
+_ADDITIONAL_IMAGES_CONFIG_KEY = "additionalImages"
+_ADDITIONAL_IMAGES_REGISTRY_NAME = "additional-images-registry"
+_ADDITIONAL_IMAGES_REGISTRY_ENV: list[pulumi.Input[str]] = [
+    "CA4S_REGISTRY_MODE=additional-images",
+]
+
+
+class AdditionalImageConfig(PulumiConfigModel):
+    source_path: NonEmptyStr
+    source_ref: NonEmptyStr
+    image_name: NonEmptyStr
+    build_args: Mapping[NonEmptyStr, NonEmptyStr] | None = None
+
+
+class AdditionalImagesConfig(PulumiConfigModel):
+    registry_name: NonEmptyStr = _ADDITIONAL_IMAGES_REGISTRY_NAME
+    registry_port: StrictPositiveInt | None = None
+    images: Mapping[NonEmptyStr, AdditionalImageConfig] = {}
 
 
 def run_stack() -> None:
@@ -38,9 +59,47 @@ def run_stack() -> None:
         config.get_object("cloudProviderKind") or {}
     )
     gitops_config = GitOpsConfig.model_validate(config.get_object("gitops") or {})
+    additional_images_config_value = config.get_object(_ADDITIONAL_IMAGES_CONFIG_KEY)
+    additional_images_config = (
+        AdditionalImagesConfig.model_validate(additional_images_config_value)
+        if additional_images_config_value is not None
+        else None
+    )
 
     registry = CtlptlRegistry("registry")
-    cluster = CtlptlCluster("mgmt", registry_name=registry.registry_name)
+    additional_images_registry: CtlptlRegistry | None = None
+    if additional_images_config is not None and additional_images_config.images:
+        additional_images_registry = CtlptlRegistry(
+            "additional-images-registry",
+            registry_name=additional_images_config.registry_name,
+            port=additional_images_config.registry_port,
+            env=_ADDITIONAL_IMAGES_REGISTRY_ENV,
+        )
+    additional_images: dict[str, CtlptlRegistryImage] = {}
+    if additional_images_config is not None and additional_images_registry is not None:
+        for image_key, image_config in additional_images_config.images.items():
+            build_args: dict[str, pulumi.Input[str]] | None = None
+            if image_config.build_args is not None:
+                build_args = dict(image_config.build_args)
+            additional_images[image_key] = CtlptlRegistryImage(
+                f"additional-image-{image_key}",
+                source_path=image_config.source_path,
+                source_ref=image_config.source_ref,
+                registry_name=additional_images_registry.registry_name,
+                registry_port=additional_images_registry.port,
+                image_name=image_config.image_name,
+                build_args=build_args,
+                opts=pulumi.ResourceOptions(depends_on=[additional_images_registry]),
+            )
+
+    additional_registry_names: list[pulumi.Input[str]] | None = None
+    if additional_images_registry is not None:
+        additional_registry_names = [additional_images_registry.registry_name]
+    cluster = CtlptlCluster(
+        "mgmt",
+        registry_name=registry.registry_name,
+        additional_registry_names=additional_registry_names,
+    )
     mgmt_provider = k8s.Provider(
         "mgmt-k8s",
         kubeconfig=cluster.kubeconfig,
@@ -106,6 +165,7 @@ def run_stack() -> None:
         gitops_provider=gitops_config.provider,
         gitops_webhook=gitops_webhook,
         pko=pko,
+        additional_images=additional_images,
     )
     if _azure_infrastructure_enabled(init_stack_config):
         _export_azure_config_outputs(init_stack_config)
@@ -228,9 +288,15 @@ def _export_common_outputs(
     gitops_provider: str,
     gitops_webhook: GitOpsWebhook,
     pko: PKOBootstrap,
+    additional_images: Mapping[str, CtlptlRegistryImage],
 ) -> None:
     pulumi.export("registry_name", registry.registry_name)
     pulumi.export("registry_port", registry.port)
+    if additional_images:
+        pulumi.export(
+            "additional_image_refs",
+            {name: image.image_ref for name, image in additional_images.items()},
+        )
     pulumi.export("cluster_name", cluster.cluster_name)
     pulumi.export("context", cluster.context)
     pulumi.export("kubeconfig", cluster.kubeconfig)

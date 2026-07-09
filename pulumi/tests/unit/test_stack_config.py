@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
+
 from stack import (
+    AdditionalImagesConfig,
     _azure_infrastructure_enabled,
     _discover_username,
     _with_local_registry_config,
@@ -62,6 +65,107 @@ def test_empty_stack_config_keeps_azure_disabled() -> None:
     config = InitStackConfig.model_validate({})
 
     assert not _azure_infrastructure_enabled(config)
+
+
+def test_additional_images_config_parses_source_and_registry_options() -> None:
+    config = AdditionalImagesConfig.model_validate(
+        {
+            "registryName": "images-registry",
+            "registryPort": 5002,
+            "images": {
+                "controller": {
+                    "sourcePath": "/src/controller",
+                    "sourceRef": "feature",
+                    "imageName": "custom/controller",
+                    "buildArgs": {"ARCH": "amd64", "package": "./cmd"},
+                }
+            },
+        }
+    )
+
+    image = config.images["controller"]
+    assert config.registry_name == "images-registry"
+    assert config.registry_port == 5002
+    assert image.source_path == "/src/controller"
+    assert image.source_ref == "feature"
+    assert image.image_name == "custom/controller"
+    assert image.build_args == {"ARCH": "amd64", "package": "./cmd"}
+
+
+def test_additional_images_config_defaults_to_dedicated_registry() -> None:
+    config = AdditionalImagesConfig.model_validate(
+        {
+            "images": {
+                "controller": {
+                    "sourcePath": "/src/controller",
+                    "sourceRef": "HEAD",
+                    "imageName": "custom/controller",
+                }
+            },
+        }
+    )
+
+    image = config.images["controller"]
+    assert config.registry_name == "additional-images-registry"
+    assert config.registry_port is None
+    assert image.build_args is None
+
+
+@pytest.mark.parametrize(
+    "value, expected_errors",
+    [
+        (
+            {"registryPort": 0, "images": {}},
+            {(('registryPort',), 'greater_than')},
+        ),
+        (
+            {"images": {"controller": {}}},
+            {
+                (('images', 'controller', 'sourcePath'), 'missing'),
+                (('images', 'controller', 'sourceRef'), 'missing'),
+                (('images', 'controller', 'imageName'), 'missing'),
+            },
+        ),
+        (
+            {
+                "images": {
+                    "controller": {
+                        "sourcePath": "/src/controller",
+                        "sourceRef": "HEAD",
+                        "imageName": "custom/controller",
+                        "buildArgs": [],
+                    }
+                }
+            },
+            {(('images', 'controller', 'buildArgs'), 'dict_type')},
+        ),
+        (
+            {
+                "images": {
+                    "controller": {
+                        "sourcePath": "/src/controller",
+                        "sourceRef": "HEAD",
+                        "imageName": "custom/controller",
+                        "buildArgs": {"ARCH": 1},
+                    }
+                }
+            },
+            {(('images', 'controller', 'buildArgs', 'ARCH'), 'string_type')},
+        ),
+    ],
+)
+def test_additional_images_config_rejects_invalid_values(
+    value: object,
+    expected_errors: set[tuple[tuple[str, ...], str]],
+) -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        AdditionalImagesConfig.model_validate(value)
+
+    errors = {
+        (tuple(str(part) for part in error["loc"]), str(error["type"]))
+        for error in exc_info.value.errors()
+    }
+    assert expected_errors <= errors
 
 
 def test_explicit_stack_config_enables_azure() -> None:
