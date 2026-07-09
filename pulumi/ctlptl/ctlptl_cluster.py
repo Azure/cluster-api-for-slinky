@@ -59,8 +59,8 @@ substitutes when rendering the manifest:
   inside ``create()``.
 * ``${DOCKER_IO_HOSTS_TOML}`` → generated ``hosts.toml`` file mounted into
     kind nodes for containerd's Docker Hub pull-through registry cache config.
-* ``${ADDITIONAL_REGISTRY_MOUNTS}`` → generated extraMount entries for direct
-    HTTP registry endpoints such as ``capz-image-registry:5000``.
+* ``${CUSTOM_REGISTRY_MOUNTS}`` → generated extraMount entries for direct
+    HTTP custom registry endpoints such as ``custom-registry:5000``.
 
 The ``registry_name`` input is rendered into that generated Docker Hub
 ``hosts.toml`` file. The ctlptl ``Cluster`` manifest does not set its own
@@ -75,9 +75,9 @@ without the proxy env, destroying the retained cache.
                           ``CtlptlRegistry().registry_name`` to wire the
                           dependency implicitly. Required because Docker Hub
                           pulls are routed through the sibling registry cache.
-    - ``additional_registry_names``: optional sibling registry names exposed to
-                          containerd as direct HTTP registries and connected to
-                          the kind Docker network.
+    - ``custom_registry_names``: optional sibling custom registry names exposed
+                          to containerd as direct HTTP registries and connected
+                          to the kind Docker network.
 * Outputs:
     - ``cluster_name`` : the ctlptl ``Cluster.name`` ultimately used
                          (autonamed or explicit).
@@ -172,7 +172,7 @@ kindV1Alpha4Cluster:
     - hostPath: ${DOCKER_IO_HOSTS_TOML}
       containerPath: /etc/containerd/certs.d/docker.io/hosts.toml
       readOnly: true
-${ADDITIONAL_REGISTRY_MOUNTS}
+${CUSTOM_REGISTRY_MOUNTS}
     # required by CAPD
     - hostPath: /var/run/docker.sock
       containerPath: /var/run/docker.sock
@@ -184,7 +184,7 @@ ${ADDITIONAL_REGISTRY_MOUNTS}
     - hostPath: ${DOCKER_IO_HOSTS_TOML}
       containerPath: /etc/containerd/certs.d/docker.io/hosts.toml
       readOnly: true
-${ADDITIONAL_REGISTRY_MOUNTS}
+${CUSTOM_REGISTRY_MOUNTS}
     # required by CAPD (capd-controller-manager may be scheduled on either kind node)
     - hostPath: /var/run/docker.sock
       containerPath: /var/run/docker.sock
@@ -268,7 +268,7 @@ def _registry_hosts_toml(cluster_name: str, registry_name: str) -> Path:
     return path
 
 
-def _additional_registry_mounts(
+def _custom_registry_mounts(
     cluster_name: str,
     registry_names: list[str],
 ) -> str:
@@ -326,7 +326,7 @@ def _connect_registry_to_kind_network(registry_name: str) -> None:
 def _render(
     cluster_name: str,
     registry_name: Optional[str] = None,
-    additional_registry_names: Optional[list[str]] = None,
+    custom_registry_names: Optional[list[str]] = None,
 ) -> str:
     """Render the vendored manifest with all placeholders substituted.
 
@@ -349,9 +349,9 @@ def _render(
             "registry_name is required to render kind registry cache config"
         )
     docker_io_hosts_toml = _docker_io_hosts_toml(cluster_name, registry_name)
-    additional_registry_mounts = _additional_registry_mounts(
+    custom_registry_mounts = _custom_registry_mounts(
         cluster_name,
-        additional_registry_names or [],
+        custom_registry_names or [],
     )
     rendered = _MANIFEST_TEMPLATE
     rendered = rendered.replace("${CLUSTER_NAME}", cluster_name)
@@ -359,8 +359,8 @@ def _render(
         "${DOCKER_IO_HOSTS_TOML}", str(docker_io_hosts_toml)
     )
     rendered = rendered.replace(
-        "${ADDITIONAL_REGISTRY_MOUNTS}",
-        additional_registry_mounts,
+        "${CUSTOM_REGISTRY_MOUNTS}",
+        custom_registry_mounts,
     )
     return rendered
 
@@ -389,12 +389,12 @@ class _CtlptlClusterProvider(ResourceProvider):
             f"kind-{props.get('_autoname_seed') or 'mgmt'}-{secrets.token_hex(4)}"
         )
         registry_name: Optional[str] = props.get("registry_name")
-        additional_registry_names = _registry_names(props.get("additional_registry_names"))
-        rendered = _render(cluster_name, registry_name, additional_registry_names)
+        custom_registry_names = _registry_names(props.get("custom_registry_names"))
+        rendered = _render(cluster_name, registry_name, custom_registry_names)
 
         _run(["ctlptl", "apply", "-f", "-"], stdin=rendered)
         for connected_registry_name in _registry_names(
-            [registry_name, *additional_registry_names]
+            [registry_name, *custom_registry_names]
         ):
             _connect_registry_to_kind_network(connected_registry_name)
         kubeconfig = _fetch_kubeconfig(cluster_name)
@@ -404,7 +404,7 @@ class _CtlptlClusterProvider(ResourceProvider):
             outs={
                 "cluster_name": cluster_name,
                 "registry_name": registry_name,
-                "additional_registry_names": additional_registry_names,
+                "custom_registry_names": custom_registry_names,
                 "kubeconfig": kubeconfig,
                 "context": cluster_name,
             },
@@ -430,10 +430,10 @@ class _CtlptlClusterProvider(ResourceProvider):
         # create time — there's no in-place rewire.
         if news.get("registry_name") != olds.get("registry_name"):
             replaces.append("registry_name")
-        if _registry_names(news.get("additional_registry_names")) != _registry_names(
-            olds.get("additional_registry_names")
+        if _registry_names(news.get("custom_registry_names")) != _registry_names(
+            olds.get("custom_registry_names")
         ):
-            replaces.append("additional_registry_names")
+            replaces.append("custom_registry_names")
 
         return DiffResult(
             changes=bool(replaces),
@@ -498,8 +498,8 @@ class CtlptlCluster(Resource):
     generated Docker Hub hosts file, and Pulumi's Output→Input machinery
     tracks the dependency — no explicit ``depends_on`` needed.
 
-    Pass ``additional_registry_names=[registry.registry_name]`` for direct HTTP
-    registries that should be reachable as ``<registry-name>:5000`` from pods.
+    Pass ``custom_registry_names=[registry.registry_name]`` for direct HTTP
+    custom registries that should be reachable as ``<registry-name>:5000`` from pods.
     """
 
     cluster_name: Output[str]
@@ -512,7 +512,7 @@ class CtlptlCluster(Resource):
         name: str,
         cluster_name: Optional[Input[str]] = None,
         registry_name: Optional[Input[str]] = None,
-        additional_registry_names: Optional[Input[List[Input[str]]]] = None,
+        custom_registry_names: Optional[Input[List[Input[str]]]] = None,
         opts: Optional[ResourceOptions] = None,
     ):
         super().__init__(
@@ -530,9 +530,9 @@ class CtlptlCluster(Resource):
                 # Passing the Output here also wires the cross-resource
                 # dependency without an explicit ``depends_on``.
                 "registry_name": registry_name,
-                # Optional direct HTTP registries exposed to containerd as
+                # Optional direct HTTP custom registries exposed to containerd as
                 # <registry-name>:5000 and connected to the kind Docker network.
-                "additional_registry_names": additional_registry_names,
+                "custom_registry_names": custom_registry_names,
                 # Hidden seed used by ``create()`` for autoname derivation.
                 # Sourced from the Pulumi logical name so the autonamed
                 # value is greppable (e.g. "kind-mgmt-a1b2c3d4").

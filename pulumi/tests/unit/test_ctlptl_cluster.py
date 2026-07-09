@@ -40,7 +40,7 @@ def test_render_generates_docker_hub_hosts_for_registry_cache(
     assert 'capabilities = ["pull", "resolve"]' in hosts_toml
 
 
-def test_render_mounts_additional_http_registries(
+def test_render_mounts_custom_http_registries(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -50,13 +50,13 @@ def test_render_mounts_additional_http_registries(
     rendered = ctlptl_cluster._render(
         "kind-mgmt-test",
         "registry-test",
-        ["additional-images-registry"],
+        ["custom-registry"],
     )
 
     hosts_path = (
         state_dir
         / "kind-mgmt-test"
-        / "additional-images-registry:5000"
+        / "custom-registry:5000"
         / "hosts.toml"
     )
     hosts_toml = hosts_path.read_text(encoding="utf-8")
@@ -64,14 +64,14 @@ def test_render_mounts_additional_http_registries(
     assert f"hostPath: {hosts_path}" in rendered
     assert (
         "containerPath: "
-        "/etc/containerd/certs.d/additional-images-registry:5000/hosts.toml"
+        "/etc/containerd/certs.d/custom-registry:5000/hosts.toml"
     ) in rendered
-    assert 'server = "http://additional-images-registry:5000"' in hosts_toml
-    assert '[host."http://additional-images-registry:5000"]' in hosts_toml
+    assert 'server = "http://custom-registry:5000"' in hosts_toml
+    assert '[host."http://custom-registry:5000"]' in hosts_toml
     assert 'capabilities = ["pull", "resolve"]' in hosts_toml
 
 
-def test_create_connects_cache_and_additional_registries(
+def test_create_connects_cache_and_custom_registries(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -103,13 +103,13 @@ def test_create_connects_cache_and_additional_registries(
         {
             "cluster_name": "kind-mgmt-test",
             "registry_name": "registry-test",
-            "additional_registry_names": ["additional-images-registry"],
+            "custom_registry_names": ["custom-registry"],
         }
     )
 
-    assert result.outs["additional_registry_names"] == ["additional-images-registry"]
-    assert connected_registries == ["registry-test", "additional-images-registry"]
-    assert "additional-images-registry:5000/hosts.toml" in applied_manifests[0]
+    assert result.outs["custom_registry_names"] == ["custom-registry"]
+    assert connected_registries == ["registry-test", "custom-registry"]
+    assert "custom-registry:5000/hosts.toml" in applied_manifests[0]
 
 
 def test_render_requires_registry_name(monkeypatch: pytest.MonkeyPatch) -> None:

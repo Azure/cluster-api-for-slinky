@@ -13,8 +13,9 @@ from ctlptl import (
     CloudProviderKind,
     CloudProviderKindConfig,
     CtlptlCluster,
+    CtlptlCustomRegistryImage,
     CtlptlRegistry,
-    CtlptlRegistryImage,
+    CtlptlRegistryService,
 )
 from gitrepo import GitOpsConfig, GitOpsRepository, GitOpsWebhook
 from fluxcd import FluxInfrastructure
@@ -32,24 +33,24 @@ from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadCl
 
 
 _OWNER_TAG = "Owner"
-_ADDITIONAL_IMAGES_CONFIG_KEY = "additionalImages"
-_ADDITIONAL_IMAGES_REGISTRY_NAME = "additional-images-registry"
-_ADDITIONAL_IMAGES_REGISTRY_ENV: list[pulumi.Input[str]] = [
-    "CA4S_REGISTRY_MODE=additional-images",
+_CUSTOM_IMAGES_CONFIG_KEY = "customImages"
+_CUSTOM_REGISTRY_NAME = "custom-registry"
+_CUSTOM_REGISTRY_ENV: list[pulumi.Input[str]] = [
+    "CA4S_REGISTRY_MODE=custom-registry",
 ]
 
 
-class AdditionalImageConfig(PulumiConfigModel):
+class CustomImageConfig(PulumiConfigModel):
     source_path: NonEmptyStr
     source_ref: NonEmptyStr
     image_name: NonEmptyStr
     build_args: Mapping[NonEmptyStr, NonEmptyStr] | None = None
 
 
-class AdditionalImagesConfig(PulumiConfigModel):
-    registry_name: NonEmptyStr = _ADDITIONAL_IMAGES_REGISTRY_NAME
+class CustomImagesConfig(PulumiConfigModel):
+    registry_name: NonEmptyStr = _CUSTOM_REGISTRY_NAME
     registry_port: StrictPositiveInt | None = None
-    images: Mapping[NonEmptyStr, AdditionalImageConfig] = {}
+    images: Mapping[NonEmptyStr, CustomImageConfig] = {}
 
 
 def run_stack() -> None:
@@ -59,46 +60,46 @@ def run_stack() -> None:
         config.get_object("cloudProviderKind") or {}
     )
     gitops_config = GitOpsConfig.model_validate(config.get_object("gitops") or {})
-    additional_images_config_value = config.get_object(_ADDITIONAL_IMAGES_CONFIG_KEY)
-    additional_images_config = (
-        AdditionalImagesConfig.model_validate(additional_images_config_value)
-        if additional_images_config_value is not None
+    custom_images_config_value = config.get_object(_CUSTOM_IMAGES_CONFIG_KEY)
+    custom_images_config = (
+        CustomImagesConfig.model_validate(custom_images_config_value)
+        if custom_images_config_value is not None
         else None
     )
 
-    registry = CtlptlRegistry("registry")
-    additional_images_registry: CtlptlRegistry | None = None
-    if additional_images_config is not None and additional_images_config.images:
-        additional_images_registry = CtlptlRegistry(
-            "additional-images-registry",
-            registry_name=additional_images_config.registry_name,
-            port=additional_images_config.registry_port,
-            env=_ADDITIONAL_IMAGES_REGISTRY_ENV,
+    cache_registry = CtlptlRegistry("cache-registry")
+    custom_registry: CtlptlRegistry | None = None
+    if custom_images_config is not None and custom_images_config.images:
+        custom_registry = CtlptlRegistry(
+            "custom-registry",
+            registry_name=custom_images_config.registry_name,
+            port=custom_images_config.registry_port,
+            env=_CUSTOM_REGISTRY_ENV,
         )
-    additional_images: dict[str, CtlptlRegistryImage] = {}
-    if additional_images_config is not None and additional_images_registry is not None:
-        for image_key, image_config in additional_images_config.images.items():
+    custom_images: dict[str, CtlptlCustomRegistryImage] = {}
+    if custom_images_config is not None and custom_registry is not None:
+        for image_key, image_config in custom_images_config.images.items():
             build_args: dict[str, pulumi.Input[str]] | None = None
             if image_config.build_args is not None:
                 build_args = dict(image_config.build_args)
-            additional_images[image_key] = CtlptlRegistryImage(
-                f"additional-image-{image_key}",
+            custom_images[image_key] = CtlptlCustomRegistryImage(
+                f"custom-image-{image_key}",
                 source_path=image_config.source_path,
                 source_ref=image_config.source_ref,
-                registry_name=additional_images_registry.registry_name,
-                registry_port=additional_images_registry.port,
+                registry_name=custom_registry.registry_name,
+                registry_port=custom_registry.port,
                 image_name=image_config.image_name,
                 build_args=build_args,
-                opts=pulumi.ResourceOptions(depends_on=[additional_images_registry]),
+                opts=pulumi.ResourceOptions(depends_on=[custom_registry]),
             )
 
-    additional_registry_names: list[pulumi.Input[str]] | None = None
-    if additional_images_registry is not None:
-        additional_registry_names = [additional_images_registry.registry_name]
+    custom_registry_names: list[pulumi.Input[str]] | None = None
+    if custom_registry is not None:
+        custom_registry_names = [custom_registry.registry_name]
     cluster = CtlptlCluster(
         "mgmt",
-        registry_name=registry.registry_name,
-        additional_registry_names=additional_registry_names,
+        registry_name=cache_registry.registry_name,
+        custom_registry_names=custom_registry_names,
     )
     mgmt_provider = k8s.Provider(
         "mgmt-k8s",
@@ -111,6 +112,14 @@ def run_stack() -> None:
         metadata={"name": PKO_NAMESPACE},
         opts=pulumi.ResourceOptions(provider=mgmt_provider),
     )
+    if custom_registry is not None:
+        CtlptlRegistryService(
+            "custom-registry-service",
+            registry_name=custom_registry.registry_name,
+            namespace=pko_namespace.metadata["name"],
+            provider=mgmt_provider,
+            dependencies=[cluster, custom_registry, pko_namespace],
+        )
 
     lb = CloudProviderKind(
         "lb",
@@ -137,7 +146,7 @@ def run_stack() -> None:
     init_stack_config = _with_owner_tag_config(
         _with_local_registry_config(
             InitStackConfig.model_validate(config.get_object("initStack") or {}),
-            LocalPortRegistrySetting(port=registry.port),
+            LocalPortRegistrySetting(port=cache_registry.port),
         )
     )
 
@@ -158,14 +167,14 @@ def run_stack() -> None:
     )
 
     _export_common_outputs(
-        registry=registry,
+        cache_registry=cache_registry,
         cluster=cluster,
         lb=lb,
         repo=repo,
         gitops_provider=gitops_config.provider,
         gitops_webhook=gitops_webhook,
         pko=pko,
-        additional_images=additional_images,
+        custom_images=custom_images,
     )
     if _azure_infrastructure_enabled(init_stack_config):
         _export_azure_config_outputs(init_stack_config)
@@ -281,21 +290,21 @@ def _azure_infrastructure_enabled(init_stack_config: InitStackConfig) -> bool:
 
 def _export_common_outputs(
     *,
-    registry: CtlptlRegistry,
+    cache_registry: CtlptlRegistry,
     cluster: CtlptlCluster,
     lb: CloudProviderKind,
     repo: GitOpsRepository,
     gitops_provider: str,
     gitops_webhook: GitOpsWebhook,
     pko: PKOBootstrap,
-    additional_images: Mapping[str, CtlptlRegistryImage],
+    custom_images: Mapping[str, CtlptlCustomRegistryImage],
 ) -> None:
-    pulumi.export("registry_name", registry.registry_name)
-    pulumi.export("registry_port", registry.port)
-    if additional_images:
+    pulumi.export("cache_registry_name", cache_registry.registry_name)
+    pulumi.export("cache_registry_port", cache_registry.port)
+    if custom_images:
         pulumi.export(
-            "additional_image_refs",
-            {name: image.image_ref for name, image in additional_images.items()},
+            "custom_image_refs",
+            {name: image.image_ref for name, image in custom_images.items()},
         )
     pulumi.export("cluster_name", cluster.cluster_name)
     pulumi.export("context", cluster.context)

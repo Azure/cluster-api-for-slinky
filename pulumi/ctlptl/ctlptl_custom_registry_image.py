@@ -1,4 +1,4 @@
-"""Pulumi dynamic resource: build an image into a local ctlptl registry."""
+"""Pulumi dynamic resource: build a custom image into a local ctlptl registry."""
 
 from __future__ import annotations
 
@@ -202,8 +202,8 @@ def _ensure_image(props: dict) -> dict[str, object]:
     }
 
 
-class _CtlptlRegistryImageProvider(ResourceProvider):
-    """Lifecycle hooks for an image built into a local ctlptl registry."""
+class _CtlptlCustomRegistryImageProvider(ResourceProvider):
+    """Lifecycle hooks for a custom image built into a local ctlptl registry."""
 
     def check(self, olds: dict, news: dict) -> CheckResult:
         checked = dict(news)
@@ -253,8 +253,8 @@ class _CtlptlRegistryImageProvider(ResourceProvider):
         return ReadResult(id_=id_, outs=props)
 
 
-class CtlptlRegistryImage(Resource):
-    """Build and push a git source ref image into a local ctlptl registry."""
+class CtlptlCustomRegistryImage(Resource):
+    """Build and push a git source ref image into a local custom registry."""
 
     source_ref: Output[str]
     source_commit: Output[str]
@@ -277,7 +277,7 @@ class CtlptlRegistryImage(Resource):
         opts: Optional[ResourceOptions] = None,
     ):
         super().__init__(
-            _CtlptlRegistryImageProvider(),
+            _CtlptlCustomRegistryImageProvider(),
             name,
             {
                 "source_path": source_path,

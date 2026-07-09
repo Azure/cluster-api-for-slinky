@@ -1,4 +1,4 @@
-"""Unit tests for :mod:`ctlptl.ctlptl_registry_image`."""
+"""Unit tests for :mod:`ctlptl.ctlptl_custom_registry_image`."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import subprocess
 
 import pytest
 
-from ctlptl import ctlptl_registry_image
-from ctlptl.ctlptl_registry_image import CtlptlRegistryImage  # noqa: F401
+from ctlptl import ctlptl_custom_registry_image
+from ctlptl.ctlptl_custom_registry_image import CtlptlCustomRegistryImage  # noqa: F401
 
 
 _SOURCE_COMMIT = "1234567890abcdef1234567890abcdef12345678"
@@ -16,9 +16,9 @@ _SOURCE_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 @pytest.fixture
 def provider(
     monkeypatch: pytest.MonkeyPatch,
-) -> ctlptl_registry_image._CtlptlRegistryImageProvider:
-    monkeypatch.setattr(ctlptl_registry_image.shutil, "which", lambda name: f"/bin/{name}")
-    return ctlptl_registry_image._CtlptlRegistryImageProvider()
+) -> ctlptl_custom_registry_image._CtlptlCustomRegistryImageProvider:
+    monkeypatch.setattr(ctlptl_custom_registry_image.shutil, "which", lambda name: f"/bin/{name}")
+    return ctlptl_custom_registry_image._CtlptlCustomRegistryImageProvider()
 
 
 def _props() -> dict[str, object]:
@@ -32,20 +32,20 @@ def _props() -> dict[str, object]:
 
 
 def test_create_skips_build_when_source_image_exists(
-    provider: ctlptl_registry_image._CtlptlRegistryImageProvider,
+    provider: ctlptl_custom_registry_image._CtlptlCustomRegistryImageProvider,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        ctlptl_registry_image,
+        ctlptl_custom_registry_image,
         "_resolve_source_commit",
         lambda source_path, source_ref: _SOURCE_COMMIT,
     )
-    monkeypatch.setattr(ctlptl_registry_image, "_manifest_exists", lambda *args: True)
+    monkeypatch.setattr(ctlptl_custom_registry_image, "_manifest_exists", lambda *args: True)
 
     def fail_build(**kwargs: object) -> None:
         raise AssertionError("existing image must not be rebuilt")
 
-    monkeypatch.setattr(ctlptl_registry_image, "_build_and_push_image", fail_build)
+    monkeypatch.setattr(ctlptl_custom_registry_image, "_build_and_push_image", fail_build)
 
     result = provider.create(_props())
 
@@ -58,18 +58,18 @@ def test_create_skips_build_when_source_image_exists(
 
 
 def test_create_builds_and_pushes_when_source_image_is_missing(
-    provider: ctlptl_registry_image._CtlptlRegistryImageProvider,
+    provider: ctlptl_custom_registry_image._CtlptlCustomRegistryImageProvider,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     builds: list[dict[str, object]] = []
     monkeypatch.setattr(
-        ctlptl_registry_image,
+        ctlptl_custom_registry_image,
         "_resolve_source_commit",
         lambda source_path, source_ref: _SOURCE_COMMIT,
     )
-    monkeypatch.setattr(ctlptl_registry_image, "_manifest_exists", lambda *args: False)
+    monkeypatch.setattr(ctlptl_custom_registry_image, "_manifest_exists", lambda *args: False)
     monkeypatch.setattr(
-        ctlptl_registry_image,
+        ctlptl_custom_registry_image,
         "_build_and_push_image",
         lambda **kwargs: builds.append(kwargs),
     )
@@ -89,15 +89,15 @@ def test_create_builds_and_pushes_when_source_image_is_missing(
 
 
 def test_create_accepts_pulumi_integer_values_deserialized_as_float(
-    provider: ctlptl_registry_image._CtlptlRegistryImageProvider,
+    provider: ctlptl_custom_registry_image._CtlptlCustomRegistryImageProvider,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        ctlptl_registry_image,
+        ctlptl_custom_registry_image,
         "_resolve_source_commit",
         lambda source_path, source_ref: _SOURCE_COMMIT,
     )
-    monkeypatch.setattr(ctlptl_registry_image, "_manifest_exists", lambda *args: True)
+    monkeypatch.setattr(ctlptl_custom_registry_image, "_manifest_exists", lambda *args: True)
     props = _props()
     props["registry_port"] = 5002.0
 
@@ -113,10 +113,10 @@ def test_build_and_push_uses_detached_git_worktree(
 ) -> None:
     calls: list[list[str]] = []
     removed: list[str] = []
-    monkeypatch.setattr(ctlptl_registry_image.shutil, "which", lambda name: f"/bin/{name}")
-    monkeypatch.setattr(ctlptl_registry_image.tempfile, "mkdtemp", lambda prefix: "/tmp/worktree")
+    monkeypatch.setattr(ctlptl_custom_registry_image.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(ctlptl_custom_registry_image.tempfile, "mkdtemp", lambda prefix: "/tmp/worktree")
     monkeypatch.setattr(
-        ctlptl_registry_image.shutil,
+        ctlptl_custom_registry_image.shutil,
         "rmtree",
         lambda path, ignore_errors=False: removed.append(path),
     )
@@ -132,9 +132,9 @@ def test_build_and_push_uses_detached_git_worktree(
         calls.append(cmd)
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
-    monkeypatch.setattr(ctlptl_registry_image.subprocess, "run", fake_run)
+    monkeypatch.setattr(ctlptl_custom_registry_image.subprocess, "run", fake_run)
 
-    ctlptl_registry_image._build_and_push_image(
+    ctlptl_custom_registry_image._build_and_push_image(
         source_path="/src/capz",
         source_ref="feature",
         host_image_ref="localhost:5002/capz/controller:source-1234567890ab",
