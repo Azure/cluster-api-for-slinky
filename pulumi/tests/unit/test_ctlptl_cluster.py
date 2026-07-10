@@ -12,6 +12,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 from ctlptl.ctlptl_cluster import CtlptlCluster  # noqa: F401
 from ctlptl import ctlptl_cluster
@@ -26,15 +27,23 @@ def test_render_generates_docker_hub_hosts_for_registry_cache(
     monkeypatch.delenv("HOME", raising=False)
 
     rendered = ctlptl_cluster._render("kind-mgmt-test", "registry-test")
+    manifest = yaml.safe_load(rendered)
 
-    hosts_path = state_dir / "kind-mgmt-test" / "docker.io" / "hosts.toml"
+    certs_dir = state_dir / "kind-mgmt-test" / "certs.d"
+    hosts_path = certs_dir / "docker.io" / "hosts.toml"
     hosts_toml = hosts_path.read_text(encoding="utf-8")
+    mounts = manifest["kindV1Alpha4Cluster"]["nodes"][0]["extraMounts"]
 
     assert "registry: registry-test" not in rendered
     assert "${HOME}" not in rendered
     assert "/root/.kube" not in rendered
-    assert f"hostPath: {hosts_path}" in rendered
-    assert "containerPath: /etc/containerd/certs.d/docker.io/hosts.toml" in rendered
+    assert mounts[0] == {
+        "hostPath": str(certs_dir),
+        "containerPath": "/etc/containerd/certs.d",
+        "readOnly": True,
+    }
+    assert f"hostPath: {certs_dir}" in rendered
+    assert "containerPath: /etc/containerd/certs.d" in rendered
     assert 'server = "https://registry-1.docker.io"' in hosts_toml
     assert '[host."http://registry-test:5000"]' in hosts_toml
     assert 'capabilities = ["pull", "resolve"]' in hosts_toml
@@ -56,16 +65,14 @@ def test_render_mounts_custom_http_registries(
     hosts_path = (
         state_dir
         / "kind-mgmt-test"
+        / "certs.d"
         / "custom-registry:5000"
         / "hosts.toml"
     )
     hosts_toml = hosts_path.read_text(encoding="utf-8")
 
-    assert f"hostPath: {hosts_path}" in rendered
-    assert (
-        "containerPath: "
-        "/etc/containerd/certs.d/custom-registry:5000/hosts.toml"
-    ) in rendered
+    assert f"hostPath: {state_dir / 'kind-mgmt-test' / 'certs.d'}" in rendered
+    assert "/etc/containerd/certs.d/custom-registry:5000/hosts.toml" not in rendered
     assert 'server = "http://custom-registry:5000"' in hosts_toml
     assert '[host."http://custom-registry:5000"]' in hosts_toml
     assert 'capabilities = ["pull", "resolve"]' in hosts_toml
@@ -109,7 +116,7 @@ def test_create_connects_cache_and_custom_registries(
 
     assert result.outs["custom_registry_names"] == ["custom-registry"]
     assert connected_registries == ["registry-test", "custom-registry"]
-    assert "custom-registry:5000/hosts.toml" in applied_manifests[0]
+    assert "containerPath: /etc/containerd/certs.d" in applied_manifests[0]
 
 
 def test_render_requires_registry_name(monkeypatch: pytest.MonkeyPatch) -> None:

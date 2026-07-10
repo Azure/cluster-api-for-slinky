@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 import sys
 import tempfile
-import urllib.error
-import urllib.request
 from typing import List, Optional
 
 from pulumi import Input, Output, ResourceOptions
@@ -22,16 +19,10 @@ from pulumi.dynamic import (
     UpdateResult,
 )
 
+from ctlptl import ctlptl_custom_registry_oci_object as oci_object
+
 _DEFAULT_IMAGE_NAME = "capz/cluster-api-azure-controller"
 _DEFAULT_BUILD_ARGS = {"ARCH": "amd64"}
-_MANIFEST_ACCEPT = ", ".join(
-    (
-        "application/vnd.oci.image.manifest.v1+json",
-        "application/vnd.docker.distribution.manifest.v2+json",
-        "application/vnd.docker.distribution.manifest.list.v2+json",
-        "application/vnd.oci.image.index.v1+json",
-    )
-)
 
 
 def _require_binary(name: str) -> str:
@@ -65,21 +56,11 @@ def _run(
 
 
 def _required_str(props: dict, name: str) -> str:
-    value = props.get(name)
-    if not isinstance(value, str) or not value:
-        raise RuntimeError(f"{name} must be a non-empty string")
-    return value
+    return oci_object.required_str(props, name)
 
 
 def _required_int(props: dict, name: str) -> int:
-    value = props.get(name)
-    if isinstance(value, bool):
-        raise RuntimeError(f"{name} must be a positive integer")
-    if isinstance(value, float) and value.is_integer():
-        value = int(value)
-    if not isinstance(value, int) or value < 1:
-        raise RuntimeError(f"{name} must be a positive integer")
-    return value
+    return oci_object.required_int(props, name)
 
 
 def _image_name_prop(props: dict) -> str:
@@ -99,44 +80,23 @@ def _build_args_prop(props: dict) -> dict[str, str]:
 
 
 def _resolve_source_commit(source_path: str, source_ref: str) -> str:
-    _require_binary("git")
-    result = _run(
-        ["git", "-C", source_path, "rev-parse", f"{source_ref}^{{commit}}"]
-    )
-    commit = result.stdout.strip()
-    if not commit:
-        raise RuntimeError(f"source_ref {source_ref!r} did not resolve to a commit")
-    return commit
+    return oci_object.resolve_source_commit(source_path, source_ref)
 
 
 def _image_tag(source_commit: str) -> str:
-    return f"source-{source_commit[:12]}"
+    return oci_object.source_tag(source_commit)
 
 
 def _host_image_ref(registry_port: int, image_name: str, image_tag: str) -> str:
-    return f"localhost:{registry_port}/{image_name}:{image_tag}"
+    return oci_object.host_ref(registry_port, image_name, image_tag)
 
 
 def _cluster_image_ref(registry_name: str, image_name: str, image_tag: str) -> str:
-    return f"{registry_name}:5000/{image_name}:{image_tag}"
+    return oci_object.cluster_ref(registry_name, image_name, image_tag)
 
 
 def _manifest_exists(registry_port: int, image_name: str, image_tag: str) -> bool:
-    url = f"http://localhost:{registry_port}/v2/{image_name}/manifests/{image_tag}"
-    request = urllib.request.Request(
-        url,
-        method="HEAD",
-        headers={"Accept": _MANIFEST_ACCEPT},
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=10):
-            return True
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            return False
-        raise RuntimeError(f"registry manifest probe failed for {url}: HTTP {exc.code}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"registry manifest probe failed for {url}: {exc}") from exc
+    return oci_object.manifest_exists(registry_port, image_name, image_tag)
 
 
 def _build_and_push_image(
@@ -166,40 +126,29 @@ def _build_and_push_image(
 
 
 def _ensure_image(props: dict) -> dict[str, object]:
-    source_path = _required_str(props, "source_path")
-    source_ref = _required_str(props, "source_ref")
-    registry_name = _required_str(props, "registry_name")
-    registry_port = _required_int(props, "registry_port")
     image_name = _image_name_prop(props)
     build_args = _build_args_prop(props)
-    source_commit = _resolve_source_commit(source_path, source_ref)
-    image_tag = _image_tag(source_commit)
-    host_image_ref = _host_image_ref(registry_port, image_name, image_tag)
-    image_ref = _cluster_image_ref(registry_name, image_name, image_tag)
 
-    built = False
-    if not _manifest_exists(registry_port, image_name, image_tag):
+    def build(source_path: str, source_ref: str, host_image_ref: str) -> None:
         _build_and_push_image(
             source_path=source_path,
             source_ref=source_ref,
             host_image_ref=host_image_ref,
             build_args=build_args,
         )
-        built = True
 
-    return {
-        "source_path": source_path,
-        "source_ref": source_ref,
-        "source_commit": source_commit,
-        "registry_name": registry_name,
-        "registry_port": registry_port,
-        "image_name": image_name,
-        "image_tag": image_tag,
-        "host_image_ref": host_image_ref,
-        "image_ref": image_ref,
-        "build_args": build_args,
-        "built": built,
-    }
+    return oci_object.ensure_source_ref_object(
+        props,
+        object_name=image_name,
+        object_name_key="image_name",
+        object_tag_key="image_tag",
+        host_ref_key="host_image_ref",
+        cluster_ref_key="image_ref",
+        extra_outputs={"build_args": build_args},
+        build=build,
+        resolve_commit=_resolve_source_commit,
+        probe_manifest=_manifest_exists,
+    )
 
 
 class _CtlptlCustomRegistryImageProvider(ResourceProvider):
@@ -229,7 +178,7 @@ class _CtlptlCustomRegistryImageProvider(ResourceProvider):
             "image_name",
             "build_args",
         )
-        return DiffResult(changes=any(olds.get(key) != news.get(key) for key in keys))
+        return DiffResult(changes=oci_object.has_diff(olds, news, keys))
 
     def update(self, id_: str, olds: dict, news: dict) -> UpdateResult:
         return UpdateResult(outs=_ensure_image(news))
@@ -238,12 +187,10 @@ class _CtlptlCustomRegistryImageProvider(ResourceProvider):
         try:
             registry_port = _required_int(props, "registry_port")
             image_name = _image_name_prop(props)
-            source_commit = str(props.get("source_commit") or "")
-            if not source_commit:
-                source_commit = _resolve_source_commit(
-                    _required_str(props, "source_path"),
-                    _required_str(props, "source_ref"),
-                )
+            source_commit = oci_object.source_commit_for_read(
+                props,
+                resolve_commit=_resolve_source_commit,
+            )
             image_tag = _image_tag(source_commit)
             if not _manifest_exists(registry_port, image_name, image_tag):
                 return ReadResult(id_=None, outs={})

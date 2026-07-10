@@ -8,6 +8,9 @@ config:
         imageName: capz/cluster-api-azure-controller
         buildArgs:
           ARCH: amd64
+  ca4s-infra:capzArtifact:
+    sourcePath: /home/zheyushen/cluster-api-provider-azure
+    sourceRef: origin/arsdragonfly/md-vmss
   ca4s-infra:initStack:
     controlPlane:
       infrastructureProviders:

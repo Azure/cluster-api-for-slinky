@@ -14,6 +14,7 @@ from ctlptl import (
     CloudProviderKindConfig,
     CtlptlCluster,
     CtlptlCustomRegistryImage,
+    CtlptlCustomRegistryOCIArtifact,
     CtlptlRegistry,
     CtlptlRegistryService,
 )
@@ -34,10 +35,12 @@ from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadCl
 
 _OWNER_TAG = "Owner"
 _CUSTOM_IMAGES_CONFIG_KEY = "customImages"
+_CAPZ_ARTIFACT_CONFIG_KEY = "capzArtifact"
 _CUSTOM_REGISTRY_NAME = "custom-registry"
 _CUSTOM_REGISTRY_ENV: list[pulumi.Input[str]] = [
     "CA4S_REGISTRY_MODE=custom-registry",
 ]
+_CAPZ_ARTIFACT_NAME = "capz/cluster-api-provider-azure"
 
 
 class CustomImageConfig(PulumiConfigModel):
@@ -53,6 +56,12 @@ class CustomImagesConfig(PulumiConfigModel):
     images: Mapping[NonEmptyStr, CustomImageConfig] = {}
 
 
+class CAPZArtifactConfig(PulumiConfigModel):
+    source_path: NonEmptyStr
+    source_ref: NonEmptyStr
+    artifact_name: NonEmptyStr = _CAPZ_ARTIFACT_NAME
+
+
 def run_stack() -> None:
     """Build the Kind management-cluster graph from config and discovery."""
     config = pulumi.Config()
@@ -66,14 +75,30 @@ def run_stack() -> None:
         if custom_images_config_value is not None
         else None
     )
+    capz_artifact_config_value = config.get_object(_CAPZ_ARTIFACT_CONFIG_KEY)
+    capz_artifact_config = (
+        CAPZArtifactConfig.model_validate(capz_artifact_config_value)
+        if capz_artifact_config_value is not None
+        else None
+    )
 
     cache_registry = CtlptlRegistry("cache-registry")
     custom_registry: CtlptlRegistry | None = None
-    if custom_images_config is not None and custom_images_config.images:
+    if (
+        custom_images_config is not None and custom_images_config.images
+    ) or capz_artifact_config is not None:
         custom_registry = CtlptlRegistry(
             "custom-registry",
-            registry_name=custom_images_config.registry_name,
-            port=custom_images_config.registry_port,
+            registry_name=(
+                custom_images_config.registry_name
+                if custom_images_config is not None
+                else _CUSTOM_REGISTRY_NAME
+            ),
+            port=(
+                custom_images_config.registry_port
+                if custom_images_config is not None
+                else None
+            ),
             env=_CUSTOM_REGISTRY_ENV,
         )
     custom_images: dict[str, CtlptlCustomRegistryImage] = {}
@@ -92,6 +117,17 @@ def run_stack() -> None:
                 build_args=build_args,
                 opts=pulumi.ResourceOptions(depends_on=[custom_registry]),
             )
+    capz_artifact: CtlptlCustomRegistryOCIArtifact | None = None
+    if capz_artifact_config is not None and custom_registry is not None:
+        capz_artifact = CtlptlCustomRegistryOCIArtifact(
+            "capz-artifact",
+            source_path=capz_artifact_config.source_path,
+            source_ref=capz_artifact_config.source_ref,
+            registry_name=custom_registry.registry_name,
+            registry_port=custom_registry.port,
+            artifact_name=capz_artifact_config.artifact_name,
+            opts=pulumi.ResourceOptions(depends_on=[custom_registry]),
+        )
 
     custom_registry_names: list[pulumi.Input[str]] | None = None
     if custom_registry is not None:
@@ -112,8 +148,9 @@ def run_stack() -> None:
         metadata={"name": PKO_NAMESPACE},
         opts=pulumi.ResourceOptions(provider=mgmt_provider),
     )
+    custom_registry_service: CtlptlRegistryService | None = None
     if custom_registry is not None:
-        CtlptlRegistryService(
+        custom_registry_service = CtlptlRegistryService(
             "custom-registry-service",
             registry_name=custom_registry.registry_name,
             namespace=pko_namespace.metadata["name"],
@@ -175,6 +212,8 @@ def run_stack() -> None:
         gitops_webhook=gitops_webhook,
         pko=pko,
         custom_images=custom_images,
+        capz_artifact=capz_artifact,
+        custom_registry_service=custom_registry_service,
     )
     if _azure_infrastructure_enabled(init_stack_config):
         _export_azure_config_outputs(init_stack_config)
@@ -298,6 +337,8 @@ def _export_common_outputs(
     gitops_webhook: GitOpsWebhook,
     pko: PKOBootstrap,
     custom_images: Mapping[str, CtlptlCustomRegistryImage],
+    capz_artifact: CtlptlCustomRegistryOCIArtifact | None,
+    custom_registry_service: CtlptlRegistryService | None,
 ) -> None:
     pulumi.export("cache_registry_name", cache_registry.registry_name)
     pulumi.export("cache_registry_port", cache_registry.port)
@@ -306,6 +347,19 @@ def _export_common_outputs(
             "custom_image_refs",
             {name: image.image_ref for name, image in custom_images.items()},
         )
+    if capz_artifact is not None:
+        pulumi.export("capz_artifact_ref", capz_artifact.artifact_ref)
+        if custom_registry_service is not None:
+            pulumi.export(
+                "capz_artifact_oci_url",
+                pulumi.Output.concat(
+                    custom_registry_service.url,
+                    "/",
+                    capz_artifact.artifact_name,
+                    ":",
+                    capz_artifact.artifact_tag,
+                ),
+            )
     pulumi.export("cluster_name", cluster.cluster_name)
     pulumi.export("context", cluster.context)
     pulumi.export("kubeconfig", cluster.kubeconfig)

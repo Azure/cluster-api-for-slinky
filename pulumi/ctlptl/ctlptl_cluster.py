@@ -57,10 +57,8 @@ substitutes when rendering the manifest:
 * ``${CLUSTER_NAME}`` → the autonamed or pinned ``cluster_name``. Must be
   expanded inside the provider because the autonamed value only exists
   inside ``create()``.
-* ``${DOCKER_IO_HOSTS_TOML}`` → generated ``hosts.toml`` file mounted into
-    kind nodes for containerd's Docker Hub pull-through registry cache config.
-* ``${CUSTOM_REGISTRY_MOUNTS}`` → generated extraMount entries for direct
-    HTTP custom registry endpoints such as ``custom-registry:5000``.
+* ``${CONTAINERD_CERTS_D}`` → generated ``certs.d`` directory mounted into
+    kind nodes for containerd's Docker Hub cache and custom registry config.
 
 The ``registry_name`` input is rendered into that generated Docker Hub
 ``hosts.toml`` file. The ctlptl ``Cluster`` manifest does not set its own
@@ -169,10 +167,9 @@ kindV1Alpha4Cluster:
     extraMounts:
     # Docker Hub mirror for in-cluster pod pulls. Host Docker still handles the
     # node image pull before these containers exist.
-    - hostPath: ${DOCKER_IO_HOSTS_TOML}
-      containerPath: /etc/containerd/certs.d/docker.io/hosts.toml
+    - hostPath: ${CONTAINERD_CERTS_D}
+      containerPath: /etc/containerd/certs.d
       readOnly: true
-${CUSTOM_REGISTRY_MOUNTS}
     # required by CAPD
     - hostPath: /var/run/docker.sock
       containerPath: /var/run/docker.sock
@@ -181,10 +178,9 @@ ${CUSTOM_REGISTRY_MOUNTS}
     extraMounts:
     # Docker Hub mirror for in-cluster pod pulls. Host Docker still handles the
     # node image pull before these containers exist.
-    - hostPath: ${DOCKER_IO_HOSTS_TOML}
-      containerPath: /etc/containerd/certs.d/docker.io/hosts.toml
+    - hostPath: ${CONTAINERD_CERTS_D}
+      containerPath: /etc/containerd/certs.d
       readOnly: true
-${CUSTOM_REGISTRY_MOUNTS}
     # required by CAPD (capd-controller-manager may be scheduled on either kind node)
     - hostPath: /var/run/docker.sock
       containerPath: /var/run/docker.sock
@@ -243,7 +239,7 @@ def _fetch_kubeconfig(context: str) -> str:
 
 def _docker_io_hosts_toml(cluster_name: str, registry_name: str) -> Path:
     """Write the containerd Docker Hub hosts config for this kind cluster."""
-    path = _GENERATED_CONFIG_DIR / cluster_name / "docker.io" / "hosts.toml"
+    path = _GENERATED_CONFIG_DIR / cluster_name / "certs.d" / "docker.io" / "hosts.toml"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "server = \"https://registry-1.docker.io\"\n\n"
@@ -257,7 +253,7 @@ def _docker_io_hosts_toml(cluster_name: str, registry_name: str) -> Path:
 def _registry_hosts_toml(cluster_name: str, registry_name: str) -> Path:
     """Write the containerd hosts config for an in-network HTTP registry."""
     endpoint = f"{registry_name}:5000"
-    path = _GENERATED_CONFIG_DIR / cluster_name / endpoint / "hosts.toml"
+    path = _GENERATED_CONFIG_DIR / cluster_name / "certs.d" / endpoint / "hosts.toml"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         f"server = \"http://{endpoint}\"\n\n"
@@ -268,23 +264,13 @@ def _registry_hosts_toml(cluster_name: str, registry_name: str) -> Path:
     return path
 
 
-def _custom_registry_mounts(
+def _write_custom_registry_hosts_toml(
     cluster_name: str,
     registry_names: list[str],
 ) -> str:
-    mounts: list[str] = []
     for registry_name in registry_names:
-        hosts_path = _registry_hosts_toml(cluster_name, registry_name)
-        mounts.extend(
-            [
-                f"    - hostPath: {hosts_path}",
-                f"      containerPath: /etc/containerd/certs.d/{registry_name}:5000/hosts.toml",
-                "      readOnly: true",
-            ]
-        )
-    if not mounts:
-        return ""
-    return "\n".join(mounts) + "\n"
+        _registry_hosts_toml(cluster_name, registry_name)
+    return ""
 
 
 def _registry_names(value: object) -> list[str]:
@@ -338,8 +324,8 @@ def _render(
             ``CtlptlRegistry().registry_name`` directly as an ``Input[str]``, giving
             Pulumi the cross-resource dependency edge for free (no ``depends_on``
             needed).
-        * ``${DOCKER_IO_HOSTS_TOML}`` → generated hostPath file pointing Docker Hub
-            pulls at the sibling ctlptl registry's in-cluster address.
+        * ``${CONTAINERD_CERTS_D}`` → generated hostPath directory pointing Docker Hub
+            pulls and custom registry pulls at in-cluster registry addresses.
 
         A missing ``registry_name`` is rejected here because Docker Hub pull-through
         cache config depends on the sibling registry's in-cluster name.
@@ -349,18 +335,14 @@ def _render(
             "registry_name is required to render kind registry cache config"
         )
     docker_io_hosts_toml = _docker_io_hosts_toml(cluster_name, registry_name)
-    custom_registry_mounts = _custom_registry_mounts(
+    _write_custom_registry_hosts_toml(
         cluster_name,
         custom_registry_names or [],
     )
     rendered = _MANIFEST_TEMPLATE
     rendered = rendered.replace("${CLUSTER_NAME}", cluster_name)
     rendered = rendered.replace(
-        "${DOCKER_IO_HOSTS_TOML}", str(docker_io_hosts_toml)
-    )
-    rendered = rendered.replace(
-        "${CUSTOM_REGISTRY_MOUNTS}",
-        custom_registry_mounts,
+        "${CONTAINERD_CERTS_D}", str(docker_io_hosts_toml.parents[1])
     )
     return rendered
 

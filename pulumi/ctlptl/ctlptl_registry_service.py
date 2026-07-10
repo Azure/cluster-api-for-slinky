@@ -258,13 +258,14 @@ class CtlptlRegistryService(pulumi.ComponentResource):
         self.service_name = Output.from_input(resolved_service_name)
         self.namespace = Output.from_input(namespace)
         self.ip_address = address.ip_address
+        registry_port_text = Output.from_input(registry_port).apply(str)
         self.url = Output.concat(
             "http://",
             self.service_name,
             ".",
             self.namespace,
             ".svc.cluster.local:",
-            registry_port,
+            registry_port_text,
         )
         self.register_outputs(
             {

@@ -5,6 +5,7 @@ Pulumi dynamic providers that wrap the ``ctlptl`` and
 
 * :class:`CtlptlRegistry` — Docker-backed image registry.
 * :class:`CtlptlCustomRegistryImage` — source-ref image built into a custom registry.
+* :class:`CtlptlCustomRegistryOCIArtifact` — CAPZ provider artifacts built into a custom registry.
 * :class:`CtlptlCluster` — kind cluster wired to the registry.
 * :class:`CtlptlRegistryService` — in-cluster Service for a registry container.
 * :class:`CloudProviderKind` — host-side daemon that turns ``type:
@@ -22,6 +23,7 @@ shares this package through ``stack.py``.
 from ctlptl.cloud_provider_kind import CloudProviderKind, CloudProviderKindConfig
 from ctlptl.ctlptl_cluster import CtlptlCluster
 from ctlptl.ctlptl_custom_registry_image import CtlptlCustomRegistryImage
+from ctlptl.ctlptl_custom_registry_oci_artifact import CtlptlCustomRegistryOCIArtifact
 from ctlptl.ctlptl_registry import CtlptlRegistry
 from ctlptl.ctlptl_registry_service import CtlptlRegistryService
 
@@ -30,6 +32,7 @@ __all__ = [
   "CloudProviderKindConfig",
   "CtlptlCluster",
   "CtlptlCustomRegistryImage",
+  "CtlptlCustomRegistryOCIArtifact",
   "CtlptlRegistry",
   "CtlptlRegistryService",
 ]

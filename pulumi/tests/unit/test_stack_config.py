@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from stack import (
+    CAPZArtifactConfig,
     CustomImagesConfig,
     _azure_infrastructure_enabled,
     _discover_username,
@@ -109,6 +110,53 @@ def test_custom_images_config_defaults_to_dedicated_registry() -> None:
     assert config.registry_name == "custom-registry"
     assert config.registry_port is None
     assert image.build_args is None
+
+
+def test_capz_artifact_config_defaults_to_capz_artifact_name() -> None:
+    config = CAPZArtifactConfig.model_validate(
+        {
+            "sourcePath": "/src/capz",
+            "sourceRef": "origin/arsdragonfly/md-vmss",
+        }
+    )
+
+    assert config.source_path == "/src/capz"
+    assert config.source_ref == "origin/arsdragonfly/md-vmss"
+    assert config.artifact_name == "capz/cluster-api-provider-azure"
+
+
+@pytest.mark.parametrize(
+    "value, expected_errors",
+    [
+        (
+            {},
+            {
+                (("sourcePath",), "missing"),
+                (("sourceRef",), "missing"),
+            },
+        ),
+        (
+            {
+                "sourcePath": "/src/capz",
+                "sourceRef": "HEAD",
+                "artifactName": "",
+            },
+            {(("artifactName",), "string_too_short")},
+        ),
+    ],
+)
+def test_capz_artifact_config_rejects_invalid_values(
+    value: object,
+    expected_errors: set[tuple[tuple[str, ...], str]],
+) -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        CAPZArtifactConfig.model_validate(value)
+
+    errors = {
+        (tuple(str(part) for part in error["loc"]), str(error["type"]))
+        for error in exc_info.value.errors()
+    }
+    assert expected_errors <= errors
 
 
 @pytest.mark.parametrize(
