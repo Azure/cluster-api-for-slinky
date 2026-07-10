@@ -893,7 +893,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
     cluster_control_plane_available: k8s.apiextensions.CustomResourcePatch
     calico_operator_chart_version: pulumi.Output[str]
     calico_operator_status: pulumi.Output[Any]
-    cluster_autoscaler: ClusterAPIAutoscalerOutputs | None
+    cluster_autoscaler: pulumi.Output[ClusterAPIAutoscalerOutputs] | None
 
     def __init__(
         self,
@@ -1181,8 +1181,8 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "calico_operator_status": self.calico_operator_status,
                 "local_path_storage_class_name": local_path_storage.storage_class_name,
                 "cluster_autoscaler": (
-                    self.cluster_autoscaler.to_outputs()
-                    if self.cluster_autoscaler
+                    self.cluster_autoscaler.apply(lambda outputs: outputs.model_dump())
+                    if self.cluster_autoscaler is not None
                     else None
                 ),
             }

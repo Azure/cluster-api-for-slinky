@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 import pulumi
-from pydantic import field_serializer
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 from lib.config import PulumiConfigModel
 from stacks.workload_cluster.registry_setting import RegistryConfig
@@ -62,6 +62,30 @@ class LocalWorkloadClusterConfig(PulumiConfigModel):
         return class_name
 
 
+class LocalWorkloadClusterOutputs(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    cluster_class: str
+    cluster_instance: str
+    cluster_name: str
+    docker_cluster_name: str
+    control_plane_name: str
+    worker_machine_deployments: list[str]
+    cluster_autoscaler: ClusterAPIAutoscalerOutputs | None
+    keda: KEDAOutputs | None
+    prometheus_chart_version: str
+    prometheus_namespace: str
+    prometheus_status: Any
+    calico_operator_chart_version: str
+    calico_operator_status: Any
+    workload_cluster_ready: bool
+    slurm_operator_chart_version: str
+    slurm_operator_status: Any
+    slurm_chart_version: str
+    slurm_status: Any
+    todo: str
+
+
 class LocalWorkloadClusterClass(pulumi.ComponentResource):
     """Reusable local workload-cluster class.
 
@@ -70,20 +94,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
     names and Pulumi outputs.
     """
 
-    cluster_class: pulumi.Output[str]
-    cluster_instance: pulumi.Output[str]
-    cluster_name: pulumi.Output[str]
-    docker_cluster_name: pulumi.Output[str]
-    control_plane_name: pulumi.Output[str]
-    worker_machine_deployments: list[pulumi.Output[str]]
-    cluster_autoscaler: ClusterAPIAutoscalerOutputs | None
-    keda: KEDAOutputs | None
-    prometheus_namespace: pulumi.Output[str]
-    prometheus_status: pulumi.Output[Any]
-    calico_operator_chart_version: pulumi.Output[str]
-    calico_operator_status: pulumi.Output[Any]
-    workload_cluster_ready: pulumi.Output[bool]
-    todo: pulumi.Output[str]
+    outputs: pulumi.Output[LocalWorkloadClusterOutputs]
 
     def __init__(
         self,
@@ -130,50 +141,44 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             opts=child_options(depends_on=[infrastructure]),
         )
 
-        self.cluster_class = pulumi.Output.from_input(_CLUSTER_CLASS)
-        self.cluster_instance = pulumi.Output.from_input(instance)
-        self.cluster_name = infrastructure.cluster_name
-        self.docker_cluster_name = infrastructure.docker_cluster_name
-        self.control_plane_name = infrastructure.control_plane_name
-        self.worker_machine_deployments = infrastructure.worker_machine_deployments
-        self.cluster_autoscaler = infrastructure.cluster_autoscaler
-        self.keda = deployments.keda
-        self.prometheus_namespace = deployments.prometheus_namespace
-        self.prometheus_status = deployments.prometheus_status
-        self.calico_operator_chart_version = infrastructure.calico_operator_chart_version
-        self.calico_operator_status = infrastructure.calico_operator_status
-        self.workload_cluster_ready = deployments.workload_cluster_ready
-        self.todo = pulumi.Output.from_input(
-            "Wire workload-driven autoscaling and tenant-facing Slurm operations."
-        )
+        outputs = {
+            "cluster_class": pulumi.Output.from_input(_CLUSTER_CLASS),
+            "cluster_instance": pulumi.Output.from_input(instance),
+            "cluster_name": infrastructure.cluster_name,
+            "docker_cluster_name": infrastructure.docker_cluster_name,
+            "control_plane_name": infrastructure.control_plane_name,
+            "worker_machine_deployments": pulumi.Output.all(
+                *infrastructure.worker_machine_deployments
+            ),
+            "cluster_autoscaler": (
+                infrastructure.cluster_autoscaler.apply(lambda value: value.model_dump())
+                if infrastructure.cluster_autoscaler is not None
+                else None
+            ),
+            "keda": (
+                deployments.keda.apply(lambda value: value.model_dump())
+                if deployments.keda is not None
+                else None
+            ),
+            "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
+            "prometheus_namespace": deployments.prometheus_namespace,
+            "prometheus_status": deployments.prometheus_status,
+            "calico_operator_chart_version": infrastructure.calico_operator_chart_version,
+            "calico_operator_status": infrastructure.calico_operator_status,
+            "workload_cluster_ready": deployments.workload_cluster_ready,
+            "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_operator_status": deployments.slurm_operator_status,
+            "slurm_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_status": deployments.slurm_status,
+            "todo": pulumi.Output.from_input(
+                "Wire workload-driven autoscaling and tenant-facing Slurm operations."
+            ),
+        }
 
-        self.register_outputs(
-            {
-                "cluster_class": self.cluster_class,
-                "cluster_instance": self.cluster_instance,
-                "cluster_name": self.cluster_name,
-                "docker_cluster_name": self.docker_cluster_name,
-                "control_plane_name": self.control_plane_name,
-                "worker_machine_deployments": self.worker_machine_deployments,
-                "cluster_autoscaler": (
-                    self.cluster_autoscaler.to_outputs()
-                    if self.cluster_autoscaler
-                    else None
-                ),
-                "keda": self.keda.to_outputs() if self.keda else None,
-                "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
-                "prometheus_namespace": self.prometheus_namespace,
-                "prometheus_status": self.prometheus_status,
-                "calico_operator_chart_version": self.calico_operator_chart_version,
-                "calico_operator_status": self.calico_operator_status,
-                "workload_cluster_ready": self.workload_cluster_ready,
-                "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
-                "slurm_operator_status": deployments.slurm_operator_status,
-                "slurm_chart_version": _SLINKY_CHART_VERSION,
-                "slurm_status": deployments.slurm_status,
-                "todo": self.todo,
-            }
+        self.outputs = pulumi.Output.all(**outputs).apply(
+            LocalWorkloadClusterOutputs.model_validate
         )
+        self.register_outputs(outputs)
 
 
 WorkloadClusterClass = LocalWorkloadClusterClass

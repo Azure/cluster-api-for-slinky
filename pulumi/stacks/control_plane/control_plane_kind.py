@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 import pulumi
+from pydantic import BaseModel, ConfigDict
 
 from lib.config import PulumiConfigModel
-from lib.outputs import CompositeOutput
 from stacks.control_plane.control_plane_config import (
     AzureClusterIdentityConfig,
     AzureInfrastructureProviderConfig,
@@ -23,37 +22,39 @@ from stacks.control_plane.capi import ClusterAPIOperator
 from stacks.control_plane.certmanager import CertManager
 
 
-@dataclass(frozen=True)
-class ManagementAWXControlPlaneOutputs(CompositeOutput):
-    operator_namespace: pulumi.Output[str]
-    instance_name: pulumi.Output[str]
-    service_name: pulumi.Output[str]
-    api_url: pulumi.Output[str]
-    admin_user: pulumi.Output[str]
-    admin_password: pulumi.Output[str]
-    admin_password_secret: pulumi.Output[str]
-    organization_id: pulumi.Output[float]
-    project_id: pulumi.Output[float]
-    project_name: pulumi.Output[str]
-    scm_credential_id: pulumi.Output[float]
-    management_kubernetes_credential_id: pulumi.Output[float]
-    dynamic_inventory_id: pulumi.Output[float]
-    dynamic_inventory_source_id: pulumi.Output[float]
-    cluster_state_job_template_id: pulumi.Output[float]
-    ready: pulumi.Output[bool]
+class ManagementAWXControlPlaneOutputs(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    operator_namespace: str
+    instance_name: str
+    service_name: str
+    api_url: str
+    admin_user: str
+    admin_password: str
+    admin_password_secret: str
+    organization_id: float
+    project_id: float
+    project_name: str
+    scm_credential_id: float
+    management_kubernetes_credential_id: float
+    dynamic_inventory_id: float
+    dynamic_inventory_source_id: float
+    cluster_state_job_template_id: float
+    ready: bool
 
 
 class KindAzureControlPlaneSpec(PulumiConfigModel):
     identity: AzureClusterIdentityConfig
 
 
-@dataclass(frozen=True)
-class KindAzureControlPlaneOutputs(CompositeOutput):
-    cluster_identity_name: pulumi.Output[str]
-    cluster_identity_namespace: pulumi.Output[str]
-    client_id: pulumi.Output[str]
-    tenant_id: pulumi.Output[str]
-    ready: pulumi.Output[bool]
+class KindAzureControlPlaneOutputs(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    cluster_identity_name: str
+    cluster_identity_namespace: str
+    client_id: str
+    tenant_id: str
+    ready: bool
 
 
 def _enabled_infrastructure_provider_names(
@@ -70,7 +71,7 @@ def _enabled_infrastructure_provider_names(
 class ManagementAWXControlPlane(pulumi.ComponentResource):
     """Build the optional management-cluster AWX control-plane resource graph."""
 
-    outputs: ManagementAWXControlPlaneOutputs
+    outputs: pulumi.Output[ManagementAWXControlPlaneOutputs]
 
     def __init__(
         self,
@@ -115,38 +116,38 @@ class ManagementAWXControlPlane(pulumi.ComponentResource):
             awx_configuration.dynamic_inventory_source_id,
             awx_configuration.cluster_state_job_template_id,
         ).apply(lambda _: True)
-        self.outputs = ManagementAWXControlPlaneOutputs(
-            operator_namespace=awx_operator.namespace,
-            instance_name=awx_instance.name,
-            service_name=awx_instance.service_name,
-            api_url=awx_provider_config.api_url,
-            admin_user=awx_instance.admin_user,
-            admin_password=awx_provider_config.admin_password,
-            admin_password_secret=awx_instance.admin_password_secret,
-            organization_id=awx_configuration.organization_id,
-            project_id=awx_configuration.project_id,
-            project_name=awx_configuration.project_name,
-            scm_credential_id=awx_configuration.scm_credential_id,
-            management_kubernetes_credential_id=(
+        outputs = {
+            "operator_namespace": awx_operator.namespace,
+            "instance_name": awx_instance.name,
+            "service_name": awx_instance.service_name,
+            "api_url": awx_provider_config.api_url,
+            "admin_user": awx_instance.admin_user,
+            "admin_password": awx_provider_config.admin_password,
+            "admin_password_secret": awx_instance.admin_password_secret,
+            "organization_id": awx_configuration.organization_id,
+            "project_id": awx_configuration.project_id,
+            "project_name": awx_configuration.project_name,
+            "scm_credential_id": awx_configuration.scm_credential_id,
+            "management_kubernetes_credential_id": (
                 awx_configuration.management_kubernetes_credential_id
             ),
-            dynamic_inventory_id=awx_configuration.dynamic_inventory_id,
-            dynamic_inventory_source_id=(
-                awx_configuration.dynamic_inventory_source_id
-            ),
-            cluster_state_job_template_id=(
+            "dynamic_inventory_id": awx_configuration.dynamic_inventory_id,
+            "dynamic_inventory_source_id": awx_configuration.dynamic_inventory_source_id,
+            "cluster_state_job_template_id": (
                 awx_configuration.cluster_state_job_template_id
             ),
-            ready=ready,
+            "ready": ready,
+        }
+        self.outputs = pulumi.Output.all(**outputs).apply(
+            ManagementAWXControlPlaneOutputs.model_validate
         )
-
-        self.register_outputs(self.outputs.to_outputs())
+        self.register_outputs(outputs)
 
 
 class KindAzureControlPlane(pulumi.ComponentResource):
     """Azure capability block for a Kind management control plane."""
 
-    outputs: KindAzureControlPlaneOutputs
+    outputs: pulumi.Output[KindAzureControlPlaneOutputs]
 
     def __init__(
         self,
@@ -172,15 +173,17 @@ class KindAzureControlPlane(pulumi.ComponentResource):
             ),
         )
 
-        self.outputs = KindAzureControlPlaneOutputs(
-            cluster_identity_name=azure_cluster_identity.identity_name,
-            cluster_identity_namespace=azure_cluster_identity.identity_namespace,
-            client_id=pulumi.Output.from_input(str(spec.identity.client_id)),
-            tenant_id=pulumi.Output.from_input(str(spec.identity.tenant_id)),
-            ready=azure_cluster_identity.identity_name.apply(lambda _: True),
+        outputs = {
+            "cluster_identity_name": azure_cluster_identity.identity_name,
+            "cluster_identity_namespace": azure_cluster_identity.identity_namespace,
+            "client_id": pulumi.Output.from_input(str(spec.identity.client_id)),
+            "tenant_id": pulumi.Output.from_input(str(spec.identity.tenant_id)),
+            "ready": azure_cluster_identity.identity_name.apply(lambda _: True),
+        }
+        self.outputs = pulumi.Output.all(**outputs).apply(
+            KindAzureControlPlaneOutputs.model_validate
         )
-
-        self.register_outputs(self.outputs.to_outputs())
+        self.register_outputs(outputs)
 
 
 class ControlPlaneKind(pulumi.ComponentResource):
@@ -192,8 +195,8 @@ class ControlPlaneKind(pulumi.ComponentResource):
     capi_provider_namespaces: dict[str, pulumi.Output[str]]
     infrastructure_providers: pulumi.Output[list[str]]
     awx_enabled: pulumi.Output[bool]
-    awx: ManagementAWXControlPlaneOutputs | None
-    azure: KindAzureControlPlaneOutputs | None
+    awx: pulumi.Output[ManagementAWXControlPlaneOutputs] | None
+    azure: pulumi.Output[KindAzureControlPlaneOutputs] | None
     control_plane_ready: pulumi.Output[bool]
     todo: pulumi.Output[str]
 
@@ -272,9 +275,9 @@ class ControlPlaneKind(pulumi.ComponentResource):
 
         ready_inputs: list[pulumi.Input[Any]] = [capi.provider_version]
         if self.awx is not None:
-            ready_inputs.append(self.awx.ready)
+            ready_inputs.append(self.awx.apply(lambda outputs: outputs.ready))
         if self.azure is not None:
-            ready_inputs.append(self.azure.ready)
+            ready_inputs.append(self.azure.apply(lambda outputs: outputs.ready))
         self.control_plane_ready = pulumi.Output.all(*ready_inputs).apply(lambda _: True)
         self.todo = pulumi.Output.from_input(
             "Kind control plane installed cert-manager, CAPI, and requested capabilities."
@@ -288,8 +291,16 @@ class ControlPlaneKind(pulumi.ComponentResource):
                 "capi_provider_namespaces": self.capi_provider_namespaces,
                 "infrastructure_providers": self.infrastructure_providers,
                 "awx_enabled": self.awx_enabled,
-                "awx": self.awx.to_outputs() if self.awx else None,
-                "azure": self.azure.to_outputs() if self.azure else None,
+                "awx": (
+                    self.awx.apply(lambda outputs: outputs.model_dump())
+                    if self.awx is not None
+                    else None
+                ),
+                "azure": (
+                    self.azure.apply(lambda outputs: outputs.model_dump())
+                    if self.azure is not None
+                    else None
+                ),
                 "control_plane_ready": self.control_plane_ready,
                 "todo": self.todo,
             }

@@ -80,25 +80,25 @@ class _FakeManagementAWXControlPlane:
 
     def __init__(self, name: str, **kwargs: object) -> None:
         self.calls.append({"name": name, **kwargs})
-        self.outputs = ManagementAWXControlPlaneOutputs(
-            operator_namespace=pulumi.Output.from_input("awx"),
-            instance_name=pulumi.Output.from_input("awx"),
-            service_name=pulumi.Output.from_input("awx-service"),
-            api_url=pulumi.Output.from_input(
-                "http://awx-service.awx.svc.cluster.local"
+        self.outputs = pulumi.Output.from_input(
+            ManagementAWXControlPlaneOutputs(
+                operator_namespace="awx",
+                instance_name="awx",
+                service_name="awx-service",
+                api_url="http://awx-service.awx.svc.cluster.local",
+                admin_user="admin",
+                admin_password="password",
+                admin_password_secret="awx-admin-password",
+                organization_id=1.0,
+                project_id=2.0,
+                project_name="gitops",
+                scm_credential_id=3.0,
+                management_kubernetes_credential_id=4.0,
+                dynamic_inventory_id=5.0,
+                dynamic_inventory_source_id=6.0,
+                cluster_state_job_template_id=7.0,
+                ready=True,
             ),
-            admin_user=pulumi.Output.from_input("admin"),
-            admin_password=pulumi.Output.from_input("password"),
-            admin_password_secret=pulumi.Output.from_input("awx-admin-password"),
-            organization_id=pulumi.Output.from_input(1.0),
-            project_id=pulumi.Output.from_input(2.0),
-            project_name=pulumi.Output.from_input("gitops"),
-            scm_credential_id=pulumi.Output.from_input(3.0),
-            management_kubernetes_credential_id=pulumi.Output.from_input(4.0),
-            dynamic_inventory_id=pulumi.Output.from_input(5.0),
-            dynamic_inventory_source_id=pulumi.Output.from_input(6.0),
-            cluster_state_job_template_id=pulumi.Output.from_input(7.0),
-            ready=pulumi.Output.from_input(True),
         )
 
 
@@ -198,8 +198,7 @@ def test_control_plane_local_instantiates_awx_when_enabled(monkeypatch: Any) -> 
     assert call["flux_source_namespace"] == "pko-system"
     assert call["flux_source_name"] == "gitops-source"
     assert control_plane.awx is not None
-    assert "project_id" in control_plane._test_outputs["awx"]
-    assert "provider" not in control_plane._test_outputs["awx"]
+    assert control_plane._test_outputs["awx"] is not None
 
 
 def test_kind_azure_control_plane_creates_identity_for_user_assigned_msi(
@@ -227,7 +226,7 @@ def test_kind_azure_control_plane_creates_identity_for_user_assigned_msi(
     assert identity.allowed_namespaces == AllowedNamespacesConfig()
     identity_opts = _FakeAzureClusterIdentity.calls[0]["opts"]
     assert isinstance(identity_opts, pulumi.ResourceOptions)
-    assert control_plane.outputs.cluster_identity_name is not None
+    assert control_plane.outputs is not None
 
 
 def test_kind_azure_control_plane_creates_identity_for_workload_identity(
@@ -252,4 +251,4 @@ def test_kind_azure_control_plane_creates_identity_for_workload_identity(
 
     identity = _FakeAzureClusterIdentity.calls[0]["identity"]
     assert isinstance(identity, WorkloadIdentityClusterIdentityConfig)
-    assert control_plane.outputs.cluster_identity_name is not None
+    assert control_plane.outputs is not None

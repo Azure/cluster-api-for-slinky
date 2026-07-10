@@ -10,7 +10,6 @@ import pulumi
 from pydantic import Field, StringConstraints
 
 from lib.config import PulumiConfigModel
-from lib.outputs import to_output_value
 from stacks.workload_cluster.workload_cluster_class_aks import (
     AKSWorkloadClusterClass,
     AKSWorkloadClusterConfig,
@@ -49,18 +48,10 @@ class WorkloadClusterContext:
     identity_namespace: pulumi.Input[str] | None = None
 
 
-def _workload_cluster_output(cluster: Any) -> dict[str, Any]:
-    return {
-        name: to_output_value(value)
-        for name, value in vars(cluster).items()
-        if not name.startswith("_")
-    }
-
-
 class Tenants(pulumi.ComponentResource):
     """Instantiate workload-cluster instances from ``spec.workloadClusters``."""
 
-    workload_clusters: list[dict[str, Any]]
+    workload_clusters: pulumi.Output[list[dict[str, Any]]]
 
     def __init__(
         self,
@@ -95,9 +86,9 @@ class Tenants(pulumi.ComponentResource):
             )
         ]
 
-        self.workload_clusters = [
-            _workload_cluster_output(cluster) for cluster in child_clusters
-        ]
+        self.workload_clusters = pulumi.Output.all(
+            *[cluster.outputs for cluster in child_clusters]
+        ).apply(lambda outputs: [output.model_dump() for output in outputs])
 
         self.register_outputs({"workload_clusters": self.workload_clusters})
 

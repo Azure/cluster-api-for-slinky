@@ -44,7 +44,7 @@ class InitStack(pulumi.ComponentResource):
     """Instantiate the configured control plane and workload tenants."""
 
     control_plane_ready: pulumi.Output[bool]
-    workload_clusters: list[dict[str, object]]
+    workload_clusters: pulumi.Output[list[dict[str, object]]]
 
     def __init__(
         self,
@@ -95,12 +95,12 @@ class InitStack(pulumi.ComponentResource):
             azure_outputs = control_plane.azure
             tenant_context = WorkloadClusterContext(
                 identity_name=(
-                    azure_outputs.cluster_identity_name
+                    azure_outputs.apply(lambda outputs: outputs.cluster_identity_name)
                     if azure_outputs is not None
                     else None
                 ),
                 identity_namespace=(
-                    azure_outputs.cluster_identity_namespace
+                    azure_outputs.apply(lambda outputs: outputs.cluster_identity_namespace)
                     if azure_outputs is not None
                     else None
                 ),

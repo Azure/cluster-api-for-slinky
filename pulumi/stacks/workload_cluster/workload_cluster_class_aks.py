@@ -6,7 +6,7 @@ from typing import Any, Literal, Mapping
 from uuid import UUID
 
 import pulumi
-from pydantic import Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from localenv import discover_azure_resource_placement
@@ -91,6 +91,28 @@ class AKSWorkloadClusterConfig(PulumiConfigModel):
         return class_name
 
 
+class AKSWorkloadClusterOutputs(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    cluster_class: str
+    cluster_instance: str
+    cluster_name: str
+    control_plane_name: str
+    machine_pool_name: str
+    machine_pool_names: list[str]
+    control_plane_ready: bool
+    keda: KEDAOutputs | None
+    prometheus_chart_version: str
+    prometheus_namespace: str
+    prometheus_status: Any
+    workload_cluster_ready: bool
+    slurm_operator_chart_version: str
+    slurm_operator_status: Any
+    slurm_chart_version: str
+    slurm_status: Any
+    todo: str
+
+
 def _default_aks_node_pools(node_count: int) -> tuple[AKSNodePoolSpec, ...]:
     return (
         AKSNodePoolSpec(
@@ -119,18 +141,7 @@ _AKS_KEDA_SCALED_NODE_SETS = (
 class AKSWorkloadClusterClass(pulumi.ComponentResource):
     """Reusable AKS workload-cluster class."""
 
-    cluster_class: pulumi.Output[str]
-    cluster_instance: pulumi.Output[str]
-    cluster_name: pulumi.Output[str]
-    control_plane_name: pulumi.Output[str]
-    machine_pool_name: pulumi.Output[str]
-    machine_pool_names: list[pulumi.Output[str]]
-    control_plane_ready: pulumi.Output[bool]
-    keda: KEDAOutputs | None
-    prometheus_namespace: pulumi.Output[str]
-    prometheus_status: pulumi.Output[Any]
-    workload_cluster_ready: pulumi.Output[bool]
-    todo: pulumi.Output[str]
+    outputs: pulumi.Output[AKSWorkloadClusterOutputs]
 
     def __init__(
         self,
@@ -197,42 +208,36 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             opts=child_options(depends_on=[infrastructure]),
         )
 
-        self.cluster_class = pulumi.Output.from_input(_CLUSTER_CLASS)
-        self.cluster_instance = pulumi.Output.from_input(instance)
-        self.cluster_name = infrastructure.cluster_name
-        self.control_plane_name = infrastructure.control_plane_name
-        self.machine_pool_name = infrastructure.machine_pool_name
-        self.machine_pool_names = infrastructure.machine_pool_names
-        self.control_plane_ready = infrastructure.control_plane_ready
-        self.keda = deployments.keda
-        self.prometheus_namespace = deployments.prometheus_namespace
-        self.prometheus_status = deployments.prometheus_status
-        self.workload_cluster_ready = deployments.workload_cluster_ready
-        self.todo = pulumi.Output.from_input(
-            "Validate AKS workload-driven autoscaling end-to-end."
-        )
+        outputs = {
+            "cluster_class": pulumi.Output.from_input(_CLUSTER_CLASS),
+            "cluster_instance": pulumi.Output.from_input(instance),
+            "cluster_name": infrastructure.cluster_name,
+            "control_plane_name": infrastructure.control_plane_name,
+            "machine_pool_name": infrastructure.machine_pool_name,
+            "machine_pool_names": pulumi.Output.all(*infrastructure.machine_pool_names),
+            "control_plane_ready": infrastructure.control_plane_ready,
+            "keda": (
+                deployments.keda.apply(lambda value: value.model_dump())
+                if deployments.keda is not None
+                else None
+            ),
+            "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
+            "prometheus_namespace": deployments.prometheus_namespace,
+            "prometheus_status": deployments.prometheus_status,
+            "workload_cluster_ready": deployments.workload_cluster_ready,
+            "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_operator_status": deployments.slurm_operator_status,
+            "slurm_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_status": deployments.slurm_status,
+            "todo": pulumi.Output.from_input(
+                "Validate AKS workload-driven autoscaling end-to-end."
+            ),
+        }
 
-        self.register_outputs(
-            {
-                "cluster_class": self.cluster_class,
-                "cluster_instance": self.cluster_instance,
-                "cluster_name": self.cluster_name,
-                "control_plane_name": self.control_plane_name,
-                "machine_pool_name": self.machine_pool_name,
-                "machine_pool_names": self.machine_pool_names,
-                "control_plane_ready": self.control_plane_ready,
-                "keda": self.keda.to_outputs() if self.keda else None,
-                "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
-                "prometheus_namespace": self.prometheus_namespace,
-                "prometheus_status": self.prometheus_status,
-                "workload_cluster_ready": self.workload_cluster_ready,
-                "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
-                "slurm_operator_status": deployments.slurm_operator_status,
-                "slurm_chart_version": _SLINKY_CHART_VERSION,
-                "slurm_status": deployments.slurm_status,
-                "todo": self.todo,
-            }
+        self.outputs = pulumi.Output.all(**outputs).apply(
+            AKSWorkloadClusterOutputs.model_validate
         )
+        self.register_outputs(outputs)
 
 
 WorkloadClusterClass = AKSWorkloadClusterClass
