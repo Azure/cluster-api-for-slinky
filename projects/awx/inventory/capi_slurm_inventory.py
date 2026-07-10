@@ -15,8 +15,9 @@ import re
 import sys
 import tempfile
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict
 
 CAPI_GROUP = "cluster.x-k8s.io"
 CAPI_VERSION = "v1beta2"
@@ -37,8 +38,9 @@ _CA_CERT_ENV = ("CA4S_K8S_SSL_CA_CERT", "K8S_AUTH_SSL_CA_CERT")
 _VERIFY_SSL_ENV = ("CA4S_K8S_VERIFY_SSL", "K8S_AUTH_VERIFY_SSL")
 
 
-@dataclass(frozen=True)
-class KubernetesAuth:
+class KubernetesAuth(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     host: str
     token: str
     ca_cert: str | None
