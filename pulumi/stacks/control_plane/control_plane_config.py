@@ -8,10 +8,8 @@ from uuid import UUID
 from pydantic import Field, StrictBool, TypeAdapter, field_serializer
 
 from lib.config import (
-    EnabledConfig,
     NonEmptyStr,
     PulumiConfigModel,
-    maybe_disabled,
 )
 from localenv import (
     AzureResourcePlacement,
@@ -80,9 +78,14 @@ AzureClusterIdentityConfig: TypeAlias = Annotated[
 ]
 
 
-@maybe_disabled
-class DockerInfrastructureProviderConfig(EnabledConfig):
+class DockerInfrastructureProviderConfig(PulumiConfigModel):
     """Enabled Docker (CAPD) infrastructure provider settings."""
+
+    @field_serializer("enabled")
+    def serialize_enabled(self, enabled: bool) -> bool:
+        return enabled
+
+    enabled: StrictBool = False
 
 
 def _discover_default_resource_placement(
@@ -162,9 +165,16 @@ class InfrastructureProvidersConfig(PulumiConfigModel):
     azure: AzureInfrastructureProviderConfig | None = None
 
 
-@maybe_disabled
-class ControlPlaneAWXConfig(EnabledConfig):
+class ControlPlaneAWXConfig(PulumiConfigModel):
     """Enabled AWX deployment settings."""
+
+    @field_serializer("enabled")
+    def serialize_enabled(self, enabled: bool) -> bool:
+        return enabled
+
+    enabled: StrictBool = False
+    flux_source_name: str = ""
+    flux_source_namespace: str = ""
 
 
 class ControlPlaneDeploymentsConfig(PulumiConfigModel):

@@ -7,23 +7,17 @@ control plane and workload tenants for the active env.
 This module is intentionally shared by both sides of that handoff:
 
 * :class:`pko.pko_bootstrap.PKOBootstrap` calls :func:`init_stack_config` when it
-  creates the single init Stack CR.
+    creates the single init Stack CR.
 * ``pulumi/stacks/init/__main__.py`` calls :func:`run` from inside the PKO
-    workspace to reconstruct :class:`stacks.stack_cr.StackCRConfig` and instantiate
-  the unified init component for the active env.
+    workspace to instantiate the unified init component for the active env.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Mapping
-
 import pulumi
-from pydantic import ValidationError
 
 from lib.config import PulumiConfigModel
 
-from stacks.stack_cr import StackCRConfig, stack_cr_config_from_config
 from stacks.control_plane.control_plane_config import ControlPlaneKindConfig
 from stacks.control_plane.control_plane_kind import ControlPlaneKind
 from stacks.workload_cluster.tenants import (
@@ -35,9 +29,7 @@ from stacks.workload_cluster.tenants import (
 
 INIT_PROJECT = "ca4s-init"
 INIT_REPO_DIR = "pulumi/stacks/init/"
-INIT_STACK_SPEC_CONFIG_NAME = "stackSpec"
 INIT_STACK_CONFIG_NAME = "initStackConfig"
-INIT_STACK_SPEC_CONFIG_KEY = f"{INIT_PROJECT}:{INIT_STACK_SPEC_CONFIG_NAME}"
 INIT_STACK_CONFIG_KEY = f"{INIT_PROJECT}:{INIT_STACK_CONFIG_NAME}"
 
 
@@ -46,12 +38,6 @@ class InitStackConfig(PulumiConfigModel):
 
     control_plane: ControlPlaneKindConfig = ControlPlaneKindConfig()
     tenants: TenantsConfig = TenantsConfig()
-
-
-@dataclass(frozen=True)
-class InitStackInputs:
-    stack_spec: StackCRConfig
-    init_stack_config: InitStackConfig
 
 
 class InitStack(pulumi.ComponentResource):
@@ -64,7 +50,7 @@ class InitStack(pulumi.ComponentResource):
         self,
         name: str,
         *,
-        inputs: InitStackInputs,
+        config: InitStackConfig,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -74,8 +60,7 @@ class InitStack(pulumi.ComponentResource):
             opts=opts,
         )
 
-        control_plane_config = inputs.init_stack_config.control_plane
-        control_plane, tenants = self._build(inputs, control_plane_config)
+        control_plane, tenants = self._build(config)
 
         self.control_plane_ready = control_plane.control_plane_ready
         self.workload_clusters = tenants.workload_clusters
@@ -89,10 +74,9 @@ class InitStack(pulumi.ComponentResource):
 
     def _build(
         self,
-        inputs: InitStackInputs,
-        control_plane_config: ControlPlaneKindConfig,
+        config: InitStackConfig,
     ) -> tuple[ControlPlaneKind, Tenants]:
-        stack_spec = inputs.stack_spec
+        control_plane_config = config.control_plane
         azure_provider = control_plane_config.infrastructure_providers.azure
         azure_config = (
             azure_provider
@@ -102,8 +86,6 @@ class InitStack(pulumi.ComponentResource):
 
         control_plane = ControlPlaneKind(
             "control-plane",
-            flux_source_namespace=stack_spec.flux_source_namespace,
-            flux_source_name=stack_spec.flux_source_name,
             config=control_plane_config,
             opts=pulumi.ResourceOptions(parent=self),
         )
@@ -126,63 +108,21 @@ class InitStack(pulumi.ComponentResource):
 
         tenants = Tenants(
             "tenants",
-            spec=inputs.init_stack_config.tenants,
+            spec=config.tenants,
             context=tenant_context,
             opts=pulumi.ResourceOptions(parent=self, depends_on=[control_plane]),
         )
         return control_plane, tenants
 
 
-def init_stack_config(
-    *,
-    stack_spec: StackCRConfig,
-    init_stack_config: InitStackConfig | None = None,
-) -> dict[str, Any]:
-    """Build the inline config map for the single outer-owned init Stack CR."""
-    return {
-        INIT_STACK_SPEC_CONFIG_KEY: stack_spec.to_config(),
-        INIT_STACK_CONFIG_KEY: (
-            init_stack_config.to_config()
-            if init_stack_config is not None
-            else {}
-        ),
-    }
-
-
-def parse_init_stack_spec(value: object) -> StackCRConfig:
-    if not isinstance(value, Mapping):
-        raise ValueError(f"{INIT_STACK_SPEC_CONFIG_KEY} must be an object")
-    try:
-        return stack_cr_config_from_config(dict(value))
-    except ValidationError as exc:
-        error = exc.errors()[0]
-        config_key = ".".join(str(part) for part in error["loc"])
-        raise ValueError(
-            f"{INIT_STACK_SPEC_CONFIG_KEY}.{config_key}: {error['msg']}"
-        ) from exc
-
-
-def load_init_stack_inputs() -> InitStackInputs:
-    config = pulumi.Config()
-    stack_spec = parse_init_stack_spec(
-        config.require_object(INIT_STACK_SPEC_CONFIG_NAME)
-    )
-
-    init_stack_config = InitStackConfig.model_validate(
-        config.get_object(INIT_STACK_CONFIG_NAME) or {}
-    )
-
-    return InitStackInputs(
-        stack_spec=stack_spec,
-        init_stack_config=init_stack_config,
-    )
-
-
 def run() -> None:
     """Instantiate the init-stack component for the active env."""
-    inputs = load_init_stack_inputs()
+    pulumi_config = pulumi.Config()
+    config = InitStackConfig.model_validate(
+        pulumi_config.get_object(INIT_STACK_CONFIG_NAME) or {}
+    )
 
-    init_stack = InitStack("init-stack", inputs=inputs)
+    init_stack = InitStack("init-stack", config=config)
 
     pulumi.export("control_plane_ready", init_stack.control_plane_ready)
     pulumi.export("workload_clusters", init_stack.workload_clusters)

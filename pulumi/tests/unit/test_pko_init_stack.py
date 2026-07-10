@@ -1,27 +1,32 @@
 from __future__ import annotations
 
+import atexit
 import asyncio
 
 import pulumi
-import pytest
 
 from stacks.init.init_stack import (
     INIT_STACK_CONFIG_KEY,
-    INIT_STACK_SPEC_CONFIG_KEY,
     InitStackConfig,
-    init_stack_config,
-    parse_init_stack_spec,
 )
 from stacks.control_plane.control_plane_config import (
     AzureInfrastructureProviderConfig,
+    ControlPlaneAWXConfig,
+    ControlPlaneDeploymentsConfig,
     ControlPlaneKindConfig,
     InfrastructureProvidersConfig,
     UserAssignedMSIClusterIdentityConfig,
 )
+from pko.pko_bootstrap import _init_stack_config_with_flux_source
 from stacks.workload_cluster.registry_setting import LocalPortRegistrySetting
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
 from stacks.workload_cluster.tenants import TenantsConfig
 from stacks.stack_cr import StackCRConfig, build_stack_spec
+
+
+_BASE_EVENT_LOOP = asyncio.new_event_loop()
+asyncio.set_event_loop(_BASE_EVENT_LOOP)
+atexit.register(_BASE_EVENT_LOOP.close)
 
 
 def _stack_spec() -> StackCRConfig:
@@ -36,7 +41,7 @@ def _stack_spec() -> StackCRConfig:
     )
 
 
-def test_init_stack_config_wraps_shared_spec_and_init_stack_config() -> None:
+def test_init_stack_config_serializes_tenants() -> None:
     config = InitStackConfig(
         tenants=TenantsConfig(
             workload_clusters={
@@ -47,21 +52,7 @@ def test_init_stack_config_wraps_shared_spec_and_init_stack_config() -> None:
         ),
     )
 
-    payload = init_stack_config(
-        stack_spec=_stack_spec(),
-        init_stack_config=config,
-    )
-
-    assert payload[INIT_STACK_SPEC_CONFIG_KEY] == {
-        "pkoNamespace": "pulumi-kubernetes-operator",
-        "serviceAccountName": "pulumi-runner",
-        "fluxSourceName": "gitops-source",
-        "fluxSourceNamespace": "gitea",
-        "statePvcName": "pko-state",
-        "stateBackendUrl": "file:///state",
-        "passphraseSecretName": "pko-state-passphrase",
-    }
-    assert payload[INIT_STACK_CONFIG_KEY] == {
+    assert config.to_config() == {
         "tenants": {
             "workloadClusters": {
                 "local": {
@@ -91,12 +82,7 @@ def test_init_stack_config_serializes_azure_uuid_fields_as_strings() -> None:
         )
     )
 
-    payload = init_stack_config(
-        stack_spec=_stack_spec(),
-        init_stack_config=config,
-    )
-
-    assert payload[INIT_STACK_CONFIG_KEY]["controlPlane"] == {
+    assert config.to_config()["controlPlane"] == {
         "infrastructureProviders": {
             "azure": {
                 "enabled": True,
@@ -113,40 +99,39 @@ def test_init_stack_config_serializes_azure_uuid_fields_as_strings() -> None:
     }
 
 
-def test_parse_init_stack_spec_round_trips_config_payload() -> None:
-    payload = init_stack_config(stack_spec=_stack_spec())[INIT_STACK_SPEC_CONFIG_KEY]
-
-    parsed = parse_init_stack_spec(payload)
-
-    assert parsed == _stack_spec()
-
-
-def test_stack_spec_config_resolves_pulumi_outputs() -> None:
+def test_output_init_stack_config_serializes_to_config() -> None:
+    previous_loop = asyncio.get_event_loop()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        payload = StackCRConfig(
-            pko_namespace=pulumi.Output.from_input("pulumi-kubernetes-operator"),
-            service_account_name="pulumi-runner",
-            flux_source_name="gitops-source",
+        config = _init_stack_config_with_flux_source(
+            init_stack_config=InitStackConfig(
+                control_plane=ControlPlaneKindConfig(
+                    deployments=ControlPlaneDeploymentsConfig(
+                        awx=ControlPlaneAWXConfig(enabled=True)
+                    )
+                )
+            ),
+            flux_source_name=pulumi.Output.from_input("gitops-source"),
             flux_source_namespace="gitea",
-            state_pvc_name="pko-state",
-            state_backend_url="file:///state",
-            passphrase_secret_name="pko-state-passphrase",
-        ).to_config()
+        )
 
+        assert isinstance(config, pulumi.Output)
+        payload = pulumi.Output.from_input(config).apply(lambda resolved: resolved.to_config())
         assert isinstance(payload, pulumi.Output)
         assert loop.run_until_complete(payload.future()) == {
-            "pkoNamespace": "pulumi-kubernetes-operator",
-            "serviceAccountName": "pulumi-runner",
-            "fluxSourceName": "gitops-source",
-            "fluxSourceNamespace": "gitea",
-            "statePvcName": "pko-state",
-            "stateBackendUrl": "file:///state",
-            "passphraseSecretName": "pko-state-passphrase",
+            "controlPlane": {
+                "deployments": {
+                    "awx": {
+                        "enabled": True,
+                        "fluxSourceName": "gitops-source",
+                        "fluxSourceNamespace": "gitea",
+                    }
+                }
+            }
         }
     finally:
-        asyncio.set_event_loop(asyncio.new_event_loop())
+        asyncio.set_event_loop(previous_loop)
         loop.close()
 
 
@@ -188,9 +173,27 @@ def test_build_stack_spec_uses_flux_source_namespace() -> None:
     ]
 
 
-def test_parse_init_stack_spec_rejects_missing_required_field() -> None:
-    payload = dict(init_stack_config(stack_spec=_stack_spec())[INIT_STACK_SPEC_CONFIG_KEY])
-    del payload["fluxSourceName"]
+def test_build_stack_spec_accepts_output_stack_cr_config() -> None:
+    previous_loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        spec = build_stack_spec(
+            spec=pulumi.Output.from_input(_stack_spec()),
+            project_name="ca4s-init",
+            env="local",
+            repo_dir="pulumi/stacks/init",
+        )
 
-    with pytest.raises(ValueError, match=f"{INIT_STACK_SPEC_CONFIG_KEY}.fluxSourceName"):
-        parse_init_stack_spec(payload)
+        assert isinstance(spec, pulumi.Output)
+        resolved = loop.run_until_complete(spec.future())
+        assert resolved["fluxSource"]["sourceRef"] == {
+            "apiVersion": "source.toolkit.fluxcd.io/v1",
+            "kind": "GitRepository",
+            "name": "gitops-source",
+        }
+        assert resolved["serviceAccountName"] == "pulumi-runner"
+        assert resolved["backend"] == "file:///state"
+    finally:
+        asyncio.set_event_loop(previous_loop)
+        loop.close()

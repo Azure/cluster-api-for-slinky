@@ -25,7 +25,6 @@ https://www.pulumi.com/docs/iac/using-pulumi/continuous-delivery/pulumi-kubernet
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 import pulumi
@@ -75,11 +74,24 @@ _DEFAULT_FLUX_SOURCE_API_VERSION = "source.toolkit.fluxcd.io/v1"
 _DEFAULT_FLUX_SOURCE_KIND = "GitRepository"
 
 
-class _StackCRConfigPayload(PulumiConfigModel):
+class StackCRConfig(PulumiConfigModel):
+    """Bundle of resolved inputs every Stack CR we emit needs."""
+
+    # Where the Stack CRs themselves live. The PKO operator watches this
+    # namespace for Stack CRs.
     pko_namespace: NonEmptyStr
+
+    # Workspace pod identity. References the SA created by
+    # :class:`pko._service_account.WorkspaceServiceAccount`.
     service_account_name: NonEmptyStr
+
+    # Flux Source reference PKO uses to fetch the Pulumi program artifact.
     flux_source_name: NonEmptyStr
     flux_source_namespace: NonEmptyStr
+
+    # State backend. The PVC is mounted at ``/state`` and the backend
+    # URL is ``file:///state``; the passphrase Secret feeds
+    # ``PULUMI_CONFIG_PASSPHRASE`` via ``envRefs``.
     state_pvc_name: NonEmptyStr
     state_backend_url: NonEmptyStr
     passphrase_secret_name: NonEmptyStr
@@ -87,96 +99,22 @@ class _StackCRConfigPayload(PulumiConfigModel):
     flux_source_kind: NonEmptyStr = _DEFAULT_FLUX_SOURCE_KIND
 
 
-@dataclass(frozen=True)
-class StackCRConfig:
-    """Bundle of inputs every Stack CR we emit needs.
-
-    Pure Python-side data carrier. ``PKOBootstrap`` builds one instance and
-    serializes its fields into the init Stack CR config; the PKO-owned init
-    stack reconstructs it and passes it through to every child Stack-CR build
-    path. Callers feed the same :func:`build_stack_spec` to produce the
-    ``spec`` dict and then instantiate the ``CustomResource`` themselves. Do
-    NOT pass an instance directly as a resource property bag; this is not a
-    ``@pulumi.input_type``.
-
-    All Output-typed fields accept either ``Output[str]`` or plain
-    ``str``; pulumi-kubernetes resolves Outputs before sending the
-    final CR to the API server.
-    """
-
-    # Where the Stack CRs themselves live. The PKO operator watches this
-    # namespace for Stack CRs.
-    pko_namespace: pulumi.Input[str]
-
-    # Workspace pod identity. References the SA created by
-    # :class:`pko._service_account.WorkspaceServiceAccount`.
-    service_account_name: pulumi.Input[str]
-
-    # Flux Source reference PKO uses to fetch the Pulumi program artifact.
-    flux_source_name: pulumi.Input[str]
-    flux_source_namespace: pulumi.Input[str]
-
-    # State backend. The PVC is mounted at ``/state`` and the backend
-    # URL is ``file:///state``; the passphrase Secret feeds
-    # ``PULUMI_CONFIG_PASSPHRASE`` via ``envRefs``.
-    state_pvc_name: pulumi.Input[str]
-    state_backend_url: pulumi.Input[str]
-    passphrase_secret_name: pulumi.Input[str]
-
-    flux_source_api_version: pulumi.Input[str] = _DEFAULT_FLUX_SOURCE_API_VERSION
-    flux_source_kind: pulumi.Input[str] = _DEFAULT_FLUX_SOURCE_KIND
-
-    def to_config(self) -> pulumi.Input[dict[str, object]]:
-        values = {
-            "pko_namespace": self.pko_namespace,
-            "service_account_name": self.service_account_name,
-            "flux_source_name": self.flux_source_name,
-            "flux_source_namespace": self.flux_source_namespace,
-            "state_pvc_name": self.state_pvc_name,
-            "state_backend_url": self.state_backend_url,
-            "passphrase_secret_name": self.passphrase_secret_name,
-            "flux_source_api_version": self.flux_source_api_version,
-            "flux_source_kind": self.flux_source_kind,
-        }
-        if any(isinstance(value, pulumi.Output) for value in values.values()):
-            return pulumi.Output.all(**values).apply(
-                lambda resolved: _StackCRConfigPayload.model_validate(
-                    resolved
-                ).to_config()
-            )
-        return _StackCRConfigPayload.model_validate(values).to_config()
-
-
-def stack_cr_config_from_config(value: dict[str, object]) -> StackCRConfig:
-    config = _StackCRConfigPayload.model_validate(value)
-    return StackCRConfig(
-        pko_namespace=config.pko_namespace,
-        service_account_name=config.service_account_name,
-        flux_source_name=config.flux_source_name,
-        flux_source_namespace=config.flux_source_namespace,
-        state_pvc_name=config.state_pvc_name,
-        state_backend_url=config.state_backend_url,
-        passphrase_secret_name=config.passphrase_secret_name,
-        flux_source_api_version=config.flux_source_api_version,
-        flux_source_kind=config.flux_source_kind,
-    )
-
-
 def build_stack_spec(
     *,
-    spec: StackCRConfig,
+    spec: pulumi.Input[StackCRConfig],
     project_name: str,
     env: pulumi.Input[str],
     repo_dir: str,
     config: dict[str, Any] | None = None,
     prerequisites: list[pulumi.Input[str]] | None = None,
-) -> dict[str, Any]:
+) -> pulumi.Input[dict[str, Any]]:
     """Assemble the ``spec`` portion of a ``pulumi.com/v1`` Stack CR.
 
-    Returns the plain dict ready to drop into a
+    Returns the dict, or an Output resolving to the dict, ready to drop into a
     ``k8s.apiextensions.CustomResource(spec=...)`` call. The caller
     owns the ``CustomResource`` instantiation itself and may mutate
-    the returned dict before shipping; nothing here holds a reference.
+    the returned dict before shipping when the return value is already plain;
+    nothing here holds a reference.
 
     Args:
         spec:           Shared shape; see :class:`StackCRConfig`.
@@ -196,14 +134,24 @@ def build_stack_spec(
                         should wait on. Maps to ``spec.prerequisites``.
 
     Returns:
-        A plain ``dict`` suitable as the ``spec=`` argument of
+        A ``dict`` or ``Output[dict]`` suitable as the ``spec=`` argument of
         ``k8s.apiextensions.CustomResource``.
     """
+    if not isinstance(spec, StackCRConfig):
+        return pulumi.Output.from_input(spec).apply(
+            lambda resolved: build_stack_spec(
+                spec=StackCRConfig.model_validate(resolved),
+                project_name=project_name,
+                env=env,
+                repo_dir=repo_dir,
+                config=config,
+                prerequisites=prerequisites,
+            )
+        )
+
     # Compose spec.stack as a single Output so we don't have to await
     # each component separately.
-    stack_name = pulumi.Output.concat(
-        f"{_ORG_PLACEHOLDER}/{project_name}/", env
-    )
+    stack_name = pulumi.Output.concat(f"{_ORG_PLACEHOLDER}/{project_name}/", env)
 
     # PULUMI_CONFIG_PASSPHRASE comes out of the shared passphrase Secret
     # so every inner stack uses the same passphrase against the shared

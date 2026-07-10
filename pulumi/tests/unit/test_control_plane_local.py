@@ -8,6 +8,7 @@ import pytest
 from stacks.control_plane import control_plane_kind
 from stacks.control_plane.control_plane_config import (
     AllowedNamespacesConfig,
+    ControlPlaneAWXConfig,
     ControlPlaneDeploymentsConfig,
     ControlPlaneKindConfig,
     UserAssignedMSIClusterIdentityConfig,
@@ -163,8 +164,6 @@ def test_control_plane_local_skips_awx_when_disabled(monkeypatch: Any) -> None:
 
     control_plane = ControlPlaneKind(
         "control-plane",
-        flux_source_namespace="pko-system",
-        flux_source_name="gitops-source",
         config=ControlPlaneKindConfig.model_validate(
             {"deployments": {"awx": {"enabled": False}}}
         ),
@@ -182,10 +181,14 @@ def test_control_plane_local_instantiates_awx_when_enabled(monkeypatch: Any) -> 
 
     control_plane = ControlPlaneKind(
         "control-plane",
-        flux_source_namespace="pko-system",
-        flux_source_name="gitops-source",
-        config=ControlPlaneKindConfig.model_validate(
-            {"deployments": {"awx": {"enabled": True}}}
+        config=ControlPlaneKindConfig(
+            deployments=ControlPlaneDeploymentsConfig(
+                awx=ControlPlaneAWXConfig(
+                    enabled=True,
+                    flux_source_namespace="pko-system",
+                    flux_source_name="gitops-source",
+                )
+            )
         ),
     )
 

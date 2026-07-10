@@ -29,11 +29,14 @@ from pko import PKO_NAMESPACE
 from pko._backend import StateBackend
 from pko._release import PKORelease
 from pko._service_account import WorkspaceServiceAccount
+from stacks.control_plane.control_plane_config import (
+    ControlPlaneAWXConfig,
+)
 from stacks.init.init_stack import (
     INIT_PROJECT,
     INIT_REPO_DIR,
+    INIT_STACK_CONFIG_KEY,
     InitStackConfig,
-    init_stack_config as build_init_stack_config,
 )
 from stacks.kubernetes_annotations import (
     DELETE_PROPAGATION_ORPHAN,
@@ -54,6 +57,45 @@ from stacks.stack_cr import StackCRConfig, build_stack_spec
 # stack themselves — brittle for CI and for our test runbook.
 _WAIT_FOR_READY = "condition=Ready"
 _INIT_STACK_TIMEOUT = "60m"
+
+
+def _init_stack_config_with_flux_source(
+    *,
+    init_stack_config: InitStackConfig | None,
+    flux_source_name: pulumi.Input[str],
+    flux_source_namespace: pulumi.Input[str],
+) -> pulumi.Input[InitStackConfig]:
+    base_config = init_stack_config or InitStackConfig()
+    base_awx_config = base_config.control_plane.deployments.awx
+    if not base_awx_config.enabled:
+        return base_config
+
+    def merge_flux_source(resolved: dict[str, str]) -> InitStackConfig:
+        control_plane = base_config.control_plane
+        deployments = control_plane.deployments
+        awx_config = ControlPlaneAWXConfig(
+            **{
+                **base_awx_config.model_dump(),
+                "flux_source_name": resolved["flux_source_name"],
+                "flux_source_namespace": resolved["flux_source_namespace"],
+            }
+        )
+        return base_config.model_copy(
+            update={
+                "control_plane": control_plane.model_copy(
+                    update={
+                        "deployments": deployments.model_copy(
+                            update={"awx": awx_config}
+                        )
+                    }
+                )
+            }
+        )
+
+    return pulumi.Output.all(
+        flux_source_name=flux_source_name,
+        flux_source_namespace=flux_source_namespace,
+    ).apply(merge_flux_source)
 
 
 class PKOBootstrap(pulumi.ComponentResource):
@@ -141,10 +183,8 @@ class PKOBootstrap(pulumi.ComponentResource):
             opts=ResourceOptions(parent=self),
         )
 
-        # Bundle the shared shape once. PKOBootstrap passes it as init-stack
-        # config; the PKO-owned init stack reconstructs it and uses it for all
-        # child Stack CRs.
-        stack_spec = StackCRConfig(
+        # Bundle the shared shape used to build the outer-owned init Stack CR.
+        stack_spec = pulumi.Output.all(
             pko_namespace=release.namespace,
             service_account_name=sa.service_account_name,
             flux_source_name=flux_source.source_name,
@@ -154,7 +194,7 @@ class PKOBootstrap(pulumi.ComponentResource):
             state_pvc_name=backend.pvc_name,
             state_backend_url=backend.backend_url,
             passphrase_secret_name=backend.passphrase_secret_name,
-        )
+        ).apply(StackCRConfig.model_validate)
 
         # Everything must wait for PKO itself to be Ready. ``depends_on``
         # the release's status Output is enough — pulumi-kubernetes
@@ -173,10 +213,15 @@ class PKOBootstrap(pulumi.ComponentResource):
             project_name=INIT_PROJECT,
             env=env,
             repo_dir=INIT_REPO_DIR,
-            config=build_init_stack_config(
-                stack_spec=stack_spec,
-                init_stack_config=init_stack_config,
-            ),
+            config={
+                INIT_STACK_CONFIG_KEY: pulumi.Output.from_input(
+                    _init_stack_config_with_flux_source(
+                        init_stack_config=init_stack_config,
+                        flux_source_name=flux_source.source_name,
+                        flux_source_namespace=flux_source.namespace,
+                    )
+                ).apply(lambda config: config.to_config())
+            },
         )
         init_stack = k8s.apiextensions.CustomResource(
             f"{name}-init",

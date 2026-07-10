@@ -60,7 +60,7 @@ def _enabled_infrastructure_provider_names(
     providers: InfrastructureProvidersConfig,
 ) -> tuple[str, ...]:
     names: list[str] = []
-    if isinstance(providers.docker, DockerInfrastructureProviderConfig):
+    if providers.docker is not None and providers.docker.enabled:
         names.append("docker")
     if providers.azure is not None and providers.azure.enabled:
         names.append("azure")
@@ -201,8 +201,6 @@ class ControlPlaneKind(pulumi.ComponentResource):
         self,
         name: str,
         *,
-        flux_source_namespace: pulumi.Input[str] = "",
-        flux_source_name: pulumi.Input[str] = "",
         config: ControlPlaneKindConfig = ControlPlaneKindConfig(),
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
@@ -225,6 +223,7 @@ class ControlPlaneKind(pulumi.ComponentResource):
             if azure_config is not None and azure_config.identity is not None
             else None
         )
+        awx_config = config.deployments.awx
 
         def child_options() -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(parent=self)
@@ -242,11 +241,11 @@ class ControlPlaneKind(pulumi.ComponentResource):
         awx = (
             ManagementAWXControlPlane(
                 "awx",
-                flux_source_namespace=flux_source_namespace,
-                flux_source_name=flux_source_name,
+                flux_source_namespace=awx_config.flux_source_namespace,
+                flux_source_name=awx_config.flux_source_name,
                 opts=child_options(),
             )
-            if config.deployments.awx.enabled
+            if awx_config.enabled
             else None
         )
         azure = (
@@ -267,7 +266,7 @@ class ControlPlaneKind(pulumi.ComponentResource):
         self.infrastructure_providers = pulumi.Output.from_input(
             list(_enabled_infrastructure_provider_names(config.infrastructure_providers))
         )
-        self.awx_enabled = pulumi.Output.from_input(config.deployments.awx.enabled)
+        self.awx_enabled = pulumi.Output.from_input(awx_config.enabled)
         self.awx = awx.outputs if awx else None
         self.azure = azure.outputs if azure else None
 
