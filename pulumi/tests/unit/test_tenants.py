@@ -5,8 +5,8 @@ import pytest
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
 from stacks.workload_cluster.tenants import (
     Tenants,
-    WorkloadClusterContext,
     TenantsConfig,
+    WorkloadClusterContext,
 )
 
 
@@ -15,6 +15,18 @@ def test_tenants_config_defaults_to_local_cluster() -> None:
 
     assert spec.workload_clusters == {
         "local": LocalWorkloadClusterConfig(),
+    }
+
+
+def test_workload_cluster_context_is_plain_pydantic_model() -> None:
+    context = WorkloadClusterContext(
+        identity_name="cluster-identity",
+        identity_namespace="default",
+    )
+
+    assert context.model_dump() == {
+        "identity_name": "cluster-identity",
+        "identity_namespace": "default",
     }
 
 

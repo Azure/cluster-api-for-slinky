@@ -90,20 +90,18 @@ class InitStack(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
-        tenant_context = None
+        tenant_context: pulumi.Input[WorkloadClusterContext] | None = None
         if azure_config is not None:
             azure_outputs = control_plane.azure
-            tenant_context = WorkloadClusterContext(
-                identity_name=(
-                    azure_outputs.apply(lambda outputs: outputs.cluster_identity_name)
-                    if azure_outputs is not None
-                    else None
-                ),
-                identity_namespace=(
-                    azure_outputs.apply(lambda outputs: outputs.cluster_identity_namespace)
-                    if azure_outputs is not None
-                    else None
-                ),
+            tenant_context = (
+                azure_outputs.apply(
+                    lambda outputs: WorkloadClusterContext(
+                        identity_name=outputs.cluster_identity_name,
+                        identity_namespace=outputs.cluster_identity_namespace,
+                    )
+                )
+                if azure_outputs is not None
+                else None
             )
 
         tenants = Tenants(

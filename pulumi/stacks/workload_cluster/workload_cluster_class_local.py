@@ -102,7 +102,6 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
         *,
         instance: str,
         config: LocalWorkloadClusterConfig,
-        context: Any | None = None,
         machine_deployments: tuple[LocalMachineDeploymentSpec, ...] = _LOCAL_MACHINE_DEPLOYMENTS,
         slurm_node_sets: tuple[SlurmNodeSetSpec, ...] = _LOCAL_SLURM_NODE_SETS,
         keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = _LOCAL_KEDA_SCALED_NODE_SETS,

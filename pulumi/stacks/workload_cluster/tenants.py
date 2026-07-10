@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import Annotated, Any
 
 import pulumi
-from pydantic import Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from lib.config import PulumiConfigModel
 from stacks.workload_cluster.workload_cluster_class_aks import (
@@ -42,10 +41,11 @@ class TenantsConfig(PulumiConfigModel):
     }
 
 
-@dataclass(frozen=True)
-class WorkloadClusterContext:
-    identity_name: pulumi.Input[str] | None = None
-    identity_namespace: pulumi.Input[str] | None = None
+class WorkloadClusterContext(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    identity_name: str
+    identity_namespace: str
 
 
 class Tenants(pulumi.ComponentResource):
@@ -58,7 +58,7 @@ class Tenants(pulumi.ComponentResource):
         name: str,
         *,
         spec: TenantsConfig | Mapping[str, object] | None = None,
-        context: WorkloadClusterContext | None = None,
+        context: pulumi.Input[WorkloadClusterContext] | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:workload:Tenants", name, props={}, opts=opts)
@@ -73,13 +73,12 @@ class Tenants(pulumi.ComponentResource):
             if isinstance(spec_input, TenantsConfig)
             else TenantsConfig.model_validate(spec_input or {})
         )
-        workload_context = context or WorkloadClusterContext()
 
         child_clusters = [
             self._instantiate_workload_cluster(
                 instance_name,
                 workload_cluster,
-                workload_context,
+                context=context,
             )
             for instance_name, workload_cluster in (
                 sorted(workload_clusters_spec.workload_clusters.items())
@@ -96,14 +95,28 @@ class Tenants(pulumi.ComponentResource):
         self,
         instance_name: DnsLabel,
         workload_cluster: WorkloadClusterConfig,
-        context: WorkloadClusterContext,
+        *,
+        context: pulumi.Input[WorkloadClusterContext] | None,
     ) -> Any:
         if isinstance(workload_cluster, AKSWorkloadClusterConfig):
             return AKSWorkloadClusterClass(
                 f"{instance_name}-workload-cluster",
                 instance=instance_name,
                 config=workload_cluster,
-                context=context,
+                identity_name=(
+                    pulumi.Output.from_input(context).apply(
+                        lambda value: value.identity_name
+                    )
+                    if context is not None
+                    else None
+                ),
+                identity_namespace=(
+                    pulumi.Output.from_input(context).apply(
+                        lambda value: value.identity_namespace
+                    )
+                    if context is not None
+                    else None
+                ),
                 opts=pulumi.ResourceOptions(parent=self),
             )
 
@@ -111,6 +124,5 @@ class Tenants(pulumi.ComponentResource):
             f"{instance_name}-workload-cluster",
             instance=instance_name,
             config=workload_cluster,
-            context=context,
             opts=pulumi.ResourceOptions(parent=self),
         )

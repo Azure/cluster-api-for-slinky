@@ -149,7 +149,6 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
         *,
         instance: str,
         config: AKSWorkloadClusterConfig,
-        context: Any | None = None,
         identity_name: pulumi.Input[str] | None = None,
         identity_namespace: pulumi.Input[str] | None = None,
         node_pools: tuple[AKSNodePoolSpec, ...] | None = None,
@@ -164,9 +163,6 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             opts=opts,
         )
         workload_spec = config.parameters
-        if context is not None:
-            identity_name = identity_name or context.identity_name
-            identity_namespace = identity_namespace or context.identity_namespace
         if identity_name is None:
             raise ValueError("aks workload cluster class requires identity_name")
         if identity_namespace is None:
