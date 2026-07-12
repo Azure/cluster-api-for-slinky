@@ -10,6 +10,7 @@ from stack import (
     CustomImagesConfig,
     _azure_infrastructure_enabled,
     _discover_username,
+    _merge_capz_provider_overrides,
     _with_local_registry_config,
     _with_owner_tag_config,
 )
@@ -367,6 +368,68 @@ def test_owner_tag_config_preserves_explicit_owner_tag() -> None:
     workload_cluster = updated.tenants.workload_clusters["caps-aks"]
     assert isinstance(workload_cluster, AKSWorkloadClusterConfig)
     assert workload_cluster.parameters.additional_tags == {"owner": "platform"}
+
+
+def test_capz_provider_overrides_are_applied_to_enabled_azure_provider() -> None:
+    config = InitStackConfig(
+        control_plane=ControlPlaneKindConfig(
+            infrastructure_providers=InfrastructureProvidersConfig(
+                azure=AzureInfrastructureProviderConfig(
+                    enabled=True,
+                    default_subscription_id=_SUBSCRIPTION_ID,
+                    default_location=_LOCATION,
+                    default_resource_group=_RESOURCE_GROUP,
+                    identity=UserAssignedMSIClusterIdentityConfig(
+                        client_id=_CLIENT_ID,
+                        tenant_id=_TENANT_ID,
+                    ),
+                )
+            )
+        )
+    )
+
+    updated = _merge_capz_provider_overrides(
+        config,
+        provider_oci=(
+            "http://custom-registry.pulumi-kubernetes-operator.svc.cluster.local:5000/"
+            "capz/cluster-api-provider-azure:source-1234567890ab"
+        ),
+        controller_image=(
+            "custom-registry:5000/capz/cluster-api-azure-controller:source-1234567890ab"
+        ),
+    )
+
+    azure = updated.control_plane.infrastructure_providers.azure
+    assert isinstance(azure, AzureInfrastructureProviderConfig)
+    assert azure.provider_oci == (
+        "http://custom-registry.pulumi-kubernetes-operator.svc.cluster.local:5000/"
+        "capz/cluster-api-provider-azure:source-1234567890ab"
+    )
+    assert azure.controller_image == (
+        "custom-registry:5000/capz/cluster-api-azure-controller:source-1234567890ab"
+    )
+    assert updated.control_plane.to_config()["infrastructureProviders"]["azure"][
+        "providerOci"
+    ] == (
+        "http://custom-registry.pulumi-kubernetes-operator.svc.cluster.local:5000/"
+        "capz/cluster-api-provider-azure:source-1234567890ab"
+    )
+
+
+def test_capz_provider_overrides_skip_disabled_azure_provider() -> None:
+    config = InitStackConfig(
+        control_plane=ControlPlaneKindConfig(
+            infrastructure_providers=InfrastructureProvidersConfig(
+                azure=AzureInfrastructureProviderConfig(enabled=False)
+            )
+        )
+    )
+
+    assert _merge_capz_provider_overrides(
+        config,
+        provider_oci="http://custom-registry/capz:tag",
+        controller_image="custom-registry:5000/capz/controller:tag",
+    ) == config
 
 
 def test_discover_username_prefers_environment(monkeypatch: pytest.MonkeyPatch) -> None:

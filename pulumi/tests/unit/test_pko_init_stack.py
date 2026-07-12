@@ -135,6 +135,46 @@ def test_output_init_stack_config_serializes_to_config() -> None:
         loop.close()
 
 
+def test_output_init_stack_config_accepts_output_base_config() -> None:
+    previous_loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        config = _init_stack_config_with_flux_source(
+            init_stack_config=pulumi.Output.from_input(
+                InitStackConfig(
+                    control_plane=ControlPlaneKindConfig(
+                        infrastructure_providers=InfrastructureProvidersConfig(
+                            azure=AzureInfrastructureProviderConfig(
+                                enabled=True,
+                                identity=UserAssignedMSIClusterIdentityConfig(
+                                    client_id="11111111-1111-1111-1111-111111111111",
+                                    tenant_id="22222222-2222-2222-2222-222222222222",
+                                ),
+                                provider_oci="http://custom-registry/capz:tag",
+                                controller_image="custom-registry:5000/capz/controller:tag",
+                            )
+                        )
+                    )
+                )
+            ),
+            flux_source_name="gitops-source",
+            flux_source_namespace="gitea",
+        )
+
+        assert isinstance(config, pulumi.Output)
+        resolved = loop.run_until_complete(config.future())
+        assert resolved.control_plane.infrastructure_providers.azure.provider_oci == (
+            "http://custom-registry/capz:tag"
+        )
+        assert resolved.control_plane.infrastructure_providers.azure.controller_image == (
+            "custom-registry:5000/capz/controller:tag"
+        )
+    finally:
+        asyncio.set_event_loop(previous_loop)
+        loop.close()
+
+
 def test_build_stack_spec_uses_flux_source_namespace() -> None:
     spec = build_stack_spec(
         spec=_stack_spec(),

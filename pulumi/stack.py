@@ -41,6 +41,7 @@ _CUSTOM_REGISTRY_ENV: list[pulumi.Input[str]] = [
     "CA4S_REGISTRY_MODE=custom-registry",
 ]
 _CAPZ_ARTIFACT_NAME = "capz/cluster-api-provider-azure"
+_CAPZ_CONTROLLER_IMAGE_KEY = "capz-controller"
 
 
 class CustomImageConfig(PulumiConfigModel):
@@ -157,6 +158,12 @@ def run_stack() -> None:
             provider=mgmt_provider,
             dependencies=[cluster, custom_registry, pko_namespace],
         )
+    capz_artifact_oci_url: pulumi.Output[str] | None = None
+    if capz_artifact is not None and custom_registry_service is not None:
+        capz_artifact_oci_url = _capz_artifact_oci_url(
+            capz_artifact=capz_artifact,
+            custom_registry_service=custom_registry_service,
+        )
 
     lb = CloudProviderKind(
         "lb",
@@ -180,11 +187,19 @@ def run_stack() -> None:
         },
     )
 
-    init_stack_config = _with_owner_tag_config(
+    base_init_stack_config = _with_owner_tag_config(
         _with_local_registry_config(
             InitStackConfig.model_validate(config.get_object("initStack") or {}),
             LocalPortRegistrySetting(port=cache_registry.port),
         )
+    )
+    capz_controller_image_ref: pulumi.Output[str] | None = None
+    if _CAPZ_CONTROLLER_IMAGE_KEY in custom_images:
+        capz_controller_image_ref = custom_images[_CAPZ_CONTROLLER_IMAGE_KEY].image_ref
+    init_stack_config = _with_capz_provider_overrides(
+        base_init_stack_config,
+        provider_oci=capz_artifact_oci_url,
+        controller_image=capz_controller_image_ref,
     )
 
     pko = PKOBootstrap(
@@ -213,10 +228,11 @@ def run_stack() -> None:
         pko=pko,
         custom_images=custom_images,
         capz_artifact=capz_artifact,
+        capz_artifact_oci_url=capz_artifact_oci_url,
         custom_registry_service=custom_registry_service,
     )
-    if _azure_infrastructure_enabled(init_stack_config):
-        _export_azure_config_outputs(init_stack_config)
+    if _azure_infrastructure_enabled(base_init_stack_config):
+        _export_azure_config_outputs(base_init_stack_config)
 
 
 def _with_local_registry_config(
@@ -294,6 +310,77 @@ def _has_owner_tag(additional_tags: dict[str, str]) -> bool:
     return any(tag.casefold() == _OWNER_TAG.casefold() for tag in additional_tags)
 
 
+def _merge_capz_provider_overrides(
+    init_stack_config: InitStackConfig,
+    *,
+    provider_oci: str | None,
+    controller_image: str | None,
+) -> InitStackConfig:
+    if provider_oci is None and controller_image is None:
+        return init_stack_config
+
+    control_plane = init_stack_config.control_plane
+    providers = control_plane.infrastructure_providers
+    azure_provider = providers.azure
+    if azure_provider is None or not azure_provider.enabled:
+        return init_stack_config
+
+    updates: dict[str, str] = {}
+    if provider_oci is not None:
+        updates["provider_oci"] = provider_oci
+    if controller_image is not None:
+        updates["controller_image"] = controller_image
+
+    return init_stack_config.model_copy(
+        update={
+            "control_plane": control_plane.model_copy(
+                update={
+                    "infrastructure_providers": providers.model_copy(
+                        update={
+                            "azure": azure_provider.model_copy(update=updates),
+                        }
+                    )
+                }
+            )
+        }
+    )
+
+
+def _with_capz_provider_overrides(
+    init_stack_config: InitStackConfig,
+    *,
+    provider_oci: pulumi.Input[str] | None,
+    controller_image: pulumi.Input[str] | None,
+) -> pulumi.Input[InitStackConfig]:
+    if provider_oci is None and controller_image is None:
+        return init_stack_config
+
+    return pulumi.Output.all(
+        provider_oci=provider_oci,
+        controller_image=controller_image,
+    ).apply(
+        lambda resolved: _merge_capz_provider_overrides(
+            init_stack_config,
+            provider_oci=resolved.get("provider_oci"),
+            controller_image=resolved.get("controller_image"),
+        )
+    )
+
+
+def _capz_artifact_oci_url(
+    *,
+    capz_artifact: CtlptlCustomRegistryOCIArtifact,
+    custom_registry_service: CtlptlRegistryService,
+) -> pulumi.Output[str]:
+    return pulumi.Output.concat(
+        custom_registry_service.url,
+        "/",
+        capz_artifact.artifact_name,
+        ":",
+        capz_artifact.artifact_tag,
+    )
+
+
 def _export_azure_config_outputs(init_stack_config: InitStackConfig) -> None:
     providers = init_stack_config.control_plane.infrastructure_providers
     azure_provider = providers.azure
@@ -338,6 +425,7 @@ def _export_common_outputs(
     pko: PKOBootstrap,
     custom_images: Mapping[str, CtlptlCustomRegistryImage],
     capz_artifact: CtlptlCustomRegistryOCIArtifact | None,
+    capz_artifact_oci_url: pulumi.Output[str] | None,
     custom_registry_service: CtlptlRegistryService | None,
 ) -> None:
     pulumi.export("cache_registry_name", cache_registry.registry_name)
@@ -349,17 +437,8 @@ def _export_common_outputs(
         )
     if capz_artifact is not None:
         pulumi.export("capz_artifact_ref", capz_artifact.artifact_ref)
-        if custom_registry_service is not None:
-            pulumi.export(
-                "capz_artifact_oci_url",
-                pulumi.Output.concat(
-                    custom_registry_service.url,
-                    "/",
-                    capz_artifact.artifact_name,
-                    ":",
-                    capz_artifact.artifact_tag,
-                ),
-            )
+        if capz_artifact_oci_url is not None:
+            pulumi.export("capz_artifact_oci_url", capz_artifact_oci_url)
     pulumi.export("cluster_name", cluster.cluster_name)
     pulumi.export("context", cluster.context)
     pulumi.export("kubeconfig", cluster.kubeconfig)

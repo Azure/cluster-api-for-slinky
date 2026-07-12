@@ -14,6 +14,7 @@ from localenv import (
     AzureResourcePlacement,
 )
 import stacks.control_plane.control_plane_config as control_plane_config_module
+from stacks.control_plane.capi._operator import _provider_spec
 from stacks.control_plane.control_plane_config import (
     CONTROL_PLANE_KIND_CHILD_CONFIG_KEY,
     AllowedNamespacesConfig,
@@ -158,6 +159,18 @@ def _azure_provider(config):
     azure = config.infrastructure_providers.azure
     assert isinstance(azure, AzureInfrastructureProviderConfig)
     return azure
+
+
+def _enabled_azure_payload(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "enabled": True,
+        "defaultSubscriptionId": _SUBSCRIPTION_ID,
+        "defaultLocation": _LOCATION,
+        "defaultResourceGroup": _RESOURCE_GROUP,
+        "identity": _full_payload(),
+    }
+    payload.update(overrides)
+    return payload
 
 
 def _assert_user_assigned_identity(
@@ -824,6 +837,151 @@ def test_infrastructure_providers_round_trip() -> None:
     parsed = ControlPlaneKindConfig.model_validate(control_plane)
     assert isinstance(parsed.infrastructure_providers.docker, DockerInfrastructureProviderConfig)
     assert isinstance(parsed.infrastructure_providers.azure, AzureInfrastructureProviderConfig)
+
+
+def test_azure_provider_custom_capz_refs_round_trip() -> None:
+    config = ControlPlaneKindConfig.model_validate(
+        {
+            "infrastructureProviders": {
+                "azure": {
+                    "enabled": True,
+                    "defaultSubscriptionId": _SUBSCRIPTION_ID,
+                    "defaultLocation": _LOCATION,
+                    "defaultResourceGroup": _RESOURCE_GROUP,
+                    "identity": _full_payload(),
+                    "providerOci": "http://custom-registry.pulumi-kubernetes-operator.svc.cluster.local:5000/capz/cluster-api-provider-azure:source-1234567890ab",
+                    "controllerImage": "custom-registry:5000/capz/cluster-api-azure-controller:source-1234567890ab",
+                }
+            }
+        }
+    )
+
+    azure = _azure_provider(config)
+    assert azure.provider_oci == (
+        "http://custom-registry.pulumi-kubernetes-operator.svc.cluster.local:5000/"
+        "capz/cluster-api-provider-azure:source-1234567890ab"
+    )
+    assert azure.controller_image == (
+        "custom-registry:5000/capz/cluster-api-azure-controller:source-1234567890ab"
+    )
+    assert config.to_config()["infrastructureProviders"]["azure"] == {
+        "enabled": True,
+        "identity": {
+            "type": "UserAssignedMSI",
+            "clientId": _CLIENT_ID,
+            "tenantId": _TENANT_ID,
+        },
+        "defaultSubscriptionId": _SUBSCRIPTION_ID,
+        "defaultLocation": _LOCATION,
+        "defaultResourceGroup": _RESOURCE_GROUP,
+        "providerOci": (
+            "http://custom-registry.pulumi-kubernetes-operator.svc.cluster.local:5000/"
+            "capz/cluster-api-provider-azure:source-1234567890ab"
+        ),
+        "controllerImage": (
+            "custom-registry:5000/capz/cluster-api-azure-controller:source-1234567890ab"
+        ),
+    }
+
+
+def test_capi_provider_spec_uses_provider_oci_and_controller_image() -> None:
+    assert _provider_spec(
+        version="v1.24.1",
+        infrastructure_config=AzureInfrastructureProviderConfig(
+            provider_oci="http://custom-registry/ns/capz:source-1234567890ab",
+            controller_image=(
+                "custom-registry:5000/capz/controller:source-1234567890ab"
+            ),
+        ),
+    ) == {
+        "version": "v1.24.1",
+        "manager": {"featureGates": {"ClusterTopology": True}},
+        "fetchConfig": {
+            "oci": "http://custom-registry/ns/capz:source-1234567890ab",
+        },
+        "deployment": {
+            "containers": [
+                {
+                    "name": "manager",
+                    "imageUrl": "custom-registry:5000/capz/controller:source-1234567890ab",
+                }
+            ]
+        },
+    }
+
+
+def test_enabled_provider_names_returns_all_enabled_providers() -> None:
+    config = ControlPlaneKindConfig.model_validate(
+        {
+            "infrastructureProviders": {
+                "docker": {"enabled": True},
+                "azure": _enabled_azure_payload(),
+            }
+        }
+    )
+
+    assert set(config.infrastructure_providers.enabled_provider_names()) == {
+        "docker",
+        "azure",
+    }
+
+
+def test_enabled_provider_names_skips_disabled_providers() -> None:
+    config = ControlPlaneKindConfig.model_validate(
+        {
+            "infrastructureProviders": {
+                "docker": {"enabled": False},
+                "azure": _enabled_azure_payload(),
+            }
+        }
+    )
+
+    assert config.infrastructure_providers.enabled_provider_names() == ("azure",)
+
+
+def test_enabled_provider_names_empty_when_none_enabled() -> None:
+    assert ControlPlaneKindConfig().infrastructure_providers.enabled_provider_names() == ()
+
+
+def test_enabled_providers_retain_provider_specific_oci_and_image_fields() -> None:
+    config = ControlPlaneKindConfig.model_validate(
+        {
+            "infrastructureProviders": {
+                "docker": {
+                    "enabled": True,
+                    "providerOci": "http://custom-registry/capd:tag",
+                    "controllerImage": "custom-registry:5000/capd/controller:tag",
+                },
+                "azure": _enabled_azure_payload(
+                    providerOci="http://custom-registry/capz:tag",
+                    controllerImage="custom-registry:5000/capz/controller:tag",
+                ),
+            }
+        }
+    )
+
+    providers = config.infrastructure_providers.enabled_providers()
+    docker = providers["docker"]
+    azure = providers["azure"]
+    assert isinstance(docker, DockerInfrastructureProviderConfig)
+    assert isinstance(azure, AzureInfrastructureProviderConfig)
+    assert docker.provider_oci == "http://custom-registry/capd:tag"
+    assert docker.controller_image == "custom-registry:5000/capd/controller:tag"
+    assert azure.provider_oci == "http://custom-registry/capz:tag"
+    assert azure.controller_image == "custom-registry:5000/capz/controller:tag"
+
+    serialized = config.to_config()["infrastructureProviders"]
+    assert serialized["docker"] == {
+        "enabled": True,
+        "providerOci": "http://custom-registry/capd:tag",
+        "controllerImage": "custom-registry:5000/capd/controller:tag",
+    }
+    assert serialized["azure"]["providerOci"] == (
+        "http://custom-registry/capz:tag"
+    )
+    assert serialized["azure"]["controllerImage"] == (
+        "custom-registry:5000/capz/controller:tag"
+    )
 
 
 def test_parse_defaults_leave_infrastructure_providers_unspecified() -> None:

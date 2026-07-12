@@ -11,6 +11,8 @@ from stacks.control_plane.control_plane_config import (
     ControlPlaneAWXConfig,
     ControlPlaneDeploymentsConfig,
     ControlPlaneKindConfig,
+    DockerInfrastructureProviderConfig,
+    InfrastructureProvidersConfig,
     UserAssignedMSIClusterIdentityConfig,
     WorkloadIdentityClusterIdentityConfig,
 )
@@ -66,7 +68,11 @@ class _FakeClusterAPIOperator(pulumi.ComponentResource):
         name: str,
         *,
         cert_manager: _FakeCertManager,
-        infrastructure_providers: tuple[str, ...] = ("docker",),
+        infrastructure_providers: InfrastructureProvidersConfig = (
+            InfrastructureProvidersConfig(
+                docker=DockerInfrastructureProviderConfig(enabled=True)
+            )
+        ),
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         self.name = name

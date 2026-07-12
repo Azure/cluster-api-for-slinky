@@ -61,16 +61,21 @@ _INIT_STACK_TIMEOUT = "60m"
 
 def _init_stack_config_with_flux_source(
     *,
-    init_stack_config: InitStackConfig | None,
+    init_stack_config: pulumi.Input[InitStackConfig] | None,
     flux_source_name: pulumi.Input[str],
     flux_source_namespace: pulumi.Input[str],
 ) -> pulumi.Input[InitStackConfig]:
-    base_config = init_stack_config or InitStackConfig()
-    base_awx_config = base_config.control_plane.deployments.awx
-    if not base_awx_config.enabled:
-        return base_config
+    def merge_flux_source(resolved: dict[str, object]) -> InitStackConfig:
+        base_config_value = resolved["base_config"]
+        base_config = (
+            base_config_value
+            if isinstance(base_config_value, InitStackConfig)
+            else InitStackConfig.model_validate(base_config_value)
+        )
+        base_awx_config = base_config.control_plane.deployments.awx
+        if not base_awx_config.enabled:
+            return base_config
 
-    def merge_flux_source(resolved: dict[str, str]) -> InitStackConfig:
         control_plane = base_config.control_plane
         deployments = control_plane.deployments
         awx_config = ControlPlaneAWXConfig(
@@ -93,6 +98,7 @@ def _init_stack_config_with_flux_source(
         )
 
     return pulumi.Output.all(
+        base_config=init_stack_config or InitStackConfig(),
         flux_source_name=flux_source_name,
         flux_source_namespace=flux_source_namespace,
     ).apply(merge_flux_source)
@@ -150,7 +156,7 @@ class PKOBootstrap(pulumi.ComponentResource):
         namespace_resource: pulumi.Resource | None = None,
         flux_source: FluxSource,
         env: str,
-        init_stack_config: InitStackConfig | None = None,
+        init_stack_config: pulumi.Input[InitStackConfig] | None = None,
         opts: ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:pko:PKOBootstrap", name, props={}, opts=opts)

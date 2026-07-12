@@ -10,10 +10,7 @@ from pydantic import BaseModel, ConfigDict
 from lib.config import PulumiConfigModel
 from stacks.control_plane.control_plane_config import (
     AzureClusterIdentityConfig,
-    AzureInfrastructureProviderConfig,
     ControlPlaneKindConfig,
-    DockerInfrastructureProviderConfig,
-    InfrastructureProvidersConfig,
 )
 from stacks.control_plane.awx import AWXInstance, AWXOperator, AWXProviderConfig
 from stacks.control_plane.awx._configuration import AWXConfiguration
@@ -55,17 +52,6 @@ class KindAzureControlPlaneOutputs(BaseModel):
     client_id: str
     tenant_id: str
     ready: bool
-
-
-def _enabled_infrastructure_provider_names(
-    providers: InfrastructureProvidersConfig,
-) -> tuple[str, ...]:
-    names: list[str] = []
-    if providers.docker is not None and providers.docker.enabled:
-        names.append("docker")
-    if providers.azure is not None and providers.azure.enabled:
-        names.append("azure")
-    return tuple(names)
 
 
 class ManagementAWXControlPlane(pulumi.ComponentResource):
@@ -235,9 +221,7 @@ class ControlPlaneKind(pulumi.ComponentResource):
         capi = ClusterAPIOperator(
             "cluster-api",
             cert_manager=cert_manager,
-            infrastructure_providers=_enabled_infrastructure_provider_names(
-                config.infrastructure_providers
-            ),
+            infrastructure_providers=config.infrastructure_providers,
             opts=child_options(),
         )
 
@@ -267,7 +251,7 @@ class ControlPlaneKind(pulumi.ComponentResource):
         self.capi_provider_version = capi.provider_version
         self.capi_provider_namespaces = capi.provider_namespaces
         self.infrastructure_providers = pulumi.Output.from_input(
-            list(_enabled_infrastructure_provider_names(config.infrastructure_providers))
+            list(config.infrastructure_providers.enabled_provider_names())
         )
         self.awx_enabled = pulumi.Output.from_input(awx_config.enabled)
         self.awx = awx.outputs if awx else None

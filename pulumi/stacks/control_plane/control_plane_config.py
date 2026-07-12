@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, TypeAlias, Union
+from typing import Annotated, ClassVar, Literal, TypeAlias, Union
 from uuid import UUID
 
 from pydantic import Field, StrictBool, TypeAdapter, field_serializer
@@ -78,14 +78,23 @@ AzureClusterIdentityConfig: TypeAlias = Annotated[
 ]
 
 
-class DockerInfrastructureProviderConfig(PulumiConfigModel):
-    """Enabled Docker (CAPD) infrastructure provider settings."""
+class InfrastructureProviderConfig(PulumiConfigModel):
+    """Common CAPI Operator settings for an infrastructure provider."""
 
     @field_serializer("enabled")
     def serialize_enabled(self, enabled: bool) -> bool:
         return enabled
 
+    provider_name: ClassVar[str]
     enabled: StrictBool = False
+    provider_oci: NonEmptyStr | None = None
+    controller_image: NonEmptyStr | None = None
+
+
+class DockerInfrastructureProviderConfig(InfrastructureProviderConfig):
+    """Enabled Docker (CAPD) infrastructure provider settings."""
+
+    provider_name: ClassVar[str] = "docker"
 
 
 def _discover_default_resource_placement(
@@ -138,14 +147,10 @@ def _discover_default_identity(
     )
 
 
-class AzureInfrastructureProviderConfig(PulumiConfigModel):
+class AzureInfrastructureProviderConfig(InfrastructureProviderConfig):
     """Enabled Azure (CAPZ) infrastructure provider settings and cluster identity."""
 
-    @field_serializer("enabled")
-    def serialize_enabled(self, enabled: bool) -> bool:
-        return enabled
-
-    enabled: StrictBool = False
+    provider_name: ClassVar[str] = "azure"
     identity: AzureClusterIdentityConfig | None = Field(
         default_factory=_discover_default_identity
     )
@@ -163,6 +168,24 @@ class AzureInfrastructureProviderConfig(PulumiConfigModel):
 class InfrastructureProvidersConfig(PulumiConfigModel):
     docker: DockerInfrastructureProviderConfig | None = None
     azure: AzureInfrastructureProviderConfig | None = None
+
+    def enabled_providers(self) -> dict[str, InfrastructureProviderConfig]:
+        """Enabled provider configs keyed by their CAPI Operator provider name."""
+        # Keep enumeration deterministic for stable Pulumi previews and outputs.
+        # InfrastructureProvider CRs do not depend on one another.
+        candidates: tuple[InfrastructureProviderConfig | None, ...] = (
+            self.docker,
+            self.azure,
+        )
+        return {
+            provider.provider_name: provider
+            for provider in candidates
+            if provider is not None and provider.enabled
+        }
+
+    def enabled_provider_names(self) -> tuple[str, ...]:
+        """CAPI Operator provider names for every enabled infrastructure provider."""
+        return tuple(self.enabled_providers())
 
 
 class ControlPlaneAWXConfig(PulumiConfigModel):

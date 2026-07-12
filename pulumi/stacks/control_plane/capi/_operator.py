@@ -22,6 +22,11 @@ import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
+from stacks.control_plane.control_plane_config import (
+    DockerInfrastructureProviderConfig,
+    InfrastructureProviderConfig,
+    InfrastructureProvidersConfig,
+)
 from stacks.kubernetes_annotations import (
     pulumi_wait_for,
 )
@@ -58,6 +63,7 @@ _PROVIDER_API_VERSION = "operator.cluster.x-k8s.io/v1alpha2"
 _PROVIDER_FEATURE_GATES = {
     "ClusterTopology": True,
 }
+_PROVIDER_MANAGER_CONTAINER = "manager"
 _WAIT_FOR_READY = "condition=Ready"
 _WAIT_FOR_AVAILABLE = "condition=Available"
 _WAIT_FOR_WEBHOOK_CA_BUNDLE = "jsonpath={.webhooks[*].clientConfig.caBundle}"
@@ -130,16 +136,40 @@ _INFRASTRUCTURE_PROVIDERS: dict[str, dict[str, object]] = {
 }
 
 
+def _provider_spec(
+    *,
+    version: str,
+    infrastructure_config: InfrastructureProviderConfig | None = None,
+) -> dict[str, object]:
+    spec: dict[str, object] = {
+        "version": version,
+        "manager": {
+            "featureGates": _PROVIDER_FEATURE_GATES,
+        },
+    }
+    if infrastructure_config is None:
+        return spec
+    if infrastructure_config.provider_oci is not None:
+        spec["fetchConfig"] = {"oci": infrastructure_config.provider_oci}
+    if infrastructure_config.controller_image is not None:
+        spec["deployment"] = {
+            "containers": [
+                {
+                    "name": _PROVIDER_MANAGER_CONTAINER,
+                    "imageUrl": infrastructure_config.controller_image,
+                }
+            ]
+        }
+    return spec
+
+
 class ClusterAPIOperator(pulumi.ComponentResource):
     """Install Cluster API Operator and the requested CAPI providers.
 
     Args:
-      * ``infrastructure_providers`` — tuple of infrastructure provider
-        names to install (e.g. ``("docker",)`` for the local env or
-        ``("azure",)`` for the Azure env). Each name must be a key of
-        :data:`_INFRASTRUCTURE_PROVIDERS`. Defaults to ``("docker",)`` so
-        the existing local control plane keeps its current behavior
-        without any callsite change.
+            * ``infrastructure_providers`` — complete infrastructure provider
+                configuration. Enabled providers are installed; provider-specific OCI
+                and image settings are rendered directly into their provider CRs.
 
     Outputs:
       * ``namespace`` — namespace containing the operator deployment.
@@ -164,7 +194,11 @@ class ClusterAPIOperator(pulumi.ComponentResource):
         name: str,
         *,
         cert_manager: pulumi.Resource | None = None,
-        infrastructure_providers: tuple[str, ...] = ("docker",),
+        infrastructure_providers: InfrastructureProvidersConfig = (
+            InfrastructureProvidersConfig(
+                docker=DockerInfrastructureProviderConfig(enabled=True)
+            )
+        ),
         provider: k8s.Provider | None = None,
         opts: ResourceOptions | None = None,
     ) -> None:
@@ -208,14 +242,14 @@ class ClusterAPIOperator(pulumi.ComponentResource):
         # Validate the requested infrastructure providers up front so a typo
         # surfaces as a clear Python error at plan time, not a confusing CAPI
         # Operator reconciliation failure ten minutes into an apply.
-        if not infrastructure_providers:
+        provider_configs = infrastructure_providers.enabled_providers()
+        if not provider_configs:
             raise ValueError(
                 "at least one CAPI infrastructure provider is required; pass "
-                "infrastructure_providers=(\"docker\",) for local or "
-                "(\"azure\",) for Azure"
+                "an InfrastructureProvidersConfig with docker or azure enabled"
             )
         unknown = [
-            n for n in infrastructure_providers if n not in _INFRASTRUCTURE_PROVIDERS
+            name for name in provider_configs if name not in _INFRASTRUCTURE_PROVIDERS
         ]
         if unknown:
             known = sorted(_INFRASTRUCTURE_PROVIDERS.keys())
@@ -240,7 +274,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
                 str(_INFRASTRUCTURE_PROVIDERS[infra_name]["namespace"]),
                 provider,
             )
-            for infra_name in infrastructure_providers
+            for infra_name in provider_configs
         }
 
         core_provider = self._provider_cr(
@@ -286,9 +320,10 @@ class ClusterAPIOperator(pulumi.ComponentResource):
                 namespace=str(_INFRASTRUCTURE_PROVIDERS[infra_name]["namespace"]),
                 namespace_resource=infrastructure_namespaces[infra_name],
                 dependencies=[release, *operator_webhooks],
+                infrastructure_config=provider_config,
                 provider=provider,
             )
-            for infra_name in infrastructure_providers
+            for infra_name, provider_config in provider_configs.items()
         }
         core_deployment_ready = self._provider_deployment_ready_patch(
             name,
@@ -378,7 +413,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             "bootstrap": Output.from_input(CAPI_BOOTSTRAP_NAMESPACE),
             "control_plane": Output.from_input(CAPI_CONTROL_PLANE_NAMESPACE),
         }
-        for infra_name in infrastructure_providers:
+        for infra_name in provider_configs:
             self.provider_namespaces[f"infrastructure_{infra_name}"] = (
                 Output.from_input(
                     str(_INFRASTRUCTURE_PROVIDERS[infra_name]["namespace"])
@@ -445,6 +480,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
         dependencies: list[pulumi.Resource],
         provider: k8s.Provider | None,
         version: str = CAPI_PROVIDER_VERSION,
+        infrastructure_config: InfrastructureProviderConfig | None = None,
     ) -> k8s.apiextensions.CustomResource:
         return k8s.apiextensions.CustomResource(
             f"{parent_name}-{resource_name}",
@@ -455,12 +491,10 @@ class ClusterAPIOperator(pulumi.ComponentResource):
                 "namespace": namespace,
                 "annotations": pulumi_wait_for(_WAIT_FOR_READY),
             },
-            spec={
-                "version": version,
-                "manager": {
-                    "featureGates": _PROVIDER_FEATURE_GATES,
-                },
-            },
+            spec=_provider_spec(
+                version=version,
+                infrastructure_config=infrastructure_config,
+            ),
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,
