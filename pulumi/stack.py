@@ -30,6 +30,9 @@ from stacks.workload_cluster.tenants import (
 )
 from stacks.init.init_stack import InitStackConfig
 from stacks.workload_cluster.workload_cluster_class_aks import AKSWorkloadClusterConfig
+from stacks.workload_cluster.workload_cluster_class_azure_byo import (
+    AzureBYOWorkloadClusterConfig,
+)
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
 
 
@@ -266,7 +269,10 @@ def _with_owner_tag_config(
 
     workload_clusters: dict[str, WorkloadClusterConfig] = {}
     for name, workload_cluster in init_stack_config.tenants.workload_clusters.items():
-        if isinstance(workload_cluster, AKSWorkloadClusterConfig):
+        if isinstance(
+            workload_cluster,
+            (AKSWorkloadClusterConfig, AzureBYOWorkloadClusterConfig),
+        ):
             parameters = workload_cluster.parameters
             additional_tags = dict(parameters.additional_tags)
             if not _has_owner_tag(additional_tags):

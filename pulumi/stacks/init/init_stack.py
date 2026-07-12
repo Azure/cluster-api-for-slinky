@@ -98,6 +98,8 @@ class InitStack(pulumi.ComponentResource):
                     lambda outputs: WorkloadClusterContext(
                         identity_name=outputs.cluster_identity_name,
                         identity_namespace=outputs.cluster_identity_namespace,
+                        azure_client_id=outputs.client_id,
+                        azure_tenant_id=outputs.tenant_id,
                     )
                 )
                 if azure_outputs is not None

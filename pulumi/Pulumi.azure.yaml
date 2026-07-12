@@ -17,4 +17,7 @@ config:
         azure:
           enabled: true
     tenants:
-      workloadClusters: {}
+      workloadClusters:
+        caps-self:
+          className: azure-byo
+          parameters: {}

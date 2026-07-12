@@ -6,6 +6,9 @@ pulumi>=3.0,<4.0
 # Pulumi providers used by the gitops phase of pulumi/__main__.py
 pulumi-kubernetes>=4.0,<5.0
 pulumi-random>=4.0,<5.0
+# Azure resources owned directly by PKO workload classes (for example the
+# empty Flexible VMSS consumed by the CAPZ BYO attachment path).
+pulumi-azure-native>=3.20,<4.0
 
 # Runtime validation for JSON-like Pulumi config payloads.
 pydantic>=2.0,<3.0

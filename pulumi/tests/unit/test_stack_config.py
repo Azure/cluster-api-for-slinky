@@ -28,6 +28,10 @@ from stacks.workload_cluster.workload_cluster_class_aks import (
     AKSWorkloadClusterConfig,
     AzureWorkloadSpec,
 )
+from stacks.workload_cluster.workload_cluster_class_azure_byo import (
+    AzureBYOWorkloadClusterConfig,
+    AzureBYOWorkloadSpec,
+)
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
 
 
@@ -309,7 +313,7 @@ def test_local_registry_config_is_applied_to_local_workload_clusters_only() -> N
     }
 
 
-def test_owner_tag_config_is_applied_to_aks_workload_clusters_only() -> None:
+def test_owner_tag_config_is_applied_to_azure_workload_clusters_only() -> None:
     config = InitStackConfig(
         tenants=TenantsConfig(
             workload_clusters={
@@ -319,6 +323,13 @@ def test_owner_tag_config_is_applied_to_aks_workload_clusters_only() -> None:
                         subscription_id=_SUBSCRIPTION_ID,
                         location="westus2",
                         resource_group="rg-capz-mi-dev2",
+                        additional_tags={"costCenter": "hpc"},
+                    )
+                ),
+                "caps-self": AzureBYOWorkloadClusterConfig(
+                    parameters=AzureBYOWorkloadSpec(
+                        subscription_id=_SUBSCRIPTION_ID,
+                        location="southcentralus",
                         additional_tags={"costCenter": "hpc"},
                     )
                 ),
@@ -337,6 +348,17 @@ def test_owner_tag_config_is_applied_to_aks_workload_clusters_only() -> None:
                     "subscriptionId": _SUBSCRIPTION_ID,
                     "location": "westus2",
                     "resourceGroup": "rg-capz-mi-dev2",
+                    "additionalTags": {
+                        "costCenter": "hpc",
+                        "Owner": "zheyushen",
+                    },
+                },
+            },
+            "caps-self": {
+                "className": "azure-byo",
+                "parameters": {
+                    "subscriptionId": _SUBSCRIPTION_ID,
+                    "location": "southcentralus",
                     "additionalTags": {
                         "costCenter": "hpc",
                         "Owner": "zheyushen",

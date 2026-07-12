@@ -9,6 +9,10 @@ import pulumi
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from lib.config import PulumiConfigModel
+from stacks.workload_cluster.workload_cluster_class_azure_byo import (
+    AzureBYOWorkloadClusterClass,
+    AzureBYOWorkloadClusterConfig,
+)
 from stacks.workload_cluster.workload_cluster_class_aks import (
     AKSWorkloadClusterClass,
     AKSWorkloadClusterConfig,
@@ -30,7 +34,9 @@ DnsLabel = Annotated[
 
 
 WorkloadClusterConfig = Annotated[
-    AKSWorkloadClusterConfig | LocalWorkloadClusterConfig,
+    AzureBYOWorkloadClusterConfig
+    | AKSWorkloadClusterConfig
+    | LocalWorkloadClusterConfig,
     Field(discriminator="class_name"),
 ]
 
@@ -46,6 +52,8 @@ class WorkloadClusterContext(BaseModel):
 
     identity_name: str
     identity_namespace: str
+    azure_client_id: str
+    azure_tenant_id: str
 
 
 class Tenants(pulumi.ComponentResource):
@@ -98,6 +106,28 @@ class Tenants(pulumi.ComponentResource):
         *,
         context: pulumi.Input[WorkloadClusterContext] | None,
     ) -> Any:
+        if isinstance(workload_cluster, AzureBYOWorkloadClusterConfig):
+            return AzureBYOWorkloadClusterClass(
+                f"{instance_name}-workload-cluster",
+                instance=instance_name,
+                config=workload_cluster,
+                azure_client_id=(
+                    pulumi.Output.from_input(context).apply(
+                        lambda value: value.azure_client_id
+                    )
+                    if context is not None
+                    else None
+                ),
+                azure_tenant_id=(
+                    pulumi.Output.from_input(context).apply(
+                        lambda value: value.azure_tenant_id
+                    )
+                    if context is not None
+                    else None
+                ),
+                opts=pulumi.ResourceOptions(parent=self),
+            )
+
         if isinstance(workload_cluster, AKSWorkloadClusterConfig):
             return AKSWorkloadClusterClass(
                 f"{instance_name}-workload-cluster",
