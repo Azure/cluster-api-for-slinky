@@ -68,6 +68,11 @@ _WAIT_FOR_READY = "condition=Ready"
 _WAIT_FOR_AVAILABLE = "condition=Available"
 _WAIT_FOR_WEBHOOK_CA_BUNDLE = "jsonpath={.webhooks[*].clientConfig.caBundle}"
 
+_WebhookConfigurationPatch = (
+    k8s.admissionregistration.v1.MutatingWebhookConfigurationPatch
+    | k8s.admissionregistration.v1.ValidatingWebhookConfigurationPatch
+)
+
 _CAPI_OPERATOR_WEBHOOK_CONFIGURATIONS = {
     "mutating": "capi-operator-mutating-webhook-configuration",
     "validating": "capi-operator-validating-webhook-configuration",
@@ -349,7 +354,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             dependency=control_plane_provider,
             provider=provider,
         )
-        infrastructure_deployment_ready: dict[str, pulumi.Resource] = {
+        infrastructure_deployment_ready: dict[str, k8s.apps.v1.DeploymentPatch] = {
             infra_name: self._provider_deployment_ready_patch(
                 name,
                 resource_name=f"infrastructure-{infra_name}",
@@ -383,7 +388,9 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             dependency=control_plane_deployment_ready,
             provider=provider,
         )
-        infrastructure_webhook_patches: dict[str, list[pulumi.Resource]] = {
+        infrastructure_webhook_patches: dict[
+            str, list[_WebhookConfigurationPatch]
+        ] = {
             infra_name: self._webhook_configuration_patches(
                 name,
                 resource_name=f"infrastructure-{infra_name}",
@@ -393,7 +400,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
             )
             for infra_name, cr in infrastructure_provider_crs.items()
         }
-        webhook_patches: dict[str, list[pulumi.Resource]] = {
+        webhook_patches: dict[str, list[_WebhookConfigurationPatch]] = {
             "operator": operator_webhooks,
             "core": core_webhooks,
             "bootstrap": bootstrap_webhooks,
@@ -534,7 +541,7 @@ class ClusterAPIOperator(pulumi.ComponentResource):
         names: dict[str, str],
         dependency: pulumi.Resource,
         provider: k8s.Provider | None,
-    ) -> list[pulumi.Resource]:
+    ) -> list[_WebhookConfigurationPatch]:
         annotations = pulumi_wait_for(_WAIT_FOR_WEBHOOK_CA_BUNDLE)
         mutating = k8s.admissionregistration.v1.MutatingWebhookConfigurationPatch(
             f"{parent_name}-{resource_name}-mutating-webhook-ready",
