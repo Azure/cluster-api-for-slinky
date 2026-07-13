@@ -5,10 +5,12 @@ from ._azure import (
     AZURE_MANAGEMENT_SCOPE,
     AzureDiscoveredCredential,
     AzureEnvironment,
+    AzureHostNetwork,
     AzureIdentityType,
     AzureResourcePlacement,
     discover_azure_credentials,
     discover_azure_environment,
+    discover_azure_host_network,
     discover_azure_resource_placement,
 )
 from ._host import discover_local_username
@@ -18,10 +20,12 @@ __all__ = [
     "AZURE_MANAGEMENT_SCOPE",
     "AzureDiscoveredCredential",
     "AzureEnvironment",
+    "AzureHostNetwork",
     "AzureIdentityType",
     "AzureResourcePlacement",
     "discover_azure_credentials",
     "discover_azure_environment",
+    "discover_azure_host_network",
     "discover_azure_resource_placement",
     "discover_local_username",
 ]

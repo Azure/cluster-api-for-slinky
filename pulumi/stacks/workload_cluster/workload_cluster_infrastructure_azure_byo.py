@@ -7,6 +7,9 @@ from collections.abc import Mapping
 
 import pulumi
 import pulumi_azure_native as azure_native
+from pydantic import BaseModel, ConfigDict
+
+from localenv import AzureHostNetwork
 
 
 _FLEX_ORCHESTRATION_MODE = "Flexible"
@@ -14,6 +17,40 @@ _DEFAULT_FLEX_ZONE = "1"
 _DEFAULT_PLATFORM_FAULT_DOMAIN_COUNT = 1
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
+
+
+class AzureBYOSubnet(BaseModel):
+    """Resolved existing subnet consumed by the Azure BYO CAPI graph."""
+
+    model_config = ConfigDict(frozen=True)
+
+    subscription_id: str
+    location: str
+    vnet_id: str
+    vnet_name: str
+    vnet_resource_group: str
+    subnet_id: str
+    subnet_name: str
+    address_prefix: str | None = None
+    network_security_group_id: str | None = None
+    nat_gateway_id: str | None = None
+    route_table_id: str | None = None
+
+    @classmethod
+    def from_host_network(cls, network: AzureHostNetwork) -> AzureBYOSubnet:
+        return cls(
+            subscription_id=network.subscription_id,
+            location=network.location,
+            vnet_id=network.vnet_id,
+            vnet_name=network.vnet_name,
+            vnet_resource_group=network.vnet_resource_group,
+            subnet_id=network.subnet_id,
+            subnet_name=network.subnet_name,
+            address_prefix=network.subnet_address_prefix,
+            network_security_group_id=network.network_security_group_id,
+            nat_gateway_id=network.nat_gateway_id,
+            route_table_id=network.route_table_id,
+        )
 
 
 def _resource_name(instance: str, suffix: str) -> str:
@@ -77,6 +114,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
     resource_group_name: pulumi.Output[str]
     vmss_flex_id: pulumi.Output[str]
     vmss_flex_name: pulumi.Output[str]
+    byo_subnet: AzureBYOSubnet | None
 
     def __init__(
         self,
@@ -88,6 +126,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         client_id: pulumi.Input[str],
         location: str,
         additional_tags: Mapping[str, str],
+        byo_subnet: AzureBYOSubnet | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -146,11 +185,15 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.resource_group_name = resource_group.name
         self.vmss_flex_id = flex.id
         self.vmss_flex_name = flex.name
+        self.byo_subnet = byo_subnet
         self.register_outputs(
             {
                 "resource_group_id": self.resource_group_id,
                 "resource_group_name": self.resource_group_name,
                 "vmss_flex_id": self.vmss_flex_id,
                 "vmss_flex_name": self.vmss_flex_name,
+                "byo_subnet": (
+                    self.byo_subnet.model_dump() if self.byo_subnet is not None else None
+                ),
             }
         )
