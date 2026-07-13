@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 import pulumi
@@ -15,15 +15,21 @@ from pydantic import (
     field_serializer,
 )
 
-from lib.config import NonEmptyStr, PulumiConfigModel
+from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from localenv import discover_azure_host_network, discover_azure_resource_placement
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
+    AzureBYONodePoolSpec,
     AzureBYOSubnet,
     AzureBYOWorkloadClusterInfrastructure,
 )
 
 
 _CLUSTER_CLASS = "azure-byo"
+_DEFAULT_KUBERNETES_VERSION = "v1.36.1"
+_DEFAULT_CONTROL_PLANE_VM_SIZE = "Standard_D2as_v5"
+_DEFAULT_WORKER_VM_SIZE = "Standard_D2as_v5"
+_CONTROLLER_NODE_TYPE = "controller"
+_COMPUTE_NODE_TYPE = "compute"
 
 
 class AzureBYOSubnetConfig(PulumiConfigModel):
@@ -55,6 +61,10 @@ class AzureBYOWorkloadSpec(PulumiConfigModel):
         )
     )
     additional_tags: Mapping[NonEmptyStr, str] = Field(default_factory=dict)
+    kubernetes_version: NonEmptyStr = _DEFAULT_KUBERNETES_VERSION
+    control_plane_vm_size: NonEmptyStr = _DEFAULT_CONTROL_PLANE_VM_SIZE
+    worker_vm_size: NonEmptyStr = _DEFAULT_WORKER_VM_SIZE
+    worker_replicas: StrictPositiveInt = 1
     vnet: AzureBYOVNetConfig | None = None
     use_auto_discovered_vnet: StrictBool | None = None
 
@@ -89,7 +99,38 @@ class AzureBYOWorkloadClusterOutputs(BaseModel):
     vmss_flex_id: str
     vmss_flex_name: str
     byo_subnet: dict[str, object] | None
+    cluster_name: str
+    control_plane_name: str
+    worker_machine_deployment_name: str
+    worker_machine_deployment_names: list[str]
+    control_plane_ready: bool
+    azure_cloud_provider_chart_version: str
+    azure_cloud_provider_status: Any
+    calico_chart_version: str
+    calico_status: Any
+    workload_cluster_ready: bool
     todo: str
+
+
+def _default_node_pools(
+    parameters: AzureBYOWorkloadSpec,
+) -> tuple[AzureBYONodePoolSpec, ...]:
+    return (
+        AzureBYONodePoolSpec(
+            name="control-plane",
+            node_type=_CONTROLLER_NODE_TYPE,
+            vm_size=parameters.control_plane_vm_size,
+            replicas=1,
+            controller=True,
+        ),
+        AzureBYONodePoolSpec(
+            name="compute",
+            node_type=_COMPUTE_NODE_TYPE,
+            vm_size=parameters.worker_vm_size,
+            replicas=parameters.worker_replicas,
+            attach_to_flex=True,
+        ),
+    )
 
 
 def _azure_resource_id(
@@ -153,8 +194,12 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
         *,
         instance: str,
         config: AzureBYOWorkloadClusterConfig,
+        identity_name: pulumi.Input[str] | None,
+        identity_namespace: pulumi.Input[str] | None,
         azure_client_id: pulumi.Input[str] | None,
         azure_tenant_id: pulumi.Input[str] | None,
+        azure_identity_resource_id: pulumi.Input[str] | None,
+        node_pools: tuple[AzureBYONodePoolSpec, ...] | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -167,8 +212,17 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             raise ValueError("azure-byo workload class requires azure_client_id")
         if azure_tenant_id is None:
             raise ValueError("azure-byo workload class requires azure_tenant_id")
+        if identity_name is None:
+            raise ValueError("azure-byo workload class requires identity_name")
+        if identity_namespace is None:
+            raise ValueError("azure-byo workload class requires identity_namespace")
+        if azure_identity_resource_id is None:
+            raise ValueError(
+                "azure-byo workload class requires an auto-discovered UAMI resource ID"
+            )
 
         parameters = config.parameters
+        node_pools = node_pools or _default_node_pools(parameters)
         byo_subnet = _resolve_byo_subnet(parameters)
         infrastructure = AzureBYOWorkloadClusterInfrastructure(
             "infrastructure",
@@ -176,9 +230,14 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             subscription_id=str(parameters.subscription_id),
             tenant_id=azure_tenant_id,
             client_id=azure_client_id,
+            node_identity_resource_id=azure_identity_resource_id,
+            identity_name=identity_name,
+            identity_namespace=identity_namespace,
             location=parameters.location,
             additional_tags=parameters.additional_tags,
             byo_subnet=byo_subnet,
+            kubernetes_version=parameters.kubernetes_version,
+            node_pools=node_pools,
             opts=pulumi.ResourceOptions(parent=self),
         )
 
@@ -194,8 +253,24 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
                 if infrastructure.byo_subnet is not None
                 else None
             ),
+            "cluster_name": infrastructure.cluster_name,
+            "control_plane_name": infrastructure.control_plane_name,
+            "worker_machine_deployment_name": (
+                infrastructure.worker_machine_deployment_name
+            ),
+            "worker_machine_deployment_names": (
+                pulumi.Output.all(*infrastructure.worker_machine_deployment_names)
+            ),
+            "control_plane_ready": infrastructure.control_plane_ready,
+            "azure_cloud_provider_chart_version": (
+                infrastructure.azure_cloud_provider_chart_version
+            ),
+            "azure_cloud_provider_status": infrastructure.azure_cloud_provider_status,
+            "calico_chart_version": infrastructure.calico_chart_version,
+            "calico_status": infrastructure.calico_status,
+            "workload_cluster_ready": infrastructure.workload_cluster_ready,
             "todo": pulumi.Output.from_input(
-                "Attach the compute MachineDeployment through virtualMachineScaleSetID."
+                "Validate VMSS Flex worker replacement and cluster teardown."
             ),
         }
         self.outputs = pulumi.Output.all(**outputs).apply(

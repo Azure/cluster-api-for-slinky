@@ -54,6 +54,7 @@ class WorkloadClusterContext(BaseModel):
     identity_namespace: str
     azure_client_id: str
     azure_tenant_id: str
+    azure_identity_resource_id: str | None = None
 
 
 class Tenants(pulumi.ComponentResource):
@@ -111,6 +112,20 @@ class Tenants(pulumi.ComponentResource):
                 f"{instance_name}-workload-cluster",
                 instance=instance_name,
                 config=workload_cluster,
+                identity_name=(
+                    pulumi.Output.from_input(context).apply(
+                        lambda value: value.identity_name
+                    )
+                    if context is not None
+                    else None
+                ),
+                identity_namespace=(
+                    pulumi.Output.from_input(context).apply(
+                        lambda value: value.identity_namespace
+                    )
+                    if context is not None
+                    else None
+                ),
                 azure_client_id=(
                     pulumi.Output.from_input(context).apply(
                         lambda value: value.azure_client_id
@@ -121,6 +136,13 @@ class Tenants(pulumi.ComponentResource):
                 azure_tenant_id=(
                     pulumi.Output.from_input(context).apply(
                         lambda value: value.azure_tenant_id
+                    )
+                    if context is not None
+                    else None
+                ),
+                azure_identity_resource_id=(
+                    pulumi.Output.from_input(context).apply(
+                        lambda value: value.azure_identity_resource_id
                     )
                     if context is not None
                     else None

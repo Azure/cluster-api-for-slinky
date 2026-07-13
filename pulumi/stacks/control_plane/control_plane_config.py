@@ -37,6 +37,7 @@ class AzureClusterIdentityBaseConfig(PulumiConfigModel):
 
     client_id: UUID | None = None
     tenant_id: UUID | None = None
+    resource_id: NonEmptyStr | None = None
     allowed_namespaces: AllowedNamespacesConfig = Field(
         default_factory=AllowedNamespacesConfig
     )
@@ -143,6 +144,7 @@ def _discover_default_identity(
             "type": credential.type,
             "clientId": credential.client_id,
             "tenantId": credential.tenant_id,
+            "resourceId": credential.resource_id,
         }
     )
 

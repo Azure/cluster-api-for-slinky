@@ -51,6 +51,7 @@ class KindAzureControlPlaneOutputs(BaseModel):
     cluster_identity_namespace: str
     client_id: str
     tenant_id: str
+    resource_id: str | None
     ready: bool
 
 
@@ -164,6 +165,7 @@ class KindAzureControlPlane(pulumi.ComponentResource):
             "cluster_identity_namespace": azure_cluster_identity.identity_namespace,
             "client_id": pulumi.Output.from_input(str(spec.identity.client_id)),
             "tenant_id": pulumi.Output.from_input(str(spec.identity.tenant_id)),
+            "resource_id": pulumi.Output.from_input(spec.identity.resource_id),
             "ready": azure_cluster_identity.identity_name.apply(lambda _: True),
         }
         self.outputs = pulumi.Output.all(**outputs).apply(

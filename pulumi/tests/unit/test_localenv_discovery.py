@@ -20,6 +20,10 @@ _CLIENT_ID = "11111111-1111-1111-1111-111111111111"
 _WORKLOAD_CLIENT_ID = "22222222-2222-2222-2222-222222222222"
 _TENANT_ID = "33333333-3333-3333-3333-333333333333"
 _SUBSCRIPTION_ID = "44444444-4444-4444-4444-444444444444"
+_UAMI_RESOURCE_ID = (
+    f"/subscriptions/{_SUBSCRIPTION_ID}/resourceGroups/host-rg/providers/"
+    "Microsoft.ManagedIdentity/userAssignedIdentities/host-uami"
+)
 _NIC_ID = (
     f"/subscriptions/{_SUBSCRIPTION_ID}/resourceGroups/host-rg/providers/"
     "Microsoft.Network/networkInterfaces/host-nic"
@@ -182,6 +186,7 @@ class _FakeAccessToken:
 
 class _FakeManagedIdentityCredential:
     client_id: str | None = None
+    resource_id: str = _UAMI_RESOURCE_ID
     instances: list[_FakeManagedIdentityCredential] = []
     scopes: list[str] = []
 
@@ -192,7 +197,13 @@ class _FakeManagedIdentityCredential:
     def get_token(self, scope: str) -> _FakeAccessToken:
         self.scopes.append(scope)
         return _FakeAccessToken(
-            _jwt({"tid": _TENANT_ID, "appid": self.client_id or _CLIENT_ID})
+            _jwt(
+                {
+                    "tid": _TENANT_ID,
+                    "appid": self.client_id or _CLIENT_ID,
+                    "xms_mirid": self.resource_id,
+                }
+            )
         )
 
 
@@ -254,6 +265,7 @@ def test_azure_environment_discovery_returns_credentials_and_resource_placement(
             type="UserAssignedMSI",
             client_id=_CLIENT_ID,
             tenant_id=_TENANT_ID,
+            resource_id=_UAMI_RESOURCE_ID,
         ),
         azure_discovery.AzureDiscoveredCredential(
             type="WorkloadIdentity",
@@ -288,6 +300,23 @@ def test_azure_discovery_passes_client_id_hint_to_managed_identity(
 
     assert env is not None
     assert _FakeManagedIdentityCredential.instances[0].client_id == _CLIENT_ID
+
+
+def test_system_assigned_identity_is_not_reported_as_user_assigned(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_azure_identity(monkeypatch)
+    _FakeManagedIdentityCredential.resource_id = (
+        f"/subscriptions/{_SUBSCRIPTION_ID}/resourceGroups/host-rg/providers/"
+        "Microsoft.Compute/virtualMachines/host-vm"
+    )
+    try:
+        assert azure_discovery.discover_azure_credentials(
+            identity_types=("UserAssignedMSI",)
+        ) == ()
+    finally:
+        _FakeManagedIdentityCredential.resource_id = _UAMI_RESOURCE_ID
+        _clear_azure_discovery_caches()
 
 
 def test_azure_host_network_discovery_resolves_primary_subnet_through_arm(

@@ -100,6 +100,7 @@ class InitStack(pulumi.ComponentResource):
                         identity_namespace=outputs.cluster_identity_namespace,
                         azure_client_id=outputs.client_id,
                         azure_tenant_id=outputs.tenant_id,
+                        azure_identity_resource_id=outputs.resource_id,
                     )
                 )
                 if azure_outputs is not None

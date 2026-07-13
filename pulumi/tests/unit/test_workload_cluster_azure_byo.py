@@ -11,11 +11,20 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     AzureBYOVNetConfig,
     AzureBYOWorkloadClusterConfig,
     AzureBYOWorkloadSpec,
+    _default_node_pools,
     _explicit_byo_subnet,
     _resolve_byo_subnet,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
+    AzureBYONodePoolSpec,
     AzureBYOSubnet,
+    _azure_cluster_spec,
+    _cluster_spec,
+    _kubeadm_config_template_spec,
+    _kubeadm_control_plane_spec,
+    _machine_deployment_spec,
+    _machine_template_spec,
+    _partition_node_pools,
     _resource_name,
     _resource_group_args,
     _resource_group_name,
@@ -26,6 +35,26 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
 
 _SUBSCRIPTION_ID = "44444444-4444-4444-4444-444444444444"
 _OTHER_SUBSCRIPTION_ID = "55555555-5555-5555-5555-555555555555"
+
+
+def _controller_node() -> AzureBYONodePoolSpec:
+    return AzureBYONodePoolSpec(
+        name="control-plane",
+        node_type="controller",
+        vm_size="Standard_D2as_v5",
+        replicas=1,
+        controller=True,
+    )
+
+
+def _compute_node() -> AzureBYONodePoolSpec:
+    return AzureBYONodePoolSpec(
+        name="compute",
+        node_type="compute",
+        vm_size="Standard_D2as_v5",
+        replicas=1,
+        attach_to_flex=True,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -315,6 +344,44 @@ def test_resource_group_args_derive_owned_resource_group() -> None:
     assert args.tags == {"Owner": "zheyushen"}
 
 
+def test_default_node_pools_match_minimum_cluster_sizing() -> None:
+    parameters = AzureBYOWorkloadSpec(
+        subscription_id=_SUBSCRIPTION_ID,
+        location="westus2",
+        control_plane_vm_size="Standard_D4as_v5",
+        worker_vm_size="Standard_D8as_v5",
+        worker_replicas=2,
+    )
+
+    controller, compute = _default_node_pools(parameters)
+
+    assert controller == AzureBYONodePoolSpec(
+        name="control-plane",
+        node_type="controller",
+        vm_size="Standard_D4as_v5",
+        replicas=1,
+        controller=True,
+    )
+    assert compute == AzureBYONodePoolSpec(
+        name="compute",
+        node_type="compute",
+        vm_size="Standard_D8as_v5",
+        replicas=2,
+        attach_to_flex=True,
+    )
+
+
+def test_node_pools_require_one_controller_and_worker() -> None:
+    assert _partition_node_pools((_controller_node(), _compute_node())) == (
+        _controller_node(),
+        (_compute_node(),),
+    )
+    with pytest.raises(ValueError, match="exactly one controller"):
+        _partition_node_pools((_compute_node(),))
+    with pytest.raises(ValueError, match="at least one worker"):
+        _partition_node_pools((_controller_node(),))
+
+
 def test_vmss_flex_args_describe_empty_placement_container() -> None:
     args = _vmss_flex_args(
         instance="caps-self",
@@ -341,3 +408,186 @@ def test_owned_resource_names_derive_from_instance() -> None:
 def test_resource_name_rejects_empty_instance() -> None:
     with pytest.raises(ValueError, match="at least one alphanumeric"):
         _resource_name("---", "flex")
+
+
+def test_cluster_spec_wires_self_managed_refs_and_networks() -> None:
+    assert _cluster_spec(
+        cluster_name="caps-self",
+        control_plane_name="caps-self-control-plane",
+    ) == {
+        "clusterNetwork": {
+            "pods": {"cidrBlocks": ["192.168.0.0/16"]},
+            "services": {"cidrBlocks": ["10.96.0.0/12"]},
+            "serviceDomain": "cluster.local",
+        },
+        "controlPlaneRef": {
+            "apiVersion": "controlplane.cluster.x-k8s.io/v1beta1",
+            "kind": "KubeadmControlPlane",
+            "name": "caps-self-control-plane",
+        },
+        "infrastructureRef": {
+            "apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1",
+            "kind": "AzureCluster",
+            "name": "caps-self",
+        },
+    }
+
+
+def test_azure_cluster_spec_reuses_cluster_subnet_and_internal_lb() -> None:
+    subnet = AzureBYOSubnet(
+        subscription_id=_SUBSCRIPTION_ID,
+        location="westus2",
+        vnet_id="/vnet",
+        vnet_name="host-vnet",
+        vnet_resource_group="network-rg",
+        subnet_id="/vnet/subnets/default",
+        subnet_name="default",
+        address_prefix="10.0.0.0/24",
+        network_security_group_id="/networkSecurityGroups/host-nsg",
+        nat_gateway_id="/natGateways/host-nat",
+        route_table_id="/routeTables/host-routes",
+    )
+
+    spec = _azure_cluster_spec(
+        cluster_name="caps-self",
+        identity_name="cluster-identity",
+        identity_namespace="default",
+        location="westus2",
+        resource_group="caps-self-rg",
+        subscription_id=_SUBSCRIPTION_ID,
+        subnet=subnet,
+        additional_tags={"Owner": "zheyushen"},
+    )
+
+    assert spec["identityRef"] == {
+        "apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1",
+        "kind": "AzureClusterIdentity",
+        "name": "cluster-identity",
+        "namespace": "default",
+    }
+    assert spec["networkSpec"] == {
+        "vnet": {"name": "host-vnet", "resourceGroup": "network-rg"},
+        "subnets": [
+            {
+                "name": "default",
+                "role": "cluster",
+                "securityGroup": {"name": "host-nsg"},
+                "routeTable": {"name": "host-routes"},
+                "natGateway": {"name": "host-nat"},
+            }
+        ],
+        "apiServerLB": {
+            "name": "caps-self-internal-lb",
+            "type": "Internal",
+            "availabilityZones": ["1"],
+        },
+        "controlPlaneOutboundLB": {"frontendIPsCount": 1},
+        "nodeOutboundLB": {"frontendIPsCount": 1},
+    }
+
+
+def test_machine_template_attaches_uami_subnet_and_flex_vmss() -> None:
+    spec = _machine_template_spec(
+        node=_compute_node(),
+        subnet_name="default",
+        node_identity_provider_id="azure:///identity",
+        virtual_machine_scale_set_id="/vmss/flex",
+        additional_tags={"Owner": "zheyushen"},
+    )
+
+    assert spec == {
+        "template": {
+            "spec": {
+                "vmSize": "Standard_D2as_v5",
+                "osDisk": {
+                    "diskSizeGB": 128,
+                    "managedDisk": {"storageAccountType": "Premium_LRS"},
+                    "osType": "Linux",
+                },
+                "identity": "UserAssigned",
+                "userAssignedIdentities": [
+                    {"providerID": "azure:///identity"}
+                ],
+                "networkInterfaces": [{"subnetName": "default"}],
+                "additionalTags": {"Owner": "zheyushen"},
+                "virtualMachineScaleSetID": "/vmss/flex",
+            }
+        }
+    }
+
+
+def test_machine_template_omits_flex_vmss_for_non_flex_node_pool() -> None:
+    node = AzureBYONodePoolSpec(
+        name="services",
+        node_type="controller",
+        vm_size="Standard_D2as_v5",
+        replicas=1,
+    )
+
+    spec = _machine_template_spec(
+        node=node,
+        subnet_name="default",
+        node_identity_provider_id="azure:///identity",
+        additional_tags={},
+    )
+
+    assert "virtualMachineScaleSetID" not in spec["template"]["spec"]
+
+
+def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
+    spec = _kubeadm_control_plane_spec(
+    node=_controller_node(),
+        cluster_name="caps-self",
+        control_plane_name="caps-self-control-plane",
+        kubernetes_version="v1.36.1",
+    )
+
+    kubeadm = spec["kubeadmConfigSpec"]
+    assert kubeadm["files"][0]["contentFrom"]["secret"] == {
+        "name": "caps-self-control-plane-azure-json",
+        "key": "control-plane-azure.json",
+    }
+    assert kubeadm["initConfiguration"]["nodeRegistration"]["kubeletExtraArgs"] == {
+        "cloud-provider": "external",
+        "node-labels": "slinky.slurm.net/node-type=controller",
+    }
+    assert "127.0.0.1 apiserver.caps-self.capz.io" in kubeadm[
+        "preKubeadmCommands"
+    ][0]
+
+
+def test_compute_machine_deployment_references_flex_worker_templates() -> None:
+    spec = _machine_deployment_spec(
+        node=_compute_node(),
+        cluster_name="caps-self",
+        worker_name="caps-self-compute",
+        kubernetes_version="v1.36.1",
+    )
+
+    assert spec["replicas"] == 1
+    assert spec["template"]["spec"]["failureDomain"] == "1"
+    assert spec["template"]["metadata"]["labels"][
+        "slinky.slurm.net/node-type"
+    ] == "compute"
+    assert spec["template"]["spec"]["infrastructureRef"] == {
+        "apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1",
+        "kind": "AzureMachineTemplate",
+        "name": "caps-self-compute",
+    }
+
+
+def test_worker_kubeadm_template_mounts_azure_config_and_labels_node() -> None:
+    spec = _kubeadm_config_template_spec(
+        node=_compute_node(),
+        worker_name="caps-self-compute",
+    )
+
+    template = spec["template"]["spec"]
+    assert template["files"][0]["contentFrom"]["secret"] == {
+        "name": "caps-self-compute-azure-json",
+        "key": "worker-node-azure.json",
+    }
+    assert template["joinConfiguration"]["nodeRegistration"]["kubeletExtraArgs"] == {
+        "cloud-provider": "external",
+        "node-labels": "slinky.slurm.net/node-type=compute",
+    }

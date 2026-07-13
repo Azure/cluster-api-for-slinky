@@ -41,6 +41,7 @@ class AzureDiscoveredCredential(PulumiConfigModel):
     type: AzureIdentityType
     client_id: str
     tenant_id: str
+    resource_id: str | None = None
 
 
 class AzureResourcePlacement(PulumiConfigModel):
@@ -190,11 +191,19 @@ def discover_azure_credentials(
         if not isinstance(tenant_id, str) or discovered_client_id is None:
             return None
 
+        resource_id = claims.get("xms_mirid")
+        if identity_type == "UserAssignedMSI":
+            if not isinstance(resource_id, str) or (
+                "/userAssignedIdentities/" not in resource_id
+            ):
+                return None
+
         return AzureDiscoveredCredential.model_validate(
             {
                 "type": identity_type,
                 "client_id": discovered_client_id,
                 "tenant_id": tenant_id,
+                "resource_id": resource_id,
             }
         )
 
