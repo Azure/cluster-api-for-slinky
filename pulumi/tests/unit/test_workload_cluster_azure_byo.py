@@ -396,7 +396,7 @@ def test_vmss_flex_args_describe_empty_placement_container() -> None:
     assert args.orchestration_mode == "Flexible"
     assert args.platform_fault_domain_count == 1
     assert args.zones == ["1"]
-    assert args.sku.capacity == 0
+    assert args.sku is None
     assert args.tags == {"Owner": "zheyushen"}
 
 

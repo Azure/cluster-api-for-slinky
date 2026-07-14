@@ -413,7 +413,6 @@ def _vmss_flex_args(
         orchestration_mode=_FLEX_ORCHESTRATION_MODE,
         platform_fault_domain_count=_DEFAULT_PLATFORM_FAULT_DOMAIN_COUNT,
         zones=[_DEFAULT_FLEX_ZONE],
-        sku=azure_native.compute.SkuArgs(capacity=0),
         tags=dict(additional_tags),
     )
 
@@ -465,6 +464,8 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             opts=opts,
         )
 
+        controller_node, worker_nodes = _partition_node_pools(node_pools)
+
         azure_provider = azure_native.Provider(
             "azure-native",
             subscription_id=subscription_id,
@@ -515,7 +516,6 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "azure-byo requires an explicit or auto-discovered VNet/subnet"
             )
 
-        controller_node, worker_nodes = _partition_node_pools(node_pools)
         cluster_name = _cluster_name(instance)
         control_plane_name = _resource_name(instance, controller_node.name)
         node_identity_provider_id = pulumi.Output.concat(
