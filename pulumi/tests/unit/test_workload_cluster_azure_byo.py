@@ -536,12 +536,13 @@ def test_machine_template_omits_flex_vmss_for_non_flex_node_pool() -> None:
 
 def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
     spec = _kubeadm_control_plane_spec(
-    node=_controller_node(),
+        node=_controller_node(),
         cluster_name="caps-self",
         control_plane_name="caps-self-control-plane",
         kubernetes_version="v1.36.1",
     )
 
+    assert "failureDomain" not in spec["machineTemplate"]
     kubeadm = spec["kubeadmConfigSpec"]
     assert kubeadm["files"][0]["contentFrom"]["secret"] == {
         "name": "caps-self-control-plane-azure-json",

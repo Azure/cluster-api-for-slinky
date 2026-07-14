@@ -269,7 +269,6 @@ def _kubeadm_control_plane_spec(
                 "AzureMachineTemplate",
                 control_plane_name,
             ),
-            "failureDomain": node.failure_domain,
         },
         "kubeadmConfigSpec": {
             "clusterConfiguration": {
