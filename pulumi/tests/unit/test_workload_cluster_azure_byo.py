@@ -16,10 +16,12 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     _resolve_byo_subnet,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
+    _CONTROL_PLANE_READY_API_VERSION,
     AzureBYONodePoolSpec,
     AzureBYOSubnet,
     _cluster_annotations,
     _control_plane_annotations,
+    _control_plane_ready_annotations,
     _azure_cluster_spec,
     _cluster_spec,
     _kubeadm_config_template_spec,
@@ -73,9 +75,15 @@ def test_cluster_lifecycle_annotations_defer_readiness_to_late_patch() -> None:
     }
 
 
-def test_control_plane_lifecycle_annotations_wait_only_for_initialization() -> None:
+def test_control_plane_creation_defers_readiness_to_v1beta2_patch() -> None:
+    assert _CONTROL_PLANE_READY_API_VERSION == (
+        "controlplane.cluster.x-k8s.io/v1beta2"
+    )
     assert _control_plane_annotations() == {
         PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_FOREGROUND,
+        PULUMI_SKIP_AWAIT_ANNOTATION: "true",
+    }
+    assert _control_plane_ready_annotations() == {
         PULUMI_WAIT_FOR_ANNOTATION: "condition=Initialized",
     }
 

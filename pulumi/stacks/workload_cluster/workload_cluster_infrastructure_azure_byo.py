@@ -30,6 +30,7 @@ _DEFAULT_PLATFORM_FAULT_DOMAIN_COUNT = 1
 _CAPI_API_VERSION = "cluster.x-k8s.io/v1beta1"
 _BOOTSTRAP_API_VERSION = "bootstrap.cluster.x-k8s.io/v1beta1"
 _CONTROL_PLANE_API_VERSION = "controlplane.cluster.x-k8s.io/v1beta1"
+_CONTROL_PLANE_READY_API_VERSION = "controlplane.cluster.x-k8s.io/v1beta2"
 _INFRASTRUCTURE_API_VERSION = "infrastructure.cluster.x-k8s.io/v1beta1"
 _NAMESPACE = "default"
 _POD_CIDR = "192.168.0.0/16"
@@ -52,8 +53,12 @@ def _cluster_annotations() -> dict[str, str]:
 
 def _control_plane_annotations() -> dict[str, str]:
     return foreground_delete_annotations(
-        pulumi_wait_for(_WAIT_FOR_CONTROL_PLANE_INITIALIZED)
+        {PULUMI_SKIP_AWAIT_ANNOTATION: "true"}
     )
+
+
+def _control_plane_ready_annotations() -> dict[str, str]:
+    return pulumi_wait_for(_WAIT_FOR_CONTROL_PLANE_INITIALIZED)
 
 
 class AzureBYONodePoolSpec(PulumiConfigModel):
@@ -667,6 +672,20 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 capi_lifecycle=True,
             ),
         )
+        control_plane_ready = k8s.apiextensions.CustomResourcePatch(
+            "control-plane-ready",
+            api_version=_CONTROL_PLANE_READY_API_VERSION,
+            kind="KubeadmControlPlane",
+            metadata={
+                "name": control_plane_name,
+                "namespace": _NAMESPACE,
+                "annotations": _control_plane_ready_annotations(),
+            },
+            opts=child_options(
+                depends_on=[control_plane],
+                capi_lifecycle=True,
+            ),
+        )
         worker_machine_deployments: list[k8s.apiextensions.CustomResource] = []
         worker_names: list[str] = []
         for worker_node in worker_nodes:
@@ -738,7 +757,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         workload_kubeconfig_secret = k8s.core.v1.Secret.get(
             "workload-kubeconfig-secret",
             id=f"{_NAMESPACE}/{cluster_name}-kubeconfig",
-            opts=child_options(depends_on=[control_plane]),
+            opts=child_options(depends_on=[control_plane_ready]),
         )
         workload_kubeconfig = pulumi.Output.secret(
             workload_kubeconfig_secret.data.apply(
