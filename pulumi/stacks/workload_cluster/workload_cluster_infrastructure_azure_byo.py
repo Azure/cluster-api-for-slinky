@@ -683,23 +683,10 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 ),
             )
             worker_machine_deployments.append(worker_machine_deployment)
-        control_plane_initialized = k8s.apiextensions.CustomResourcePatch(
-            "control-plane-initialized",
-            api_version=_CAPI_API_VERSION,
-            kind="Cluster",
-            metadata={
-                "name": cluster_name,
-                "namespace": _NAMESPACE,
-                "annotations": pulumi_wait_for(
-                    "condition=ControlPlaneInitialized"
-                ),
-            },
-            opts=child_options(depends_on=[control_plane]),
-        )
         workload_kubeconfig_secret = k8s.core.v1.Secret.get(
             "workload-kubeconfig-secret",
             id=f"{_NAMESPACE}/{cluster_name}-kubeconfig",
-            opts=child_options(depends_on=[control_plane_initialized]),
+            opts=child_options(depends_on=[control_plane]),
         )
         workload_kubeconfig = pulumi.Output.secret(
             workload_kubeconfig_secret.data.apply(
