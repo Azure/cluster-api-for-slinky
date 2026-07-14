@@ -17,6 +17,17 @@ from pydantic import (
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from localenv import discover_azure_host_network, discover_azure_resource_placement
+from stacks.workload_cluster.workload_cluster_deployments import (
+    KEDAOutputs,
+    KEDANodeSetScalerSpec,
+    SlurmNodeSetSpec,
+    _PROMETHEUS_CHART_VERSION,
+    _SLINKY_CHART_VERSION,
+    WorkloadClusterDeployments,
+)
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    ClusterAPIAutoscalerOutputs,
+)
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     AzureBYONodePoolSpec,
     AzureBYOSubnet,
@@ -30,6 +41,13 @@ _DEFAULT_CONTROL_PLANE_VM_SIZE = "Standard_D2as_v5"
 _DEFAULT_WORKER_VM_SIZE = "Standard_D2as_v5"
 _CONTROLLER_NODE_TYPE = "controller"
 _COMPUTE_NODE_TYPE = "compute"
+
+_AZURE_BYO_SLURM_NODE_SETS = (
+    SlurmNodeSetSpec(name="compute", node_type=_COMPUTE_NODE_TYPE, replicas=1),
+)
+_AZURE_BYO_KEDA_SCALED_NODE_SETS = (
+    KEDANodeSetScalerSpec(node_set_name="compute", min_replicas=1, max_replicas=10),
+)
 
 
 class AzureBYOSubnetConfig(PulumiConfigModel):
@@ -108,6 +126,16 @@ class AzureBYOWorkloadClusterOutputs(BaseModel):
     azure_cloud_provider_status: Any
     calico_chart_version: str
     calico_status: Any
+    local_path_storage_class_name: str
+    cluster_autoscaler: ClusterAPIAutoscalerOutputs | None
+    keda: KEDAOutputs | None
+    prometheus_chart_version: str
+    prometheus_namespace: str
+    prometheus_status: Any
+    slurm_operator_chart_version: str
+    slurm_operator_status: Any
+    slurm_chart_version: str
+    slurm_status: Any
     workload_cluster_ready: bool
     todo: str
 
@@ -116,19 +144,24 @@ def _default_node_pools(
     parameters: AzureBYOWorkloadSpec,
 ) -> tuple[AzureBYONodePoolSpec, ...]:
     return (
-        AzureBYONodePoolSpec(
-            name="control-plane",
-            node_type=_CONTROLLER_NODE_TYPE,
-            vm_size=parameters.control_plane_vm_size,
-            replicas=1,
-            controller=True,
+        AzureBYONodePoolSpec.model_validate(
+            {
+                "name": "control-plane",
+                "node_type": _CONTROLLER_NODE_TYPE,
+                "vm_size": parameters.control_plane_vm_size,
+                "replicas": 1,
+                "controller": True,
+            }
         ),
-        AzureBYONodePoolSpec(
-            name="compute",
-            node_type=_COMPUTE_NODE_TYPE,
-            vm_size=parameters.worker_vm_size,
-            replicas=parameters.worker_replicas,
-            attach_to_flex=True,
+        AzureBYONodePoolSpec.model_validate(
+            {
+                "name": "compute",
+                "node_type": _COMPUTE_NODE_TYPE,
+                "vm_size": parameters.worker_vm_size,
+                "replicas": parameters.worker_replicas,
+                "attach_to_flex": True,
+                "autoscaler_bounds": (1, 10),
+            }
         ),
     )
 
@@ -200,6 +233,12 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
         azure_tenant_id: pulumi.Input[str] | None,
         azure_identity_resource_id: pulumi.Input[str] | None,
         node_pools: tuple[AzureBYONodePoolSpec, ...] | None = None,
+        slurm_node_sets: tuple[
+            SlurmNodeSetSpec, ...
+        ] = _AZURE_BYO_SLURM_NODE_SETS,
+        keda_scaled_node_sets: tuple[
+            KEDANodeSetScalerSpec, ...
+        ] = _AZURE_BYO_KEDA_SCALED_NODE_SETS,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -240,6 +279,17 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             node_pools=node_pools,
             opts=pulumi.ResourceOptions(parent=self),
         )
+        deployments = WorkloadClusterDeployments(
+            "deployments",
+            instance=instance,
+            slurm_node_sets=slurm_node_sets,
+            keda_scaled_node_sets=keda_scaled_node_sets,
+            workload_provider=infrastructure.workload_provider,
+            opts=pulumi.ResourceOptions(
+                parent=self,
+                depends_on=[infrastructure],
+            ),
+        )
 
         outputs = {
             "cluster_class": pulumi.Output.from_input(_CLUSTER_CLASS),
@@ -268,7 +318,32 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             "azure_cloud_provider_status": infrastructure.azure_cloud_provider_status,
             "calico_chart_version": infrastructure.calico_chart_version,
             "calico_status": infrastructure.calico_status,
-            "workload_cluster_ready": infrastructure.workload_cluster_ready,
+            "local_path_storage_class_name": (
+                infrastructure.local_path_storage_class_name
+            ),
+            "cluster_autoscaler": (
+                infrastructure.cluster_autoscaler.apply(
+                    lambda value: value.model_dump()
+                )
+                if infrastructure.cluster_autoscaler is not None
+                else None
+            ),
+            "keda": (
+                deployments.keda.apply(lambda value: value.model_dump())
+                if deployments.keda is not None
+                else None
+            ),
+            "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
+            "prometheus_namespace": deployments.prometheus_namespace,
+            "prometheus_status": deployments.prometheus_status,
+            "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_operator_status": deployments.slurm_operator_status,
+            "slurm_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_status": deployments.slurm_status,
+            "workload_cluster_ready": pulumi.Output.all(
+                infrastructure.workload_cluster_ready,
+                deployments.workload_cluster_ready,
+            ).apply(lambda _: True),
             "todo": pulumi.Output.from_input(
                 "Validate VMSS Flex worker replacement and uninterrupted "
                 "single-pass outer teardown."

@@ -22,6 +22,15 @@ from stacks.workload_cluster.workload_cluster_addons import (
     AzureCloudProvider,
     CalicoVXLAN,
 )
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    AUTOSCALER_MAX_ANNOTATION,
+    AUTOSCALER_MIN_ANNOTATION,
+    ClusterAPIAutoscaler,
+    ClusterAPIAutoscalerOutputs,
+    machine_deployment_labels,
+    worker_labels,
+)
+from stacks.workload_cluster.workload_cluster_storage import LocalPathStorage
 
 
 _FLEX_ORCHESTRATION_MODE = "Flexible"
@@ -71,6 +80,21 @@ class AzureBYONodePoolSpec(PulumiConfigModel):
     controller: StrictBool = False
     attach_to_flex: StrictBool = False
     failure_domain: NonEmptyStr = _DEFAULT_FLEX_ZONE
+    autoscaler_bounds: tuple[StrictPositiveInt, StrictPositiveInt] | None = None
+
+
+def _autoscaler_annotations(
+    bounds: tuple[int, int] | None,
+) -> dict[str, str]:
+    if bounds is None:
+        return {}
+    min_replicas, max_replicas = bounds
+    if min_replicas > max_replicas:
+        raise ValueError("autoscaler minimum replicas must not exceed maximum")
+    return {
+        AUTOSCALER_MIN_ANNOTATION: str(min_replicas),
+        AUTOSCALER_MAX_ANNOTATION: str(max_replicas),
+    }
 
 
 class AzureBYOSubnet(BaseModel):
@@ -363,15 +387,23 @@ def _machine_deployment_spec(
     kubernetes_version: str,
 ) -> dict[str, object]:
     labels = {
+        **worker_labels(cluster_name, node.node_type),
         f"{cluster_name}.worker": node.name,
-        "slinky.slurm.net/node-type": node.node_type,
     }
+    autoscaler_annotations = _autoscaler_annotations(node.autoscaler_bounds)
     return {
         "clusterName": cluster_name,
         "replicas": node.replicas,
         "selector": {"matchLabels": labels},
         "template": {
-            "metadata": {"labels": labels},
+            "metadata": {
+                "labels": labels,
+                **(
+                    {"annotations": autoscaler_annotations}
+                    if autoscaler_annotations
+                    else {}
+                ),
+            },
             "spec": {
                 "clusterName": cluster_name,
                 "version": kubernetes_version,
@@ -478,6 +510,8 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
     azure_cloud_provider_status: pulumi.Output[object]
     calico_chart_version: pulumi.Output[str]
     calico_status: pulumi.Output[object]
+    local_path_storage_class_name: pulumi.Output[str]
+    cluster_autoscaler: pulumi.Output[ClusterAPIAutoscalerOutputs] | None
     workload_cluster_ready: pulumi.Output[bool]
 
     def __init__(
@@ -569,11 +603,13 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             *,
             depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
             capi_lifecycle: bool = False,
+            ignore_changes: list[str] | None = None,
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
+                ignore_changes=ignore_changes,
                 custom_timeouts=(
                     pulumi.CustomTimeouts(
                         create=_CAPI_LIFECYCLE_TIMEOUT,
@@ -691,6 +727,9 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         for worker_node in worker_nodes:
             worker_name = _resource_name(instance, worker_node.name)
             worker_names.append(worker_name)
+            autoscaler_annotations = _autoscaler_annotations(
+                worker_node.autoscaler_bounds
+            )
             template_dependencies: list[pulumi.Input[pulumi.Resource]] = [
                 azure_cluster_ready
             ]
@@ -735,7 +774,16 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 metadata={
                     "name": worker_name,
                     "namespace": _NAMESPACE,
-                    "annotations": foreground_delete_annotations(),
+                    "labels": machine_deployment_labels(
+                        cluster_name,
+                        worker_node.node_type,
+                        autoscaler_enabled=(
+                            worker_node.autoscaler_bounds is not None
+                        ),
+                    ),
+                    "annotations": foreground_delete_annotations(
+                        autoscaler_annotations
+                    ),
                 },
                 spec=_machine_deployment_spec(
                     node=worker_node,
@@ -751,6 +799,11 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                         worker_bootstrap_template,
                     ],
                     capi_lifecycle=True,
+                    ignore_changes=(
+                        ["spec.replicas"]
+                        if worker_node.autoscaler_bounds is not None
+                        else None
+                    ),
                 ),
             )
             worker_machine_deployments.append(worker_machine_deployment)
@@ -792,6 +845,29 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             depends_on=[azure_cloud_provider],
             opts=pulumi.ResourceOptions(parent=self),
         )
+        local_path_storage = LocalPathStorage(
+            "local-path-storage",
+            provider=workload_provider,
+            depends_on=[azure_cloud_provider, calico],
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+        cluster_autoscaler_enabled = any(
+            worker.autoscaler_bounds is not None for worker in worker_nodes
+        )
+        cluster_autoscaler: ClusterAPIAutoscaler | None = None
+        if cluster_autoscaler_enabled:
+            cluster_autoscaler = ClusterAPIAutoscaler(
+                "cluster-autoscaler",
+                instance=instance,
+                cluster_name=cluster_name,
+                workload_kubeconfig=workload_kubeconfig,
+                provider=provider,
+                depends_on=[
+                    workload_kubeconfig_secret,
+                    *worker_machine_deployments,
+                ],
+                opts=pulumi.ResourceOptions(parent=self),
+            )
         cluster_control_plane_available = k8s.apiextensions.CustomResourcePatch(
             "cluster-control-plane-available",
             api_version=_CAPI_API_VERSION,
@@ -802,7 +878,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "annotations": pulumi_wait_for(_WAIT_FOR_CONTROL_PLANE_AVAILABLE),
             },
             opts=child_options(
-                depends_on=[azure_cloud_provider, calico],
+                depends_on=[azure_cloud_provider, calico, local_path_storage],
                 capi_lifecycle=True,
             ),
         )
@@ -821,6 +897,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                         worker_machine_deployment,
                         azure_cloud_provider,
                         calico,
+                        local_path_storage,
                     ],
                     capi_lifecycle=True,
                 ),
@@ -853,6 +930,10 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.azure_cloud_provider_status = azure_cloud_provider.status
         self.calico_chart_version = calico.chart_version
         self.calico_status = calico.status
+        self.local_path_storage_class_name = local_path_storage.storage_class_name
+        self.cluster_autoscaler = (
+            cluster_autoscaler.outputs if cluster_autoscaler is not None else None
+        )
         self.workload_cluster_ready = pulumi.Output.all(
             *[worker.id for worker in worker_available]
         ).apply(lambda _: True)
@@ -878,6 +959,16 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "azure_cloud_provider_status": self.azure_cloud_provider_status,
                 "calico_chart_version": self.calico_chart_version,
                 "calico_status": self.calico_status,
+                "local_path_storage_class_name": (
+                    self.local_path_storage_class_name
+                ),
+                "cluster_autoscaler": (
+                    self.cluster_autoscaler.apply(
+                        lambda outputs: outputs.model_dump()
+                    )
+                    if self.cluster_autoscaler is not None
+                    else None
+                ),
                 "workload_cluster_ready": self.workload_cluster_ready,
             }
         )

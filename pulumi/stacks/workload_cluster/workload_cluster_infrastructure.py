@@ -140,7 +140,7 @@ class ClusterAPIAutoscaler(pulumi.ComponentResource):
         instance: str,
         cluster_name: str,
         workload_kubeconfig: pulumi.Input[str],
-        provider: k8s.Provider,
+        provider: k8s.Provider | None,
         infrastructure_api_groups: tuple[str, ...] = (_CAPI_INFRASTRUCTURE_API_GROUP,),
         depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
         opts: pulumi.ResourceOptions | None = None,

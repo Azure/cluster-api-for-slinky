@@ -19,6 +19,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _CONTROL_PLANE_READY_API_VERSION,
     AzureBYONodePoolSpec,
     AzureBYOSubnet,
+    _autoscaler_annotations,
     _cluster_annotations,
     _control_plane_annotations,
     _control_plane_ready_annotations,
@@ -65,6 +66,7 @@ def _compute_node() -> AzureBYONodePoolSpec:
         vm_size="Standard_D2as_v5",
         replicas=1,
         attach_to_flex=True,
+        autoscaler_bounds=(1, 10),
     )
 
 
@@ -399,7 +401,18 @@ def test_default_node_pools_match_minimum_cluster_sizing() -> None:
         vm_size="Standard_D8as_v5",
         replicas=2,
         attach_to_flex=True,
+        autoscaler_bounds=(1, 10),
     )
+
+
+def test_byo_autoscaler_annotations_define_worker_bounds() -> None:
+    assert _autoscaler_annotations((1, 10)) == {
+        "cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size": "1",
+        "cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size": "10",
+    }
+    assert _autoscaler_annotations(None) == {}
+    with pytest.raises(ValueError, match="minimum replicas"):
+        _autoscaler_annotations((10, 1))
 
 
 def test_node_pools_require_one_controller_and_worker() -> None:
@@ -630,6 +643,15 @@ def test_compute_machine_deployment_references_flex_worker_templates() -> None:
     )
 
     assert spec["replicas"] == 1
+    assert spec["template"]["metadata"]["annotations"] == {
+        "cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size": "1",
+        "cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size": "10",
+    }
+    assert spec["selector"]["matchLabels"] == {
+        "cluster.x-k8s.io/cluster-name": "caps-self",
+        "slinky.slurm.net/node-type": "compute",
+        "caps-self.worker": "compute",
+    }
     assert spec["template"]["spec"]["failureDomain"] == "1"
     assert spec["template"]["metadata"]["labels"][
         "slinky.slurm.net/node-type"

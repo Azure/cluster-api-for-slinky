@@ -135,7 +135,12 @@ def _controller_tolerations() -> list[dict[str, str]]:
             "key": "slinky.slurm.net/controller",
             "operator": "Exists",
             "effect": "NoSchedule",
-        }
+        },
+        {
+            "key": "node-role.kubernetes.io/control-plane",
+            "operator": "Exists",
+            "effect": "NoSchedule",
+        },
     ]
 
 
