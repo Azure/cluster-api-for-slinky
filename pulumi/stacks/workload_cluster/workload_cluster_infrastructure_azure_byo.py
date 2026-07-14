@@ -36,10 +36,24 @@ _POD_CIDR = "192.168.0.0/16"
 _SERVICE_CIDR = "10.96.0.0/12"
 _SERVICE_DOMAIN = "cluster.local"
 _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
+_WAIT_FOR_CONTROL_PLANE_INITIALIZED = "condition=Initialized"
 _WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneAvailable"
+_CAPI_LIFECYCLE_TIMEOUT = "60m"
 _AZURE_PROVIDER_ID_PREFIX = "azure://"
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
+
+
+def _cluster_annotations() -> dict[str, str]:
+    return foreground_delete_annotations(
+        {PULUMI_SKIP_AWAIT_ANNOTATION: "true"}
+    )
+
+
+def _control_plane_annotations() -> dict[str, str]:
+    return foreground_delete_annotations(
+        pulumi_wait_for(_WAIT_FOR_CONTROL_PLANE_INITIALIZED)
+    )
 
 
 class AzureBYONodePoolSpec(PulumiConfigModel):
@@ -92,8 +106,17 @@ def _resource_name(instance: str, suffix: str) -> str:
     normalized = _DNS_LABEL_INVALID_CHARS.sub("-", instance.lower()).strip("-")
     if not normalized:
         raise ValueError("instance must contain at least one alphanumeric character")
-    normalized = normalized[: _DNS_LABEL_MAX_LENGTH - len(suffix) - 1].rstrip("-")
-    return f"{normalized}-{suffix}"
+    normalized_suffix = _DNS_LABEL_INVALID_CHARS.sub(
+        "-", suffix.lower()
+    ).strip("-")
+    if not normalized_suffix:
+        raise ValueError("resource suffix must contain at least one alphanumeric character")
+    if len(normalized_suffix) >= _DNS_LABEL_MAX_LENGTH:
+        raise ValueError("resource suffix must be shorter than 63 characters")
+    normalized = normalized[
+        : _DNS_LABEL_MAX_LENGTH - len(normalized_suffix) - 1
+    ].rstrip("-")
+    return f"{normalized}-{normalized_suffix}"
 
 
 def _cluster_name(instance: str) -> str:
@@ -113,6 +136,20 @@ def _partition_node_pools(
     if not workers:
         raise ValueError("azure-byo requires at least one worker node spec")
     return controllers[0], workers
+
+
+def _validate_node_pool_names(
+    instance: str,
+    node_pools: tuple[AzureBYONodePoolSpec, ...],
+) -> None:
+    logical_names = [node.name for node in node_pools]
+    if len(logical_names) != len(set(logical_names)):
+        raise ValueError("azure-byo node pool names must be unique")
+    resource_names = [_resource_name(instance, node.name) for node in node_pools]
+    if len(resource_names) != len(set(resource_names)):
+        raise ValueError(
+            "azure-byo node pool names must remain unique after normalization"
+        )
 
 
 def _resource_group_name(instance: str) -> str:
@@ -465,6 +502,11 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         )
 
         controller_node, worker_nodes = _partition_node_pools(node_pools)
+        _validate_node_pool_names(instance, node_pools)
+        if byo_subnet is None:
+            raise ValueError(
+                "azure-byo requires an explicit or auto-discovered VNet/subnet"
+            )
 
         azure_provider = azure_native.Provider(
             "azure-native",
@@ -511,11 +553,6 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             ),
         )
 
-        if byo_subnet is None:
-            raise ValueError(
-                "azure-byo requires an explicit or auto-discovered VNet/subnet"
-            )
-
         cluster_name = _cluster_name(instance)
         control_plane_name = _resource_name(instance, controller_node.name)
         node_identity_provider_id = pulumi.Output.concat(
@@ -526,11 +563,21 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         def child_options(
             *,
             depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+            capi_lifecycle: bool = False,
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
+                custom_timeouts=(
+                    pulumi.CustomTimeouts(
+                        create=_CAPI_LIFECYCLE_TIMEOUT,
+                        update=_CAPI_LIFECYCLE_TIMEOUT,
+                        delete=_CAPI_LIFECYCLE_TIMEOUT,
+                    )
+                    if capi_lifecycle
+                    else None
+                ),
             )
 
         azure_cluster = k8s.apiextensions.CustomResource(
@@ -552,7 +599,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 subnet=byo_subnet,
                 additional_tags=additional_tags,
             ),
-            opts=child_options(depends_on=[resource_group]),
+            opts=child_options(depends_on=[resource_group], capi_lifecycle=True),
         )
         cluster = k8s.apiextensions.CustomResource(
             "cluster",
@@ -561,16 +608,14 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(
-                    {PULUMI_SKIP_AWAIT_ANNOTATION: "true"}
-                ),
+                "annotations": _cluster_annotations(),
                 "labels": {"cloud-provider": "azure"},
             },
             spec=_cluster_spec(
                 cluster_name=cluster_name,
                 control_plane_name=control_plane_name,
             ),
-            opts=child_options(depends_on=[azure_cluster]),
+            opts=child_options(depends_on=[azure_cluster], capi_lifecycle=True),
         )
         azure_cluster_ready = k8s.apiextensions.CustomResourcePatch(
             "azure-cluster-ready",
@@ -581,7 +626,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "namespace": _NAMESPACE,
                 "annotations": pulumi_wait_for("condition=Ready"),
             },
-            opts=child_options(depends_on=[cluster]),
+            opts=child_options(depends_on=[cluster], capi_lifecycle=True),
         )
         control_plane_machine_template = k8s.apiextensions.CustomResource(
             "control-plane-machine-template",
@@ -594,7 +639,9 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 node_identity_provider_id=node_identity_provider_id,
                 additional_tags=additional_tags,
             ),
-            opts=child_options(depends_on=[azure_cluster_ready]),
+            opts=child_options(
+                depends_on=[azure_cluster_ready], capi_lifecycle=True
+            ),
         )
         control_plane = k8s.apiextensions.CustomResource(
             "control-plane",
@@ -603,9 +650,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": control_plane_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(
-                    pulumi_wait_for("condition=Initialized")
-                ),
+                "annotations": _control_plane_annotations(),
             },
             spec=_kubeadm_control_plane_spec(
                 node=controller_node,
@@ -618,7 +663,8 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     cluster,
                     azure_cluster_ready,
                     control_plane_machine_template,
-                ]
+                ],
+                capi_lifecycle=True,
             ),
         )
         worker_machine_deployments: list[k8s.apiextensions.CustomResource] = []
@@ -645,7 +691,9 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     ),
                     additional_tags=additional_tags,
                 ),
-                opts=child_options(depends_on=template_dependencies),
+                opts=child_options(
+                    depends_on=template_dependencies, capi_lifecycle=True
+                ),
             )
             worker_bootstrap_template = k8s.apiextensions.CustomResource(
                 f"{worker_node.name}-bootstrap-template",
@@ -656,7 +704,10 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     node=worker_node,
                     worker_name=worker_name,
                 ),
-                opts=child_options(depends_on=[cluster, azure_cluster_ready]),
+                opts=child_options(
+                    depends_on=[cluster, azure_cluster_ready],
+                    capi_lifecycle=True,
+                ),
             )
             worker_machine_deployment = k8s.apiextensions.CustomResource(
                 f"{worker_node.name}-machine-deployment",
@@ -679,7 +730,8 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                         control_plane,
                         worker_machine_template,
                         worker_bootstrap_template,
-                    ]
+                    ],
+                    capi_lifecycle=True,
                 ),
             )
             worker_machine_deployments.append(worker_machine_deployment)
@@ -699,6 +751,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         workload_provider = k8s.Provider(
             "workload-k8s",
             kubeconfig=workload_kubeconfig,
+            delete_unreachable=True,
             upsert_existing_objects=True,
             opts=pulumi.ResourceOptions(
                 parent=self,
@@ -731,6 +784,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             },
             opts=child_options(
                 depends_on=[azure_cloud_provider, calico],
+                capi_lifecycle=True,
             ),
         )
         worker_available = [
@@ -748,7 +802,8 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                         worker_machine_deployment,
                         azure_cloud_provider,
                         calico,
-                    ]
+                    ],
+                    capi_lifecycle=True,
                 ),
             )
             for worker_node, worker_name, worker_machine_deployment in zip(

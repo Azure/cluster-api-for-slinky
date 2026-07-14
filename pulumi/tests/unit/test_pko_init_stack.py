@@ -204,6 +204,11 @@ def test_build_stack_spec_uses_flux_source_namespace() -> None:
         "type": "Literal",
         "literal": {"value": "/share/source/pulumi"},
     }
+    assert "PULUMI_K8S_DELETE_UNREACHABLE" not in spec["envRefs"]
+    assert spec["updateTemplate"] == {
+        "spec": {"ttlAfterCompleted": "1m"},
+    }
+    assert spec["destroyOnFinalize"] is True
     assert spec["workspaceTemplate"]["spec"]["podTemplate"]["spec"]["containers"] == [
         {
             "name": "pulumi",

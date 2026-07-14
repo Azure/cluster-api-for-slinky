@@ -933,6 +933,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         management_provider = k8s.Provider(
             "management-k8s",
             kubeconfig=management_kubeconfig.kubeconfig,
+            delete_unreachable=False,
             upsert_existing_objects=True,
             opts=child_options(depends_on=[management_kubeconfig]),
         )
@@ -1124,6 +1125,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         workload_provider = k8s.Provider(
             "workload-k8s",
             kubeconfig=workload_kubeconfig,
+            delete_unreachable=True,
             upsert_existing_objects=True,
             opts=child_options(depends_on=[workload_kubeconfig_secret]),
         )

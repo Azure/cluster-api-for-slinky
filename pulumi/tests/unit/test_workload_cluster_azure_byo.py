@@ -18,6 +18,8 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     AzureBYONodePoolSpec,
     AzureBYOSubnet,
+    _cluster_annotations,
+    _control_plane_annotations,
     _azure_cluster_spec,
     _cluster_spec,
     _kubeadm_config_template_spec,
@@ -28,8 +30,15 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _resource_name,
     _resource_group_args,
     _resource_group_name,
+    _validate_node_pool_names,
     _vmss_flex_args,
     _vmss_flex_name,
+)
+from stacks.kubernetes_annotations import (
+    DELETE_PROPAGATION_FOREGROUND,
+    PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION,
+    PULUMI_SKIP_AWAIT_ANNOTATION,
+    PULUMI_WAIT_FOR_ANNOTATION,
 )
 
 
@@ -55,6 +64,20 @@ def _compute_node() -> AzureBYONodePoolSpec:
         replicas=1,
         attach_to_flex=True,
     )
+
+
+def test_cluster_lifecycle_annotations_defer_readiness_to_late_patch() -> None:
+    assert _cluster_annotations() == {
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_FOREGROUND,
+        PULUMI_SKIP_AWAIT_ANNOTATION: "true",
+    }
+
+
+def test_control_plane_lifecycle_annotations_wait_only_for_initialization() -> None:
+    assert _control_plane_annotations() == {
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_FOREGROUND,
+        PULUMI_WAIT_FOR_ANNOTATION: "condition=Initialized",
+    }
 
 
 @pytest.fixture(autouse=True)
@@ -380,6 +403,39 @@ def test_node_pools_require_one_controller_and_worker() -> None:
         _partition_node_pools((_compute_node(),))
     with pytest.raises(ValueError, match="at least one worker"):
         _partition_node_pools((_controller_node(),))
+
+
+def test_node_pool_names_must_be_unique_after_normalization() -> None:
+    nodes = (
+        _controller_node(),
+        AzureBYONodePoolSpec(
+            name="compute_pool",
+            node_type="compute",
+            vm_size="Standard_D2as_v5",
+            replicas=1,
+        ),
+        AzureBYONodePoolSpec(
+            name="compute-pool",
+            node_type="compute",
+            vm_size="Standard_D2as_v5",
+            replicas=1,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="after normalization"):
+        _validate_node_pool_names("caps-self", nodes)
+
+
+def test_node_pool_name_must_fit_dns_resource_suffix() -> None:
+    node = AzureBYONodePoolSpec(
+        name="n" * 63,
+        node_type="compute",
+        vm_size="Standard_D2as_v5",
+        replicas=1,
+    )
+
+    with pytest.raises(ValueError, match="shorter than 63"):
+        _validate_node_pool_names("caps-self", (_controller_node(), node))
 
 
 def test_vmss_flex_args_describe_empty_placement_container() -> None:

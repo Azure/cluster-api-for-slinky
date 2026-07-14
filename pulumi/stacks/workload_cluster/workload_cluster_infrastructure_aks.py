@@ -500,6 +500,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
         workload_provider = k8s.Provider(
             "workload-k8s",
             kubeconfig=workload_kubeconfig,
+            delete_unreachable=True,
             upsert_existing_objects=True,
             opts=ResourceOptions(parent=self, depends_on=[workload_kubeconfig_secret]),
         )
