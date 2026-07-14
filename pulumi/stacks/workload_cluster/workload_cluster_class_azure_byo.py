@@ -270,7 +270,8 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             "calico_status": infrastructure.calico_status,
             "workload_cluster_ready": infrastructure.workload_cluster_ready,
             "todo": pulumi.Output.from_input(
-                "Validate VMSS Flex worker replacement and cluster teardown."
+                "Validate VMSS Flex worker replacement and uninterrupted "
+                "single-pass outer teardown."
             ),
         }
         self.outputs = pulumi.Output.all(**outputs).apply(
