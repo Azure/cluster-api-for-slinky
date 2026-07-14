@@ -33,6 +33,24 @@ _BOOTSTRAP_HELM_TIMEOUT_SECONDS = 30 * 60
 _BOOTSTRAP_HELM_TIMEOUT = "30m"
 
 
+def _helm_values() -> dict[str, object]:
+    return {
+        "rbac": {
+            "extraRules": [
+                {
+                    "apiGroups": ["source.toolkit.fluxcd.io"],
+                    "resources": ["*"],
+                    "verbs": ["get", "list", "watch"],
+                },
+            ],
+        },
+        "resources": {
+            "limits": {"cpu": "200m", "memory": "512Mi"},
+            "requests": {"cpu": "200m", "memory": "512Mi"},
+        },
+    }
+
+
 class PKORelease(pulumi.ComponentResource):
     """Namespace + Helm OCI release of PKO.
 
@@ -75,17 +93,7 @@ class PKORelease(pulumi.ComponentResource):
             atomic=True,
             wait_for_jobs=True,
             timeout=_BOOTSTRAP_HELM_TIMEOUT_SECONDS,
-            values={
-                "rbac": {
-                    "extraRules": [
-                        {
-                            "apiGroups": ["source.toolkit.fluxcd.io"],
-                            "resources": ["*"],
-                            "verbs": ["get", "list", "watch"],
-                        },
-                    ],
-                },
-            },
+            values=_helm_values(),
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,
