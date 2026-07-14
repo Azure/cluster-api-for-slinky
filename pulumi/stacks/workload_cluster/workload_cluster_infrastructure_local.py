@@ -75,7 +75,7 @@ _CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
-_WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneAvailable"
+_WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneReady"
 _SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 

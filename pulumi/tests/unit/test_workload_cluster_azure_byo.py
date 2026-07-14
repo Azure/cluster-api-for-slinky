@@ -17,6 +17,7 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _CONTROL_PLANE_READY_API_VERSION,
+    _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
     AzureBYONodePoolSpec,
     AzureBYOSubnet,
     _autoscaler_annotations,
@@ -75,6 +76,7 @@ def test_cluster_lifecycle_annotations_defer_readiness_to_late_patch() -> None:
         PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_FOREGROUND,
         PULUMI_SKIP_AWAIT_ANNOTATION: "true",
     }
+    assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneReady"
 
 
 def test_control_plane_creation_defers_readiness_to_v1beta2_patch() -> None:

@@ -9,6 +9,9 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
     AUTOSCALER_MIN_ANNOTATION,
 )
+from stacks.workload_cluster.workload_cluster_infrastructure_local import (
+    _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
+)
 
 
 def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
@@ -26,3 +29,7 @@ def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
             DELETE_PROPAGATION_FOREGROUND
         ),
     }
+
+
+def test_v1beta1_cluster_wait_uses_legacy_control_plane_condition() -> None:
+    assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneReady"
