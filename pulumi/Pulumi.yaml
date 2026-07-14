@@ -25,7 +25,8 @@ description: |
   ``sys.path`` shim, no ``PYTHONPATH`` wiring.
 
   Configuration lives in the active stack config file
-  (for example ``Pulumi.local.yaml`` or ``Pulumi.azure.yaml``). ``pulumi config
+  (for example ``Pulumi.local.yaml``, ``Pulumi.aks.yaml``, or
+  ``Pulumi.azurebyo.yaml``). ``pulumi config
   set <key> <value> -s <stack>`` is the canonical way to populate them;
   they are NOT meant to be hand-edited as a primary workflow.
 runtime:
