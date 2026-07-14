@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, StrictBool
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from localenv import AzureHostNetwork
 from stacks.kubernetes_annotations import (
+    PULUMI_SKIP_AWAIT_ANNOTATION,
     foreground_delete_annotations,
     pulumi_wait_for,
 )
@@ -560,7 +561,9 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(),
+                "annotations": foreground_delete_annotations(
+                    {PULUMI_SKIP_AWAIT_ANNOTATION: "true"}
+                ),
                 "labels": {"cloud-provider": "azure"},
             },
             spec=_cluster_spec(
