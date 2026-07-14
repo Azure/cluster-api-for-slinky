@@ -241,12 +241,6 @@ def build_stack_spec(
         # local dev; tune per env if/when needed.
         "continueResyncOnCommitMatch": True,
         "resyncFrequencySeconds": 3600,
-        # PKO defaults completed Update CRs to 24 hours. Keep enough history
-        # for Stack status absorption while ensuring stale Update finalizers
-        # cannot outlive the operator and block namespace teardown.
-        "updateTemplate": {
-            "spec": {"ttlAfterCompleted": "1m"},
-        },
         # On Stack CR delete, run ``pulumi destroy`` first to tear down
         # what the inner stack created. Without this, deleting the CR
         # leaks the inner resources.
