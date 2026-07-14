@@ -680,25 +680,16 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 ),
             )
             worker_machine_deployments.append(worker_machine_deployment)
-        cluster_control_plane_available = k8s.apiextensions.CustomResourcePatch(
-            "cluster-control-plane-available",
+        control_plane_initialized = k8s.apiextensions.CustomResourcePatch(
+            "control-plane-initialized",
             api_version=_CAPI_API_VERSION,
             kind="Cluster",
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": pulumi_wait_for(_WAIT_FOR_CONTROL_PLANE_AVAILABLE),
-            },
-            opts=child_options(depends_on=[control_plane]),
-        )
-        control_plane_initialized = k8s.apiextensions.CustomResourcePatch(
-            "control-plane-initialized",
-            api_version=_CONTROL_PLANE_API_VERSION,
-            kind="KubeadmControlPlane",
-            metadata={
-                "name": control_plane_name,
-                "namespace": _NAMESPACE,
-                "annotations": pulumi_wait_for("condition=Initialized"),
+                "annotations": pulumi_wait_for(
+                    "condition=ControlPlaneInitialized"
+                ),
             },
             opts=child_options(depends_on=[control_plane]),
         )
@@ -738,6 +729,19 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             provider=workload_provider,
             depends_on=[azure_cloud_provider],
             opts=pulumi.ResourceOptions(parent=self),
+        )
+        cluster_control_plane_available = k8s.apiextensions.CustomResourcePatch(
+            "cluster-control-plane-available",
+            api_version=_CAPI_API_VERSION,
+            kind="Cluster",
+            metadata={
+                "name": cluster_name,
+                "namespace": _NAMESPACE,
+                "annotations": pulumi_wait_for(_WAIT_FOR_CONTROL_PLANE_AVAILABLE),
+            },
+            opts=child_options(
+                depends_on=[azure_cloud_provider, calico],
+            ),
         )
         worker_available = [
             k8s.apiextensions.CustomResourcePatch(
