@@ -105,7 +105,7 @@ preflight() {
   # AzureCluster.identityRef requires this to exist on the mgmt cluster already
   # (created by the Pulumi azure control-plane stack / Phase 1).
   if [[ "$PLAN" != "1" ]] && ! kctx get azureclusteridentity cluster-identity -n "$NAMESPACE" >/dev/null 2>&1; then
-    die "AzureClusterIdentity 'cluster-identity' missing in ns/$NAMESPACE — bring up the CAPZ control plane first (pulumi up -s azure)."
+    die "AzureClusterIdentity 'cluster-identity' missing in ns/$NAMESPACE — bring up the CAPZ control plane first (pulumi up -s azurebyo)."
   fi
 
   if [[ "$WORKER_MODE" == "flex" ]]; then

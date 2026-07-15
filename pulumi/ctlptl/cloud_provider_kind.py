@@ -89,6 +89,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from pydantic import StrictBool
 from pulumi import Output, ResourceOptions, log
 from pulumi.dynamic import (
     CheckResult,
@@ -98,6 +99,8 @@ from pulumi.dynamic import (
     Resource,
     ResourceProvider,
 )
+
+from lib.config import PulumiConfigModel
 
 
 # ---------------------------------------------------------------------------
@@ -415,6 +418,10 @@ class _CloudProviderKindProvider(ResourceProvider):
 # ---------------------------------------------------------------------------
 
 
+class CloudProviderKindConfig(PulumiConfigModel):
+    enable_lb_port_mapping: StrictBool = True
+
+
 class CloudProviderKind(Resource):
     """The ``cloud-provider-kind`` daemon, running detached on the host.
 
@@ -439,7 +446,7 @@ class CloudProviderKind(Resource):
     def __init__(
         self,
         name: str,
-        enable_lb_port_mapping: bool = True,
+        config: CloudProviderKindConfig = CloudProviderKindConfig(),
         opts: Optional[ResourceOptions] = None,
     ):
         super().__init__(
@@ -448,7 +455,7 @@ class CloudProviderKind(Resource):
             {
                 # Tracked input — toggling this triggers a replace
                 # (daemon restart with new argv).
-                "enable_lb_port_mapping": enable_lb_port_mapping,
+                "enable_lb_port_mapping": config.enable_lb_port_mapping,
                 # Outputs only — declared as ``None`` inputs so Pulumi
                 # treats them as expected output names during preview.
                 "pid": None,

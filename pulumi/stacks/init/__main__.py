@@ -10,11 +10,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+_PROJECT_DIR = Path(__file__).resolve().parent
 _PULUMI_DIR = Path(__file__).resolve().parents[2]
-if str(_PULUMI_DIR) not in sys.path:
-    sys.path.insert(0, str(_PULUMI_DIR))
+for path in (_PULUMI_DIR, _PROJECT_DIR):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
-from pko._init_stack import run
+from init_stack import run
 
 
 run()

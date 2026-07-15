@@ -4,13 +4,23 @@ from __future__ import annotations
 
 import base64
 import re
-from dataclasses import dataclass
-from typing import Mapping
+from typing import Mapping, Sequence
 
 import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
+from pydantic import StrictBool
 
+from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
+from stacks.kubernetes_annotations import (
+    PULUMI_SKIP_AWAIT_ANNOTATION,
+    foreground_delete_annotations,
+    pulumi_wait_for,
+)
+from stacks.workload_cluster.aso_detach_reconciler import (
+    ASODetachReconciler,
+    aso_agent_pool_detach_label_patch,
+)
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     CONTROLLER_NODE_TYPE,
     NODE_TYPE_LABEL,
@@ -46,20 +56,21 @@ _SYSTEM_NODE_POOL_MODE = "System"
 _USER_NODE_POOL_MODE = "User"
 _AKS_CONTROLLER_NODE_LABELS = {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
 
-_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
-_WAIT_FOR_READY = "condition=Ready"
+_WAIT_FOR_STATUS_READY = "jsonpath={.status.ready}=true"
+_AKS_CONTROL_PLANE_TIMEOUT = "60m"
+_AKS_DELETE_TIMEOUT = "60m"
+_AMCP_IMMUTABLE_DEFAULTED_FIELDS = ["spec.sshPublicKey"]
 
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 
 
-@dataclass(frozen=True)
-class AKSNodePoolSpec:
-    name: str
-    node_type: str
-    replicas: int
-    controller: bool = False
-    autoscaling_bounds: tuple[int, int] | None = None
+class AKSNodePoolSpec(PulumiConfigModel):
+    name: NonEmptyStr
+    node_type: NonEmptyStr
+    replicas: StrictPositiveInt
+    controller: StrictBool = False
+    autoscaling_bounds: tuple[StrictPositiveInt, StrictPositiveInt] | None = None
 
 
 def _resource_name(instance: str, suffix: str | None = None) -> str:
@@ -188,6 +199,7 @@ def _azure_managed_machine_pool_spec(
     additional_tags: Mapping[str, str],
     node_labels: Mapping[str, str],
     autoscaling_bounds: tuple[int, int] | None = None,
+    aso_managed_clusters_agent_pool_patches: Sequence[str] = (),
 ) -> dict[str, object]:
     """``AzureManagedMachinePool.spec`` for one AKS managed node pool.
 
@@ -206,9 +218,11 @@ def _azure_managed_machine_pool_spec(
         spec["additionalTags"] = dict(additional_tags)
     if autoscaling_bounds is not None:
         min_count, max_count = autoscaling_bounds
-        spec["enableAutoScaling"] = True
-        spec["minCount"] = min_count
-        spec["maxCount"] = max_count
+        spec["scaling"] = {"minSize": min_count, "maxSize": max_count}
+    if aso_managed_clusters_agent_pool_patches:
+        spec["asoManagedClustersAgentPoolPatches"] = list(
+            aso_managed_clusters_agent_pool_patches
+        )
     return spec
 
 
@@ -217,6 +231,16 @@ def _decode_secret_data_value(data: Mapping[str, str], key: str) -> str:
     if not encoded_value:
         raise KeyError(f"Secret data[{key!r}] is missing")
     return base64.b64decode(encoded_value).decode("utf-8")
+
+
+def _machine_pool_delete_annotations(*, controller: bool) -> dict[str, str]:
+    if controller:
+        return {}
+    return foreground_delete_annotations()
+
+
+def _aso_agent_pool_detach_patches(*, cluster_name: str) -> list[str]:
+    return [aso_agent_pool_detach_label_patch(cluster_name=cluster_name)]
 
 
 class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
@@ -258,7 +282,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
         cluster_name = _resource_name(instance)
 
         def child_opts(
-            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+            depends_on: Sequence[pulumi.Input[pulumi.Resource]] | None = None,
         ) -> ResourceOptions:
             return ResourceOptions(
                 parent=self, provider=provider, depends_on=depends_on
@@ -268,59 +292,13 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             f"{name}-managed-cluster",
             api_version=_INFRASTRUCTURE_API_VERSION,
             kind=_AMC_KIND,
-            metadata={"name": cluster_name, "namespace": _NAMESPACE},
+            metadata={
+                "name": cluster_name,
+                "namespace": _NAMESPACE,
+                "annotations": foreground_delete_annotations(),
+            },
             spec={},
             opts=child_opts(),
-        )
-
-        machine_pools: list[k8s.apiextensions.CustomResource] = []
-        machine_pool_names: list[Output[str]] = []
-        for pool in node_pools:
-            cr_pool_name = _resource_name(instance, pool.name)
-            aks_pool_name = _aks_pool_name(pool)
-            pool_mode = _SYSTEM_NODE_POOL_MODE if pool.controller else _USER_NODE_POOL_MODE
-            azure_managed_machine_pool = k8s.apiextensions.CustomResource(
-                f"{name}-{pool.name}-managed-machine-pool",
-                api_version=_INFRASTRUCTURE_API_VERSION,
-                kind=_AMMP_KIND,
-                metadata={"name": cr_pool_name, "namespace": _NAMESPACE},
-                spec=_azure_managed_machine_pool_spec(
-                    mode=pool_mode,
-                    pool_name=aks_pool_name,
-                    sku=node_sku,
-                    additional_tags=dict(additional_tags or {}),
-                    node_labels=node_labels(pool.node_type),
-                    autoscaling_bounds=pool.autoscaling_bounds,
-                ),
-                opts=child_opts(),
-            )
-
-            machine_pool = k8s.apiextensions.CustomResource(
-                f"{name}-{pool.name}-machine-pool",
-                api_version=_CAPI_API_VERSION,
-                kind=_MACHINE_POOL_KIND,
-                metadata={"name": cr_pool_name, "namespace": _NAMESPACE},
-                spec=_machine_pool_spec(
-                    cluster_name=cluster_name,
-                    pool_name=cr_pool_name,
-                    version=kubernetes_version,
-                    replicas=pool.replicas,
-                ),
-                opts=child_opts(depends_on=[azure_managed_machine_pool]),
-            )
-            machine_pools.append(machine_pool)
-            machine_pool_names.append(Output.from_input(cr_pool_name))
-
-        cluster = k8s.apiextensions.CustomResource(
-            f"{name}-cluster",
-            api_version=_CAPI_API_VERSION,
-            kind=_CLUSTER_KIND,
-            metadata={"name": cluster_name, "namespace": _NAMESPACE},
-            spec=_cluster_spec(
-                control_plane_name=cluster_name,
-                infrastructure_name=cluster_name,
-            ),
-            opts=child_opts(depends_on=[azure_managed_cluster]),
         )
 
         azure_managed_control_plane = k8s.apiextensions.CustomResource(
@@ -330,7 +308,11 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": {_WAIT_FOR_ANNOTATION: _WAIT_FOR_READY},
+                # CAPZ cannot make AMCP ready until at least one System AMMP exists.
+                # The explicit ready patch below waits after machine pools are created.
+                "annotations": foreground_delete_annotations(
+                    {PULUMI_SKIP_AWAIT_ANNOTATION: "true"}
+                ),
             },
             spec=_azure_managed_control_plane_spec(
                 identity_name=identity_name,
@@ -341,13 +323,171 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 version=kubernetes_version,
                 additional_tags=dict(additional_tags or {}),
             ),
-            opts=child_opts(depends_on=[cluster, *machine_pools]),
+            opts=pulumi.ResourceOptions.merge(
+                child_opts(depends_on=[azure_managed_cluster]),
+                pulumi.ResourceOptions(
+                    ignore_changes=_AMCP_IMMUTABLE_DEFAULTED_FIELDS,
+                    custom_timeouts=pulumi.CustomTimeouts(
+                        create=_AKS_CONTROL_PLANE_TIMEOUT,
+                        update=_AKS_CONTROL_PLANE_TIMEOUT,
+                        delete=_AKS_CONTROL_PLANE_TIMEOUT,
+                    )
+                ),
+            ),
+        )
+
+        # Workaround until CAPZ owns this teardown transition itself. The
+        # reconciler keeps ASO agent-pool children on detach-on-delete so ASO
+        # does not issue a child agent-pool delete while AKS parent cluster
+        # deletion owns cleanup. Root-cause fix: kubernetes-sigs/CAPZ#6447.
+        aso_detach_reconciler = ASODetachReconciler(
+            f"{name}-aso-detach-reconciler",
+            namespace=_NAMESPACE,
+            cluster_name=cluster_name,
+            provider=provider,
+            opts=ResourceOptions(parent=self),
+        )
+
+        cluster = k8s.apiextensions.CustomResource(
+            f"{name}-cluster",
+            api_version=_CAPI_API_VERSION,
+            kind=_CLUSTER_KIND,
+            metadata={
+                "name": cluster_name,
+                "namespace": _NAMESPACE,
+                "annotations": foreground_delete_annotations(),
+            },
+            spec=_cluster_spec(
+                control_plane_name=cluster_name,
+                infrastructure_name=cluster_name,
+            ),
+            opts=pulumi.ResourceOptions.merge(
+                child_opts(
+                    depends_on=[azure_managed_control_plane, aso_detach_reconciler]
+                ),
+                pulumi.ResourceOptions(
+                    custom_timeouts=pulumi.CustomTimeouts(delete=_AKS_DELETE_TIMEOUT)
+                ),
+            ),
+        )
+
+        machine_pool_cr_names = [
+            _resource_name(instance, pool.name) for pool in node_pools
+        ]
+
+        machine_pools: list[k8s.apiextensions.CustomResource] = []
+        machine_pool_names: list[Output[str]] = []
+        for pool, cr_pool_name in zip(node_pools, machine_pool_cr_names, strict=True):
+            aks_pool_name = _aks_pool_name(pool)
+            pool_mode = _SYSTEM_NODE_POOL_MODE if pool.controller else _USER_NODE_POOL_MODE
+            pool_delete_annotations = _machine_pool_delete_annotations(
+                controller=pool.controller
+            )
+            aso_agent_pool_patches = _aso_agent_pool_detach_patches(
+                cluster_name=cluster_name
+            )
+            delete_with_cluster_opts = (
+                pulumi.ResourceOptions(deleted_with=cluster)
+                if pool.controller
+                else pulumi.ResourceOptions()
+            )
+            azure_managed_machine_pool = k8s.apiextensions.CustomResource(
+                f"{name}-{pool.name}-managed-machine-pool",
+                api_version=_INFRASTRUCTURE_API_VERSION,
+                kind=_AMMP_KIND,
+                metadata={
+                    "name": cr_pool_name,
+                    "namespace": _NAMESPACE,
+                    "annotations": pool_delete_annotations,
+                },
+                spec=_azure_managed_machine_pool_spec(
+                    mode=pool_mode,
+                    pool_name=aks_pool_name,
+                    sku=node_sku,
+                    additional_tags=dict(additional_tags or {}),
+                    node_labels=node_labels(pool.node_type),
+                    autoscaling_bounds=pool.autoscaling_bounds,
+                    aso_managed_clusters_agent_pool_patches=aso_agent_pool_patches,
+                ),
+                opts=pulumi.ResourceOptions.merge(
+                    pulumi.ResourceOptions.merge(
+                        child_opts(
+                            depends_on=[
+                                azure_managed_control_plane,
+                                aso_detach_reconciler,
+                            ]
+                        ),
+                        pulumi.ResourceOptions(
+                            custom_timeouts=pulumi.CustomTimeouts(
+                                delete=_AKS_DELETE_TIMEOUT
+                            )
+                        ),
+                    ),
+                    delete_with_cluster_opts,
+                ),
+            )
+
+            machine_pool = k8s.apiextensions.CustomResource(
+                f"{name}-{pool.name}-machine-pool",
+                api_version=_CAPI_API_VERSION,
+                kind=_MACHINE_POOL_KIND,
+                metadata={
+                    "name": cr_pool_name,
+                    "namespace": _NAMESPACE,
+                    "annotations": pool_delete_annotations,
+                },
+                spec=_machine_pool_spec(
+                    cluster_name=cluster_name,
+                    pool_name=cr_pool_name,
+                    version=kubernetes_version,
+                    replicas=pool.replicas,
+                ),
+                opts=pulumi.ResourceOptions.merge(
+                    pulumi.ResourceOptions.merge(
+                        child_opts(
+                            depends_on=[
+                                cluster,
+                                azure_managed_control_plane,
+                                azure_managed_machine_pool,
+                            ]
+                        ),
+                        pulumi.ResourceOptions(
+                            custom_timeouts=pulumi.CustomTimeouts(
+                                delete=_AKS_DELETE_TIMEOUT
+                            )
+                        ),
+                    ),
+                    delete_with_cluster_opts,
+                ),
+            )
+            machine_pools.append(machine_pool)
+            machine_pool_names.append(Output.from_input(cr_pool_name))
+
+        azure_managed_control_plane_ready = k8s.apiextensions.CustomResourcePatch(
+            f"{name}-control-plane-ready",
+            api_version=_INFRASTRUCTURE_API_VERSION,
+            kind=_AMCP_KIND,
+            metadata={
+                "name": cluster_name,
+                "namespace": _NAMESPACE,
+                "annotations": pulumi_wait_for(_WAIT_FOR_STATUS_READY),
+            },
+            opts=pulumi.ResourceOptions.merge(
+                child_opts(depends_on=machine_pools),
+                pulumi.ResourceOptions(
+                    custom_timeouts=pulumi.CustomTimeouts(
+                        create=_AKS_CONTROL_PLANE_TIMEOUT,
+                        update=_AKS_CONTROL_PLANE_TIMEOUT,
+                        delete=_AKS_CONTROL_PLANE_TIMEOUT,
+                    )
+                ),
+            ),
         )
 
         workload_kubeconfig_secret = k8s.core.v1.Secret.get(
             "workload-kubeconfig-secret",
             id=f"{_NAMESPACE}/{cluster_name}-kubeconfig",
-            opts=child_opts(depends_on=[azure_managed_control_plane]),
+            opts=child_opts(depends_on=[azure_managed_control_plane_ready]),
         )
         workload_kubeconfig = pulumi.Output.secret(
             workload_kubeconfig_secret.data.apply(
@@ -360,6 +500,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
         workload_provider = k8s.Provider(
             "workload-k8s",
             kubeconfig=workload_kubeconfig,
+            delete_unreachable=True,
             upsert_existing_objects=True,
             opts=ResourceOptions(parent=self, depends_on=[workload_kubeconfig_secret]),
         )
@@ -368,7 +509,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.control_plane_name = Output.from_input(cluster_name)
         self.machine_pool_names = machine_pool_names
         self.machine_pool_name = machine_pool_names[0]
-        self.control_plane_ready = azure_managed_control_plane.id.apply(
+        self.control_plane_ready = azure_managed_control_plane_ready.id.apply(
             lambda _: True
         )
         self.workload_kubeconfig = workload_kubeconfig

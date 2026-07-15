@@ -2,16 +2,11 @@
 
 Phase 1 contents:
 
-* :class:`AzureClusterIdentity` -- ``UserAssignedMSI``-flavored
-  ``AzureClusterIdentity`` CR. No backing Secret -- the CAPZ controller
-  fetches Azure AD tokens from the host VM's IMDS endpoint at reconcile
-  time using the UAMI's clientID. See :mod:`.azure._cluster_identity`
-  for the IMDS reachability prerequisite and the comparison against
-  ServicePrincipal and WorkloadIdentity flavors.
-* :class:`IMDSPreflightJob` -- one-shot ``batch/v1`` Job in
-  ``capz-system`` that probes IMDS for a UAMI-bound token from inside
-  the same network namespace CAPZ runs in. Gates
-  :class:`ControlPlaneKind`'s ``control_plane_ready`` output.
+* :class:`AzureClusterIdentity` -- ``AzureClusterIdentity`` CR for the
+  secretless CAPZ identity flavors this stack supports: ``UserAssignedMSI``
+  and ``WorkloadIdentity``. ``UserAssignedMSI`` uses the host VM's IMDS
+  endpoint at reconcile time; ``WorkloadIdentity`` relies on the
+  management cluster's OIDC/federated-credential setup.
 Future Phase 2+ contents will likely include thin Pulumi wrappers
 around the CAPZ workload-cluster shapes (``AzureManagedControlPlane``
 / ``AzureManagedCluster`` / ``AzureManagedMachinePool``) once
@@ -24,11 +19,8 @@ are where its consumers run (alongside sibling subpackages ``awx/``,
 from __future__ import annotations
 
 from ._cluster_identity import AzureClusterIdentity
-from ._imds_preflight_job import IMDSPreflightJob, IMDSPreflightJobOutputs
 
 
 __all__ = [
     "AzureClusterIdentity",
-    "IMDSPreflightJob",
-    "IMDSPreflightJobOutputs",
 ]

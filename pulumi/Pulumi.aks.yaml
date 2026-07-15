@@ -1,0 +1,23 @@
+encryptionsalt: v1:VjgtcOTgSeI=:v1:Qk+1kfEEW+5Qj98l:26uVqeGXBdx4OW/LvLPHhaX3sPPb7Q==
+config:
+  ca4s-infra:customImages:
+    images:
+      capz-controller:
+        sourcePath: /home/zheyushen/cluster-api-provider-azure
+        sourceRef: origin/arsdragonfly/md-vmss
+        imageName: capz/cluster-api-azure-controller
+        buildArgs:
+          ARCH: amd64
+  ca4s-infra:capzArtifact:
+    sourcePath: /home/zheyushen/cluster-api-provider-azure
+    sourceRef: origin/arsdragonfly/md-vmss
+  ca4s-infra:initStack:
+    controlPlane:
+      infrastructureProviders:
+        azure:
+          enabled: true
+    tenants:
+      workloadClusters:
+        caps-aks:
+          className: aks
+          parameters: {}

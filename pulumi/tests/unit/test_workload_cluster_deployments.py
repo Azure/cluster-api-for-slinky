@@ -20,7 +20,12 @@ def test_prometheus_values_pin_components_to_controller_node() -> None:
             "key": "slinky.slurm.net/controller",
             "operator": "Exists",
             "effect": "NoSchedule",
-        }
+        },
+        {
+            "key": "node-role.kubernetes.io/control-plane",
+            "operator": "Exists",
+            "effect": "NoSchedule",
+        },
     ]
 
     assert values["prometheus"]["prometheusSpec"] == {
@@ -58,7 +63,12 @@ def test_keda_values_pin_components_to_controller_node() -> None:
             "key": "slinky.slurm.net/controller",
             "operator": "Exists",
             "effect": "NoSchedule",
-        }
+        },
+        {
+            "key": "node-role.kubernetes.io/control-plane",
+            "operator": "Exists",
+            "effect": "NoSchedule",
+        },
     ]
     expected_placement = {
         "nodeSelector": expected_node_selector,

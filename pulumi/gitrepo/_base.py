@@ -53,6 +53,9 @@ from typing import Any
 import pulumi
 from pulumi import Output
 
+from fluxcd import FluxSource
+from lib.config import NonEmptyStr, PulumiConfigModel
+
 
 # Single source of truth for the Pulumi resource type token used by the
 # base class. Concrete subclasses must override this with their own
@@ -63,6 +66,12 @@ from pulumi import Output
 _BASE_TYPE = "ca4s:gitrepo:GitOpsRepository"
 _WEBHOOK_BASE_TYPE = "ca4s:gitrepo:GitOpsWebhook"
 _PROVIDER_MODULE_PREFIX = "gitrepo."
+
+
+class GitOpsConfig(PulumiConfigModel):
+    provider: NonEmptyStr = "gitea-builtin"
+    provider_args: Mapping[str, Any] = {}
+    sync_triggers: Mapping[str, Any] = {}
 
 
 def _provider_module_name(provider_name: str) -> str:
@@ -127,9 +136,8 @@ class GitOpsRepositoryProvider(pulumi.ComponentResource):
     default_branch: "Output[str]"
     ssh_private_key_secret_name: "Output[str]"
     ssh_private_key_secret_namespace: "Output[str]"
-    flux_source: pulumi.Resource
+    flux_source: FluxSource
     flux_source_name: "Output[str]"
-    flux_receiver_token: "Output[str]"
     flux_receiver_url: "Output[str]"
     webhook_args: Mapping[str, Any]
 
@@ -150,9 +158,8 @@ class GitOpsRepository(pulumi.ComponentResource):
     default_branch: "Output[str]"
     ssh_private_key_secret_name: "Output[str]"
     ssh_private_key_secret_namespace: "Output[str]"
-    flux_source: pulumi.Resource
+    flux_source: FluxSource
     flux_source_name: "Output[str]"
-    flux_receiver_token: "Output[str]"
     flux_receiver_url: "Output[str]"
     webhook_args: Mapping[str, Any]
 
@@ -160,16 +167,20 @@ class GitOpsRepository(pulumi.ComponentResource):
         self,
         name: str,
         *,
-        gitops_provider_name: str,
-        gitops_provider_args: Mapping[str, Any],
+        config: GitOpsConfig,
+        runtime_args: Mapping[str, Any],
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(_BASE_TYPE, name, props={}, opts=opts)
 
-        concrete_cls = _load_provider_class(gitops_provider_name, "Repository")
+        concrete_cls = _load_provider_class(config.provider, "Repository")
         concrete = concrete_cls(
             name,
-            **dict(gitops_provider_args),
+            **{
+                **config.provider_args,
+                **runtime_args,
+                "sync_triggers": config.sync_triggers,
+            },
             opts=pulumi.ResourceOptions(parent=self),
         )
 
@@ -180,7 +191,6 @@ class GitOpsRepository(pulumi.ComponentResource):
         self.ssh_private_key_secret_namespace = concrete.ssh_private_key_secret_namespace
         self.flux_source = concrete.flux_source
         self.flux_source_name = concrete.flux_source_name
-        self.flux_receiver_token = concrete.flux_receiver_token
         self.flux_receiver_url = concrete.flux_receiver_url
         self.webhook_args = concrete.webhook_args
 
@@ -192,9 +202,7 @@ class GitOpsRepository(pulumi.ComponentResource):
                 "ssh_private_key_secret_name": self.ssh_private_key_secret_name,
                 "ssh_private_key_secret_namespace": self.ssh_private_key_secret_namespace,
                 "flux_source_name": self.flux_source_name,
-                "flux_receiver_token": self.flux_receiver_token,
                 "flux_receiver_url": self.flux_receiver_url,
-                "webhook_args": self.webhook_args,
             }
         )
 
@@ -222,13 +230,13 @@ class GitOpsWebhook(pulumi.ComponentResource):
         self,
         name: str,
         *,
-        gitops_provider_name: str,
+        config: GitOpsConfig,
         gitops_webhook_args: Mapping[str, Any],
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(_WEBHOOK_BASE_TYPE, name, props={}, opts=opts)
 
-        concrete_cls = _load_provider_class(gitops_provider_name, "Webhook")
+        concrete_cls = _load_provider_class(config.provider, "Webhook")
         concrete = concrete_cls(
             name,
             **dict(gitops_webhook_args),

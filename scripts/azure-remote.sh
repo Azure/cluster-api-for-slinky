@@ -14,13 +14,14 @@
 #   CAPZ_REMOTE       ssh alias or user@host   (default: capz-mgmt)
 #   CAPZ_REMOTE_REPO  repo path on the VM      (default: /home/azureuser/caps-pulumi)
 #   CAPZ_CONTEXT      kube context on the VM   (default: auto-detected)
+#   CAPZ_PULUMI_STACK Pulumi stack             (default: azurebyo)
 #
 # Usage:
 #   azure-remote.sh sync                 rsync local working tree -> VM
 #   azure-remote.sh ssh [cmd...]         interactive shell on the VM (or run cmd)
 #   azure-remote.sh kubectl <args...>    kubectl against the mgmt cluster
-#   azure-remote.sh preview              sync, then `pulumi preview -s azure`
-#   azure-remote.sh up                   sync, then `pulumi up -s azure`
+#   azure-remote.sh preview              sync, then preview the configured Pulumi stack
+#   azure-remote.sh up                   sync, then update the configured Pulumi stack
 #   azure-remote.sh apply-selfmanaged    sync, then apply the self-managed manifest
 #   azure-remote.sh delete-selfmanaged   delete the self-managed cluster CRs
 #   azure-remote.sh addons               install Day-2 addons (cloud-provider-azure + Calico)
@@ -34,6 +35,7 @@ REMOTE_REPO="${CAPZ_REMOTE_REPO:-/home/azureuser/caps-pulumi}"
 LOCAL_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST="selfmanaged-workload-cluster.yaml"
 CONTEXT="${CAPZ_CONTEXT:-}"
+PULUMI_STACK="${CAPZ_PULUMI_STACK:-azurebyo}"
 
 ssh_run() { ssh "$REMOTE" "$@"; }
 
@@ -72,9 +74,9 @@ case "$cmd" in
   kubectl)
     kube "$@" ;;
   preview)
-    sync_repo; ssh_run "cd '$REMOTE_REPO/pulumi' && pulumi preview -s azure" ;;
+    sync_repo; ssh_run "cd '$REMOTE_REPO/pulumi' && pulumi preview -s '$PULUMI_STACK'" ;;
   up)
-    sync_repo; ssh_run "cd '$REMOTE_REPO/pulumi' && pulumi up -s azure" ;;
+    sync_repo; ssh_run "cd '$REMOTE_REPO/pulumi' && pulumi up -s '$PULUMI_STACK'" ;;
   apply-selfmanaged)
     sync_repo
     need_context

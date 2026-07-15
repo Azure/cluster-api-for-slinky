@@ -58,20 +58,24 @@ from __future__ import annotations
 
 import os
 import base64
+import time
+from collections.abc import Sequence
 from typing import Any, Mapping, Optional
 
 import pulumi
 import pulumi_gitea as gitea_sdk
 import pulumi_kubernetes as k8s
 import pulumi_random as random
+import requests
 from pulumi import Output, ResourceOptions
+from pulumi.dynamic import CreateResult, DiffResult, Resource, ResourceProvider, UpdateResult
 
+from fluxcd import FluxSource
 from gitrepo._base import GitOpsRepositoryProvider, GitOpsWebhookProvider
 from gitrepo.external_secrets import ExternalSecretsOperator
 from gitrepo.flux_git_auth import FluxGitAuthSecret
 from gitrepo.git_sync import GitSync
-from pko._flux import FluxGitSource
-from pko._release import PKO_NAMESPACE
+from stacks.kubernetes_annotations import pulumi_wait_for
 
 
 # Pinned upstream chart. Bump this together with ``_GITEA_APP_VERSION``
@@ -112,6 +116,11 @@ _DEFAULT_BRANCH = "main"
 _GITEA_HTTP_SERVICE = "gitea-http"
 _GITEA_HTTP_PORT = 3000
 _WAIT_FOR_LOAD_BALANCER_IP = "jsonpath={.status.loadBalancer.ingress[0].ip}"
+_WAIT_FOR_READY = "condition=Ready"
+_GITEA_API_READY_TIMEOUT_SECONDS = 300
+_GITEA_API_READY_POLL_INTERVAL_SECONDS = 5
+_BOOTSTRAP_HELM_TIMEOUT_SECONDS = 30 * 60
+_BOOTSTRAP_HELM_TIMEOUT = "30m"
 
 # SSH endpoint. The chart's default ``service.ssh`` is a *headless*
 # ClusterIP (``clusterIP: None``), which we explicitly override below
@@ -261,16 +270,12 @@ def _chart_values(
             "http": {
                 "type": "LoadBalancer",
                 "clusterIP": "",
-                "annotations": {
-                    "pulumi.com/waitFor": _WAIT_FOR_LOAD_BALANCER_IP,
-                },
+                "annotations": pulumi_wait_for(_WAIT_FOR_LOAD_BALANCER_IP),
             },
             "ssh": {
                 "type": "LoadBalancer",
                 "clusterIP": "",
-                "annotations": {
-                    "pulumi.com/waitFor": _WAIT_FOR_LOAD_BALANCER_IP,
-                },
+                "annotations": pulumi_wait_for(_WAIT_FOR_LOAD_BALANCER_IP),
             },
         },
         # Mount the pre-generated host keypair Secret onto the Gitea
@@ -359,6 +364,147 @@ def _decode_secret_data_key(data: Mapping[str, str] | None, key: str) -> str:
     return base64.b64decode(data[key]).decode("utf-8")
 
 
+def _secret_data_key_output(
+    name: str,
+    *,
+    secret_name: str,
+    secret_key: str,
+    provider: k8s.Provider,
+    parent: pulumi.Resource,
+    depends_on: Sequence[pulumi.Resource],
+    strip: bool = False,
+    secret: bool = False,
+) -> Output[str]:
+    if pulumi.runtime.is_dry_run():
+        value = Output.from_input(pulumi.UNKNOWN)
+    else:
+        lookup = k8s.core.v1.Secret.get(
+            name,
+            id=f"{_GITEA_NAMESPACE}/{secret_name}",
+            opts=ResourceOptions(
+                parent=parent,
+                provider=provider,
+                depends_on=list(depends_on),
+            ),
+        )
+        value = lookup.data.apply(
+            lambda data: _decode_secret_data_key(data, secret_key).strip()
+            if strip
+            else _decode_secret_data_key(data, secret_key)
+        )
+    return Output.secret(value) if secret else value
+
+
+def _gitea_external_endpoints(
+    name: str,
+    *,
+    provider: k8s.Provider,
+    parent: pulumi.Resource,
+    depends_on: pulumi.Resource,
+) -> tuple[Output[str], Output[str]]:
+    if pulumi.runtime.is_dry_run():
+        return (
+            Output.from_input(pulumi.UNKNOWN),
+            Output.from_input(pulumi.UNKNOWN),
+        )
+
+    gitea_http_svc = k8s.core.v1.Service.get(
+        f"{name}-gitea-http-lookup",
+        id=f"{_GITEA_NAMESPACE}/{_GITEA_HTTP_SERVICE}",
+        opts=ResourceOptions(
+            parent=parent,
+            provider=provider,
+            depends_on=[depends_on],
+        ),
+    )
+    gitea_ssh_svc = k8s.core.v1.Service.get(
+        f"{name}-gitea-ssh-lookup",
+        id=f"{_GITEA_NAMESPACE}/{_GITEA_SSH_SERVICE}",
+        opts=ResourceOptions(
+            parent=parent,
+            provider=provider,
+            depends_on=[depends_on],
+        ),
+    )
+
+    def _build_external_base(status: Any) -> str:
+        return f"http://{_load_balancer_host(status)}:{_GITEA_HTTP_PORT}"
+
+    def _load_balancer_host(status: Any) -> str:
+        entry = status.load_balancer.ingress[0]
+        return entry.ip or entry.hostname
+
+    return (
+        gitea_http_svc.status.apply(_build_external_base),
+        gitea_ssh_svc.status.apply(_load_balancer_host),
+    )
+
+
+class _GiteaAPIReadinessProvider(ResourceProvider):
+    def _wait(self, props: dict[str, Any]) -> dict[str, Any]:
+        base_url = str(props["base_url"]).rstrip("/")
+        timeout_seconds = int(
+            props.get("timeout_seconds") or _GITEA_API_READY_TIMEOUT_SECONDS
+        )
+        deadline = time.monotonic() + timeout_seconds
+        last_error = "Gitea API has not been checked yet"
+
+        while True:
+            try:
+                response = requests.get(f"{base_url}/api/v1/version", timeout=10)
+                response.raise_for_status()
+                payload = response.json()
+                version = payload.get("version")
+                if isinstance(version, str) and version:
+                    return {
+                        "base_url": base_url,
+                        "timeout_seconds": timeout_seconds,
+                        "version": version,
+                    }
+                last_error = f"unexpected version payload: {payload!r}"
+            except (ValueError, requests.RequestException) as exc:
+                last_error = str(exc)
+
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    "timed out waiting for Gitea API readiness: " + last_error
+                )
+            time.sleep(_GITEA_API_READY_POLL_INTERVAL_SECONDS)
+
+    def create(self, props: dict[str, Any]) -> CreateResult:
+        outs = self._wait(props)
+        return CreateResult(id_=f"{outs['base_url']}/api-ready", outs=outs)
+
+    def diff(self, _id: str, old: dict[str, Any], new: dict[str, Any]) -> DiffResult:
+        keys = ("base_url", "timeout_seconds")
+        return DiffResult(changes=any(old.get(key) != new.get(key) for key in keys))
+
+    def update(self, _id: str, _old: dict[str, Any], new: dict[str, Any]) -> UpdateResult:
+        return UpdateResult(outs=self._wait(new))
+
+
+class GiteaAPIReadiness(Resource):
+    version: pulumi.Output[str]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        base_url: pulumi.Input[str],
+        timeout_seconds: pulumi.Input[int] = _GITEA_API_READY_TIMEOUT_SECONDS,
+        opts: ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            _GiteaAPIReadinessProvider(),
+            name,
+            {
+                "base_url": base_url,
+                "timeout_seconds": timeout_seconds,
+            },
+            opts,
+        )
+
+
 class GiteaBuiltinRepository(GitOpsRepositoryProvider):
     """In-cluster, ephemeral Gitea backing the GitOps source.
 
@@ -371,7 +517,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         ``kubernetes.Provider`` so this stack doesn't accidentally use the
         ambient ``~/.kube/config`` context, which can drift if the user
         ``kubectl config use-context`` to something else mid-session.
-    flux_provider, flux_infrastructure, pko_namespace_resource :
+    flux_provider, flux_infrastructure :
         Management-cluster handles for declaring the Flux ``GitRepository``
         source that PKO Stack CRs consume. The Gitea implementation owns this
         because it knows the provider-specific SSH Secret and known_hosts shape.
@@ -405,7 +551,8 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         *,
         flux_provider: k8s.Provider,
         flux_infrastructure: pulumi.Resource,
-        pko_namespace_resource: pulumi.Resource,
+        flux_source_namespace: pulumi.Input[str] = _GITEA_NAMESPACE,
+        flux_source_namespace_resource: pulumi.Resource | None = None,
         admin_username: str = _DEFAULT_ADMIN_USERNAME,
         admin_email: str = _DEFAULT_ADMIN_EMAIL,
         repo_owner: Optional[str] = None,
@@ -530,7 +677,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             metadata={
                 "name": _HOST_KEY_SECRET,
                 "namespace": _GITEA_NAMESPACE,
-                "annotations": {"pulumi.com/waitFor": "condition=Ready"},
+                "annotations": pulumi_wait_for(_WAIT_FOR_READY),
             },
             spec={
                 "refreshPolicy": "CreatedOnce",
@@ -561,7 +708,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             metadata={
                 "name": _USER_KEY_SECRET,
                 "namespace": _GITEA_NAMESPACE,
-                "annotations": {"pulumi.com/waitFor": "condition=Ready"},
+                "annotations": pulumi_wait_for(_WAIT_FOR_READY),
             },
             spec={
                 "refreshPolicy": "CreatedOnce",
@@ -679,7 +826,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             metadata={
                 "name": _USER_PUBLIC_KEY_SECRET,
                 "namespace": _GITEA_NAMESPACE,
-                "annotations": {"pulumi.com/waitFor": "condition=Ready"},
+                "annotations": pulumi_wait_for(_WAIT_FOR_READY),
             },
             spec={
                 "refreshPolicy": "CreatedOnce",
@@ -724,7 +871,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             cleanup_on_fail=True,
             atomic=True,
             wait_for_jobs=True,
-            timeout=600,
+            timeout=_BOOTSTRAP_HELM_TIMEOUT_SECONDS,
             values=_chart_values(
                 _CREDENTIALS_SECRET, admin_email, _HOST_KEY_SECRET
             ),
@@ -732,55 +879,36 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
                 parent=self,
                 provider=k8s_provider,
                 depends_on=[credentials_secret, host_key_secret],
+                custom_timeouts=pulumi.CustomTimeouts(
+                    create=_BOOTSTRAP_HELM_TIMEOUT,
+                    update=_BOOTSTRAP_HELM_TIMEOUT,
+                    delete=_BOOTSTRAP_HELM_TIMEOUT,
+                ),
             ),
         )
 
-        # Look the chart-created Service up so we can read the LoadBalancer
-        # IP that cloud-provider-kind assigned to it. ``Service.get`` is
-        # the canonical "import existing k8s resource into Pulumi state"
-        # call; combined with ``depends_on=[gitea]`` it correctly defers
-        # the lookup until after the Helm release has finished. The chart
-        # annotates both LoadBalancer Services with ``pulumi.com/waitFor``
-        # so the Helm release does not complete until the host-reachable IPs
-        # are assigned.
-        gitea_http_svc = k8s.core.v1.Service.get(
-            f"{name}-gitea-http-lookup",
-            id=f"{_GITEA_NAMESPACE}/{_GITEA_HTTP_SERVICE}",
-            opts=ResourceOptions(
-                parent=self,
-                provider=k8s_provider,
-                depends_on=[gitea],
-            ),
-        )
-        gitea_ssh_svc = k8s.core.v1.Service.get(
-            f"{name}-gitea-ssh-lookup",
-            id=f"{_GITEA_NAMESPACE}/{_GITEA_SSH_SERVICE}",
-            opts=ResourceOptions(
-                parent=self,
-                provider=k8s_provider,
-                depends_on=[gitea],
-            ),
+        # Resolve the LB ingress to host-reachable endpoints. During preview,
+        # the chart-created Services may not exist yet after an atomic rollback;
+        # real updates still read them after the Helm release completes.
+        external_base, external_ssh_host = _gitea_external_endpoints(
+            name,
+            provider=k8s_provider,
+            parent=self,
+            depends_on=gitea,
         )
 
-        # Resolve the LB ingress to host-reachable endpoints. The chart-level
-        # ``pulumi.com/waitFor`` annotations make missing ingress data a hard
-        # contract violation here rather than something to paper over.
-        def _build_external_base(status: Any) -> str:
-            return f"http://{_load_balancer_host(status)}:{_GITEA_HTTP_PORT}"
-
-        def _load_balancer_host(status: Any) -> str:
-            entry = status.load_balancer.ingress[0]
-            return entry.ip or entry.hostname
-
-        external_base = gitea_http_svc.status.apply(_build_external_base)
-        external_ssh_host = gitea_ssh_svc.status.apply(_load_balancer_host)
+        gitea_api_ready = GiteaAPIReadiness(
+            f"{name}-api-ready",
+            base_url=external_base,
+            opts=ResourceOptions(parent=self, depends_on=[gitea]),
+        )
 
         gitea_provider = gitea_sdk.Provider(
             f"{name}-provider",
             base_url=external_base,
             username=admin_username,
             password=admin_password.result,
-            opts=ResourceOptions(parent=self, depends_on=[gitea]),
+            opts=ResourceOptions(parent=self, depends_on=[gitea_api_ready]),
         )
 
         # Create the actual repo through Gitea's REST API, then push the
@@ -797,22 +925,19 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             opts=ResourceOptions(
                 parent=self,
                 provider=gitea_provider,
-                depends_on=[gitea],
+                depends_on=[gitea_api_ready],
                 delete_before_replace=True,
             ),
         )
 
-        user_public_key_lookup = k8s.core.v1.Secret.get(
+        user_public_key = _secret_data_key_output(
             f"{name}-ssh-user-public-key-lookup",
-            id=f"{_GITEA_NAMESPACE}/{_USER_PUBLIC_KEY_SECRET}",
-            opts=ResourceOptions(
-                parent=self,
-                provider=k8s_provider,
-                depends_on=[user_public_key_secret],
-            ),
-        )
-        user_public_key = user_public_key_lookup.data.apply(
-            lambda data: _decode_secret_data_key(data, _USER_PUBLIC_KEY_SECRET_KEY).strip()
+            secret_name=_USER_PUBLIC_KEY_SECRET,
+            secret_key=_USER_PUBLIC_KEY_SECRET_KEY,
+            provider=k8s_provider,
+            parent=self,
+            depends_on=[user_public_key_secret],
+            strip=True,
         )
 
         # Upload the ESO-projected public key through the generated Gitea SDK.
@@ -831,31 +956,22 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             ),
         )
 
-        user_key_lookup = k8s.core.v1.Secret.get(
+        user_private_key = _secret_data_key_output(
             f"{name}-ssh-user-key-lookup",
-            id=f"{_GITEA_NAMESPACE}/{_USER_KEY_SECRET}",
-            opts=ResourceOptions(
-                parent=self,
-                provider=k8s_provider,
-                depends_on=[user_key_secret],
-            ),
+            secret_name=_USER_KEY_SECRET,
+            secret_key=_USER_PRIVATE_KEY_SECRET_KEY,
+            provider=k8s_provider,
+            parent=self,
+            depends_on=[user_key_secret],
+            secret=True,
         )
-        host_key_lookup = k8s.core.v1.Secret.get(
+        host_public_key = _secret_data_key_output(
             f"{name}-ssh-host-key-lookup",
-            id=f"{_GITEA_NAMESPACE}/{_HOST_KEY_SECRET}",
-            opts=ResourceOptions(
-                parent=self,
-                provider=k8s_provider,
-                depends_on=[host_key_secret],
-            ),
-        )
-        user_private_key = Output.secret(
-            user_key_lookup.data.apply(
-                lambda data: _decode_secret_data_key(data, _USER_PRIVATE_KEY_SECRET_KEY)
-            )
-        )
-        host_public_key = host_key_lookup.data.apply(
-            lambda data: _decode_secret_data_key(data, _HOST_PUBLIC_KEY_SECRET_KEY)
+            secret_name=_HOST_KEY_SECRET,
+            secret_key=_HOST_PUBLIC_KEY_SECRET_KEY,
+            provider=k8s_provider,
+            parent=self,
+            depends_on=[host_key_secret],
         )
 
         sync = GitSync(
@@ -884,12 +1000,22 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             user_private_key_key=_USER_PRIVATE_KEY_SECRET_KEY,
             host_secret_name=_HOST_KEY_SECRET,
             host_public_key_key=_HOST_PUBLIC_KEY_SECRET_KEY,
-            target_namespace=PKO_NAMESPACE,
+            target_namespace=flux_source_namespace,
             target_name=_FLUX_GIT_AUTH_SECRET,
             known_hosts_hostname=_in_cluster_ssh_host(),
             opts=ResourceOptions(
                 parent=self,
-                depends_on=[sync, pko_namespace_resource, host_key_secret, user_key_secret],
+                depends_on=[
+                    dep
+                    for dep in [
+                        sync,
+                        gitea_ns,
+                        flux_source_namespace_resource,
+                        host_key_secret,
+                        user_key_secret,
+                    ]
+                    if dep is not None
+                ],
             ),
         )
 
@@ -904,20 +1030,20 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
         self.ssh_private_key_secret_name = Output.from_input(_USER_KEY_SECRET)
         self.ssh_private_key_secret_namespace = Output.from_input(_GITEA_NAMESPACE)
 
-        flux_source = FluxGitSource(
+        flux_source = FluxSource(
             f"{name}-flux-source",
             provider=flux_provider,
-            flux_infrastructure=flux_infrastructure,
-            pko_namespace_resource=pko_namespace_resource,
+            namespace=flux_source_namespace,
             repo_url=self.url,
             repo_branch=self.default_branch,
-            git_auth_secret_name=_FLUX_GIT_AUTH_SECRET,
-            git_auth_secret_resource=flux_git_auth,
-            opts=ResourceOptions(parent=self, depends_on=[sync]),
+            git_auth_secret_name=flux_git_auth.name,
+            opts=ResourceOptions(
+                parent=self,
+                depends_on=[sync, flux_infrastructure, flux_git_auth],
+            ),
         )
         self.flux_source = flux_source
         self.flux_source_name = flux_source.source_name
-        self.flux_receiver_token = flux_source.receiver_token
         self.flux_receiver_url = flux_source.receiver_url
 
         # Built-in-provider handles used by the local stack to register the
@@ -949,7 +1075,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             "owner": self.owner,
             "repo_name": self.repo_name,
             "webhook_url": self.flux_receiver_url,
-            "secret": self.flux_receiver_token,
+            "secret": flux_source.receiver_token,
             "events": ["push"],
         }
 
@@ -965,7 +1091,6 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
                 "ssh_private_key_secret_name": self.ssh_private_key_secret_name,
                 "ssh_private_key_secret_namespace": self.ssh_private_key_secret_namespace,
                 "flux_source_name": self.flux_source_name,
-                "flux_receiver_token": self.flux_receiver_token,
                 "flux_receiver_url": self.flux_receiver_url,
                 "api_url": self.api_url,
                 "gitea_chart_version": self.gitea_chart_version,
@@ -974,7 +1099,6 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
                 "admin_password": self.admin_password,
                 "owner": self.owner,
                 "repo_name": self.repo_name,
-                "webhook_args": self.webhook_args,
                 "repo_full_name": self.repo_full_name,
                 "repo_html_url": self.repo_html_url,
                 "sync_head_sha": self.sync_head_sha,

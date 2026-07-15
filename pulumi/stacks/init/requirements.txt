@@ -5,7 +5,10 @@
 # installing it as a wheel.
 pulumi>=3.0,<4.0
 pulumi-kubernetes>=4.0,<5.0
+pulumi-azure-native>=3.20,<4.0
+pydantic>=2.0,<3.0
 requests>=2.31,<3.0
+azure-identity>=1.19,<2.0
 ../../sdks/local
 ../../sdks/awx
 ../../sdks/flux

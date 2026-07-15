@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 import pulumi
 import pulumi_kubernetes as k8s
+from pydantic import BaseModel, ConfigDict
 
-from lib.outputs import CompositeOutput
+from lib.config import (
+    NonEmptyStr,
+    PulumiConfigModel,
+    StrictNonNegativeInt,
+    StrictPositiveInt,
+)
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     CONTROLLER_NODE_TYPE,
     NODE_TYPE_LABEL,
@@ -43,27 +48,26 @@ _SLINKY_OPERATOR_NAMESPACE = "slinky"
 _SLURM_NAMESPACE = "slurm"
 
 
-@dataclass(frozen=True)
-class SlurmNodeSetSpec:
-    name: str
-    node_type: str
-    replicas: int
+class SlurmNodeSetSpec(PulumiConfigModel):
+    name: NonEmptyStr
+    node_type: NonEmptyStr
+    replicas: StrictPositiveInt
 
 
-@dataclass(frozen=True)
-class KEDANodeSetScalerSpec:
-    node_set_name: str
-    min_replicas: int
-    max_replicas: int
+class KEDANodeSetScalerSpec(PulumiConfigModel):
+    node_set_name: NonEmptyStr
+    min_replicas: StrictNonNegativeInt
+    max_replicas: StrictPositiveInt
 
 
-@dataclass(frozen=True)
-class KEDAOutputs(CompositeOutput):
-    chart_version: pulumi.Output[str]
-    namespace: pulumi.Output[str]
-    release_name: pulumi.Output[str]
-    scaled_object_names: pulumi.Output[list[str]]
-    status: pulumi.Output[Any]
+class KEDAOutputs(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    chart_version: str
+    namespace: str
+    release_name: str
+    scaled_object_names: list[str]
+    status: Any
 
 
 def _keda_namespace(instance: str) -> str:
@@ -131,7 +135,12 @@ def _controller_tolerations() -> list[dict[str, str]]:
             "key": "slinky.slurm.net/controller",
             "operator": "Exists",
             "effect": "NoSchedule",
-        }
+        },
+        {
+            "key": "node-role.kubernetes.io/control-plane",
+            "operator": "Exists",
+            "effect": "NoSchedule",
+        },
     ]
 
 
@@ -345,12 +354,8 @@ auth_provider = none
 class KEDANodeSetScaler(pulumi.ComponentResource):
     """KEDA ScaledObjects that translate Slurm queue depth into NodeSet replicas."""
 
-    chart_version: pulumi.Output[str]
-    namespace: pulumi.Output[str]
-    release_name: pulumi.Output[str]
-    scaled_object_names: pulumi.Output[list[str]]
     status: pulumi.Output[Any]
-    outputs: KEDAOutputs
+    outputs: pulumi.Output[KEDAOutputs]
 
     def __init__(
         self,
@@ -442,25 +447,22 @@ class KEDANodeSetScaler(pulumi.ComponentResource):
                 opts=child_options(depends_on=[release, *(depends_on or [])]),
             )
 
-        self.namespace = pulumi.Output.from_input(namespace_name)
-        self.chart_version = pulumi.Output.from_input(_KEDA_CHART_VERSION)
-        self.release_name = pulumi.Output.from_input(release_name)
-        self.scaled_object_names = pulumi.Output.from_input(scaled_object_names)
         self.status = release.status
-        self.outputs = KEDAOutputs(
-            chart_version=self.chart_version,
-            namespace=self.namespace,
-            release_name=self.release_name,
-            scaled_object_names=self.scaled_object_names,
-            status=self.status,
-        )
-        self.register_outputs(self.outputs.to_outputs())
+        outputs = {
+            "chart_version": pulumi.Output.from_input(_KEDA_CHART_VERSION),
+            "namespace": pulumi.Output.from_input(namespace_name),
+            "release_name": pulumi.Output.from_input(release_name),
+            "scaled_object_names": pulumi.Output.from_input(scaled_object_names),
+            "status": self.status,
+        }
+        self.outputs = pulumi.Output.all(**outputs).apply(KEDAOutputs.model_validate)
+        self.register_outputs(outputs)
 
 
 class WorkloadClusterDeployments(pulumi.ComponentResource):
     """Kubernetes deployments installed after a workload cluster exists."""
 
-    keda: KEDAOutputs | None
+    keda: pulumi.Output[KEDAOutputs] | None
     prometheus_namespace: pulumi.Output[str]
     prometheus_status: pulumi.Output[Any]
     slurm_operator_status: pulumi.Output[Any]
@@ -649,13 +651,17 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
             slurm_operator.status,
             slurm_release.status,
         ]
-        if self.keda is not None:
-            ready_inputs.append(self.keda.status)
+        if keda is not None:
+            ready_inputs.append(keda.status)
         self.workload_cluster_ready = pulumi.Output.all(*ready_inputs).apply(lambda _: True)
 
         self.register_outputs(
             {
-                "keda": self.keda.to_outputs() if self.keda else None,
+                "keda": (
+                    self.keda.apply(lambda outputs: outputs.model_dump())
+                    if self.keda is not None
+                    else None
+                ),
                 "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
                 "prometheus_namespace": self.prometheus_namespace,
                 "prometheus_status": self.prometheus_status,

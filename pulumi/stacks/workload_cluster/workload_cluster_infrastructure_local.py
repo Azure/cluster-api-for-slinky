@@ -25,29 +25,30 @@ import base64
 import os
 import re
 import urllib.request
-from dataclasses import dataclass
 from typing import Any, Mapping
 
 import pulumi
 import pulumi_kubernetes as k8s
 import pulumi_local as local
 import yaml
+from pydantic import StrictBool
 
-from stacks.workload_cluster.registry_setting import (
-    REGISTRY_CONFIG_NAME,
-    RegistrySetting,
-    parse_registry_setting,
+from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
+from stacks.kubernetes_annotations import (
+    foreground_delete_annotations,
+    pulumi_wait_for,
 )
+from stacks.workload_cluster.registry_setting import RegistryConfig
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
     AUTOSCALER_MIN_ANNOTATION,
     ClusterAPIAutoscaler,
     ClusterAPIAutoscalerOutputs,
     NODE_TYPE_LABEL,
-    POD_SECURITY_PRIVILEGED_LABELS,
     machine_deployment_labels,
     worker_labels,
 )
+from stacks.workload_cluster.workload_cluster_storage import LocalPathStorage
 
 
 _CAPI_API_VERSION = "cluster.x-k8s.io/v1beta2"
@@ -72,21 +73,9 @@ _CALICO_OPERATOR_CRDS_URL = (
 )
 _CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 
-_LOCAL_PATH_NAMESPACE = "local-path-storage"
-_LOCAL_PATH_STORAGE_CLASS = "local-path"
-_LOCAL_PATH_PROVISIONER_VERSION = "v0.0.32"
-_LOCAL_PATH_SERVICE_ACCOUNT = "local-path-provisioner-service-account"
-_LOCAL_PATH_RBAC_NAME = "local-path-provisioner-role"
-_LOCAL_PATH_RBAC_BINDING_NAME = "local-path-provisioner-bind"
-_LOCAL_PATH_CONFIG_NAME = "local-path-config"
-_LOCAL_PATH_DEPLOYMENT_NAME = "local-path-provisioner"
-
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
-_WAIT_FOR_ANNOTATION = "pulumi.com/waitFor"
-_WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneAvailable"
-_DELETION_PROPAGATION_ANNOTATION = "pulumi.com/deletionPropagationPolicy"
-_DELETE_FOREGROUND = "Foreground"
+_WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneReady"
 _SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
@@ -96,13 +85,12 @@ _DOCKER_HUB_PUBLIC_MIRROR = "https://mirror.gcr.io"
 _DOCKER_DESKTOP_HOST = "host.docker.internal"
 
 
-@dataclass(frozen=True)
-class LocalMachineDeploymentSpec:
-    name: str
-    node_type: str
-    replicas: int
-    controller: bool = False
-    autoscaler_bounds: tuple[int, int] | None = None
+class LocalMachineDeploymentSpec(PulumiConfigModel):
+    name: NonEmptyStr
+    node_type: NonEmptyStr
+    replicas: StrictPositiveInt
+    controller: StrictBool = False
+    autoscaler_bounds: tuple[StrictPositiveInt, StrictPositiveInt] | None = None
 
 
 def _autoscaler_annotations(
@@ -117,14 +105,8 @@ def _autoscaler_annotations(
     }
 
 
-def _read_registry_setting() -> RegistrySetting | None:
-    return parse_registry_setting(
-        pulumi.Config("ca4s-workload-cluster").get_object(REGISTRY_CONFIG_NAME)
-    )
-
-
 def _containerd_docker_io_mirror_commands(
-    registry_setting: RegistrySetting | None,
+    registry_setting: RegistryConfig | None,
 ) -> list[str]:
     if registry_setting is None:
         hosts_toml = (
@@ -152,7 +134,7 @@ def _containerd_docker_io_mirror_commands(
             "fi\n"
             f"cat >{_DOCKER_IO_HOSTS_DIR}/hosts.toml <<EOF\n"
             f'server = "{_DOCKER_IO_SERVER}"\n\n'
-            f'[host."http://${{_CA4S_REGISTRY_HOST}}:{registry_setting["port"]}"]\n'
+            f'[host."http://${{_CA4S_REGISTRY_HOST}}:{registry_setting.port}"]\n'
             '  capabilities = ["pull", "resolve"]\n'
             "EOF"
         ),
@@ -176,15 +158,6 @@ def _health_check() -> dict[str, object]:
                 {"type": "Ready", "status": "False", "timeoutSeconds": 300},
             ],
         },
-    }
-
-
-def _foreground_delete_annotations(
-    annotations: Mapping[str, str] | None = None,
-) -> dict[str, str]:
-    return {
-        **(dict(annotations) if annotations else {}),
-        _DELETION_PROPAGATION_ANNOTATION: _DELETE_FOREGROUND,
     }
 
 
@@ -401,276 +374,6 @@ class CalicoCNI(pulumi.ComponentResource):
         )
 
 
-class LocalPathStorage(pulumi.ComponentResource):
-    """local-path provisioner and default StorageClass for workload clusters."""
-
-    namespace: pulumi.Output[str]
-    storage_class_name: pulumi.Output[str]
-
-    def __init__(
-        self,
-        name: str,
-        *,
-        provider: k8s.Provider,
-        depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
-        opts: pulumi.ResourceOptions | None = None,
-    ) -> None:
-        super().__init__("ca4s:workload:LocalPathStorage", name, props={}, opts=opts)
-
-        def child_options(
-            *, depends_on: list[pulumi.Input[pulumi.Resource]] | None = None
-        ) -> pulumi.ResourceOptions:
-            return pulumi.ResourceOptions(
-                parent=self,
-                provider=provider,
-                depends_on=depends_on,
-            )
-
-        namespace = k8s.core.v1.Namespace(
-            "local-path-storage-namespace",
-            metadata={
-                "name": _LOCAL_PATH_NAMESPACE,
-                "labels": POD_SECURITY_PRIVILEGED_LABELS,
-            },
-            opts=child_options(depends_on=depends_on),
-        )
-        service_account = k8s.core.v1.ServiceAccount(
-            "local-path-service-account",
-            metadata={
-                "name": _LOCAL_PATH_SERVICE_ACCOUNT,
-                "namespace": _LOCAL_PATH_NAMESPACE,
-            },
-            opts=child_options(depends_on=[namespace]),
-        )
-        role = k8s.rbac.v1.Role(
-            "local-path-role",
-            metadata={
-                "name": _LOCAL_PATH_RBAC_NAME,
-                "namespace": _LOCAL_PATH_NAMESPACE,
-            },
-            rules=[
-                k8s.rbac.v1.PolicyRuleArgs(
-                    api_groups=[""],
-                    resources=["pods"],
-                    verbs=[
-                        "get",
-                        "list",
-                        "watch",
-                        "create",
-                        "patch",
-                        "update",
-                        "delete",
-                    ],
-                )
-            ],
-            opts=child_options(depends_on=[namespace]),
-        )
-        cluster_role = k8s.rbac.v1.ClusterRole(
-            "local-path-cluster-role",
-            metadata={"name": _LOCAL_PATH_RBAC_NAME},
-            rules=[
-                k8s.rbac.v1.PolicyRuleArgs(
-                    api_groups=[""],
-                    resources=[
-                        "nodes",
-                        "persistentvolumeclaims",
-                        "configmaps",
-                        "pods",
-                        "pods/log",
-                    ],
-                    verbs=["get", "list", "watch"],
-                ),
-                k8s.rbac.v1.PolicyRuleArgs(
-                    api_groups=[""],
-                    resources=["persistentvolumes"],
-                    verbs=[
-                        "get",
-                        "list",
-                        "watch",
-                        "create",
-                        "patch",
-                        "update",
-                        "delete",
-                    ],
-                ),
-                k8s.rbac.v1.PolicyRuleArgs(
-                    api_groups=[""],
-                    resources=["events"],
-                    verbs=["create", "patch"],
-                ),
-                k8s.rbac.v1.PolicyRuleArgs(
-                    api_groups=["storage.k8s.io"],
-                    resources=["storageclasses"],
-                    verbs=["get", "list", "watch"],
-                ),
-            ],
-            opts=child_options(depends_on=depends_on),
-        )
-        k8s.rbac.v1.RoleBinding(
-            "local-path-role-binding",
-            metadata={
-                "name": _LOCAL_PATH_RBAC_BINDING_NAME,
-                "namespace": _LOCAL_PATH_NAMESPACE,
-            },
-            role_ref=k8s.rbac.v1.RoleRefArgs(
-                api_group="rbac.authorization.k8s.io",
-                kind="Role",
-                name=_LOCAL_PATH_RBAC_NAME,
-            ),
-            subjects=[
-                k8s.rbac.v1.SubjectArgs(
-                    kind="ServiceAccount",
-                    name=_LOCAL_PATH_SERVICE_ACCOUNT,
-                    namespace=_LOCAL_PATH_NAMESPACE,
-                )
-            ],
-            opts=child_options(depends_on=[role, service_account]),
-        )
-        k8s.rbac.v1.ClusterRoleBinding(
-            "local-path-cluster-role-binding",
-            metadata={"name": _LOCAL_PATH_RBAC_BINDING_NAME},
-            role_ref=k8s.rbac.v1.RoleRefArgs(
-                api_group="rbac.authorization.k8s.io",
-                kind="ClusterRole",
-                name=_LOCAL_PATH_RBAC_NAME,
-            ),
-            subjects=[
-                k8s.rbac.v1.SubjectArgs(
-                    kind="ServiceAccount",
-                    name=_LOCAL_PATH_SERVICE_ACCOUNT,
-                    namespace=_LOCAL_PATH_NAMESPACE,
-                )
-            ],
-            opts=child_options(depends_on=[cluster_role, service_account]),
-        )
-        config = k8s.core.v1.ConfigMap(
-            "local-path-config",
-            metadata={
-                "name": _LOCAL_PATH_CONFIG_NAME,
-                "namespace": _LOCAL_PATH_NAMESPACE,
-            },
-            data={
-                "config.json": (
-                    '{\n  "nodePathMap":[{\n'
-                    '    "node":"DEFAULT_PATH_FOR_NON_LISTED_NODES",\n'
-                    '    "paths":["/opt/local-path-provisioner"]\n  }]\n}'
-                ),
-                "setup": '#!/bin/sh\nset -eu\nmkdir -m 0777 -p "$VOL_DIR"\n',
-                "teardown": '#!/bin/sh\nset -eu\nrm -rf "$VOL_DIR"\n',
-                "helperPod.yaml": (
-                    "apiVersion: v1\n"
-                    "kind: Pod\n"
-                    "metadata:\n"
-                    "  name: helper-pod\n"
-                    "spec:\n"
-                    "  priorityClassName: system-node-critical\n"
-                    "  tolerations:\n"
-                    "    - key: node.kubernetes.io/disk-pressure\n"
-                    "      operator: Exists\n"
-                    "      effect: NoSchedule\n"
-                    "  containers:\n"
-                    "  - name: helper-pod\n"
-                    "    image: busybox\n"
-                    "    imagePullPolicy: IfNotPresent\n"
-                ),
-            },
-            opts=child_options(depends_on=[namespace]),
-        )
-        storage_class = k8s.storage.v1.StorageClass(
-            "local-path-storage-class",
-            metadata={
-                "name": _LOCAL_PATH_STORAGE_CLASS,
-                "annotations": {
-                    "storageclass.kubernetes.io/is-default-class": "true",
-                    "defaultVolumeType": "local",
-                },
-            },
-            provisioner="rancher.io/local-path",
-            reclaim_policy="Delete",
-            volume_binding_mode="WaitForFirstConsumer",
-            opts=child_options(depends_on=depends_on),
-        )
-        k8s.apps.v1.Deployment(
-            "local-path-deployment",
-            metadata={
-                "name": _LOCAL_PATH_DEPLOYMENT_NAME,
-                "namespace": _LOCAL_PATH_NAMESPACE,
-            },
-            spec=k8s.apps.v1.DeploymentSpecArgs(
-                replicas=1,
-                selector=k8s.meta.v1.LabelSelectorArgs(
-                    match_labels={"app": _LOCAL_PATH_DEPLOYMENT_NAME},
-                ),
-                template=k8s.core.v1.PodTemplateSpecArgs(
-                    metadata=k8s.meta.v1.ObjectMetaArgs(
-                        labels={"app": _LOCAL_PATH_DEPLOYMENT_NAME},
-                    ),
-                    spec=k8s.core.v1.PodSpecArgs(
-                        service_account_name=_LOCAL_PATH_SERVICE_ACCOUNT,
-                        containers=[
-                            k8s.core.v1.ContainerArgs(
-                                name=_LOCAL_PATH_DEPLOYMENT_NAME,
-                                image=(
-                                    "rancher/local-path-provisioner:"
-                                    f"{_LOCAL_PATH_PROVISIONER_VERSION}"
-                                ),
-                                image_pull_policy="IfNotPresent",
-                                command=[
-                                    "local-path-provisioner",
-                                    "--debug",
-                                    "start",
-                                    "--config",
-                                    "/etc/config/config.json",
-                                ],
-                                volume_mounts=[
-                                    k8s.core.v1.VolumeMountArgs(
-                                        name="config-volume",
-                                        mount_path="/etc/config/",
-                                    )
-                                ],
-                                env=[
-                                    k8s.core.v1.EnvVarArgs(
-                                        name="POD_NAMESPACE",
-                                        value_from=k8s.core.v1.EnvVarSourceArgs(
-                                            field_ref=(
-                                                k8s.core.v1.ObjectFieldSelectorArgs(
-                                                    field_path="metadata.namespace"
-                                                )
-                                            ),
-                                        ),
-                                    ),
-                                    k8s.core.v1.EnvVarArgs(
-                                        name="CONFIG_MOUNT_PATH",
-                                        value="/etc/config/",
-                                    ),
-                                ],
-                            )
-                        ],
-                        volumes=[
-                            k8s.core.v1.VolumeArgs(
-                                name="config-volume",
-                                config_map=k8s.core.v1.ConfigMapVolumeSourceArgs(
-                                    name=_LOCAL_PATH_CONFIG_NAME,
-                                ),
-                            )
-                        ],
-                    ),
-                ),
-            ),
-            opts=child_options(depends_on=[config, service_account, storage_class]),
-        )
-
-        self.namespace = pulumi.Output.from_input(_LOCAL_PATH_NAMESPACE)
-        self.storage_class_name = pulumi.Output.from_input(_LOCAL_PATH_STORAGE_CLASS)
-
-        self.register_outputs(
-            {
-                "namespace": self.namespace,
-                "storage_class_name": self.storage_class_name,
-            }
-        )
-
-
 class WorkerClass(pulumi.ComponentResource):
     machine_deployment_name: pulumi.Output[str]
 
@@ -769,7 +472,7 @@ class WorkerClass(pulumi.ComponentResource):
                 "name": machine_deployment_name,
                 "namespace": _NAMESPACE,
                 "labels": machine_deployment_label_set,
-                "annotations": _foreground_delete_annotations(autoscaler_annotations),
+                "annotations": foreground_delete_annotations(autoscaler_annotations),
             },
             spec=machine_deployment_spec,
             opts=child_options(
@@ -911,7 +614,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
     cluster_control_plane_available: k8s.apiextensions.CustomResourcePatch
     calico_operator_chart_version: pulumi.Output[str]
     calico_operator_status: pulumi.Output[Any]
-    cluster_autoscaler: ClusterAPIAutoscalerOutputs | None
+    cluster_autoscaler: pulumi.Output[ClusterAPIAutoscalerOutputs] | None
 
     def __init__(
         self,
@@ -919,6 +622,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         *,
         instance: str,
         worker_machine_deployments: tuple[LocalMachineDeploymentSpec, ...],
+        registry: RegistryConfig | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -930,9 +634,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
 
         cluster_name = _resource_name(instance, "workload")
         node_image = f"kindest/node:{_KUBERNETES_VERSION}"
-        pre_kubeadm_commands = _containerd_docker_io_mirror_commands(
-            _read_registry_setting()
-        )
+        pre_kubeadm_commands = _containerd_docker_io_mirror_commands(registry)
 
         def child_options(
             *,
@@ -952,6 +654,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         management_provider = k8s.Provider(
             "management-k8s",
             kubeconfig=management_kubeconfig.kubeconfig,
+            delete_unreachable=False,
             upsert_existing_objects=True,
             opts=child_options(depends_on=[management_kubeconfig]),
         )
@@ -971,7 +674,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": _foreground_delete_annotations(),
+                "annotations": foreground_delete_annotations(),
             },
             spec={
                 "clusterNetwork": {
@@ -1000,8 +703,8 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": _foreground_delete_annotations(
-                    {_WAIT_FOR_ANNOTATION: "condition=Ready"}
+                "annotations": foreground_delete_annotations(
+                    pulumi_wait_for("condition=Ready")
                 ),
             },
             spec={},
@@ -1027,8 +730,8 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": control_plane_template_name,
                 "namespace": _NAMESPACE,
-                "annotations": _foreground_delete_annotations(
-                    {_WAIT_FOR_ANNOTATION: "condition=Initialized"}
+                "annotations": foreground_delete_annotations(
+                    pulumi_wait_for("condition=Initialized")
                 ),
             },
             spec={
@@ -1077,9 +780,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": {
-                    _WAIT_FOR_ANNOTATION: _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
-                },
+                "annotations": pulumi_wait_for(_WAIT_FOR_CONTROL_PLANE_AVAILABLE),
             },
             opts=child_options(
                 provider=management_provider,
@@ -1145,6 +846,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         workload_provider = k8s.Provider(
             "workload-k8s",
             kubeconfig=workload_kubeconfig,
+            delete_unreachable=True,
             upsert_existing_objects=True,
             opts=child_options(depends_on=[workload_kubeconfig_secret]),
         )
@@ -1202,8 +904,8 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "calico_operator_status": self.calico_operator_status,
                 "local_path_storage_class_name": local_path_storage.storage_class_name,
                 "cluster_autoscaler": (
-                    self.cluster_autoscaler.to_outputs()
-                    if self.cluster_autoscaler
+                    self.cluster_autoscaler.apply(lambda outputs: outputs.model_dump())
+                    if self.cluster_autoscaler is not None
                     else None
                 ),
             }
