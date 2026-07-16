@@ -150,11 +150,24 @@ spec:
       name: caps-self-control-plane
   kubeadmConfigSpec:
     clusterConfiguration:
+      # slurm-bridge in-tree PodGroup (1.36+) needs the GenericWorkload +
+      # WorkloadWithJob feature gates and the scheduling.k8s.io/v1alpha2 API
+      # enabled on the control plane (apiserver serves the API; scheduler +
+      # controller-manager run the Workload/PodGroup controllers). Matches the
+      # slurm-bridge hack/kind.yaml. Enabling this rolls the (single) CP node.
+      apiServer:
+        extraArgs:
+          feature-gates: "GenericWorkload=true,WorkloadWithJob=true"
+          runtime-config: "scheduling.k8s.io/v1alpha2=true"
       controllerManager:
         extraArgs:
           allocate-node-cidrs: "false"
           cloud-provider: external
           cluster-name: caps-self
+          feature-gates: "GenericWorkload=true,WorkloadWithJob=true"
+      scheduler:
+        extraArgs:
+          feature-gates: "GenericWorkload=true,WorkloadWithJob=true"
     # CAPZ auto-generates this secret with the Azure cloud-provider config.
     files:
       - contentFrom:
