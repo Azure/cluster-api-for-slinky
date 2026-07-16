@@ -20,25 +20,44 @@
 #     both orchestrators on the same hardware: that is the "basic co-scheduling
 #     idea".
 #
+#   Demo C — GANG scheduling (coscheduling PodGroup): a 2-node JobSet (+ a
+#     coscheduling PodGroup) is placed by Slurm as ONE external job spanning both
+#     nodes, atomically — all ranks together or not at all. That is the multi-node
+#     primitive MPI/NCCL needs (the GPU version is cluster-api-provider-for-slinky/
+#     nccl-bridge-jobset.yaml). It requires the gang prereqs (scheduler-plugins
+#     CoScheduling + jobset + lws) that `install` now deploys and pins to the
+#     dedicated controller node.
+#
+#   Demo D — GANG scheduling (in-tree PodGroup, Kubernetes 1.36+): the same atomic
+#     2-node placement as Demo C, but expressed with the in-tree PodGroup API
+#     (scheduling.k8s.io/v1alpha2 — a Workload + a PodGroup, pods opting in via
+#     spec.schedulingGroup.podGroupName) instead of the coscheduling CRD. Requires
+#     the apiserver feature gates GenericWorkload + WorkloadWithJob and runtime-config
+#     scheduling.k8s.io/v1alpha2 (set in selfmanaged-workload-cluster.yaml's
+#     KubeadmControlPlane — NOT installed by this script); `demo_d` skips gracefully
+#     when they are absent (Demo C is the no-gate fallback). GPU NCCL version:
+#     nccl-bridge-wholenode-pg136.yaml.
+#
 # It runs ON the CAPZ management VM (needs helm + line of sight to the caps-self
 # API server). Drive it from a workstation with:
-#     scripts/azure-remote.sh bridge-experiment [all|install|demo|teardown]
+#     scripts/azure-remote.sh bridge-experiment [all|install|demo|gang|gang136|teardown]
 #
 # Reuses the kubeconfig-from-secret + helm-to-~/.local/bin bootstrap from
-# selfmanaged-3-addons.sh. Fully reversible: `teardown` helm-uninstalls the bridge,
+# day2-selfmanaged.sh. Fully reversible: `teardown` helm-uninstalls the bridge,
 # removes the token + workload namespace, and leaves the Slurm cluster untouched
 # (the experiment never modifies caps-self-slurm.yaml — it reuses the existing
 # `all` partition).
 #
-# !! TOPOLOGY NOTE: slurm-bridge's controllers taint every node in the managed
-# partition with `slinky.slurm.net/managed-node=slurm-bridge-scheduler:NoExecute`
-# so that only Slurm-placed pods run there. This is now SAFE on caps-self because
-# (1) the Slurm control plane (slurmctld/slurmrestd) + the three bridge components
-# run on the dedicated, UNTAINTED controller node (caps-self-md-ctrl,
-# slinky.slurm.net/node-type=controller — pinned via slurm-bridge-values.yaml
-# affinity), and (2) slurmd on the compute nodes tolerates the managed-node taint
-# (added to caps-self-slurm.yaml nodesets.slinky.podSpec.tolerations). `install`
-# still refuses if that slurmd toleration is missing (or set BRIDGE_ACK_UNSAFE=1).
+# !! TOPOLOGY WARNING (learned the hard way): slurm-bridge's controllers taint
+# EVERY node in the managed partition with `slinky.slurm.net/managed-node:NoExecute`
+# so that only Slurm-placed pods run there. On caps-self the Slurm control plane
+# (slurmctld/slurmrestd/operator) and slurmd are CO-LOCATED on the only worker
+# nodes, which ARE the managed partition — so that NoExecute taint EVICTS Slurm
+# itself and takes the cluster down. `install` therefore refuses unless slurmd
+# tolerates the taint (or BRIDGE_ACK_UNSAFE=1). caps-self now satisfies this: a
+# dedicated non-managed controller node (caps-self-md-ctrl, node-type=controller)
+# hosts the control planes + gang prereqs, and slurmd already tolerates the taint
+# (see caps-self-slurm.yaml), so `guard_topology` passes on caps-self.
 #
 # Env overrides:
 #   CLUSTER=caps-self     workload cluster name (kubeconfig secret <CLUSTER>-kubeconfig)
@@ -56,11 +75,19 @@ CLUSTER="${CLUSTER:-caps-self}"
 NAMESPACE="${NAMESPACE:-default}"
 SLURM_NS="${SLURM_NS:-slurm}"
 WL_NS="${WL_NS:-slurm-bridge}"
-BRIDGE_VERSION="${BRIDGE_VERSION:-1.1.1}"
+BRIDGE_VERSION="${BRIDGE_VERSION:-}"
 HOLD_SECS="${HOLD_SECS:-45}"
 BRIDGE_CHART="oci://ghcr.io/slinkyproject/charts/slurm-bridge"
+# Gang / JobSet / LeaderWorkerSet prerequisites (enable multi-node gang workloads).
+JOBSET_VERSION="${JOBSET_VERSION:-0.12.0}"
+LWS_VERSION="${LWS_VERSION:-0.8.0}"
 # Taint the bridge controllers imperatively stamp on every managed-partition node.
 MANAGED_TAINT_KEY="slinky.slurm.net/managed-node"
+# The dedicated non-managed node (caps-self-md-ctrl) that hosts the Slurm + bridge
+# control planes and the gang prereqs. Platform pods are pinned here so the
+# compute-node managed-node:NoExecute taint can never evict them.
+CONTROLLER_NODE_TYPE="${CONTROLLER_NODE_TYPE:-controller}"
+CONTROLLER_TAINT_KEY="slinky.slurm.net/controller"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -87,50 +114,6 @@ ensure_helm() {
   mkdir -p "$HOME/.local/bin"
   curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
     | HELM_INSTALL_DIR="$HOME/.local/bin" USE_SUDO=false bash
-}
-
-# --- slurm-bridge prerequisite charts (upstream hack/kind.sh parity) ------------
-# The bridge scheduler embeds the scheduler-plugins CoScheduling plugin and
-# watches JobSet / LeaderWorkerSet CRDs, so those must exist before it starts.
-# cert-manager is already installed on caps-self (selfmanaged-3-addons.sh). All three
-# are additive and helm-uninstalled on teardown.
-JOBSET_VERSION="${JOBSET_VERSION:-0.12.0}"
-LWS_VERSION="${LWS_VERSION:-0.8.0}"
-ensure_prereqs() {
-  ensure_helm
-  echo ">> installing bridge prerequisites (scheduler-plugins, jobset, lws)"
-  if ! helmw -n scheduler-plugins status scheduler-plugins >/dev/null 2>&1; then
-    helmw install scheduler-plugins scheduler-plugins \
-      --repo https://scheduler-plugins.sigs.k8s.io \
-      -n scheduler-plugins --create-namespace \
-      --set 'plugins.enabled={CoScheduling}' --set 'scheduler.replicaCount=0' \
-      --wait --timeout 5m || echo "##[warning]scheduler-plugins install had issues"
-  else echo "   scheduler-plugins already installed"; fi
-  if ! helmw -n jobset-system status jobset >/dev/null 2>&1; then
-    helmw install jobset oci://registry.k8s.io/jobset/charts/jobset \
-      --version "$JOBSET_VERSION" -n jobset-system --create-namespace \
-      --wait --timeout 5m || echo "##[warning]jobset install had issues"
-  else echo "   jobset already installed"; fi
-  if ! helmw -n lws-system status lws >/dev/null 2>&1; then
-    helmw install lws oci://registry.k8s.io/lws/charts/lws \
-      --version "$LWS_VERSION" -n lws-system --create-namespace \
-      --wait --timeout 5m || echo "##[warning]lws install had issues"
-  else echo "   lws already installed"; fi
-}
-
-# Label the compute (hybrid slurmd) nodes so slurm-bridge recognises them as
-# bridge worker nodes (upstream `scheduler.slinky.slurm.net/slurm-bridge=worker`).
-# Additive + idempotent; removed on teardown.
-BRIDGE_WORKER_LABEL="scheduler.slinky.slurm.net/slurm-bridge"
-label_bridge_nodes() {
-  local nodes
-  nodes="$(k get nodes -l slinky.slurm.net/node-type=compute \
-             -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)"
-  [ -n "$nodes" ] || { echo "##[warning]no node-type=compute nodes to label"; return 0; }
-  for n in $nodes; do
-    k label node "$n" "${BRIDGE_WORKER_LABEL}=worker" --overwrite >/dev/null && \
-      echo "   labelled $n ${BRIDGE_WORKER_LABEL}=worker"
-  done
 }
 
 # --- slurmctld pod/container discovery + exec helper ----------------------------
@@ -190,8 +173,69 @@ guard_topology() {
   exit 1
 }
 
+# ===============================================================================# Gang prerequisites + controller-node pinning
 # ===============================================================================
-# preflight
+# slurm-bridge only GANG-schedules a workload when its pods share a PodGroup; a
+# bare Job/JobSet is translated pod-by-pod (each becomes its own single-node Slurm
+# job). Gang therefore needs (1) the coscheduling PodGroup CRD (scheduler-plugins)
+# and (2) the JobSet + LeaderWorkerSet controllers that shape multi-node workloads.
+# Those controllers ship with no nodeSelector, so — exactly like the bridge itself —
+# they can land on a compute node and then get EVICTED the instant slurm-bridge
+# taints it managed-node:NoExecute. pin_to_controller() re-homes them (and the
+# bridge components) onto the dedicated caps-self-md-ctrl node.
+
+# pin_to_controller <namespace> [label-selector]
+# Patch every (matching) Deployment in <namespace> onto the controller node.
+# Idempotent, chart-agnostic (kubectl patch, not helm values — the v1.1.1 bridge
+# chart drops nodeSelector/affinity), and a no-op if the namespace is absent.
+pin_to_controller() {
+  local ns="$1" sel="${2:-}" d patch
+  patch='{"spec":{"template":{"spec":{"nodeSelector":{"slinky.slurm.net/node-type":"'"${CONTROLLER_NODE_TYPE}"'"},"tolerations":[{"key":"'"${CONTROLLER_TAINT_KEY}"'","operator":"Exists","effect":"NoSchedule"}]}}}}'
+  k get ns "$ns" >/dev/null 2>&1 || return 0
+  local getargs=(-n "$ns" get deploy -o name)
+  [ -n "$sel" ] && getargs=(-n "$ns" get deploy -l "$sel" -o name)
+  for d in $(k "${getargs[@]}" 2>/dev/null); do
+    k -n "$ns" patch "$d" --type=merge -p "$patch" >/dev/null 2>&1 \
+      && echo "   pinned ${ns}/${d#*/} -> node-type=${CONTROLLER_NODE_TYPE}"
+    k -n "$ns" rollout status "$d" --timeout=120s >/dev/null 2>&1 || true
+  done
+}
+
+# ensure_prereqs: install (idempotently) the gang enablers and pin them so they
+# survive the managed-node taint. scheduler.replicaCount=0 keeps the coscheduling
+# CRD + PodGroup controller WITHOUT running a second kube-scheduler (slurm-bridge
+# is the scheduler); we only need the PodGroup type + controller for gang.
+ensure_prereqs() {
+  echo ">> installing gang prerequisites (scheduler-plugins CoScheduling, jobset, lws)"
+  if ! helmw -n scheduler-plugins status scheduler-plugins >/dev/null 2>&1; then
+    helmw install scheduler-plugins scheduler-plugins \
+      --repo https://scheduler-plugins.sigs.k8s.io -n scheduler-plugins --create-namespace \
+      --set 'plugins.enabled={CoScheduling}' --set 'scheduler.replicaCount=0' \
+      --wait --timeout 5m || echo "##[warning]scheduler-plugins install reported issues (continuing)"
+  else
+    echo "   scheduler-plugins already installed"
+  fi
+  if ! helmw -n jobset-system status jobset >/dev/null 2>&1; then
+    helmw install jobset oci://registry.k8s.io/jobset/charts/jobset --version "$JOBSET_VERSION" \
+      -n jobset-system --create-namespace --wait --timeout 5m \
+      || echo "##[warning]jobset install reported issues (continuing)"
+  else
+    echo "   jobset already installed"
+  fi
+  if ! helmw -n lws-system status lws >/dev/null 2>&1; then
+    helmw install lws oci://registry.k8s.io/lws/charts/lws --version "$LWS_VERSION" \
+      -n lws-system --create-namespace --wait --timeout 5m \
+      || echo "##[warning]lws install reported issues (continuing)"
+  else
+    echo "   lws already installed"
+  fi
+  # Keep the prereq controllers off the managed compute nodes.
+  pin_to_controller scheduler-plugins
+  pin_to_controller jobset-system
+  pin_to_controller lws-system
+}
+
+# ===============================================================================# preflight
 # ===============================================================================
 preflight() {
   echo "##[section]Preflight"
@@ -221,10 +265,10 @@ install() {
   ensure_helm
   echo ">> helm: $(helm version --short)"
 
-  # 0. Prerequisite charts (scheduler-plugins CoScheduling + jobset + lws) and
-  #    bridge worker-node labels — upstream slurm-bridge hack/ parity.
+  # 0. Gang prerequisites (scheduler-plugins CoScheduling + jobset + lws), each
+  #    pinned to the controller node. These make multi-node gang workloads (Demo C
+  #    and the GPU NCCL JobSet) placeable as a single Slurm allocation.
   ensure_prereqs
-  label_bridge_nodes
 
   # 1. JWT token Secret for slurmrestd auth — prefer the operator Token CR.
   echo ">> detecting Slurm JWT signing-key secret in ns ${SLURM_NS}"
@@ -262,6 +306,12 @@ install() {
     k -n "$SLURM_NS" rollout status "deploy/$d" --timeout=180s 2>/dev/null \
       || echo "##[warning]deploy/$d not ready (continuing)"
   done
+
+  # 2b. Pin the bridge components to the controller node too. The v1.1.1 chart
+  #     can't pin via values (it renders nodeSelector/affinity INSIDE the container
+  #     spec, where they're silently dropped), so patch the Deployments directly —
+  #     otherwise they race the managed-node taint and get evicted off compute.
+  pin_to_controller "$SLURM_NS" 'app.kubernetes.io/instance=slurm-bridge'
 
   # 3. Managed namespace for bridge workloads (privileged PSA so the stock
   #    busybox pod isn't rejected — consistent with the slurm/local-path nses).
@@ -407,6 +457,153 @@ demo_b() {
 }
 
 # ===============================================================================
+# Demo C — GANG scheduling: a 2-node JobSet placed as ONE Slurm allocation
+# ===============================================================================
+demo_c() {
+  echo "##[section]Demo C — gang-scheduled 2-node JobSet (one atomic Slurm job)"
+  resolve_slurmctld
+  if ! k get crd jobsets.jobset.x-k8s.io >/dev/null 2>&1 \
+     || ! k get crd podgroups.scheduling.x-k8s.io >/dev/null 2>&1; then
+    echo "##[warning]gang prereqs (jobset + coscheduling PodGroup CRDs) are missing."
+    echo "##[warning]Run 'install' to add them, then re-run. Skipping Demo C."
+    return 0
+  fi
+
+  local idle
+  idle="$(slurm sinfo -h -N -p all -t idle -o '%N' 2>/dev/null | sort -u | grep -c . || true)"
+  idle="${idle:-0}"
+  echo ">> idle nodes in partition 'all': ${idle} (the gang needs 2)"
+  if [ "$idle" -lt 2 ]; then
+    echo "##[warning]fewer than 2 idle nodes — the gang would stay PENDING. Skipping."
+    return 0
+  fi
+
+  k delete jobset gang-proxy -n "$WL_NS" --ignore-not-found >/dev/null 2>&1 || true
+  k delete podgroup.scheduling.x-k8s.io gang-proxy -n "$WL_NS" --ignore-not-found >/dev/null 2>&1 || true
+  sleep 3
+  echo ">> submitting the 2-node gang (PodGroup minMember=2 + JobSet parallelism=2)"
+  k apply -f "$SCRIPT_DIR/slurm-bridge-gang-job.yaml"
+
+  echo ">> waiting for BOTH gang pods to reach Running (atomic placement)..."
+  local running=0
+  for _ in $(seq 1 40); do
+    running="$(k get pods -n "$WL_NS" -l scheduling.x-k8s.io/pod-group=gang-proxy \
+                 --field-selector=status.phase=Running --no-headers 2>/dev/null | grep -c . || true)"
+    [ "${running:-0}" -ge 2 ] && break
+    sleep 3
+  done
+
+  echo ">> gang pods (expect 2 Running, on 2 distinct nodes, SAME Slurm JobID):"
+  k get pods -n "$WL_NS" -l scheduling.x-k8s.io/pod-group=gang-proxy \
+    -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,PHASE:.status.phase,JOBID:.metadata.labels.scheduler\.slinky\.slurm\.net/slurm-jobid' \
+    2>&1 | sed 's/^/     /' || true
+
+  local jid
+  jid="$(k get pods -n "$WL_NS" -l scheduling.x-k8s.io/pod-group=gang-proxy \
+           -o jsonpath='{.items[0].metadata.labels.scheduler\.slinky\.slurm\.net/slurm-jobid}' 2>/dev/null || true)"
+  if [ -n "$jid" ]; then
+    echo ">> Slurm's view of the gang (expect NumNodes=2, both nodes in NodeList):"
+    slurm scontrol show job "$jid" 2>&1 \
+      | grep -oE 'JobId=[^ ]+|JobState=[^ ]+|NumNodes=[^ ]+|NodeList=[^ ]+' | sort -u | sed 's/^/     /' || true
+  fi
+
+  echo ">> waiting for the gang JobSet to complete..."
+  if k wait --for=condition=completed jobset/gang-proxy -n "$WL_NS" --timeout=180s 2>/dev/null; then
+    echo "   PASS: a 2-node JobSet was gang-placed by Slurm as ONE allocation."
+  else
+    echo "##[warning]gang JobSet did not complete in time; current pods:"
+    k get pods -n "$WL_NS" -l scheduling.x-k8s.io/pod-group=gang-proxy -o wide 2>&1 | sed 's/^/     /' || true
+  fi
+  echo "   => the multi-node primitive MPI/NCCL needs — all ranks together or not"
+  echo "      at all — works through the bridge (GPU version: nccl-bridge-jobset.yaml)."
+}
+
+# ===============================================================================
+# Demo D — GANG via the IN-TREE PodGroup (Kubernetes 1.36+ form)
+# ===============================================================================
+# Does the workload cluster's apiserver serve the in-tree PodGroup (Kubernetes
+# 1.36+)? True only when the GenericWorkload + WorkloadWithJob feature gates and
+# the scheduling.k8s.io/v1alpha2 runtime-config are enabled on kube-apiserver
+# (baked into the cluster via selfmanaged-workload-cluster.yaml, not this script).
+check_intree_podgroup() {
+  local ar
+  ar="$(k api-resources --api-group=scheduling.k8s.io 2>/dev/null || true)"
+  grep -qi 'PodGroup' <<<"$ar" && grep -qi 'Workload' <<<"$ar"
+}
+
+# The same atomic 2-node placement as Demo C, but the gang is expressed with the
+# in-tree PodGroup API (Workload + PodGroup, pods opting in via
+# spec.schedulingGroup.podGroupName) instead of the coscheduling CRD. Skips
+# gracefully when the 1.36 API is not served (Demo C is the no-gate fallback).
+demo_d() {
+  echo "##[section]Demo D — gang via the in-tree PodGroup (Kubernetes 1.36+)"
+  resolve_slurmctld
+  if ! check_intree_podgroup; then
+    echo "##[warning]the in-tree PodGroup API (scheduling.k8s.io/v1alpha2) is not served"
+    echo "##[warning]by the ${CLUSTER} apiserver. Enable GenericWorkload + WorkloadWithJob"
+    echo "##[warning]+ runtime-config scheduling.k8s.io/v1alpha2 on the control plane (see"
+    echo "##[warning]selfmanaged-workload-cluster.yaml's KubeadmControlPlane), then re-run."
+    echo "##[warning]The coscheduling gang (Demo C / 'gang') is the no-gate fallback. Skipping."
+    return 0
+  fi
+
+  local idle
+  idle="$(slurm sinfo -h -N -p all -t idle -o '%N' 2>/dev/null | sort -u | grep -c . || true)"
+  idle="${idle:-0}"
+  echo ">> idle nodes in partition 'all': ${idle} (the gang needs 2)"
+  if [ "$idle" -lt 2 ]; then
+    echo "##[warning]fewer than 2 idle nodes — the gang would stay PENDING. Skipping."
+    return 0
+  fi
+
+  # Fresh start. Delete in reverse dependency order (the PodGroup admission
+  # validates the Workload exists on create, so recreate cleanly each run).
+  k delete job pg136-test -n "$WL_NS" --ignore-not-found >/dev/null 2>&1 || true
+  k delete podgroup.scheduling.k8s.io pg136-test-gang -n "$WL_NS" --ignore-not-found >/dev/null 2>&1 || true
+  k delete workload pg136-test -n "$WL_NS" --ignore-not-found >/dev/null 2>&1 || true
+  sleep 3
+  echo ">> submitting the 2-node gang (Workload + in-tree PodGroup gang.minCount=2 + Job)"
+  k apply -f "$SCRIPT_DIR/podgroup136-test.yaml"
+
+  echo ">> waiting for BOTH gang pods to reach Running (atomic placement)..."
+  local running=0
+  for _ in $(seq 1 40); do
+    running="$(k get pods -n "$WL_NS" -l job-name=pg136-test \
+                 --field-selector=status.phase=Running --no-headers 2>/dev/null | grep -c . || true)"
+    [ "${running:-0}" -ge 2 ] && break
+    sleep 3
+  done
+
+  echo ">> gang pods (expect 2 Running, on 2 distinct nodes, SAME Slurm JobID):"
+  k get pods -n "$WL_NS" -l job-name=pg136-test \
+    -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,PHASE:.status.phase,JOBID:.metadata.labels.scheduler\.slinky\.slurm\.net/slurm-jobid,GROUP:.spec.schedulingGroup.podGroupName' \
+    2>&1 | sed 's/^/     /' || true
+
+  echo ">> in-tree PodGroup status (expect PodGroupScheduled=True):"
+  k get podgroup.scheduling.k8s.io pg136-test-gang -n "$WL_NS" \
+    -o jsonpath='{range .status.conditions[*]}     {.type}={.status} ({.message}){"\n"}{end}' 2>/dev/null || true
+
+  local jid
+  jid="$(k get pods -n "$WL_NS" -l job-name=pg136-test \
+           -o jsonpath='{.items[0].metadata.labels.scheduler\.slinky\.slurm\.net/slurm-jobid}' 2>/dev/null || true)"
+  if [ -n "$jid" ]; then
+    echo ">> Slurm's view of the gang (expect NumNodes=2, both nodes in NodeList):"
+    slurm scontrol show job "$jid" 2>&1 \
+      | grep -oE 'JobId=[^ ]+|JobState=[^ ]+|NumNodes=[^ ]+|NodeList=[^ ]+' | sort -u | sed 's/^/     /' || true
+  fi
+
+  echo ">> waiting for the gang Job to complete..."
+  if k wait --for=condition=complete job/pg136-test -n "$WL_NS" --timeout=180s 2>/dev/null; then
+    echo "   PASS: a 2-node gang was placed by Slurm as ONE allocation via the in-tree PodGroup."
+  else
+    echo "##[warning]gang Job did not complete in time; current pods:"
+    k get pods -n "$WL_NS" -l job-name=pg136-test -o wide 2>&1 | sed 's/^/     /' || true
+  fi
+  echo "   => the same atomic multi-node primitive as Demo C, via the Kubernetes 1.36"
+  echo "      in-tree PodGroup (GPU NCCL version: nccl-bridge-wholenode-pg136.yaml)."
+}
+
+# ===============================================================================
 # teardown
 # ===============================================================================
 teardown() {
@@ -425,29 +622,20 @@ teardown() {
       echo "   untainted $n"
     fi
   done
-  # Remove the bridge worker-node labels we added in install().
-  for n in $(k get nodes -l "${BRIDGE_WORKER_LABEL}=worker" \
-               -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-    k label node "$n" "${BRIDGE_WORKER_LABEL}-" 2>/dev/null && echo "   unlabelled $n"
-  done
-  # Prerequisite charts (scheduler-plugins/jobset/lws) are potentially shared
-  # cluster infra, so only remove them when explicitly asked.
-  if [ "${TEARDOWN_PREREQS:-0}" = "1" ]; then
-    for r in "lws:lws-system" "jobset:jobset-system" "scheduler-plugins:scheduler-plugins"; do
-      helmw uninstall "${r%%:*}" -n "${r##*:}" 2>/dev/null && echo ">> uninstalled ${r%%:*}"
-    done
-  fi
   k delete token slurm-bridge-token -n "$SLURM_NS" --ignore-not-found 2>/dev/null || true
   k delete secret slurm-bridge-token -n "$SLURM_NS" --ignore-not-found 2>/dev/null || true
   k delete ns "$WL_NS" --ignore-not-found 2>/dev/null || true
-  echo ">> done. The slinky Slurm cluster (ns ${SLURM_NS}) was left untouched."
+  echo ">> done. The slinky Slurm cluster (ns ${SLURM_NS}) was left untouched;"
+  echo "   the gang prereqs (jobset/lws/scheduler-plugins) were left installed (reusable)."
 }
 
 case "$ACTION" in
   preflight) preflight ;;
   install)   preflight; install ;;
-  demo)      preflight; demo_a; demo_b ;;
-  all)       preflight; install; demo_a; demo_b ;;
+  demo)      preflight; demo_a; demo_b; demo_c; demo_d ;;
+  gang)      preflight; demo_c ;;
+  gang136)   preflight; demo_d ;;
+  all)       preflight; install; demo_a; demo_b; demo_c; demo_d ;;
   teardown)  teardown ;;
-  *) echo "usage: run.sh [all|preflight|install|demo|teardown]"; exit 1 ;;
+  *) echo "usage: run.sh [all|preflight|install|demo|gang|gang136|teardown]"; exit 1 ;;
 esac

@@ -1,0 +1,253 @@
+# =============================================================================
+# nccl-bridge-wholenode-pg136.yaml — the IN-TREE PodGroup (Kubernetes 1.36+) form
+# of nccl-bridge-wholenode.yaml. Same Route A whole-node GPU NCCL run through
+# slurm-bridge on caps-self, but the gang is expressed with the in-tree PodGroup
+# API (scheduling.k8s.io/v1alpha2) instead of the coscheduling CRD.
+#
+# WHAT CHANGED vs nccl-bridge-wholenode.yaml (coscheduling form):
+#   * The gang is now THREE-ish objects (docs/workload.md#podgroup-136):
+#       - Workload (scheduling.k8s.io/v1alpha2): immutable podGroupTemplate with a
+#         gang policy + a controllerRef to the JobSet that owns the pods. Carries the
+#         slurmjob.slinky.slurm.net/* annotations (job-name, timelimit).
+#       - PodGroup (scheduling.k8s.io/v1alpha2): the runtime gang (schedulingPolicy.
+#         gang.minCount), linked back to the Workload's template via podGroupTemplateRef.
+#   * Pods opt in via spec.schedulingGroup.podGroupName (NOT the label
+#     scheduling.x-k8s.io/pod-group). schedulerName is set explicitly for clarity
+#     (the admission webhook sets it anyway for managed-namespace pods).
+#
+# PREREQUISITE (the reason this is a separate file): the caps-self control plane
+# MUST run with `--feature-gates=GenericWorkload=true,WorkloadWithJob=true` and
+# `--runtime-config=scheduling.k8s.io/v1alpha2=true` (set in
+# selfmanaged-workload-cluster.yaml, KubeadmControlPlane.clusterConfiguration).
+# Validated live on caps-self 2026-07-15 with podgroup136-test.yaml (busybox gang
+# -> one Slurm job, NumNodes=2). The coscheduling form (nccl-bridge-wholenode.yaml)
+# needs no gate and remains the fallback.
+#
+# Everything else (Route A GPU access, IB, mpirun launcher/worker, tolerations,
+# volumes, secrets) is IDENTICAL to nccl-bridge-wholenode.yaml — see that file's
+# header for the full prerequisite + design notes (nvidia RuntimeClass, nccl-ssh
+# secret, both compute-node tolerations, NVIDIA_VISIBLE_DEVICES=all, etc.).
+#
+# IMAGE REQUIREMENT (verified 2026-07-15 on caps-self V100s + driver 580 = CUDA 13):
+# NCCL must be new enough for the host GPU driver. The fleet image
+# cuda-nccl-test:12.1.1-2.18.5-1-u22 FAILS every collective ("illegal memory access",
+# reproducible even single-GPU) because NCCL 2.18.5 is too old for the CUDA-13 driver;
+# the 13.0.2 tag can't run on Volta at all (CUDA 13 dropped sm_70). The VALIDATED image
+# is nccl_2.20_good (NCCL 2.20.3 / CUDA 12.2, keeps sm_70) + openssh for mpirun:
+#   10.1.2.6:5000/nccl_2.20_good:v1-ssh
+# With it the full 2-node run PASSED (all_reduce 8k..2G, 0 wrong, ~14.5 GB/s cross-node
+# busbw over IB; 8-GPU intra-node ~126 GB/s). Gang scheduling is independent of the
+# image; this file only switches the GANG MECHANISM to the 1.36 in-tree PodGroup.
+#
+# USAGE (same envsubst var list as the coscheduling file):
+#   export IMAGE_NAME=10.1.2.6:5000/nccl_2.20_good:v1-ssh   # validated on V100 + driver 580
+#   export NUM_NODES=2 NUM_WORKERS=1 NUM_DEVICES=8 NCCL_TEST=all_reduce_perf
+#   envsubst '${IMAGE_NAME} ${NUM_NODES} ${NUM_WORKERS} ${NUM_DEVICES} ${NCCL_TEST}' \
+#     < nccl-bridge-wholenode-pg136.yaml \
+#     | sed '/imagePullSecrets:/d; /name: hpcimageacr-secret/d' | kubectl apply -f -
+# =============================================================================
+---
+# Workload: the immutable gang template + the tie to the JobSet controller. The
+# slurmjob.slinky.slurm.net/* annotations shape the Slurm job (name + timelimit).
+apiVersion: scheduling.k8s.io/v1alpha2
+kind: Workload
+metadata:
+  name: nccl-bridge-wn
+  namespace: slurm-bridge
+  annotations:
+    slurmjob.slinky.slurm.net/job-name: nccl-bridge-wn
+    slurmjob.slinky.slurm.net/timelimit: "30"
+spec:
+  controllerRef:
+    apiGroup: jobset.x-k8s.io
+    kind: JobSet
+    name: nccl-bridge-wn
+  podGroupTemplates:
+    - name: gang
+      schedulingPolicy:
+        gang:
+          minCount: ${NUM_NODES}
+---
+# Runtime gang: all NUM_NODES ranks are placed together or not at all (one Slurm job).
+apiVersion: scheduling.k8s.io/v1alpha2
+kind: PodGroup
+metadata:
+  name: nccl-bridge-wn-gang
+  namespace: slurm-bridge
+spec:
+  podGroupTemplateRef:
+    workload:
+      workloadName: nccl-bridge-wn
+      podGroupTemplateName: gang
+  schedulingPolicy:
+    gang:
+      minCount: ${NUM_NODES}
+---
+apiVersion: jobset.x-k8s.io/v1alpha2
+kind: JobSet
+metadata:
+  name: nccl-bridge-wn
+  namespace: slurm-bridge
+spec:
+  # Stable per-pod DNS: <jobset>-<rjob>-<jobIndex>-0.<jobset> (used by mpirun --host).
+  network:
+    enableDNSHostnames: true
+  # Benchmark is done when the launcher (rank 0) finishes; tear the workers down.
+  successPolicy:
+    operator: All
+    targetReplicatedJobs:
+      - launcher
+  failurePolicy:
+    maxRestarts: 0
+  replicatedJobs:
+    # --- rank 0: runs mpirun/NCCL across all ranks over pod DNS ------------------
+    - name: launcher
+      replicas: 1
+      template:
+        spec:
+          backoffLimit: 0
+          completions: 1
+          parallelism: 1
+          template:
+            spec:
+              restartPolicy: Never
+              # In-tree PodGroup opt-in (the 1.36 form; replaces the coscheduling label).
+              schedulerName: slurm-bridge-scheduler
+              schedulingGroup:
+                podGroupName: nccl-bridge-wn-gang
+              # NVIDIA container runtime (needs nvidia-container-toolkit on the node).
+              runtimeClassName: nvidia
+              # caps-self compute-node label (NOT nvidia.com/gpu.present).
+              nodeSelector:
+                slinky.slurm.net/node-type: compute
+              # caps-self compute nodes carry slinky.slurm.net/compute:NoSchedule AS WELL
+              # AS the bridge's managed-node:NoExecute. The bridge admission only injects
+              # a toleration for managed-node, so the workload MUST tolerate compute too or
+              # it stays Pending ("untolerated taint"). Verified on caps-self 2026-07-13.
+              tolerations:
+                - {key: slinky.slurm.net/compute, effect: NoSchedule, operator: Exists}
+                - {key: slinky.slurm.net/managed-node, effect: NoExecute, operator: Exists}
+              imagePullSecrets:
+                - name: hpcimageacr-secret
+              containers:
+                - name: nccl-launcher
+                  image: "${IMAGE_NAME}"
+                  imagePullPolicy: IfNotPresent
+                  securityContext:
+                    privileged: true
+                    capabilities:
+                      add: ["IPC_LOCK"]
+                  # ROUTE A: no device plugin -> tell the NVIDIA runtime to expose
+                  # every GPU on the (whole, exclusively-allocated) node.
+                  env:
+                    - { name: NVIDIA_VISIBLE_DEVICES, value: "all" }
+                    - { name: NVIDIA_DRIVER_CAPABILITIES, value: "compute,utility" }
+                  command:
+                    - /bin/bash
+                    - -c
+                    - |
+                      set -eu
+                      # SSH keys -> /root/.ssh with correct perms (mpirun uses ssh).
+                      mkdir -p /root/.ssh && cp /etc/nccl-ssh/* /root/.ssh/
+                      chmod 700 /root/.ssh && chmod 600 /root/.ssh/id_rsa
+                      chmod 644 /root/.ssh/authorized_keys /root/.ssh/id_rsa.pub || true
+                      printf 'StrictHostKeyChecking no\nUserKnownHostsFile /dev/null\n' > /root/.ssh/config
+                      # Build the mpirun host list. OpenMPI/ORTE strips the DNS subdomain and
+                      # ssh's to the SHORT name (unresolvable in k8s), so resolve each rank's
+                      # JobSet DNS name to an IP and pass IPs to --host (as benchmark_k8s_nccl.sh
+                      # does with scraped pod IPs).
+                      JS=nccl-bridge-wn; SLOTS=${NUM_DEVICES}
+                      # Own IP from the interface (self DNS lookup is flaky/racy in k8s).
+                      myip=$(hostname -I 2>/dev/null | awk '{print $1}')
+                      [ -z "$myip" ] && myip=$(getent hosts "${JS}-launcher-0-0.${JS}" | awk '{print $1}')
+                      HOSTS="${myip}:$SLOTS"
+                      LAST=$(( ${NUM_NODES} - 2 ))
+                      # Wait for each worker's sshd (bash /dev/tcp; no nc dep), then resolve its IP.
+                      for i in $(seq 0 "$LAST"); do
+                        until (exec 3<>"/dev/tcp/${JS}-worker-$i-0.${JS}/22") 2>/dev/null; do
+                          echo "[launcher] waiting for worker $i sshd..."; sleep 3; done
+                        wip=$(getent hosts "${JS}-worker-$i-0.${JS}" | awk '{print $1}')
+                        HOSTS="$HOSTS,${wip}:$SLOTS"
+                      done
+                      echo "[launcher] hosts: $HOSTS"
+                      # Same NCCL-over-InfiniBand command as benchmark_k8s_nccl.sh.
+                      exec mpirun --allow-run-as-root -np $(( ${NUM_NODES} * ${NUM_DEVICES} )) \
+                        --host "$HOSTS" --map-by "ppr:${NUM_DEVICES}:node" \
+                        -x UCX_TLS=rc -x UCX_IB_GID_INDEX=0 \
+                        -x NCCL_IB_PCI_RELAXED_ORDERING=1 -x NCCL_SOCKET_IFNAME=eth0 \
+                        -x NCCL_DEBUG=WARN -x NCCL_NET_GDR_LEVEL=5 \
+                        "/opt/nccl-tests/build/${NCCL_TEST}" -b 8k -e 2G -f 2 -g 1 -n 20
+                  volumeMounts:
+                    - { name: dshm, mountPath: /dev/shm }
+                    - { name: infiniband, mountPath: /dev/infiniband }
+                    - { name: ms, mountPath: /opt/microsoft }
+                    - { name: sshkey, mountPath: /etc/nccl-ssh, readOnly: true }
+              volumes:
+                - name: dshm
+                  emptyDir: { medium: Memory, sizeLimit: 10Gi }
+                - name: infiniband
+                  hostPath: { path: /dev/infiniband, type: DirectoryOrCreate }
+                - name: ms
+                  hostPath: { path: /opt/microsoft, type: DirectoryOrCreate }
+                - name: sshkey
+                  secret: { secretName: nccl-ssh, defaultMode: 0600 }
+    # --- ranks 1..N-1: GPU workers that just run sshd for mpirun ----------------
+    - name: worker
+      replicas: ${NUM_WORKERS}
+      template:
+        spec:
+          backoffLimit: 0
+          completions: 1
+          parallelism: 1
+          template:
+            spec:
+              restartPolicy: Never
+              # In-tree PodGroup opt-in (the 1.36 form; replaces the coscheduling label).
+              schedulerName: slurm-bridge-scheduler
+              schedulingGroup:
+                podGroupName: nccl-bridge-wn-gang
+              runtimeClassName: nvidia
+              nodeSelector:
+                slinky.slurm.net/node-type: compute
+              # Tolerate BOTH caps-self compute-node taints (see launcher note above).
+              tolerations:
+                - {key: slinky.slurm.net/compute, effect: NoSchedule, operator: Exists}
+                - {key: slinky.slurm.net/managed-node, effect: NoExecute, operator: Exists}
+              imagePullSecrets:
+                - name: hpcimageacr-secret
+              containers:
+                - name: nccl-worker
+                  image: "${IMAGE_NAME}"
+                  imagePullPolicy: IfNotPresent
+                  securityContext:
+                    privileged: true
+                    capabilities:
+                      add: ["IPC_LOCK"]
+                  env:
+                    - { name: NVIDIA_VISIBLE_DEVICES, value: "all" }
+                    - { name: NVIDIA_DRIVER_CAPABILITIES, value: "compute,utility" }
+                  command:
+                    - /bin/bash
+                    - -c
+                    - |
+                      set -eu
+                      mkdir -p /root/.ssh && cp /etc/nccl-ssh/* /root/.ssh/
+                      chmod 700 /root/.ssh && chmod 600 /root/.ssh/id_rsa
+                      chmod 644 /root/.ssh/authorized_keys /root/.ssh/id_rsa.pub || true
+                      ssh-keygen -A 2>/dev/null || true
+                      echo "[worker] sshd up; waiting for launcher"
+                      exec /usr/sbin/sshd -D -e
+                  volumeMounts:
+                    - { name: dshm, mountPath: /dev/shm }
+                    - { name: infiniband, mountPath: /dev/infiniband }
+                    - { name: ms, mountPath: /opt/microsoft }
+                    - { name: sshkey, mountPath: /etc/nccl-ssh, readOnly: true }
+              volumes:
+                - name: dshm
+                  emptyDir: { medium: Memory, sizeLimit: 10Gi }
+                - name: infiniband
+                  hostPath: { path: /dev/infiniband, type: DirectoryOrCreate }
+                - name: ms
+                  hostPath: { path: /opt/microsoft, type: DirectoryOrCreate }
+                - name: sshkey
+                  secret: { secretName: nccl-ssh, defaultMode: 0600 }

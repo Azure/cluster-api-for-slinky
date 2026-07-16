@@ -26,14 +26,8 @@ spec:
   template:
     spec:
       restartPolicy: Never
-      # caps-self compute (GPU/IB) nodes carry an EXTRA
-      # slinky.slurm.net/compute:NoSchedule taint (from the caps-self-md-0
-      # KubeadmConfigTemplate) on top of the slinky.slurm.net/managed-node
-      # taint that slurm-bridge stamps and auto-tolerates via its admission
-      # webhook. The webhook does not know about the compute taint, so a bridge
-      # workload must tolerate it itself to be bindable onto the compute nodes
-      # (exactly as slurmd does in caps-self-slurm.yaml). Upstream managed nodes
-      # have only the managed-node taint, so this toleration is caps-self-specific.
+      # caps-self compute nodes carry this taint in addition to the bridge's
+      # managed-node taint, which its admission webhook tolerates separately.
       tolerations:
         - key: slinky.slurm.net/compute
           operator: Exists

@@ -1,0 +1,90 @@
+# CPU gang proxy for caps-self: proves slurm-bridge GANG-schedules a multi-node
+# JobSet as ONE Slurm allocation spanning both compute nodes (the primitive that
+# multi-node MPI/NCCL needs — all ranks placed together, atomically).
+#
+# It is the CPU stand-in for the GPU NCCL JobSet
+# (cluster-api-provider-for-slinky/nccl-bridge-jobset.yaml): same gang mechanism,
+# minus the GPU/IB/mpirun specifics. Submitted into the managed namespace
+# `slurm-bridge`, so the bridge admission webhook rewrites schedulerName and
+# injects the managed-node toleration.
+#
+# GANG MECHANISM: the bridge does NOT gang a bare Job/JobSet (each pod becomes its
+# own single-node Slurm job). Gang requires a PodGroup. caps-self is k8s 1.36, so
+# either the in-tree PodGroup (scheduling.k8s.io/v1alpha2, needs the GenericWorkload
+# gate) or the coscheduling PodGroup below works; we use coscheduling
+# (scheduling.x-k8s.io/v1alpha1, from the scheduler-plugins prereq) since it needs
+# no feature gate. sized for caps-self's 2 GPU/IB compute nodes.
+apiVersion: scheduling.x-k8s.io/v1alpha1
+kind: PodGroup
+metadata:
+  name: gang-proxy
+  namespace: slurm-bridge
+spec:
+  # All pods labeled scheduling.x-k8s.io/pod-group=gang-proxy are allocated
+  # together or not at all (atomic gang of 2).
+  minMember: 2
+---
+apiVersion: jobset.x-k8s.io/v1alpha2
+kind: JobSet
+metadata:
+  name: gang-proxy
+  namespace: slurm-bridge
+  annotations:
+    slinky.slurm.net/job-name: gang-proxy
+    slinky.slurm.net/timelimit: "5"
+spec:
+  network:
+    enableDNSHostnames: true
+  failurePolicy:
+    maxRestarts: 0
+  replicatedJobs:
+    - name: worker
+      replicas: 1
+      template:
+        spec:
+          backoffLimit: 0
+          completions: 2
+          parallelism: 2
+          completionMode: Indexed
+          template:
+            metadata:
+              labels:
+                # Opt both pods into the gang.
+                scheduling.x-k8s.io/pod-group: gang-proxy
+            spec:
+              restartPolicy: Never
+              nodeSelector:
+                slinky.slurm.net/node-type: compute
+              tolerations:
+                - key: slinky.slurm.net/compute
+                  operator: Exists
+                  effect: NoSchedule
+                - key: slinky.slurm.net/managed-node
+                  operator: Exists
+                  effect: NoExecute
+              containers:
+                - name: worker
+                  image: busybox:stable
+                  env:
+                    - name: NODE_NAME
+                      valueFrom:
+                        fieldRef:
+                          fieldPath: spec.nodeName
+                    - name: POD_NAME
+                      valueFrom:
+                        fieldRef:
+                          fieldPath: metadata.name
+                  command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      echo "[gang] pod=$POD_NAME node=$NODE_NAME start=$(date -u)"
+                      sleep 45
+                      echo "[gang] pod=$POD_NAME done"
+                  resources:
+                    requests:
+                      cpu: "1"
+                      memory: 64Mi
+                    limits:
+                      cpu: "1"
+                      memory: 64Mi

@@ -11,16 +11,6 @@
 #
 # Components land in ns `slurm` (alongside the slinky Slurm cluster):
 #   slurm-bridge-scheduler / -controllers / -admission.
-#
-# PLACEMENT (caps-self): the components are given NO affinity/nodeSelector — the
-# slurm-bridge v1.1.1 chart renders those at the CONTAINER level (invalid, so the
-# API silently drops them; see templates/scheduler/deployment.yaml). They still
-# land on the dedicated controller node (caps-self-md-ctrl) automatically, because
-# it is the ONLY schedulable node for an untolerating pod: the k8s control-plane
-# node is tainted, and both GPU/IB compute nodes carry
-# slinky.slurm.net/compute:NoSchedule + slinky.slurm.net/managed-node:NoExecute.
-# (The chart DOES honor per-component `tolerations` at the pod level — the CAPD
-# variant needs one because its controller node is tainted.)
 
 schedulerConfig:
   # Non-primary scheduler name. The admission webhook stamps this onto pods in

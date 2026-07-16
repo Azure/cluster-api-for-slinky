@@ -1,0 +1,84 @@
+# Minimal in-tree PodGroup (1.36+) gang test for slurm-bridge on caps-self.
+#
+# Validates the mechanism the user asked to switch to (docs/workload.md#podgroup-136):
+#   * Workload (scheduling.k8s.io/v1alpha2) defines an immutable podGroupTemplate
+#     with a gang policy and a controllerRef to the Job that owns the pods.
+#   * PodGroup (scheduling.k8s.io/v1alpha2) is the runtime gang object (minCount).
+#   * Pods opt in via spec.schedulingGroup.podGroupName (NOT the coscheduling label).
+#
+# Requires GenericWorkload + WorkloadWithJob feature gates + scheduling.k8s.io/v1alpha2
+# runtime-config on the caps-self control plane (enabled via selfmanaged-workload-cluster.yaml).
+#
+# This is the 1.36 twin of slurm-bridge-gang-job.yaml (which uses the coscheduling
+# PodGroup scheduling.x-k8s.io/v1alpha1). Expect: ONE Slurm job, NumNodes=2, both
+# busybox pods on the 2 compute nodes, same slurm-jobid.
+#   kubectl apply -f podgroup136-test.yaml   (via the caps-self kubeconfig)
+---
+apiVersion: scheduling.k8s.io/v1alpha2
+kind: Workload
+metadata:
+  name: pg136-test
+  namespace: slurm-bridge
+  annotations:
+    slurmjob.slinky.slurm.net/job-name: pg136-test
+    slurmjob.slinky.slurm.net/timelimit: "5"
+spec:
+  controllerRef:
+    apiGroup: batch
+    kind: Job
+    name: pg136-test
+  podGroupTemplates:
+    - name: gang
+      schedulingPolicy:
+        gang:
+          minCount: 2
+---
+apiVersion: scheduling.k8s.io/v1alpha2
+kind: PodGroup
+metadata:
+  name: pg136-test-gang
+  namespace: slurm-bridge
+spec:
+  podGroupTemplateRef:
+    workload:
+      workloadName: pg136-test
+      podGroupTemplateName: gang
+  schedulingPolicy:
+    gang:
+      minCount: 2
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pg136-test
+  namespace: slurm-bridge
+spec:
+  completions: 2
+  parallelism: 2
+  completionMode: Indexed
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      # In-tree PodGroup opt-in (the 1.36 form).
+      schedulerName: slurm-bridge-scheduler
+      schedulingGroup:
+        podGroupName: pg136-test-gang
+      nodeSelector:
+        slinky.slurm.net/node-type: compute
+      tolerations:
+        - { key: slinky.slurm.net/compute, effect: NoSchedule, operator: Exists }
+        - { key: slinky.slurm.net/managed-node, effect: NoExecute, operator: Exists }
+      containers:
+        - name: g
+          image: busybox:stable
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "[pg136] host=$(hostname) idx=${JOB_COMPLETION_INDEX} start=$(date -u)"
+              sleep 30
+              echo "[pg136] done"
+          resources:
+            requests: { cpu: "1", memory: 64Mi }
+            limits: { cpu: "1", memory: 64Mi }

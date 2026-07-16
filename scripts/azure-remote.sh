@@ -25,7 +25,7 @@
 #   azure-remote.sh apply-selfmanaged    sync, then apply the self-managed manifest
 #   azure-remote.sh delete-selfmanaged   delete the self-managed cluster CRs
 #   azure-remote.sh addons               install Day-2 addons (cloud-provider-azure + Calico)
-#   azure-remote.sh bridge-experiment [all|install|demo|teardown]  CPU-only slurm-bridge demo
+#   azure-remote.sh bridge-experiment [all|install|demo|gang|gang136|teardown]  slurm-bridge demo (CPU + gang; gang136 = in-tree PodGroup 1.36)
 #   azure-remote.sh watch                list CAPI/CAPZ workload-cluster CRs
 #   azure-remote.sh describe             clusterctl describe cluster caps-self
 set -euo pipefail
