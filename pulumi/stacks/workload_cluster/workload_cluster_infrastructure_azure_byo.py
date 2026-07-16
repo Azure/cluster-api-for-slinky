@@ -320,13 +320,76 @@ def _node_registration(*, node_type: str | None = None) -> dict[str, object]:
     }
 
 
+def _ssh_users(
+    *,
+    ssh_username: str,
+    ssh_authorized_keys: tuple[str, ...],
+) -> list[dict[str, object]]:
+    if not ssh_authorized_keys:
+        return []
+    return [
+        {
+            "name": ssh_username,
+            "sshAuthorizedKeys": list(ssh_authorized_keys),
+        }
+    ]
+
+
 def _kubeadm_control_plane_spec(
     *,
     node: AzureBYONodePoolSpec,
     cluster_name: str,
     control_plane_name: str,
     kubernetes_version: str,
+    ssh_username: str = "capi",
+    ssh_authorized_keys: tuple[str, ...] = (),
 ) -> dict[str, object]:
+    kubeadm_config_spec: dict[str, object] = {
+        "clusterConfiguration": {
+            "controllerManager": {
+                "extraArgs": {
+                    "allocate-node-cidrs": "false",
+                    "cloud-provider": "external",
+                    "cluster-name": cluster_name,
+                }
+            }
+        },
+        "files": [
+            _cloud_config_file(
+                secret_name=f"{control_plane_name}-azure-json",
+                key="control-plane-azure.json",
+            )
+        ],
+        "initConfiguration": {
+            "nodeRegistration": _node_registration(node_type=node.node_type)
+        },
+        "joinConfiguration": {
+            "nodeRegistration": _node_registration(node_type=node.node_type)
+        },
+        "preKubeadmCommands": [
+            (
+                "if [ -f /tmp/kubeadm.yaml ] || "
+                "[ -f /run/kubeadm/kubeadm.yaml ]; then "
+                f"echo '127.0.0.1 apiserver.{cluster_name}.capz.io apiserver' "
+                ">> /etc/hosts; fi"
+            )
+        ],
+        "postKubeadmCommands": [
+            (
+                "if [ -f /tmp/kubeadm-join-config.yaml ] || "
+                "[ -f /run/kubeadm/kubeadm-join-config.yaml ]; then "
+                f"echo '127.0.0.1 apiserver.{cluster_name}.capz.io apiserver' "
+                ">> /etc/hosts; fi"
+            )
+        ],
+    }
+    ssh_users = _ssh_users(
+        ssh_username=ssh_username,
+        ssh_authorized_keys=ssh_authorized_keys,
+    )
+    if ssh_users:
+        kubeadm_config_spec["users"] = ssh_users
+
     return {
         "replicas": node.replicas,
         "version": kubernetes_version,
@@ -337,45 +400,7 @@ def _kubeadm_control_plane_spec(
                 control_plane_name,
             ),
         },
-        "kubeadmConfigSpec": {
-            "clusterConfiguration": {
-                "controllerManager": {
-                    "extraArgs": {
-                        "allocate-node-cidrs": "false",
-                        "cloud-provider": "external",
-                        "cluster-name": cluster_name,
-                    }
-                }
-            },
-            "files": [
-                _cloud_config_file(
-                    secret_name=f"{control_plane_name}-azure-json",
-                    key="control-plane-azure.json",
-                )
-            ],
-            "initConfiguration": {
-                "nodeRegistration": _node_registration(node_type=node.node_type)
-            },
-            "joinConfiguration": {
-                "nodeRegistration": _node_registration(node_type=node.node_type)
-            },
-            "preKubeadmCommands": [
-                (
-                    "if [ -f /tmp/kubeadm.yaml ] || "
-                    "[ -f /run/kubeadm/kubeadm.yaml ]; then "
-                    f"echo '127.0.0.1 apiserver.{cluster_name}.capz.io apiserver' "
-                    ">> /etc/hosts; fi"
-                )
-            ],
-            "postKubeadmCommands": [
-                (
-                    "if [ -f /tmp/kubeadm-join-config.yaml ] || "
-                    "[ -f /run/kubeadm/kubeadm-join-config.yaml ]; then "
-                    f"echo '127.0.0.1 apiserver.{cluster_name}.capz.io apiserver' "
-                    ">> /etc/hosts; fi"
-                )
-            ],
-        },
+        "kubeadmConfigSpec": kubeadm_config_spec,
     }
 
 
@@ -429,20 +454,30 @@ def _kubeadm_config_template_spec(
     *,
     node: AzureBYONodePoolSpec,
     worker_name: str,
+    ssh_username: str = "capi",
+    ssh_authorized_keys: tuple[str, ...] = (),
 ) -> dict[str, object]:
+    template_spec: dict[str, object] = {
+        "files": [
+            _cloud_config_file(
+                secret_name=f"{worker_name}-azure-json",
+                key="worker-node-azure.json",
+            )
+        ],
+        "joinConfiguration": {
+            "nodeRegistration": _node_registration(node_type=node.node_type)
+        },
+    }
+    ssh_users = _ssh_users(
+        ssh_username=ssh_username,
+        ssh_authorized_keys=ssh_authorized_keys,
+    )
+    if ssh_users:
+        template_spec["users"] = ssh_users
+
     return {
         "template": {
-            "spec": {
-                "files": [
-                    _cloud_config_file(
-                        secret_name=f"{worker_name}-azure-json",
-                        key="worker-node-azure.json",
-                    )
-                ],
-                "joinConfiguration": {
-                    "nodeRegistration": _node_registration(node_type=node.node_type)
-                },
-            }
+            "spec": template_spec,
         }
     }
 
@@ -529,6 +564,8 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         additional_tags: Mapping[str, str],
         byo_subnet: AzureBYOSubnet | None = None,
         kubernetes_version: str,
+        ssh_username: str = "capi",
+        ssh_authorized_keys: tuple[str, ...] = (),
         node_pools: tuple[AzureBYONodePoolSpec, ...],
         provider: k8s.Provider | None = None,
         opts: pulumi.ResourceOptions | None = None,
@@ -698,6 +735,8 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 cluster_name=cluster_name,
                 control_plane_name=control_plane_name,
                 kubernetes_version=kubernetes_version,
+                ssh_username=ssh_username,
+                ssh_authorized_keys=ssh_authorized_keys,
             ),
             opts=child_options(
                 depends_on=[
@@ -761,6 +800,8 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 spec=_kubeadm_config_template_spec(
                     node=worker_node,
                     worker_name=worker_name,
+                    ssh_username=ssh_username,
+                    ssh_authorized_keys=ssh_authorized_keys,
                 ),
                 opts=child_options(
                     depends_on=[cluster, azure_cluster_ready],

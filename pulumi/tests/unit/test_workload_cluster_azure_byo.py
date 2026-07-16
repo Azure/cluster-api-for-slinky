@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 
 from localenv import AzureHostNetwork, AzureResourcePlacement
@@ -134,6 +136,29 @@ def test_azure_byo_config_serializes_auto_discovered_vnet_option() -> None:
     )
 
     assert config.to_config()["parameters"]["useAutoDiscoveredVnet"] is True
+
+
+def test_azure_byo_config_serializes_ssh_authorized_keys() -> None:
+    config = AzureBYOWorkloadClusterConfig(
+        parameters=AzureBYOWorkloadSpec.model_validate(
+            {
+                "subscriptionId": _SUBSCRIPTION_ID,
+                "location": "westus2",
+                "sshUsername": "debugger",
+                "sshAuthorizedKeys": (
+                    "ssh-rsa AAAAfirst first@example.invalid",
+                    "ssh-ed25519 AAAAsecond second@example.invalid",
+                ),
+            }
+        )
+    )
+    parameters = cast(dict[str, Any], config.to_config()["parameters"])
+
+    assert parameters["sshUsername"] == "debugger"
+    assert parameters["sshAuthorizedKeys"] == [
+                "ssh-rsa AAAAfirst first@example.invalid",
+                "ssh-ed25519 AAAAsecond second@example.invalid",
+    ]
 
 
 def test_azure_byo_config_serializes_explicit_vnet_and_subnet() -> None:
@@ -636,6 +661,31 @@ def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
     ][0]
 
 
+def test_kubeadm_control_plane_adds_ssh_authorized_keys() -> None:
+    keys = (
+        "ssh-rsa AAAAfirst first@example.invalid",
+        "ssh-ed25519 AAAAsecond second@example.invalid",
+    )
+
+    spec = _kubeadm_control_plane_spec(
+        node=_controller_node(),
+        cluster_name="caps-self",
+        control_plane_name="caps-self-control-plane",
+        kubernetes_version="v1.36.1",
+        ssh_username="debugger",
+        ssh_authorized_keys=keys,
+    )
+
+    kubeadm_config_spec = cast(dict[str, Any], spec["kubeadmConfigSpec"])
+
+    assert kubeadm_config_spec["users"] == [
+        {
+            "name": "debugger",
+            "sshAuthorizedKeys": list(keys),
+        }
+    ]
+
+
 def test_compute_machine_deployment_references_flex_worker_templates() -> None:
     spec = _machine_deployment_spec(
         node=_compute_node(),
@@ -669,9 +719,14 @@ def test_worker_kubeadm_template_mounts_azure_config_and_labels_node() -> None:
     spec = _kubeadm_config_template_spec(
         node=_compute_node(),
         worker_name="caps-self-compute",
+        ssh_username="debugger",
+        ssh_authorized_keys=(
+            "ssh-rsa AAAAfirst first@example.invalid",
+            "ssh-ed25519 AAAAsecond second@example.invalid",
+        ),
     )
 
-    template = spec["template"]["spec"]
+    template = cast(dict[str, Any], cast(dict[str, Any], spec["template"])["spec"])
     assert template["files"][0]["contentFrom"]["secret"] == {
         "name": "caps-self-compute-azure-json",
         "key": "worker-node-azure.json",
@@ -680,3 +735,12 @@ def test_worker_kubeadm_template_mounts_azure_config_and_labels_node() -> None:
         "cloud-provider": "external",
         "node-labels": "slinky.slurm.net/node-type=compute",
     }
+    assert template["users"] == [
+        {
+            "name": "debugger",
+            "sshAuthorizedKeys": [
+                "ssh-rsa AAAAfirst first@example.invalid",
+                "ssh-ed25519 AAAAsecond second@example.invalid",
+            ],
+        }
+    ]
