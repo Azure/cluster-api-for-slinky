@@ -39,6 +39,7 @@ _CLUSTER_CLASS = "azure-byo"
 _DEFAULT_KUBERNETES_VERSION = "v1.36.1"
 _DEFAULT_CONTROL_PLANE_VM_SIZE = "Standard_D2as_v5"
 _DEFAULT_WORKER_VM_SIZE = "Standard_D2as_v5"
+_DEFAULT_SSH_USERNAME = "capi"
 _CONTROLLER_NODE_TYPE = "controller"
 _COMPUTE_NODE_TYPE = "compute"
 
@@ -83,6 +84,8 @@ class AzureBYOWorkloadSpec(PulumiConfigModel):
     control_plane_vm_size: NonEmptyStr = _DEFAULT_CONTROL_PLANE_VM_SIZE
     worker_vm_size: NonEmptyStr = _DEFAULT_WORKER_VM_SIZE
     worker_replicas: StrictPositiveInt = 1
+    ssh_username: NonEmptyStr = _DEFAULT_SSH_USERNAME
+    ssh_authorized_keys: tuple[NonEmptyStr, ...] = ()
     vnet: AzureBYOVNetConfig | None = None
     use_auto_discovered_vnet: StrictBool | None = None
 
@@ -276,6 +279,8 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             additional_tags=parameters.additional_tags,
             byo_subnet=byo_subnet,
             kubernetes_version=parameters.kubernetes_version,
+            ssh_username=parameters.ssh_username,
+            ssh_authorized_keys=parameters.ssh_authorized_keys,
             node_pools=node_pools,
             opts=pulumi.ResourceOptions(parent=self),
         )
