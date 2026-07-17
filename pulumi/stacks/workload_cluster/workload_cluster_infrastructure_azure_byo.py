@@ -561,6 +561,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         identity_name: pulumi.Input[str],
         identity_namespace: pulumi.Input[str],
         location: str,
+        resource_group_name: str | None = None,
         additional_tags: Mapping[str, str],
         byo_subnet: AzureBYOSubnet | None = None,
         kubernetes_version: str,
@@ -592,24 +593,41 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             use_msi=True,
             opts=pulumi.ResourceOptions(parent=self),
         )
-        resource_group = azure_native.resources.ResourceGroup(
-            "resource-group",
-            _resource_group_args(
-                instance=instance,
-                location=location,
-                additional_tags=additional_tags,
-            ),
-            opts=pulumi.ResourceOptions(
-                parent=self,
-                provider=azure_provider,
-            ),
-        )
+        if resource_group_name is None:
+            resource_group_resource = azure_native.resources.ResourceGroup(
+                "resource-group",
+                _resource_group_args(
+                    instance=instance,
+                    location=location,
+                    additional_tags=additional_tags,
+                ),
+                opts=pulumi.ResourceOptions(
+                    parent=self,
+                    provider=azure_provider,
+                ),
+            )
+            resource_group_name_output = resource_group_resource.name
+            resource_group_id = resource_group_resource.id
+            resource_group_dependencies: list[pulumi.Input[pulumi.Resource]] = [
+                resource_group_resource
+            ]
+        else:
+            existing_resource_group = azure_native.resources.get_resource_group_output(
+                resource_group_name=resource_group_name,
+                opts=pulumi.InvokeOutputOptions(
+                    parent=self,
+                    provider=azure_provider,
+                ),
+            )
+            resource_group_name_output = existing_resource_group.name
+            resource_group_id = existing_resource_group.id
+            resource_group_dependencies = []
         flex = azure_native.compute.VirtualMachineScaleSet(
             "vmss-flex",
             _vmss_flex_args(
                 instance=instance,
                 location=location,
-                resource_group=resource_group.name,
+                resource_group=resource_group_name_output,
                 additional_tags=additional_tags,
             ),
             opts=pulumi.ResourceOptions(
@@ -672,12 +690,15 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 identity_name=identity_name,
                 identity_namespace=identity_namespace,
                 location=location,
-                resource_group=resource_group.name,
+                resource_group=resource_group_name_output,
                 subscription_id=subscription_id,
                 subnet=byo_subnet,
                 additional_tags=additional_tags,
             ),
-            opts=child_options(depends_on=[resource_group], capi_lifecycle=True),
+            opts=child_options(
+                depends_on=resource_group_dependencies,
+                capi_lifecycle=True,
+            ),
         )
         cluster = k8s.apiextensions.CustomResource(
             "cluster",
@@ -951,8 +972,8 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             )
         ]
 
-        self.resource_group_id = resource_group.id
-        self.resource_group_name = resource_group.name
+        self.resource_group_id = resource_group_id
+        self.resource_group_name = resource_group_name_output
         self.vmss_flex_id = flex.id
         self.vmss_flex_name = flex.name
         self.byo_subnet = byo_subnet

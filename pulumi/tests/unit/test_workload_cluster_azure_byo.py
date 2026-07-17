@@ -16,6 +16,7 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     _default_node_pools,
     _explicit_byo_subnet,
     _resolve_byo_subnet,
+    _resolve_resource_group,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _CONTROL_PLANE_READY_API_VERSION,
@@ -136,6 +137,66 @@ def test_azure_byo_config_serializes_auto_discovered_vnet_option() -> None:
     )
 
     assert config.to_config()["parameters"]["useAutoDiscoveredVnet"] is True
+
+
+def test_azure_byo_config_serializes_discovered_resource_group_option() -> None:
+    config = AzureBYOWorkloadClusterConfig(
+        parameters=AzureBYOWorkloadSpec.model_validate(
+            {
+                "subscriptionId": _SUBSCRIPTION_ID,
+                "location": "westus2",
+                "useDiscoveredResourceGroup": True,
+            }
+        )
+    )
+    parameters = cast(dict[str, Any], config.to_config()["parameters"])
+
+    assert parameters["useDiscoveredResourceGroup"] is True
+
+
+def test_resolve_resource_group_owns_new_group_by_default() -> None:
+    parameters = AzureBYOWorkloadSpec.model_validate(
+        {"subscriptionId": _SUBSCRIPTION_ID, "location": "westus2"}
+    )
+
+    assert _resolve_resource_group(parameters) is None
+
+
+def test_resolve_resource_group_uses_discovered_host_group() -> None:
+    parameters = AzureBYOWorkloadSpec.model_validate(
+        {
+            "subscriptionId": _SUBSCRIPTION_ID,
+            "location": "westus2",
+            "useDiscoveredResourceGroup": True,
+        }
+    )
+
+    assert _resolve_resource_group(parameters) == "host-rg"
+
+
+def test_resolve_resource_group_rejects_subscription_mismatch() -> None:
+    parameters = AzureBYOWorkloadSpec.model_validate(
+        {
+            "subscriptionId": _OTHER_SUBSCRIPTION_ID,
+            "location": "westus2",
+            "useDiscoveredResourceGroup": True,
+        }
+    )
+
+    with pytest.raises(ValueError, match="subscription"):
+        _resolve_resource_group(parameters)
+
+
+def test_resolve_resource_group_allows_location_mismatch() -> None:
+    parameters = AzureBYOWorkloadSpec.model_validate(
+        {
+            "subscriptionId": _SUBSCRIPTION_ID,
+            "location": "eastus",
+            "useDiscoveredResourceGroup": True,
+        }
+    )
+
+    assert _resolve_resource_group(parameters) == "host-rg"
 
 
 def test_azure_byo_config_serializes_ssh_authorized_keys() -> None:

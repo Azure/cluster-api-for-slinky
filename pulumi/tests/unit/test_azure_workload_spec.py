@@ -13,6 +13,7 @@ from stacks.workload_cluster.workload_cluster_class_aks import (
     _DEFAULT_AKS_KUBERNETES_VERSION,
     _DEFAULT_AKS_NODE_COUNT,
     _DEFAULT_AKS_NODE_SKU,
+    _resolve_resource_group,
 )
 from stacks.workload_cluster.tenants import TenantsConfig
 
@@ -81,6 +82,59 @@ def test_build_and_parse_round_trip_defaults() -> None:
             node_count=_DEFAULT_AKS_NODE_COUNT,
         ),
     )
+
+
+def test_build_serializes_discovered_resource_group_option() -> None:
+    built = _child_config(
+        AzureWorkloadSpec(
+            location=_LOCATION,
+            resource_group="explicit-rg",
+            use_discovered_resource_group=True,
+        )
+    )
+
+    assert _parameters(built)["useDiscoveredResourceGroup"] is True  # type: ignore[index]
+
+
+def test_resolve_resource_group_uses_explicit_group_by_default() -> None:
+    parameters = AzureWorkloadSpec(
+        location=_LOCATION,
+        resource_group="explicit-rg",
+    )
+
+    assert _resolve_resource_group(parameters) == "explicit-rg"
+
+
+def test_resolve_resource_group_uses_discovered_host_group() -> None:
+    parameters = AzureWorkloadSpec(
+        location=_LOCATION,
+        resource_group="explicit-rg",
+        use_discovered_resource_group=True,
+    )
+
+    assert _resolve_resource_group(parameters) == _RESOURCE_GROUP
+
+
+def test_resolve_resource_group_rejects_subscription_mismatch() -> None:
+    parameters = AzureWorkloadSpec(
+        subscription_id="55555555-5555-5555-5555-555555555555",
+        location=_LOCATION,
+        resource_group="explicit-rg",
+        use_discovered_resource_group=True,
+    )
+
+    with pytest.raises(ValueError, match="subscription"):
+        _resolve_resource_group(parameters)
+
+
+def test_resolve_resource_group_allows_location_mismatch() -> None:
+    parameters = AzureWorkloadSpec(
+        location="eastus",
+        resource_group="explicit-rg",
+        use_discovered_resource_group=True,
+    )
+
+    assert _resolve_resource_group(parameters) == _RESOURCE_GROUP
 
 
 def test_build_omits_aks_block_when_no_overrides() -> None:

@@ -6,7 +6,7 @@ from typing import Any, Literal, Mapping
 from uuid import UUID
 
 import pulumi
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_serializer
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from localenv import discover_azure_resource_placement
@@ -67,6 +67,7 @@ class AzureWorkloadSpec(PulumiConfigModel):
             discover_azure_resource_placement(raise_on_missing=True).resource_group
         )
     )
+    use_discovered_resource_group: StrictBool = False
     additional_tags: Mapping[NonEmptyStr, str] = Field(default_factory=dict)
     aks: AKSWorkloadSizingConfig = AKSWorkloadSizingConfig()
 
@@ -80,6 +81,19 @@ class AzureWorkloadSpec(PulumiConfigModel):
         additional_tags: Mapping[NonEmptyStr, str],
     ) -> dict[str, str]:
         return dict(additional_tags)
+
+
+def _resolve_resource_group(parameters: AzureWorkloadSpec) -> str:
+    if not parameters.use_discovered_resource_group:
+        return parameters.resource_group
+
+    placement = discover_azure_resource_placement(raise_on_missing=True)
+    if placement.subscription_id.casefold() != str(parameters.subscription_id).casefold():
+        raise ValueError(
+            "auto-discovered resource group subscription does not match "
+            "AKS subscriptionId"
+        )
+    return placement.resource_group
 
 
 class AKSWorkloadClusterConfig(PulumiConfigModel):
@@ -168,7 +182,7 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
         if identity_namespace is None:
             raise ValueError("aks workload cluster class requires identity_namespace")
         location = workload_spec.location
-        resource_group = workload_spec.resource_group
+        resource_group = _resolve_resource_group(workload_spec)
 
         def child_options(
             *,

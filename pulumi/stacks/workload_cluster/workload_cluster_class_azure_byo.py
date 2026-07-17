@@ -88,6 +88,7 @@ class AzureBYOWorkloadSpec(PulumiConfigModel):
     ssh_authorized_keys: tuple[NonEmptyStr, ...] = ()
     vnet: AzureBYOVNetConfig | None = None
     use_auto_discovered_vnet: StrictBool | None = None
+    use_discovered_resource_group: StrictBool = False
 
     @field_serializer("subscription_id")
     def serialize_subscription_id(self, value: UUID) -> str:
@@ -219,6 +220,19 @@ def _resolve_byo_subnet(parameters: AzureBYOWorkloadSpec) -> AzureBYOSubnet | No
     return AzureBYOSubnet.from_host_network(network)
 
 
+def _resolve_resource_group(parameters: AzureBYOWorkloadSpec) -> str | None:
+    if not parameters.use_discovered_resource_group:
+        return None
+
+    placement = discover_azure_resource_placement(raise_on_missing=True)
+    if placement.subscription_id.casefold() != str(parameters.subscription_id).casefold():
+        raise ValueError(
+            "auto-discovered resource group subscription does not match "
+            "azure-byo subscriptionId"
+        )
+    return placement.resource_group
+
+
 class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
     """Azure BYO class whose first increment owns the Flex placement VMSS."""
 
@@ -266,6 +280,7 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
         parameters = config.parameters
         node_pools = node_pools or _default_node_pools(parameters)
         byo_subnet = _resolve_byo_subnet(parameters)
+        resource_group_name = _resolve_resource_group(parameters)
         infrastructure = AzureBYOWorkloadClusterInfrastructure(
             "infrastructure",
             instance=instance,
@@ -276,6 +291,7 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             identity_name=identity_name,
             identity_namespace=identity_namespace,
             location=parameters.location,
+            resource_group_name=resource_group_name,
             additional_tags=parameters.additional_tags,
             byo_subnet=byo_subnet,
             kubernetes_version=parameters.kubernetes_version,
