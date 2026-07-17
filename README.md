@@ -222,11 +222,26 @@ Run the manual demand generator through the login pod:
 
 ```bash
 kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm cp scripts/sleep-exclusive.slurm "$LOGIN_POD:/root/sleep-exclusive.slurm"
-kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm cp scripts/slurm_load_generator.sh "$LOGIN_POD:/root/slurm_load_generator.sh"
-kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec "$LOGIN_POD" -- chmod +x /root/slurm_load_generator.sh
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm cp scripts/slurm_load_generator.py "$LOGIN_POD:/root/slurm_load_generator.py"
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec "$LOGIN_POD" -- chmod +x /root/slurm_load_generator.py
 LOAD_PID=$(kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec "$LOGIN_POD" -- \
-  sh -lc 'nohup env MIN_RATE=8 MAX_RATE=8 RATE_ADJUST_INTERVAL_MINUTES=1 JOB_SCRIPT=/root/sleep-exclusive.slurm /root/slurm_load_generator.sh >/root/slurm_load_generator.log 2>&1 & echo $!')
+  sh -lc 'nohup /root/slurm_load_generator.py --profile azure --job-script /root/sleep-exclusive.slurm >/root/slurm_load_generator.log 2>&1 & echo $!')
 ```
+
+`--profile` provides environment-specific defaults:
+
+- `local`: `MIN_RATE=1`, `MAX_RATE=5`, `CYCLE_MINUTES=16`.
+- `azure` or `cloud`: `MIN_RATE=0.25`, `MAX_RATE=4`, `CYCLE_MINUTES=120`.
+
+`MIN_RATE` and `MAX_RATE` are jobs per minute and can be fractional. CLI flags
+such as `--min-rate`, `--max-rate`, and `--cycle-minutes` override environment
+variables, and environment variables such as `LOAD_PROFILE` and `MIN_RATE`
+override profile defaults.
+
+The generator projects angular phase through a sinusoidal wave and
+integrates that instantaneous jobs-per-minute frequency every logical second.
+Use `--tick-seconds` to change the integration interval and `--minute-seconds`
+to accelerate wall-clock time without changing the logical load profile.
 
 Watch Slurm nodes come and go:
 
