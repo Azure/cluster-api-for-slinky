@@ -104,9 +104,47 @@ mariadb:
   nodeSelector:
     kubernetes.io/os: linux
 
+# Slurm LoginSet (sackd + sshd + sssd) — the job-submission "login node". Enabled
+# so benchmark jobs are submitted via `sbatch` FROM the login pod (Slurm-native),
+# instead of orchestrating salloc from the mgmt VM. The pipeline submits by
+# `kubectl exec`-ing into this pod (no SSH key management needed); set
+# `rootSshAuthorizedKeys` (helm --set-file) only if interactive SSH is wanted.
+# Pinned to the dedicated controller node (like slurmctld/restapi) so it stays off
+# the tainted GPU/IB compute nodes and the k8s control-plane node.
 loginsets:
   slinky:
-    enabled: false
+    enabled: true
+    initconf:
+      image:
+        repository: public.ecr.aws/docker/library/alpine
+        tag: "3.21"
+    # Minimal SSSD (LOCAL files provider, no external directory) so the login pod
+    # starts without a corp auth backend; root/slurm are filtered out of NSS.
+    sssdConf: |
+      [sssd]
+      config_file_version = 2
+      services = nss,pam
+      domains = LOCAL
+
+      [nss]
+      filter_groups = root,slurm
+      filter_users = root,slurm
+
+      [pam]
+
+      [domain/LOCAL]
+      id_provider = files
+      auth_provider = none
+    podSpec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: "slinky.slurm.net/node-type"
+                    operator: In
+                    values:
+                      - "controller"
 
 nodesets:
   slinky:
