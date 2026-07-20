@@ -20,6 +20,12 @@
 # Env (injected via sbatch --export by queue-nccl-slurm.sh):
 #   NUM_NODES SHARP NODES_LIST LOCAL TEST SKU DEVICES BENCHMARK_TARGET
 
+# The in-container slurmd runs Slurm jobs as ROOT; Open MPI refuses to run as root
+# without explicit opt-in. (The host-launch path runs as the non-root `capi` user on
+# the worker host, so run-nccl-host.sh does not need this.)
+export OMPI_ALLOW_RUN_AS_ROOT=1
+export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+
 # 1. Load HPC-X (provides mpirun). hpc-image-val2 VMs have Lmod; caps-self slurmd
 #    has no module system but bind-mounts /opt/hpcx.
 if command -v module >/dev/null 2>&1 && module load mpi/hpcx 2>/dev/null; then
@@ -50,6 +56,21 @@ if [ $LOCAL -eq "1" ]; then
 	LOCAL_ARGS="-x NCCL_P2P_DISABLE=1 -x NCCL_SHM_DISABLE=1"
 	MSG_START="4G"
 	MSG_END="4G"
+fi
+
+# Transport-aware NCCL data-path args (mirrors run-nccl-host.sh). NCCL uses its own
+# IB verbs (NCCL_IB_HCA) independent of UCX; UCX_TLS selects the mode. Default is IB
+# (rc): the in-container slurmd pod has /dev/infiniband + the NCCL IB plugin
+# (/usr/local/nccl-rdma-sharp-plugins), so cross-node RDMA works in-container. Set
+# UCX_TLS=tcp for the Ethernet fallback. Only the ND40rs_v2 branch consumes these.
+UCX_TLS="${UCX_TLS:-rc,sm,self}"
+UCX_NET_DEVICES="${UCX_NET_DEVICES:-mlx5_ib0:1}"
+if [[ "$UCX_TLS" == *rc* ]]; then
+    NCCL_NET_ARGS="-x NCCL_IB_HCA=${NCCL_IB_HCA:-mlx5_ib0} -x NCCL_IB_PCI_RELAXED_ORDERING=1 -x NCCL_SOCKET_IFNAME=eth0"
+    echo "# transport: InfiniBand (NCCL_IB_HCA=${NCCL_IB_HCA:-mlx5_ib0}, UCX_TLS=$UCX_TLS)"
+else
+    NCCL_NET_ARGS="-x NCCL_IB_DISABLE=1 -x NCCL_SOCKET_IFNAME=eth0"
+    echo "# transport: TCP (NCCL_IB_DISABLE=1)"
 fi
 
 case ${TEST} in
@@ -200,22 +221,26 @@ case ${SKU} in
             /opt/nccl-tests/build/${TEST} -b 1K -e 4G -f 2 -g 1 -n 50
 	;;
     "Standard_ND40rs_v2")
-        # 8x V100 + 100Gb EDR IB. TCP by design: this in-container sbatch model is
-        # the TCP path (UCX_TLS=tcp, NCCL over sockets). Cross-node RDMA on caps-self
-        # is PROVEN only via the HOST-LAUNCH path — use
-        # scripts/nccl-slurm/run-nccl-host.sh (UCX_TLS=rc,sm,self,
-        # NCCL_IB_HCA=mlx5_ib0) for InfiniBand.
+        # 8x V100 + 100Gb EDR InfiniBand. Transport chosen by UCX_TLS (default
+        # rc,sm,self => IB; set UCX_TLS=tcp for the Ethernet fallback). In-container
+        # RDMA works on caps-self: the slurmd pod has /dev/infiniband + the NCCL IB
+        # plugin. -b 1K -e 4G with -c 1: V100 has 32GB HBM so larger buffers OOM with
+        # correctness on. Matches run-nccl-host.sh tuning so telemetry stays consistent.
         echo "# SKU: ${SKU}"
         mpirun \
             -np $(( $NUM_NODES * $DEVICES )) \
             -hostfile ${NODEFILE} \
             --map-by ppr:$DEVICES:node \
+            --bind-to numa \
+            --timeout 1800 \
             -x LD_LIBRARY_PATH=/usr/local/nccl-rdma-sharp-plugins/lib:$LD_LIBRARY_PATH \
             -mca coll_hcoll_enable 0 \
-            -x UCX_TLS=tcp \
+            -x UCX_TLS="$UCX_TLS" \
+            -x UCX_NET_DEVICES="$UCX_NET_DEVICES" \
             -x CUDA_DEVICE_ORDER=PCI_BUS_ID \
-            -x NCCL_SOCKET_IFNAME=eth0 \
-            /opt/nccl-tests/build/${TEST} -b 1K -e 4G -f 2 -g 1 -n 50
+            -x NCCL_DEBUG=WARN \
+            ${NCCL_NET_ARGS} ${SHARP_ARGS} ${LOCAL_ARGS} \
+            /opt/nccl-tests/build/${TEST} -b 1K -e 4G -f 2 -g 1 -c 1 -n 50
     ;;
     "Standard_NC256lds_xl_RTXPRO6000BSE_v6")
         echo "# SKU: ${SKU}"

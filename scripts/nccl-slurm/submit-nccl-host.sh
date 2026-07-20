@@ -23,8 +23,9 @@
 #
 # INGESTION: each run's raw stdout is tee'd (by slurm-host-mpi.sh via OUT_FILE) to
 #   ~/nccl_benchmarks_raw/<logdir>/<jobname>.o<allocjobid>
-# reproducing the PBS filename convention, so process_nccl.sh / tokustocluster.py
-# consume it unchanged — identical to the sbatch path's --output=%x.o%j trick.
+# reproducing the PBS filename convention, so process-nccl-slurm.sh (the CAPS port
+# of process_nccl.sh + the NCCL telemetry builder) consumes it unchanged. Pass
+# COLLECT=1 to run that collector automatically after the sweep.
 #
 # Usage (run ON the CAPZ mgmt VM, same context as slurm-host-mpi.sh):
 #   bash scripts/azure-remote.sh ssh \
@@ -34,6 +35,9 @@
 #   UCX_TLS=rc,sm,self         IB by default; set tcp for the Ethernet fallback.
 #   UCX_NET_DEVICES=mlx5_ib0:1 HCA (IB) or eth0 (TCP).
 #   HOST_MPI=<path>            override the slurm-host-mpi.sh path.
+#   COLLECT=1                  after the sweep, format results for the dashboard via
+#                              process-nccl-slurm.sh (busbw pairs + tokustocluster JSON).
+#                              UPLOAD=1 + KUSTO_* env additionally ingest to Kusto.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -92,6 +96,14 @@ echo "##[endgroup]"
 
 echo "##[section]NCCL host-launch summary"
 for r in "${results[@]}"; do echo "  ${r}"; done
+
+# Opt-in: collect + format the raw output for the validation dashboard. Runs
+# regardless of pass/fail (partial results still help debugging). The benchmark
+# pass/fail gate below stays authoritative; a collector hiccup only warns.
+if [ "${COLLECT:-0}" = "1" ]; then
+    SKU="$SKU" bash "$SCRIPT_DIR/process-nccl-slurm.sh" \
+        || echo "##[warning]result collection reported problems (see above)."
+fi
 
 if [ "$overall" -ne 0 ]; then
     echo "##[error]One or more NCCL benchmarks failed."
