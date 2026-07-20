@@ -20,3 +20,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .mypy_cache/
+
+# Runtime artifacts (e.g. slurm_load_generator.log)
+*.log
