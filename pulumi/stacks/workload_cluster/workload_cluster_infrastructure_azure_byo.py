@@ -53,6 +53,27 @@ _AZURE_PROVIDER_ID_PREFIX = "azure://"
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 
+# Azure Security Pack (AzSecPack) auto-config onboarding tag. Corp security policy
+# requires it on publicly-exposed Azure resources (the self-managed manifests set
+# it on every VMSS/VM). Applied whenever the API server is public so the CAPZ-
+# managed public IP and the control-plane/worker VMs carry the required security
+# tag (MDM/MDSD onboarding). TODO(caps): if org policy also mandates it on internal
+# VMs, make it unconditional (the manifests set it always).
+_AZSECPACK_TAG_KEY = "AzSecPackAutoConfigReady"
+_AZSECPACK_TAG_VALUE = "true"
+
+
+def _effective_tags(
+    additional_tags: Mapping[str, str],
+    *,
+    api_server_public: bool,
+) -> dict[str, str]:
+    """Fold the AzSecPack tag into the caller tags when the API server is public."""
+    tags = dict(additional_tags)
+    if api_server_public:
+        tags[_AZSECPACK_TAG_KEY] = _AZSECPACK_TAG_VALUE
+    return tags
+
 
 def _cluster_annotations() -> dict[str, str]:
     return foreground_delete_annotations(
@@ -70,6 +91,34 @@ def _control_plane_ready_annotations() -> dict[str, str]:
     return pulumi_wait_for(_WAIT_FOR_CONTROL_PLANE_INITIALIZED)
 
 
+class AzureBYOMarketplaceImage(PulumiConfigModel):
+    """Azure Marketplace image reference for an Azure BYO node pool.
+
+    When unset, CAPZ boots its default reference Ubuntu image, which has no GPU
+    driver / HPC-X / NCCL / InfiniBand tooling and therefore cannot run the GPU
+    benchmark path. NDV2/V100 requires a V100-compatible image such as the
+    ``microsoft-dsvm`` ``ubuntu-hpc`` ``2404-v100`` SKU (ships HPC-X, OFED,
+    CUDA/NCCL, nccl-tests, /dev/infiniband).
+
+    TODO(caps): do NOT assume a newer GPU image boots on NDV2 -- keep sku/version
+    explicit per target SKU. Newer GPU SKUs (A100/H100) need their own images.
+    """
+
+    publisher: NonEmptyStr
+    offer: NonEmptyStr
+    sku: NonEmptyStr
+    version: NonEmptyStr
+
+    def to_marketplace(self) -> dict[str, str]:
+        """Render the CAPZ ``image.marketplace`` block."""
+        return {
+            "publisher": self.publisher,
+            "offer": self.offer,
+            "sku": self.sku,
+            "version": self.version,
+        }
+
+
 class AzureBYONodePoolSpec(PulumiConfigModel):
     """One self-managed Azure node role rendered through CAPI resources."""
 
@@ -81,6 +130,9 @@ class AzureBYONodePoolSpec(PulumiConfigModel):
     attach_to_flex: StrictBool = False
     failure_domain: NonEmptyStr = _DEFAULT_FLEX_ZONE
     autoscaler_bounds: tuple[StrictPositiveInt, StrictPositiveInt] | None = None
+    # Optional V100-compatible image for the NDV2 GPU/NCCL path; None keeps the
+    # CAPZ default Ubuntu image (CPU-only clusters, e.g. caps-val).
+    image: AzureBYOMarketplaceImage | None = None
 
 
 def _autoscaler_annotations(
@@ -185,6 +237,11 @@ def _resource_group_name(instance: str) -> str:
     return _resource_name(instance, "rg")
 
 
+def _existing_resource_group_id(subscription_id: str, name: str) -> str:
+    """ARM resource id for a resource group created outside Pulumi (Option C)."""
+    return f"/subscriptions/{subscription_id}/resourceGroups/{name}"
+
+
 def _vmss_flex_name(instance: str) -> str:
     return _resource_name(instance, "flex")
 
@@ -231,6 +288,7 @@ def _azure_cluster_spec(
     subscription_id: str,
     subnet: AzureBYOSubnet,
     additional_tags: Mapping[str, str],
+    api_server_public: bool = False,
 ) -> dict[str, object]:
     cluster_subnet: dict[str, object] = {
         "name": subnet.subnet_name,
@@ -245,6 +303,22 @@ def _azure_cluster_spec(
         cluster_subnet["routeTable"] = {"name": route_table_name}
     if nat_gateway_name is not None:
         cluster_subnet["natGateway"] = {"name": nat_gateway_name}
+
+    # Head-node (control-plane) API server exposure. Default = Internal LB reached
+    # via the mgmt VM (the caps-self model). When public, CAPZ fronts the API
+    # server with a public LB + public IP, and CAPZ propagates additionalTags
+    # (including the AzSecPack tag) onto that public IP.
+    if api_server_public:
+        api_server_lb: dict[str, object] = {
+            "name": f"{cluster_name}-public-lb",
+            "type": "Public",
+        }
+    else:
+        api_server_lb = {
+            "name": f"{cluster_name}-internal-lb",
+            "type": "Internal",
+            "availabilityZones": [_DEFAULT_FLEX_ZONE],
+        }
 
     return {
         "identityRef": {
@@ -264,11 +338,7 @@ def _azure_cluster_spec(
                 "resourceGroup": subnet.vnet_resource_group,
             },
             "subnets": [cluster_subnet],
-            "apiServerLB": {
-                "name": f"{cluster_name}-internal-lb",
-                "type": "Internal",
-                "availabilityZones": [_DEFAULT_FLEX_ZONE],
-            },
+            "apiServerLB": api_server_lb,
             "controlPlaneOutboundLB": {"frontendIPsCount": 1},
             "nodeOutboundLB": {"frontendIPsCount": 1},
         },
@@ -296,6 +366,10 @@ def _machine_template_spec(
         "networkInterfaces": [{"subnetName": subnet_name}],
         "additionalTags": dict(additional_tags),
     }
+    if node.image is not None:
+        # NDV2/V100 nodes must boot a V100-compatible image (HPC-X/CUDA/NCCL);
+        # the default CAPZ Ubuntu image has no GPU/IB tooling.
+        spec["image"] = {"marketplace": node.image.to_marketplace()}
     if virtual_machine_scale_set_id is not None:
         spec["virtualMachineScaleSetID"] = virtual_machine_scale_set_id
     return {"template": {"spec": spec}}
@@ -562,6 +636,8 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         identity_namespace: pulumi.Input[str],
         location: str,
         additional_tags: Mapping[str, str],
+        api_server_public: bool = False,
+        existing_resource_group_name: str | None = None,
         byo_subnet: AzureBYOSubnet | None = None,
         kubernetes_version: str,
         ssh_username: str = "capi",
@@ -584,6 +660,12 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "azure-byo requires an explicit or auto-discovered VNet/subnet"
             )
 
+        # A public API server exposes the head node; corp security policy then
+        # requires the AzSecPack onboarding tag on the exposed Azure resources.
+        additional_tags = _effective_tags(
+            additional_tags, api_server_public=api_server_public
+        )
+
         azure_provider = azure_native.Provider(
             "azure-native",
             subscription_id=subscription_id,
@@ -592,18 +674,35 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             use_msi=True,
             opts=pulumi.ResourceOptions(parent=self),
         )
-        resource_group = azure_native.resources.ResourceGroup(
-            "resource-group",
-            _resource_group_args(
-                instance=instance,
-                location=location,
-                additional_tags=additional_tags,
-            ),
-            opts=pulumi.ResourceOptions(
-                parent=self,
-                provider=azure_provider,
-            ),
-        )
+        if existing_resource_group_name is not None:
+            # Reuse a resource group created OUTSIDE Pulumi (e.g. the pipeline's
+            # pre-created, tracked RG). Reference it read-only via .get() so Pulumi
+            # neither creates nor deletes it; child resources still land in it via
+            # resource_group.name. Lets the pipeline own the RG lifecycle
+            # (create-first + `az group delete` cleanup) without fighting Pulumi.
+            resource_group = azure_native.resources.ResourceGroup.get(
+                "resource-group",
+                _existing_resource_group_id(
+                    subscription_id, existing_resource_group_name
+                ),
+                opts=pulumi.ResourceOptions(
+                    parent=self,
+                    provider=azure_provider,
+                ),
+            )
+        else:
+            resource_group = azure_native.resources.ResourceGroup(
+                "resource-group",
+                _resource_group_args(
+                    instance=instance,
+                    location=location,
+                    additional_tags=additional_tags,
+                ),
+                opts=pulumi.ResourceOptions(
+                    parent=self,
+                    provider=azure_provider,
+                ),
+            )
         flex = azure_native.compute.VirtualMachineScaleSet(
             "vmss-flex",
             _vmss_flex_args(
@@ -676,6 +775,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 subscription_id=subscription_id,
                 subnet=byo_subnet,
                 additional_tags=additional_tags,
+                api_server_public=api_server_public,
             ),
             opts=child_options(depends_on=[resource_group], capi_lifecycle=True),
         )

@@ -20,6 +20,7 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _CONTROL_PLANE_READY_API_VERSION,
     _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
+    AzureBYOMarketplaceImage,
     AzureBYONodePoolSpec,
     AzureBYOSubnet,
     _autoscaler_annotations,
@@ -28,6 +29,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _control_plane_ready_annotations,
     _azure_cluster_spec,
     _cluster_spec,
+    _effective_tags,
     _kubeadm_config_template_spec,
     _kubeadm_control_plane_spec,
     _machine_deployment_spec,
@@ -36,6 +38,8 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _resource_name,
     _resource_group_args,
     _resource_group_name,
+    _existing_resource_group_id,
+    _ssh_users,
     _validate_node_pool_names,
     _vmss_flex_args,
     _vmss_flex_name,
@@ -71,6 +75,71 @@ def _compute_node() -> AzureBYONodePoolSpec:
         attach_to_flex=True,
         autoscaler_bounds=(1, 10),
     )
+
+
+def _v100_image() -> AzureBYOMarketplaceImage:
+    return AzureBYOMarketplaceImage(
+        publisher="microsoft-dsvm",
+        offer="ubuntu-hpc",
+        sku="2404-v100",
+        version="24.04.2026052501",
+    )
+
+
+def test_machine_template_spec_renders_marketplace_image_for_gpu_nodes() -> None:
+    node = AzureBYONodePoolSpec(
+        name="compute",
+        node_type="compute",
+        vm_size="Standard_ND40rs_v2",
+        replicas=2,
+        attach_to_flex=True,
+        image=_v100_image(),
+    )
+    spec = _machine_template_spec(
+        node=node,
+        subnet_name="node-subnet",
+        node_identity_provider_id="azure:///subscriptions/x/uami",
+        additional_tags={"Owner": "t-hernandezc"},
+        virtual_machine_scale_set_id="/subscriptions/x/vmss/flex",
+    )
+    template_spec = cast(dict[str, Any], spec["template"])["spec"]
+    assert template_spec["image"] == {
+        "marketplace": {
+            "publisher": "microsoft-dsvm",
+            "offer": "ubuntu-hpc",
+            "sku": "2404-v100",
+            "version": "24.04.2026052501",
+        }
+    }
+    assert template_spec["vmSize"] == "Standard_ND40rs_v2"
+    assert template_spec["virtualMachineScaleSetID"] == "/subscriptions/x/vmss/flex"
+
+
+def test_machine_template_spec_omits_image_when_unset() -> None:
+    spec = _machine_template_spec(
+        node=_compute_node(),
+        subnet_name="node-subnet",
+        node_identity_provider_id="azure:///subscriptions/x/uami",
+        additional_tags={},
+    )
+    template_spec = cast(dict[str, Any], spec["template"])["spec"]
+    assert "image" not in template_spec
+
+
+def test_default_node_pools_applies_worker_image_to_compute_only() -> None:
+    image = _v100_image()
+    parameters = AzureBYOWorkloadSpec(
+        subscription_id=_SUBSCRIPTION_ID,
+        location="southcentralus",
+        worker_vm_size="Standard_ND40rs_v2",
+        worker_replicas=2,
+        worker_image=image,
+    )
+    controller, workers = _partition_node_pools(_default_node_pools(parameters))
+    assert controller.image is None
+    assert len(workers) == 1
+    assert workers[0].image == image
+    assert workers[0].vm_size == "Standard_ND40rs_v2"
 
 
 def test_cluster_lifecycle_annotations_defer_readiness_to_late_patch() -> None:
@@ -404,6 +473,38 @@ def test_resource_group_args_derive_owned_resource_group() -> None:
     assert args.tags == {"Owner": "zheyushen"}
 
 
+def test_existing_resource_group_id_builds_arm_id() -> None:
+    assert _existing_resource_group_id(_SUBSCRIPTION_ID, "caps-infra-rg") == (
+        f"/subscriptions/{_SUBSCRIPTION_ID}/resourceGroups/caps-infra-rg"
+    )
+
+
+def test_azure_byo_config_serializes_existing_resource_group_name() -> None:
+    config = AzureBYOWorkloadClusterConfig(
+        parameters=AzureBYOWorkloadSpec(
+            subscription_id=_SUBSCRIPTION_ID,
+            location="southcentralus",
+            existing_resource_group_name="caps-infra-rg",
+        )
+    )
+
+    assert (
+        config.to_config()["parameters"]["existingResourceGroupName"]
+        == "caps-infra-rg"
+    )
+
+
+def test_azure_byo_config_omits_existing_resource_group_name_by_default() -> None:
+    config = AzureBYOWorkloadClusterConfig(
+        parameters=AzureBYOWorkloadSpec(
+            subscription_id=_SUBSCRIPTION_ID,
+            location="southcentralus",
+        )
+    )
+
+    assert "existingResourceGroupName" not in config.to_config()["parameters"]
+
+
 def test_default_node_pools_match_minimum_cluster_sizing() -> None:
     parameters = AzureBYOWorkloadSpec(
         subscription_id=_SUBSCRIPTION_ID,
@@ -588,6 +689,124 @@ def test_azure_cluster_spec_reuses_cluster_subnet_and_internal_lb() -> None:
         "controlPlaneOutboundLB": {"frontendIPsCount": 1},
         "nodeOutboundLB": {"frontendIPsCount": 1},
     }
+
+
+def test_azure_cluster_spec_exposes_public_api_server_when_requested() -> None:
+    subnet = AzureBYOSubnet(
+        subscription_id=_SUBSCRIPTION_ID,
+        location="westus2",
+        vnet_id="/vnet",
+        vnet_name="host-vnet",
+        vnet_resource_group="network-rg",
+        subnet_id="/vnet/subnets/default",
+        subnet_name="default",
+        network_security_group_id="/networkSecurityGroups/host-nsg",
+        nat_gateway_id="/natGateways/host-nat",
+        route_table_id="/routeTables/host-routes",
+    )
+
+    spec = _azure_cluster_spec(
+        cluster_name="caps-self",
+        identity_name="cluster-identity",
+        identity_namespace="default",
+        location="westus2",
+        resource_group="caps-self-rg",
+        subscription_id=_SUBSCRIPTION_ID,
+        subnet=subnet,
+        additional_tags={"Owner": "zheyushen"},
+        api_server_public=True,
+    )
+
+    network_spec = cast(dict[str, Any], spec["networkSpec"])
+    assert network_spec["apiServerLB"] == {
+        "name": "caps-self-public-lb",
+        "type": "Public",
+    }
+
+
+def test_effective_tags_folds_azsecpack_when_public() -> None:
+    assert _effective_tags(
+        {"Owner": "t-hernandezc"}, api_server_public=True
+    ) == {
+        "Owner": "t-hernandezc",
+        "AzSecPackAutoConfigReady": "true",
+    }
+
+
+def test_effective_tags_unchanged_when_api_server_private() -> None:
+    assert _effective_tags(
+        {"Owner": "t-hernandezc"}, api_server_public=False
+    ) == {"Owner": "t-hernandezc"}
+
+
+def test_control_plane_public_config_round_trips() -> None:
+    config = AzureBYOWorkloadClusterConfig(
+        parameters=AzureBYOWorkloadSpec(
+            subscription_id=_SUBSCRIPTION_ID,
+            location="southcentralus",
+            control_plane_public=True,
+        )
+    )
+    assert config.to_config()["parameters"]["controlPlanePublic"] is True
+
+
+def test_control_plane_public_defaults_to_private() -> None:
+    config = AzureBYOWorkloadClusterConfig(
+        parameters=AzureBYOWorkloadSpec(
+            subscription_id=_SUBSCRIPTION_ID,
+            location="southcentralus",
+        )
+    )
+    assert "controlPlanePublic" not in config.to_config()["parameters"]
+
+
+def test_ssh_users_empty_without_authorized_keys() -> None:
+    assert _ssh_users(ssh_username="capi", ssh_authorized_keys=()) == []
+
+
+def test_control_plane_spec_injects_ssh_keys_for_head_node() -> None:
+    spec = _kubeadm_control_plane_spec(
+        node=_controller_node(),
+        cluster_name="caps-self",
+        control_plane_name="caps-self-control-plane",
+        kubernetes_version="v1.36.1",
+        ssh_username="capi",
+        ssh_authorized_keys=("ssh-ed25519 AAAAC3NzaC1 debug@caps",),
+    )
+    kubeadm = cast(dict[str, Any], spec["kubeadmConfigSpec"])
+    assert kubeadm["users"] == [
+        {
+            "name": "capi",
+            "sshAuthorizedKeys": ["ssh-ed25519 AAAAC3NzaC1 debug@caps"],
+        }
+    ]
+
+
+def test_control_plane_spec_omits_users_without_keys() -> None:
+    spec = _kubeadm_control_plane_spec(
+        node=_controller_node(),
+        cluster_name="caps-self",
+        control_plane_name="caps-self-control-plane",
+        kubernetes_version="v1.36.1",
+    )
+    kubeadm = cast(dict[str, Any], spec["kubeadmConfigSpec"])
+    assert "users" not in kubeadm
+
+
+def test_worker_config_template_injects_ssh_keys() -> None:
+    spec = _kubeadm_config_template_spec(
+        node=_compute_node(),
+        worker_name="caps-self-md-0",
+        ssh_username="capi",
+        ssh_authorized_keys=("ssh-ed25519 AAAAC3NzaC1 debug@caps",),
+    )
+    template_spec = cast(dict[str, Any], spec["template"])["spec"]
+    assert template_spec["users"] == [
+        {
+            "name": "capi",
+            "sshAuthorizedKeys": ["ssh-ed25519 AAAAC3NzaC1 debug@caps"],
+        }
+    ]
 
 
 def test_machine_template_attaches_uami_subnet_and_flex_vmss() -> None:

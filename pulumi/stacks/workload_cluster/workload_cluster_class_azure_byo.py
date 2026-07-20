@@ -29,6 +29,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     ClusterAPIAutoscalerOutputs,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
+    AzureBYOMarketplaceImage,
     AzureBYONodePoolSpec,
     AzureBYOSubnet,
     AzureBYOWorkloadClusterInfrastructure,
@@ -84,10 +85,26 @@ class AzureBYOWorkloadSpec(PulumiConfigModel):
     control_plane_vm_size: NonEmptyStr = _DEFAULT_CONTROL_PLANE_VM_SIZE
     worker_vm_size: NonEmptyStr = _DEFAULT_WORKER_VM_SIZE
     worker_replicas: StrictPositiveInt = 1
+    # Optional V100-compatible Marketplace image for GPU workers (NDV2/V100).
+    # Unset => CAPZ default Ubuntu (CPU-only). TODO(caps): add control_plane_image
+    # when the head node also needs the HPC image; CP stays CPU for NCCL host-launch.
+    worker_image: AzureBYOMarketplaceImage | None = None
     ssh_username: NonEmptyStr = _DEFAULT_SSH_USERNAME
     ssh_authorized_keys: tuple[NonEmptyStr, ...] = ()
     vnet: AzureBYOVNetConfig | None = None
     use_auto_discovered_vnet: StrictBool | None = None
+    # Expose the control-plane (head node) API server on a public IP. Default
+    # False keeps the apiServerLB Internal (reached via the mgmt VM, the caps-self
+    # model). When True, CAPZ fronts the API server with a public LB + public IP,
+    # and the required Azure Security Pack tag (AzSecPackAutoConfigReady) is
+    # applied to the cluster's Azure resources so the public IP satisfies corp
+    # security policy.
+    control_plane_public: StrictBool = False
+    # Reuse a resource group created outside Pulumi (e.g. the ADO pipeline's
+    # pre-created, tracked RG). Unset => Pulumi creates + owns "<instance>-rg".
+    # When set, the BYO component references it read-only (ResourceGroup.get) so
+    # the pipeline can own RG create + `az group delete` cleanup.
+    existing_resource_group_name: NonEmptyStr | None = None
 
     @field_serializer("subscription_id")
     def serialize_subscription_id(self, value: UUID) -> str:
@@ -164,6 +181,9 @@ def _default_node_pools(
                 "replicas": parameters.worker_replicas,
                 "attach_to_flex": True,
                 "autoscaler_bounds": (1, 10),
+                # Compute (worker) nodes get the optional V100 image; the control
+                # plane above intentionally stays on the CAPZ default Ubuntu image.
+                "image": parameters.worker_image,
             }
         ),
     )
@@ -277,6 +297,8 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             identity_namespace=identity_namespace,
             location=parameters.location,
             additional_tags=parameters.additional_tags,
+            api_server_public=parameters.control_plane_public,
+            existing_resource_group_name=parameters.existing_resource_group_name,
             byo_subnet=byo_subnet,
             kubernetes_version=parameters.kubernetes_version,
             ssh_username=parameters.ssh_username,
