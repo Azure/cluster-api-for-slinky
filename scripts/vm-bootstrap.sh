@@ -17,6 +17,8 @@
 #   REPO_URL       git URL for caps-pulumi (default the GitHub repo).
 #   REPO_BRANCH    branch to check out (default capz-phase1-dev).
 #   REPO_DIR       checkout dir (default /opt/caps-pulumi).
+#   SKIP_SETUP_REPO  when set, skip the git clone/fetch (REPO_DIR is already populated,
+#                  e.g. scp'd from the pipeline agent that checked out the private repo).
 #   GIT_TOKEN      token for a private/https clone (x-access-token). Optional.
 #   PULUMI_STACK   Pulumi stack to update (default azurebyo).
 #   TENANT_NAME    workload-cluster tenant key in Pulumi.<stack>.yaml (default caps-self).
@@ -168,7 +170,11 @@ main() {
   install_pulumi
   install_kubectl_helm
   set_inotify
-  setup_repo
+  if [[ -n "${SKIP_SETUP_REPO:-}" ]]; then
+    log "SKIP_SETUP_REPO set - using pre-provisioned repo at ${REPO_DIR}"
+  else
+    setup_repo
+  fi
   setup_venv
   pulumi_up
   log "bootstrap complete"
