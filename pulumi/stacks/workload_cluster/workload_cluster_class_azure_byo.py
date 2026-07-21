@@ -100,11 +100,13 @@ class AzureBYOWorkloadSpec(PulumiConfigModel):
     # applied to the cluster's Azure resources so the public IP satisfies corp
     # security policy.
     control_plane_public: StrictBool = False
-    # Reuse a resource group created outside Pulumi (e.g. the ADO pipeline's
-    # pre-created, tracked RG). Unset => Pulumi creates + owns "<instance>-rg".
-    # When set, the BYO component references it read-only (ResourceGroup.get) so
-    # the pipeline can own RG create + `az group delete` cleanup.
-    existing_resource_group_name: NonEmptyStr | None = None
+    # Reuse the resource group that Azure IMDS host discovery selects (the RG of
+    # the VM running Docker + the Kind management cluster) instead of registering
+    # a new Pulumi-owned "<instance>-rg". CAPZ treats an untagged pre-existing RG
+    # as unmanaged: deleting the cluster removes its resources individually but
+    # preserves the shared host RG. The discovered RG must be in the workload
+    # subscription; its own location does not constrain resources placed in it.
+    use_discovered_resource_group: StrictBool = False
 
     @field_serializer("subscription_id")
     def serialize_subscription_id(self, value: UUID) -> str:
@@ -239,6 +241,19 @@ def _resolve_byo_subnet(parameters: AzureBYOWorkloadSpec) -> AzureBYOSubnet | No
     return AzureBYOSubnet.from_host_network(network)
 
 
+def _resolve_resource_group(parameters: AzureBYOWorkloadSpec) -> str | None:
+    if not parameters.use_discovered_resource_group:
+        return None
+
+    placement = discover_azure_resource_placement(raise_on_missing=True)
+    if placement.subscription_id.casefold() != str(parameters.subscription_id).casefold():
+        raise ValueError(
+            "auto-discovered resource group subscription does not match "
+            "azure-byo subscriptionId"
+        )
+    return placement.resource_group
+
+
 class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
     """Azure BYO class whose first increment owns the Flex placement VMSS."""
 
@@ -286,6 +301,7 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
         parameters = config.parameters
         node_pools = node_pools or _default_node_pools(parameters)
         byo_subnet = _resolve_byo_subnet(parameters)
+        resource_group_name = _resolve_resource_group(parameters)
         infrastructure = AzureBYOWorkloadClusterInfrastructure(
             "infrastructure",
             instance=instance,
@@ -298,7 +314,7 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             location=parameters.location,
             additional_tags=parameters.additional_tags,
             api_server_public=parameters.control_plane_public,
-            existing_resource_group_name=parameters.existing_resource_group_name,
+            resource_group_name=resource_group_name,
             byo_subnet=byo_subnet,
             kubernetes_version=parameters.kubernetes_version,
             ssh_username=parameters.ssh_username,

@@ -16,6 +16,7 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     _default_node_pools,
     _explicit_byo_subnet,
     _resolve_byo_subnet,
+    _resolve_resource_group,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _CONTROL_PLANE_READY_API_VERSION,
@@ -38,7 +39,6 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _resource_name,
     _resource_group_args,
     _resource_group_name,
-    _existing_resource_group_id,
     _ssh_users,
     _validate_node_pool_names,
     _vmss_flex_args,
@@ -473,36 +473,64 @@ def test_resource_group_args_derive_owned_resource_group() -> None:
     assert args.tags == {"Owner": "zheyushen"}
 
 
-def test_existing_resource_group_id_builds_arm_id() -> None:
-    assert _existing_resource_group_id(_SUBSCRIPTION_ID, "caps-infra-rg") == (
-        f"/subscriptions/{_SUBSCRIPTION_ID}/resourceGroups/caps-infra-rg"
-    )
-
-
-def test_azure_byo_config_serializes_existing_resource_group_name() -> None:
+def test_azure_byo_config_serializes_discovered_resource_group_option() -> None:
     config = AzureBYOWorkloadClusterConfig(
-        parameters=AzureBYOWorkloadSpec(
-            subscription_id=_SUBSCRIPTION_ID,
-            location="southcentralus",
-            existing_resource_group_name="caps-infra-rg",
+        parameters=AzureBYOWorkloadSpec.model_validate(
+            {
+                "subscriptionId": _SUBSCRIPTION_ID,
+                "location": "westus2",
+                "useDiscoveredResourceGroup": True,
+            }
         )
     )
+    parameters = cast(dict[str, Any], config.to_config()["parameters"])
 
-    assert (
-        config.to_config()["parameters"]["existingResourceGroupName"]
-        == "caps-infra-rg"
+    assert parameters["useDiscoveredResourceGroup"] is True
+
+
+def test_resolve_resource_group_owns_new_group_by_default() -> None:
+    parameters = AzureBYOWorkloadSpec.model_validate(
+        {"subscriptionId": _SUBSCRIPTION_ID, "location": "westus2"}
     )
 
+    assert _resolve_resource_group(parameters) is None
 
-def test_azure_byo_config_omits_existing_resource_group_name_by_default() -> None:
-    config = AzureBYOWorkloadClusterConfig(
-        parameters=AzureBYOWorkloadSpec(
-            subscription_id=_SUBSCRIPTION_ID,
-            location="southcentralus",
-        )
+
+def test_resolve_resource_group_uses_discovered_host_group() -> None:
+    parameters = AzureBYOWorkloadSpec.model_validate(
+        {
+            "subscriptionId": _SUBSCRIPTION_ID,
+            "location": "westus2",
+            "useDiscoveredResourceGroup": True,
+        }
     )
 
-    assert "existingResourceGroupName" not in config.to_config()["parameters"]
+    assert _resolve_resource_group(parameters) == "host-rg"
+
+
+def test_resolve_resource_group_rejects_subscription_mismatch() -> None:
+    parameters = AzureBYOWorkloadSpec.model_validate(
+        {
+            "subscriptionId": _OTHER_SUBSCRIPTION_ID,
+            "location": "westus2",
+            "useDiscoveredResourceGroup": True,
+        }
+    )
+
+    with pytest.raises(ValueError, match="subscription"):
+        _resolve_resource_group(parameters)
+
+
+def test_resolve_resource_group_allows_location_mismatch() -> None:
+    parameters = AzureBYOWorkloadSpec.model_validate(
+        {
+            "subscriptionId": _SUBSCRIPTION_ID,
+            "location": "eastus",
+            "useDiscoveredResourceGroup": True,
+        }
+    )
+
+    assert _resolve_resource_group(parameters) == "host-rg"
 
 
 def test_default_node_pools_match_minimum_cluster_sizing() -> None:
