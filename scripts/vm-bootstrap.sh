@@ -172,6 +172,9 @@ main() {
   setup_venv
   pulumi_up
   log "bootstrap complete"
+  # Success sentinel: the pipeline's `az vm run-command invoke` returns success even
+  # when this script fails, so it greps for this exact last line to decide pass/fail.
+  echo "CAPS_BOOTSTRAP_SUCCESS"
 }
 
 main "$@"
