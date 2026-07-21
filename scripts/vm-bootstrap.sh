@@ -19,6 +19,12 @@
 #   REPO_DIR       checkout dir (default /opt/caps-pulumi).
 #   GIT_TOKEN      token for a private/https clone (x-access-token). Optional.
 #   PULUMI_STACK   Pulumi stack to update (default azurebyo).
+#   TENANT_NAME    workload-cluster tenant key in Pulumi.<stack>.yaml (default caps-self).
+#   CONTROL_PLANE_VM_SIZE / WORKER_VM_SIZE / WORKER_REPLICAS
+#                  OPTIONAL per-run overrides for the tenant's control-plane / worker
+#                  SKUs + worker count. Unset => the values committed in
+#                  Pulumi.<stack>.yaml are used. `pulumi config set --path` type-infers
+#                  the replica count as an int (StrictPositiveInt in the config model).
 #   GO_VERSION     Go toolchain to install (default 1.23.4).
 #   PULUMI_CONFIG_PASSPHRASE   default empty (matches the current mgmt VM).
 #   ARM_CLIENT_ID / ARM_CLIENT_SECRET / ARM_TENANT_ID / ARM_SUBSCRIPTION_ID
@@ -42,6 +48,10 @@ REPO_BRANCH="${REPO_BRANCH:-capz-phase1-dev}"
 REPO_DIR="${REPO_DIR:-/opt/caps-pulumi}"
 GIT_TOKEN="${GIT_TOKEN:-}"
 PULUMI_STACK="${PULUMI_STACK:-azurebyo}"
+TENANT_NAME="${TENANT_NAME:-caps-self}"
+CONTROL_PLANE_VM_SIZE="${CONTROL_PLANE_VM_SIZE:-}"
+WORKER_VM_SIZE="${WORKER_VM_SIZE:-}"
+WORKER_REPLICAS="${WORKER_REPLICAS:-}"
 GO_VERSION="${GO_VERSION:-1.23.4}"
 
 export PULUMI_CONFIG_PASSPHRASE="${PULUMI_CONFIG_PASSPHRASE:-}"
@@ -134,9 +144,19 @@ pulumi_up() {
   cd "$REPO_DIR/pulumi"
   # Create/select the stack in the local backend; config lives in Pulumi.<stack>.yaml.
   pulumi stack select --create "$PULUMI_STACK"
-  # TODO(caps): ensure the tenant sets useDiscoveredResourceGroup: true (so this
-  #   VM's RG is reused) plus workerVmSize / workerImage / node count -- either in
-  #   the committed Pulumi.<stack>.yaml or via `pulumi config set --path` here.
+  # The tenant's parameters -- including useDiscoveredResourceGroup: true so THIS VM's
+  # RG is reused -- are committed in Pulumi.<stack>.yaml. Optionally override the
+  # control-plane / worker SKUs + worker count per run; `--path` type-infers the int.
+  local base="ca4s-infra:initStack.tenants.workloadClusters[\"${TENANT_NAME}\"].parameters"
+  if [[ -n "$CONTROL_PLANE_VM_SIZE" ]]; then
+    pulumi config set --path "${base}.controlPlaneVmSize" "$CONTROL_PLANE_VM_SIZE"
+  fi
+  if [[ -n "$WORKER_VM_SIZE" ]]; then
+    pulumi config set --path "${base}.workerVmSize" "$WORKER_VM_SIZE"
+  fi
+  if [[ -n "$WORKER_REPLICAS" ]]; then
+    pulumi config set --path "${base}.workerReplicas" "$WORKER_REPLICAS"
+  fi
   pulumi up -s "$PULUMI_STACK" --yes --non-interactive
 }
 

@@ -20,4 +20,17 @@ config:
       workloadClusters:
         caps-self:
           className: azure-byo
-          parameters: {}
+          parameters:
+            # Reuse the RG that the pipeline created + tracks (the mgmt VM discovers
+            # it via IMDS) instead of a new Pulumi-owned "<instance>-rg", so the
+            # pipeline's `az group delete <rg>` is the catch-all teardown.
+            useDiscoveredResourceGroup: true
+            # First infra bring-up is CPU-only (benchmarks deferred): both roles use a
+            # CPU SKU + the CAPZ default Ubuntu image (workerImage unset). To enable the
+            # GPU/NCCL path, set workerVmSize to a V100 SKU (e.g. Standard_ND40rs_v2)
+            # AND add a workerImage (the microsoft-dsvm ubuntu-hpc 2404-v100 SKU).
+            # The pipeline may override controlPlaneVmSize / workerVmSize / workerReplicas
+            # per run (see scripts/vm-bootstrap.sh); these are the fallback defaults.
+            controlPlaneVmSize: Standard_D2as_v5
+            workerVmSize: Standard_D2as_v5
+            workerReplicas: 2
