@@ -8,6 +8,13 @@ from typing import Any
 import pulumi
 import pulumi_kubernetes as k8s
 
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    controller_bootstrap_tolerations,
+    controller_node_affinity,
+    controller_node_selector,
+    controller_tolerations,
+)
+
 
 _AZURE_CCM_CHART_REPO = (
     "https://raw.githubusercontent.com/kubernetes-sigs/cloud-provider-azure/master/helm/repo"
@@ -65,7 +72,12 @@ def _azure_cloud_provider_values(
 
 def _calico_vxlan_values(*, pod_cidr: str) -> dict[str, object]:
     return {
+        "nodeSelector": controller_node_selector(),
+        "affinity": controller_node_affinity(),
+        "tolerations": controller_bootstrap_tolerations(),
         "installation": {
+            "controlPlaneNodeSelector": controller_node_selector(),
+            "controlPlaneTolerations": controller_tolerations(),
             "calicoNetwork": {
                 "ipPools": [
                     {

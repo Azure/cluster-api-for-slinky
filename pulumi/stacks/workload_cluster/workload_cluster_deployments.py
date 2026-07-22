@@ -15,9 +15,11 @@ from lib.config import (
     StrictPositiveInt,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
-    CONTROLLER_NODE_TYPE,
-    NODE_TYPE_LABEL,
     POD_SECURITY_PRIVILEGED_LABELS,
+    controller_node_affinity,
+    controller_pod_spec,
+    controller_tolerations,
+    node_type_affinity,
 )
 
 
@@ -109,52 +111,10 @@ def _prometheus_server_address(prometheus_release_name: str) -> str:
     )
 
 
-def _node_type_affinity(node_type: str) -> dict[str, object]:
-    return {
-        "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-                "nodeSelectorTerms": [
-                    {
-                        "matchExpressions": [
-                            {
-                                "key": NODE_TYPE_LABEL,
-                                "operator": "In",
-                                "values": [node_type],
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
-    }
-
-
-def _controller_tolerations() -> list[dict[str, str]]:
-    return [
-        {
-            "key": "slinky.slurm.net/controller",
-            "operator": "Exists",
-            "effect": "NoSchedule",
-        },
-        {
-            "key": "node-role.kubernetes.io/control-plane",
-            "operator": "Exists",
-            "effect": "NoSchedule",
-        },
-    ]
-
-
-def _controller_pod_spec() -> dict[str, object]:
-    return {
-        "tolerations": _controller_tolerations(),
-        "affinity": _node_type_affinity(CONTROLLER_NODE_TYPE),
-    }
-
-
 def _keda_values() -> dict[str, object]:
     component_placement = {
-        "nodeSelector": {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE},
-        "tolerations": _controller_tolerations(),
+        "affinity": controller_node_affinity(),
+        "tolerations": controller_tolerations(),
     }
     return {
         **component_placement,
@@ -196,51 +156,59 @@ def _keda_scaled_object_spec(
 def _slurm_operator_values() -> dict[str, object]:
     return {
         "operator": {
-            "tolerations": _controller_tolerations(),
-            "affinity": _node_type_affinity(CONTROLLER_NODE_TYPE),
+            **controller_pod_spec(),
         },
         "webhook": {
-            "tolerations": _controller_tolerations(),
-            "affinity": _node_type_affinity(CONTROLLER_NODE_TYPE),
+            **controller_pod_spec(),
         },
     }
 
 
+def _cert_manager_values() -> dict[str, object]:
+    return {
+        "crds": {"enabled": True},
+        **controller_pod_spec(),
+        "webhook": controller_pod_spec(),
+        "cainjector": controller_pod_spec(),
+        "startupapicheck": controller_pod_spec(),
+    }
+
+
 def _prometheus_values() -> dict[str, object]:
-    controller_node_selector = {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
-    controller_tolerations = _controller_tolerations()
+    affinity = controller_node_affinity()
+    tolerations = controller_tolerations()
     return {
         "prometheus": {
             "prometheusSpec": {
                 "serviceMonitorSelectorNilUsesHelmValues": False,
                 "podMonitorSelectorNilUsesHelmValues": False,
-                "nodeSelector": controller_node_selector,
-                "tolerations": controller_tolerations,
+                "affinity": affinity,
+                "tolerations": tolerations,
             },
         },
         "alertmanager": {
             "alertmanagerSpec": {
-                "nodeSelector": controller_node_selector,
-                "tolerations": controller_tolerations,
+                "affinity": affinity,
+                "tolerations": tolerations,
             },
         },
         "prometheusOperator": {
-            "nodeSelector": controller_node_selector,
-            "tolerations": controller_tolerations,
+            "affinity": affinity,
+            "tolerations": tolerations,
             "admissionWebhooks": {
                 "patch": {
-                    "nodeSelector": controller_node_selector,
-                    "tolerations": controller_tolerations,
+                    "affinity": affinity,
+                    "tolerations": tolerations,
                 },
             },
         },
         "grafana": {
-            "nodeSelector": controller_node_selector,
-            "tolerations": controller_tolerations,
+            "affinity": affinity,
+            "tolerations": tolerations,
         },
         "kube-state-metrics": {
-            "nodeSelector": controller_node_selector,
-            "tolerations": controller_tolerations,
+            "affinity": affinity,
+            "tolerations": tolerations,
         },
     }
 
@@ -273,7 +241,7 @@ def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
         "taintKubeNodes": False,
         "podSpec": {
             "affinity": {
-                **_node_type_affinity(node_set.node_type),
+                **node_type_affinity(node_set.node_type),
                 "podAntiAffinity": {
                     "requiredDuringSchedulingIgnoredDuringExecution": [
                         {
@@ -295,7 +263,9 @@ def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
     }
 
 
-def _slurm_values(node_sets: tuple[SlurmNodeSetSpec, ...]) -> dict[str, object]:
+def _slurm_values(
+    node_sets: tuple[SlurmNodeSetSpec, ...],
+) -> dict[str, object]:
     return {
         "configFiles": {
             "cgroup.conf": "CgroupPlugin=disabled\n",
@@ -311,7 +281,7 @@ def _slurm_values(node_sets: tuple[SlurmNodeSetSpec, ...]) -> dict[str, object]:
                 "enabled": True,
                 "serviceMonitor": {"enabled": True},
             },
-            "podSpec": _controller_pod_spec(),
+            "podSpec": controller_pod_spec(),
         },
         "loginsets": {
             "slinky": {
@@ -337,7 +307,7 @@ filter_users = root,slurm
 id_provider = files
 auth_provider = none
 """,
-                "podSpec": _controller_pod_spec(),
+                "podSpec": controller_pod_spec(),
             },
         },
         "nodesets": {
@@ -347,7 +317,7 @@ auth_provider = none
                 for node_set in node_sets
             },
         },
-        "restapi": {"podSpec": _controller_pod_spec()},
+        "restapi": {"podSpec": controller_pod_spec()},
     }
 
 
@@ -477,6 +447,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         slurm_node_sets: tuple[SlurmNodeSetSpec, ...],
         keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = (),
         workload_provider: k8s.Provider,
+        pin_coredns_to_controller: bool = False,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -485,7 +456,6 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
             props={},
             opts=opts,
         )
-
         def child_options(
             *,
             provider: pulumi.ProviderResource | None = None,
@@ -497,6 +467,18 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 provider=provider,
                 depends_on=depends_on,
                 retain_on_delete=retain_on_delete,
+            )
+
+        if pin_coredns_to_controller:
+            k8s.apps.v1.DeploymentPatch(
+                "coredns-controller-placement",
+                metadata={"name": "coredns", "namespace": "kube-system"},
+                spec={
+                    "template": {
+                        "spec": controller_pod_spec()
+                    }
+                },
+                opts=child_options(provider=workload_provider),
             )
 
         cert_manager_namespace = k8s.core.v1.Namespace(
@@ -517,7 +499,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
             atomic=True,
             wait_for_jobs=True,
             timeout=600,
-            values={"crds": {"enabled": True}},
+            values=_cert_manager_values(),
             opts=child_options(
                 provider=workload_provider,
                 depends_on=[cert_manager_namespace],

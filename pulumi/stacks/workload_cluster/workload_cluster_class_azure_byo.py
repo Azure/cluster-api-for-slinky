@@ -123,7 +123,6 @@ class AzureBYOWorkloadClusterOutputs(BaseModel):
     byo_subnet: dict[str, object] | None
     cluster_name: str
     control_plane_name: str
-    worker_machine_deployment_name: str
     worker_machine_deployment_names: list[str]
     control_plane_ready: bool
     azure_cloud_provider_chart_version: str
@@ -151,10 +150,18 @@ def _default_node_pools(
         AzureBYONodePoolSpec.model_validate(
             {
                 "name": "control-plane",
+                "node_type": "control-plane",
+                "vm_size": parameters.control_plane_vm_size,
+                "replicas": 1,
+                "kubernetes_control_plane": True,
+            }
+        ),
+        AzureBYONodePoolSpec.model_validate(
+            {
+                "name": "head",
                 "node_type": _CONTROLLER_NODE_TYPE,
                 "vm_size": parameters.control_plane_vm_size,
                 "replicas": 1,
-                "controller": True,
             }
         ),
         AzureBYONodePoolSpec.model_validate(
@@ -306,6 +313,7 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             slurm_node_sets=slurm_node_sets,
             keda_scaled_node_sets=keda_scaled_node_sets,
             workload_provider=infrastructure.workload_provider,
+            pin_coredns_to_controller=True,
             opts=pulumi.ResourceOptions(
                 parent=self,
                 depends_on=[infrastructure],
@@ -326,9 +334,6 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             ),
             "cluster_name": infrastructure.cluster_name,
             "control_plane_name": infrastructure.control_plane_name,
-            "worker_machine_deployment_name": (
-                infrastructure.worker_machine_deployment_name
-            ),
             "worker_machine_deployment_names": (
                 pulumi.Output.all(*infrastructure.worker_machine_deployment_names)
             ),

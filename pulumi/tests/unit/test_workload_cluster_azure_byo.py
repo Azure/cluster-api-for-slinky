@@ -18,6 +18,9 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     _resolve_byo_subnet,
     _resolve_resource_group,
 )
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    controller_taint,
+)
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _CONTROL_PLANE_READY_API_VERSION,
     _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
@@ -59,7 +62,7 @@ def _controller_node() -> AzureBYONodePoolSpec:
         node_type="controller",
         vm_size="Standard_D2as_v5",
         replicas=1,
-        controller=True,
+        kubernetes_control_plane=True,
     )
 
 
@@ -71,6 +74,15 @@ def _compute_node() -> AzureBYONodePoolSpec:
         replicas=1,
         attach_to_flex=True,
         autoscaler_bounds=(1, 10),
+    )
+
+
+def _head_node() -> AzureBYONodePoolSpec:
+    return AzureBYONodePoolSpec(
+        name="head",
+        node_type="controller",
+        vm_size="Standard_D2as_v5",
+        replicas=1,
     )
 
 
@@ -474,14 +486,20 @@ def test_default_node_pools_match_minimum_cluster_sizing() -> None:
         worker_replicas=2,
     )
 
-    controller, compute = _default_node_pools(parameters)
+    control_plane, head, compute = _default_node_pools(parameters)
 
-    assert controller == AzureBYONodePoolSpec(
+    assert control_plane == AzureBYONodePoolSpec(
         name="control-plane",
+        node_type="control-plane",
+        vm_size="Standard_D4as_v5",
+        replicas=1,
+        kubernetes_control_plane=True,
+    )
+    assert head == AzureBYONodePoolSpec(
+        name="head",
         node_type="controller",
         vm_size="Standard_D4as_v5",
         replicas=1,
-        controller=True,
     )
     assert compute == AzureBYONodePoolSpec(
         name="compute",
@@ -508,11 +526,10 @@ def test_node_pools_require_one_controller_and_worker() -> None:
         _controller_node(),
         (_compute_node(),),
     )
-    with pytest.raises(ValueError, match="exactly one controller"):
+    with pytest.raises(ValueError, match="exactly one Kubernetes control-plane"):
         _partition_node_pools((_compute_node(),))
     with pytest.raises(ValueError, match="at least one worker"):
         _partition_node_pools((_controller_node(),))
-
 
 def test_node_pool_names_must_be_unique_after_normalization() -> None:
     nodes = (
@@ -715,7 +732,9 @@ def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
     }
     assert kubeadm["initConfiguration"]["nodeRegistration"]["kubeletExtraArgs"] == {
         "cloud-provider": "external",
-        "node-labels": "slinky.slurm.net/node-type=controller",
+    }
+    assert kubeadm["joinConfiguration"]["nodeRegistration"]["kubeletExtraArgs"] == {
+        "cloud-provider": "external",
     }
     assert "127.0.0.1 apiserver.caps-self.capz.io" in kubeadm[
         "preKubeadmCommands"
@@ -805,3 +824,17 @@ def test_worker_kubeadm_template_mounts_azure_config_and_labels_node() -> None:
             ],
         }
     ]
+
+
+def test_controller_worker_kubeadm_template_adds_custom_taint() -> None:
+    spec = _kubeadm_config_template_spec(
+        node=_head_node(),
+        worker_name="caps-self-head",
+    )
+
+    template = cast(dict[str, Any], cast(dict[str, Any], spec["template"])["spec"])
+    registration = template["joinConfiguration"]["nodeRegistration"]
+    assert registration["taints"] == [controller_taint()]
+    assert registration["kubeletExtraArgs"]["node-labels"] == (
+        "slinky.slurm.net/node-type=controller"
+    )

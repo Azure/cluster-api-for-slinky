@@ -24,6 +24,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     COMPUTE_NODE_TYPE,
     CONTROLLER_NODE_TYPE,
     NODE_TYPE_LABEL,
+    controller_taint,
     node_labels,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_aks import (
@@ -265,6 +266,7 @@ def test_ammp_spec_is_system_pool() -> None:
         sku="Standard_D2s_v3",
         additional_tags={},
         node_labels=_AKS_CONTROLLER_NODE_LABELS,
+        taints=[controller_taint()],
     )
 
     assert spec == {
@@ -272,6 +274,7 @@ def test_ammp_spec_is_system_pool() -> None:
         "name": "syshead",
         "sku": "Standard_D2s_v3",
         "nodeLabels": _AKS_CONTROLLER_NODE_LABELS,
+        "taints": [controller_taint()],
     }
 
 

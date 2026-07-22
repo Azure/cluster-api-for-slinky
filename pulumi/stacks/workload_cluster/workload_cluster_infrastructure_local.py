@@ -31,7 +31,6 @@ import pulumi
 import pulumi_kubernetes as k8s
 import pulumi_local as local
 import yaml
-from pydantic import StrictBool
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from stacks.kubernetes_annotations import (
@@ -44,7 +43,13 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MIN_ANNOTATION,
     ClusterAPIAutoscaler,
     ClusterAPIAutoscalerOutputs,
+    CONTROLLER_NODE_TYPE,
     NODE_TYPE_LABEL,
+    controller_bootstrap_tolerations,
+    controller_node_affinity,
+    controller_node_selector,
+    controller_taint,
+    controller_tolerations,
     machine_deployment_labels,
     worker_labels,
 )
@@ -89,7 +94,6 @@ class LocalMachineDeploymentSpec(PulumiConfigModel):
     name: NonEmptyStr
     node_type: NonEmptyStr
     replicas: StrictPositiveInt
-    controller: StrictBool = False
     autoscaler_bounds: tuple[StrictPositiveInt, StrictPositiveInt] | None = None
 
 
@@ -176,18 +180,14 @@ def _kubelet_extra_args(node_type: str | None = None) -> list[dict[str, str]]:
 
 
 def _node_registration(
-    controller: bool = False,
-    *,
     node_type: str | None = None,
 ) -> dict[str, object]:
-    node_registration: dict[str, object] = {
+    registration: dict[str, object] = {
         "kubeletExtraArgs": _kubelet_extra_args(node_type),
     }
-    if controller:
-        node_registration["taints"] = [
-            {"key": "slinky.slurm.net/controller", "effect": "NoSchedule"}
-        ]
-    return node_registration
+    if node_type == CONTROLLER_NODE_TYPE:
+        registration["taints"] = [controller_taint()]
+    return registration
 
 
 def _docker_machine_template(
@@ -224,7 +224,6 @@ def _kubeadm_config_template(
     resource_name: str,
     *,
     pre_kubeadm_commands: list[str],
-    controller: bool = False,
     node_type: str | None = None,
     opts: pulumi.ResourceOptions | None = None,
 ) -> k8s.apiextensions.CustomResource:
@@ -238,10 +237,7 @@ def _kubeadm_config_template(
                 "spec": {
                     "preKubeadmCommands": pre_kubeadm_commands,
                     "joinConfiguration": {
-                        "nodeRegistration": _node_registration(
-                            controller,
-                            node_type=node_type,
-                        ),
+                        "nodeRegistration": _node_registration(node_type),
                     },
                 },
             },
@@ -260,7 +256,12 @@ def _object_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
 
 def _calico_values() -> dict[str, object]:
     return {
+        "nodeSelector": controller_node_selector(),
+        "affinity": controller_node_affinity(),
+        "tolerations": controller_bootstrap_tolerations(),
         "installation": {
+            "controlPlaneNodeSelector": controller_node_selector(),
+            "controlPlaneTolerations": controller_tolerations(),
             "calicoNetwork": {
                 "ipPools": [
                     {
@@ -426,7 +427,6 @@ class WorkerClass(pulumi.ComponentResource):
             bootstrap_template_name,
             f"cluster-{worker.name}-bootstrap-template",
             pre_kubeadm_commands=pre_kubeadm_commands,
-            controller=worker.controller,
             node_type=worker.node_type,
             opts=child_options(),
         )

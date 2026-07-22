@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from stacks.workload_cluster.workload_cluster_deployments import (
+    _cert_manager_values,
     _keda_release_name,
     _keda_scaled_object_name,
     _keda_scaled_object_spec,
@@ -10,19 +11,17 @@ from stacks.workload_cluster.workload_cluster_deployments import (
     _prometheus_values,
     _slurm_nodeset_name,
 )
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    controller_node_affinity,
+)
 
 
 def test_prometheus_values_pin_components_to_controller_node() -> None:
     values = _prometheus_values()
-    expected_node_selector = {"slinky.slurm.net/node-type": "controller"}
+    expected_affinity = controller_node_affinity()
     expected_tolerations = [
         {
             "key": "slinky.slurm.net/controller",
-            "operator": "Exists",
-            "effect": "NoSchedule",
-        },
-        {
-            "key": "node-role.kubernetes.io/control-plane",
             "operator": "Exists",
             "effect": "NoSchedule",
         },
@@ -31,21 +30,21 @@ def test_prometheus_values_pin_components_to_controller_node() -> None:
     assert values["prometheus"]["prometheusSpec"] == {
         "serviceMonitorSelectorNilUsesHelmValues": False,
         "podMonitorSelectorNilUsesHelmValues": False,
-        "nodeSelector": expected_node_selector,
+        "affinity": expected_affinity,
         "tolerations": expected_tolerations,
     }
     assert values["alertmanager"]["alertmanagerSpec"] == {
-        "nodeSelector": expected_node_selector,
+        "affinity": expected_affinity,
         "tolerations": expected_tolerations,
     }
-    assert values["prometheusOperator"]["nodeSelector"] == expected_node_selector
+    assert values["prometheusOperator"]["affinity"] == expected_affinity
     assert values["prometheusOperator"]["tolerations"] == expected_tolerations
     assert values["grafana"] == {
-        "nodeSelector": expected_node_selector,
+        "affinity": expected_affinity,
         "tolerations": expected_tolerations,
     }
     assert values["kube-state-metrics"] == {
-        "nodeSelector": expected_node_selector,
+        "affinity": expected_affinity,
         "tolerations": expected_tolerations,
     }
 
@@ -57,29 +56,42 @@ def test_keda_names_are_instance_scoped() -> None:
 
 def test_keda_values_pin_components_to_controller_node() -> None:
     values = _keda_values()
-    expected_node_selector = {"slinky.slurm.net/node-type": "controller"}
     expected_tolerations = [
         {
             "key": "slinky.slurm.net/controller",
             "operator": "Exists",
             "effect": "NoSchedule",
         },
-        {
-            "key": "node-role.kubernetes.io/control-plane",
-            "operator": "Exists",
-            "effect": "NoSchedule",
-        },
     ]
     expected_placement = {
-        "nodeSelector": expected_node_selector,
+        "affinity": controller_node_affinity(),
         "tolerations": expected_tolerations,
     }
 
-    assert values["nodeSelector"] == expected_node_selector
+    assert values["affinity"] == controller_node_affinity()
     assert values["tolerations"] == expected_tolerations
     assert values["metricsServer"] == expected_placement
     assert values["webhooks"] == expected_placement
 
+
+def test_cert_manager_values_pin_every_chart_pod_to_controller_node() -> None:
+    values = _cert_manager_values()
+    expected_placement = {
+        "affinity": controller_node_affinity(),
+        "tolerations": [
+            {
+                "key": "slinky.slurm.net/controller",
+                "operator": "Exists",
+                "effect": "NoSchedule",
+            }
+        ],
+    }
+
+    assert values["affinity"] == expected_placement["affinity"]
+    assert values["tolerations"] == expected_placement["tolerations"]
+    assert values["webhook"] == expected_placement
+    assert values["cainjector"] == expected_placement
+    assert values["startupapicheck"] == expected_placement
 
 def test_prometheus_server_address_uses_helm_release_name() -> None:
     assert (

@@ -27,6 +27,8 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MIN_ANNOTATION,
     ClusterAPIAutoscaler,
     ClusterAPIAutoscalerOutputs,
+    CONTROLLER_NODE_TYPE,
+    controller_taint,
     machine_deployment_labels,
     worker_labels,
 )
@@ -77,7 +79,7 @@ class AzureBYONodePoolSpec(PulumiConfigModel):
     node_type: NonEmptyStr
     vm_size: NonEmptyStr
     replicas: StrictPositiveInt
-    controller: StrictBool = False
+    kubernetes_control_plane: StrictBool = False
     attach_to_flex: StrictBool = False
     failure_domain: NonEmptyStr = _DEFAULT_FLEX_ZONE
     autoscaler_bounds: tuple[StrictPositiveInt, StrictPositiveInt] | None = None
@@ -158,13 +160,19 @@ def _cluster_name(instance: str) -> str:
 def _partition_node_pools(
     node_pools: tuple[AzureBYONodePoolSpec, ...],
 ) -> tuple[AzureBYONodePoolSpec, tuple[AzureBYONodePoolSpec, ...]]:
-    controllers = tuple(node for node in node_pools if node.controller)
-    workers = tuple(node for node in node_pools if not node.controller)
-    if len(controllers) != 1:
-        raise ValueError("azure-byo requires exactly one controller node spec")
+    control_planes = tuple(
+        node for node in node_pools if node.kubernetes_control_plane
+    )
+    workers = tuple(
+        node for node in node_pools if not node.kubernetes_control_plane
+    )
+    if len(control_planes) != 1:
+        raise ValueError(
+            "azure-byo requires exactly one Kubernetes control-plane node spec"
+        )
     if not workers:
         raise ValueError("azure-byo requires at least one worker node spec")
-    return controllers[0], workers
+    return control_planes[0], workers
 
 
 def _validate_node_pool_names(
@@ -314,10 +322,13 @@ def _node_registration(*, node_type: str | None = None) -> dict[str, object]:
     extra_args: dict[str, str] = {"cloud-provider": "external"}
     if node_type is not None:
         extra_args["node-labels"] = f"slinky.slurm.net/node-type={node_type}"
-    return {
+    registration: dict[str, object] = {
         "name": '{{ ds.meta_data["local_hostname"] }}',
         "kubeletExtraArgs": extra_args,
     }
+    if node_type == CONTROLLER_NODE_TYPE:
+        registration["taints"] = [controller_taint()]
+    return registration
 
 
 def _ssh_users(
@@ -361,10 +372,10 @@ def _kubeadm_control_plane_spec(
             )
         ],
         "initConfiguration": {
-            "nodeRegistration": _node_registration(node_type=node.node_type)
+            "nodeRegistration": _node_registration()
         },
         "joinConfiguration": {
-            "nodeRegistration": _node_registration(node_type=node.node_type)
+            "nodeRegistration": _node_registration()
         },
         "preKubeadmCommands": [
             (
@@ -536,7 +547,6 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
     byo_subnet: AzureBYOSubnet | None
     cluster_name: pulumi.Output[str]
     control_plane_name: pulumi.Output[str]
-    worker_machine_deployment_name: pulumi.Output[str]
     worker_machine_deployment_names: list[pulumi.Output[str]]
     control_plane_ready: pulumi.Output[bool]
     workload_kubeconfig: pulumi.Output[str]
@@ -982,7 +992,6 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.worker_machine_deployment_names = [
             pulumi.Output.from_input(worker_name) for worker_name in worker_names
         ]
-        self.worker_machine_deployment_name = self.worker_machine_deployment_names[0]
         self.control_plane_ready = cluster_control_plane_available.id.apply(
             lambda _: True
         )
@@ -1010,7 +1019,6 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 ),
                 "cluster_name": self.cluster_name,
                 "control_plane_name": self.control_plane_name,
-                "worker_machine_deployment_name": self.worker_machine_deployment_name,
                 "worker_machine_deployment_names": (
                     self.worker_machine_deployment_names
                 ),

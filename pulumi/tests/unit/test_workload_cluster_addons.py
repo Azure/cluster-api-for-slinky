@@ -6,6 +6,12 @@ from stacks.workload_cluster.workload_cluster_addons import (
     _azure_cloud_provider_values,
     _calico_vxlan_values,
 )
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    controller_bootstrap_tolerations,
+    controller_node_affinity,
+    controller_node_selector,
+    controller_tolerations,
+)
 
 
 def test_azure_cloud_provider_values_cover_bootstrap_taints() -> None:
@@ -40,3 +46,12 @@ def test_calico_uses_always_on_vxlan() -> None:
         "natOutgoing": "Enabled",
         "nodeSelector": "all()",
     }
+    assert values["nodeSelector"] == controller_node_selector()
+    assert values["affinity"] == controller_node_affinity()
+    assert values["tolerations"] == controller_bootstrap_tolerations()
+    assert values["installation"][
+        "controlPlaneNodeSelector"
+    ] == controller_node_selector()
+    assert values["installation"][
+        "controlPlaneTolerations"
+    ] == controller_tolerations()

@@ -10,6 +10,7 @@ import pulumi_kubernetes as k8s
 from pydantic import BaseModel, ConfigDict
 
 NODE_TYPE_LABEL = "slinky.slurm.net/node-type"
+CONTROLLER_TAINT_KEY = "slinky.slurm.net/controller"
 CONTROLLER_NODE_TYPE = "controller"
 COMPUTE_NODE_TYPE = "compute"
 AUTOSCALER_MIN_ANNOTATION = (
@@ -34,6 +35,67 @@ _CAPI_NAMESPACE = "default"
 _CAPI_INFRASTRUCTURE_API_GROUP = "infrastructure.cluster.x-k8s.io"
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
+
+
+def node_type_affinity(node_type: str) -> dict[str, object]:
+    return {
+        "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": NODE_TYPE_LABEL,
+                                "operator": "In",
+                                "values": [node_type],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+
+
+def controller_node_selector() -> dict[str, str]:
+    return {NODE_TYPE_LABEL: CONTROLLER_NODE_TYPE}
+
+
+def controller_node_affinity() -> dict[str, object]:
+    return node_type_affinity(CONTROLLER_NODE_TYPE)
+
+
+def controller_taint() -> dict[str, str]:
+    return {
+        "key": CONTROLLER_TAINT_KEY,
+        "value": "",
+        "effect": "NoSchedule",
+    }
+
+
+def controller_tolerations() -> list[dict[str, str]]:
+    return [
+        {
+            "key": CONTROLLER_TAINT_KEY,
+            "operator": "Exists",
+            "effect": "NoSchedule",
+        }
+    ]
+
+
+def controller_bootstrap_tolerations() -> list[dict[str, str]]:
+    return [
+        *controller_tolerations(),
+        {"operator": "Exists", "effect": "NoExecute"},
+        {"operator": "Exists", "effect": "NoSchedule"},
+    ]
+
+
+def controller_pod_spec() -> dict[str, object]:
+    return {
+        "tolerations": controller_tolerations(),
+        "affinity": controller_node_affinity(),
+    }
 
 
 def _resource_name(tenant: str, suffix: str) -> str:

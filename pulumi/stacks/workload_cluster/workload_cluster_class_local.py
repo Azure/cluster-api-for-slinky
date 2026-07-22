@@ -36,7 +36,6 @@ _LOCAL_MACHINE_DEPLOYMENTS = (
         name="head",
         node_type=CONTROLLER_NODE_TYPE,
         replicas=1,
-        controller=True,
     ),
     LocalMachineDeploymentSpec(
         name="compute",
@@ -137,6 +136,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             slurm_node_sets=slurm_node_sets,
             keda_scaled_node_sets=keda_scaled_node_sets,
             workload_provider=infrastructure.workload_provider,
+            pin_coredns_to_controller=True,
             opts=child_options(depends_on=[infrastructure]),
         )
 

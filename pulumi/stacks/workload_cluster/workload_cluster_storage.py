@@ -7,6 +7,8 @@ import pulumi_kubernetes as k8s
 
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     POD_SECURITY_PRIVILEGED_LABELS,
+    controller_node_affinity,
+    controller_tolerations,
 )
 
 
@@ -230,6 +232,8 @@ class LocalPathStorage(pulumi.ComponentResource):
                     ),
                     spec=k8s.core.v1.PodSpecArgs(
                         service_account_name=_LOCAL_PATH_SERVICE_ACCOUNT,
+                        affinity=controller_node_affinity(),
+                        tolerations=controller_tolerations(),
                         containers=[
                             k8s.core.v1.ContainerArgs(
                                 name=_LOCAL_PATH_DEPLOYMENT_NAME,

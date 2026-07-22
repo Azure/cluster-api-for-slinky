@@ -215,6 +215,7 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             slurm_node_sets=slurm_node_sets,
             keda_scaled_node_sets=keda_scaled_node_sets,
             workload_provider=infrastructure.workload_provider,
+            pin_coredns_to_controller=True,
             opts=child_options(depends_on=[infrastructure]),
         )
 

@@ -24,6 +24,7 @@ from stacks.workload_cluster.aso_detach_reconciler import (
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     CONTROLLER_NODE_TYPE,
     NODE_TYPE_LABEL,
+    controller_taint,
     node_labels,
 )
 
@@ -198,6 +199,7 @@ def _azure_managed_machine_pool_spec(
     sku: str,
     additional_tags: Mapping[str, str],
     node_labels: Mapping[str, str],
+    taints: Sequence[Mapping[str, str]] = (),
     autoscaling_bounds: tuple[int, int] | None = None,
     aso_managed_clusters_agent_pool_patches: Sequence[str] = (),
 ) -> dict[str, object]:
@@ -214,6 +216,8 @@ def _azure_managed_machine_pool_spec(
         "sku": sku,
         "nodeLabels": dict(node_labels),
     }
+    if taints:
+        spec["taints"] = [dict(taint) for taint in taints]
     if additional_tags:
         spec["additionalTags"] = dict(additional_tags)
     if autoscaling_bounds is not None:
@@ -406,6 +410,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     sku=node_sku,
                     additional_tags=dict(additional_tags or {}),
                     node_labels=node_labels(pool.node_type),
+                    taints=[controller_taint()] if pool.controller else [],
                     autoscaling_bounds=pool.autoscaling_bounds,
                     aso_managed_clusters_agent_pool_patches=aso_agent_pool_patches,
                 ),
