@@ -142,7 +142,9 @@ setup_venv() {
   log "python venv + requirements (pinned as ../.venv by pulumi/Pulumi.yaml)"
   python3 -m venv "$REPO_DIR/.venv"
   "$REPO_DIR/.venv/bin/pip" install --upgrade pip
-  "$REPO_DIR/.venv/bin/pip" install -r "$REPO_DIR/requirements.txt"
+  # requirements.txt uses editable installs whose paths are relative to the repo root
+  # (e.g. -e ./pulumi/sdks/local); pip resolves them against the CWD, so run from $REPO_DIR.
+  ( cd "$REPO_DIR" && "$REPO_DIR/.venv/bin/pip" install -r requirements.txt )
 }
 
 pulumi_up() {
