@@ -121,32 +121,30 @@ pod placement.
 
 ### Where Labels Originate
 
-In the Pulumi local workload-cluster class, worker classes generate direct
-CAPI MachineDeployments:
+The local workload cluster has one `KubeadmControlPlane`, one fixed controller
+`MachineDeployment`, and one autoscaled compute `MachineDeployment`:
 
 ```yaml
 workers:
-  machineDeployments:
-  - name: local-head
-    replicas: 1
-    metadata:
-      labels:
-        slinky.slurm.net/node-type: controller
+- name: local-head
+  replicas: 1
+  labels:
+    slinky.slurm.net/node-type: controller
 
-  - name: local-compute
-    # replicas omitted: Cluster Autoscaler owns the live value
-    metadata:
-      annotations:
-        cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size: '1'
-        cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size: '10'
-      labels:
-        slinky.slurm.net/node-type: compute
-        ca4s.azure.com/autoscaler-enabled: "true"
+- name: local-compute
+  # replicas omitted: Cluster Autoscaler owns the live value
+  metadata:
+    annotations:
+      cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size: '1'
+      cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size: '10'
+    labels:
+      slinky.slurm.net/node-type: compute
+      ca4s.azure.com/autoscaler-enabled: "true"
 ```
 
-- **`slinky.slurm.net/node-type: controller`** on the MachineDeployment
-  identifies nodes that run the Slurm head services (slurmctld, login,
-  REST API).
+- **`slinky.slurm.net/node-type: controller`** on the fixed controller
+  MachineDeployment identifies the worker that runs Slurm head and platform
+  services.
 - **`slinky.slurm.net/node-type: compute`** on the compute MachineDeployment
   identifies nodes that run slurmd worker pods.
 - **`ca4s.azure.com/autoscaler-enabled: "true"`** is a metadata marker on the
@@ -157,9 +155,10 @@ workers:
 
 ### How Labels Reach Kubernetes Nodes
 
-CAPI's controller manager propagates labels from `Machine` objects to
-`Node` objects, but only for labels that match a configured allowlist. The
-local control-plane setup configures the CAPI controller to sync Slinky labels:
+Controller and compute labels follow the CAPI propagation path from
+`MachineDeployment` to `Machine` to `Node`. CAPI only propagates labels that
+match a configured allowlist, so the local management setup enables Slinky
+labels:
 
 ```bash
 kubectl -n capi-system patch deployment/capi-controller-manager \
@@ -169,18 +168,19 @@ kubectl -n capi-system patch deployment/capi-controller-manager \
 ```
 
 This tells the CAPI controller to sync any label matching
-`.*slinky\.slurm\.net.*` from Machine to Node. Without this configuration,
-MachineDeployment-created nodes would not carry the `slinky.slurm.net/*`
-labels and pod affinity rules would fail.
+`.*slinky\.slurm\.net.*` from Machine to Node. Without it, worker nodes would
+not carry their controller/compute roles and required pod affinity would fail.
 
 ### Propagation Chain
 
 ```
-Pulumi worker class
+Pulumi controller/compute worker classes
   → MachineDeployment metadata.labels
     → Machine metadata.labels
-      → Kubernetes Node labels  (via CAPI controller --additional-sync-machine-labels)
-        → Pod nodeAffinity selectors match  (generated Slurm Helm values)
+      → Node role labels  (via --additional-sync-machine-labels)
+
+controller Node label → platform pod affinity
+compute Node label    → slurmd pod affinity
 ```
 
 ---
@@ -217,8 +217,8 @@ nodesets:
 This enforces two constraints:
 
 1. **Node affinity** — slurmd pods can only land on nodes labeled
-   `slinky.slurm.net/node-type: compute`. This keeps them off the
-   controller and control-plane nodes.
+  `slinky.slurm.net/node-type: compute`. This keeps them off controller and
+  control-plane nodes.
 2. **Pod anti-affinity** — no two pods with label
    `app.kubernetes.io/name: slurmd` may share the same hostname (node).
    This guarantees a strict **1:1 mapping between slurmd pods and compute
@@ -255,18 +255,18 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: "slinky.slurm.net/node-type"
+        - key: slinky.slurm.net/node-type
           operator: In
           values:
-          - "controller"
+          - controller
 ```
 
-This ensures all Slurm management components run on the controller worker
-rather than on compute workers, keeping head-node traffic isolated from worker
-workloads.
+This same role selects the dedicated controller MachineDeployment on local CAPD
+and Azure BYO, and the fixed System pool on AKS. Kubernetes control-plane nodes
+are not application placement targets.
 
-Other non-DaemonSet platform components are also pinned to the controller
-worker, including `cert-manager`, `slurm-operator`, `kube-prometheus-stack`,
+Other non-DaemonSet platform components are also pinned to the controller role,
+including `cert-manager`, `slurm-operator`, `kube-prometheus-stack`,
 `local-path-provisioner`, `coredns`, and `calico-kube-controllers`. The goal is
 that no ordinary platform Deployment lands on a compute node and prevents
 Cluster Autoscaler from removing that node when Slurm demand drops. DaemonSets
@@ -276,36 +276,40 @@ block scale-in by themselves.
 
 ---
 
-## Controller Node Taint Isolation
+## Controller Taint Isolation
 
-The controller worker is tainted at node registration time so tenant compute
-pods do not land on the Slurm head node by accident:
+Every project-managed controller worker/System pool has one taint:
 
 ```yaml
-joinConfiguration:
-  nodeRegistration:
-    taints:
-    - key: slinky.slurm.net/controller
-      effect: NoSchedule
+slinky.slurm.net/controller:NoSchedule
 ```
 
-Compute workers are intentionally untainted. Slurm `NodeSet` pods select them
-with `nodeAffinity`, and this keeps Cluster Autoscaler scale-in simpler: idle
-compute nodes are not held alive by platform pods that accidentally tolerated a
-compute taint.
+Platform pods tolerate this taint and use required controller-role affinity.
+Compute workers are untainted, and Slurm `NodeSet` pods select them with
+compute-role affinity. The taint keeps unconstrained tenant pods off controller
+workers, while affinity keeps platform Deployments off compute workers.
+
+Self-managed Kubernetes control-plane nodes retain kubeadm's standard
+`node-role.kubernetes.io/control-plane:NoSchedule` taint. That provider-owned
+taint is not managed or tolerated by the platform workloads because those pods
+target the dedicated controller worker instead.
 
 Placement is rendered directly by the Pulumi workload-cluster class. There are
 no separate root-level Helm values files for the managed local stack.
 
 ### Who Tolerates the Taint
 
-| Component | Tolerates controller taint? | How |
-|-----------|-----------------------------|-----|
-| Slurm controller/login/restapi | Yes | Generated chart values add `slinky.slurm.net/controller` toleration and controller node affinity |
-| Pinned platform Deployments | Yes | Generated Pulumi/Helm values add controller tolerations plus controller node affinity so they avoid compute nodes |
+| Component | Tolerates project controller taint? | How |
+|-----------|---------------------------------------|-----|
+| Slurm controller/login/restapi | Yes | Generated chart values add the custom toleration and controller-role affinity |
+| Pinned platform Deployments | Yes | Generated Pulumi/Helm values add the custom toleration plus controller-role affinity |
 | slurmd NodeSet workers | No | They select compute nodes by `slinky.slurm.net/node-type: compute` |
 | DaemonSets | Usually yes | Kubernetes DaemonSet defaults or chart tolerations allow node agents everywhere |
-| Tenant workloads | No | They stay off the controller worker unless explicitly configured |
+| Tenant workloads | No | They stay off controller nodes unless explicitly configured |
+
+AKS uses the same contract on its fixed System pool. Its Azure-managed control
+plane is not exposed as schedulable Nodes, so the System pool is the controller
+role target.
 
 ### NodeSet Placement
 
