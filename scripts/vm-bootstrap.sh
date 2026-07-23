@@ -32,6 +32,8 @@
 #   CAPZ_FORK_URL / CAPZ_FORK_BRANCH / CAPZ_FORK_DIR
 #                  public CAPZ VMSS-Flex fork checked out for the Pulumi customImages build;
 #                  CAPZ_FORK_DIR must match Pulumi.<stack>.yaml sourcePath (/home/azureuser/capz-vmss-flex).
+#   CAPS_KEEP_SSHD keep sshd on port 22 (default: stop it so the gitea-ssh LoadBalancer can
+#                  bind host:22). Set this when you rely on ssh into this VM.
 #   PULUMI_CONFIG_PASSPHRASE   default empty (matches the current mgmt VM).
 #   ARM_CLIENT_ID / ARM_CLIENT_SECRET / ARM_TENANT_ID / ARM_SUBSCRIPTION_ID
 #                  OPTIONAL service-principal override. Normally UNSET: the VM's
@@ -178,6 +180,21 @@ setup_venv() {
   ( cd "$REPO_DIR" && "$REPO_DIR/.venv/bin/pip" install -r requirements.txt )
 }
 
+free_ssh_port() {
+  # The GitOps gitea-ssh Service is type=LoadBalancer on port 22; cloud-provider-kind
+  # publishes LB services on the HOST, so it needs host:22 -- which collides with the VM's
+  # sshd and leaves gitea-ssh EXTERNAL-IP <pending> (the git sync then hangs forever). This
+  # mgmt VM is driven via `az vm run-command` (not ssh), so free port 22 by stopping sshd.
+  # Set CAPS_KEEP_SSHD=1 to skip (e.g. if you ssh into this box).
+  if [[ -n "${CAPS_KEEP_SSHD:-}" ]]; then
+    log "CAPS_KEEP_SSHD set - leaving sshd on :22 (gitea-ssh LoadBalancer may stay <pending>)"
+    return 0
+  fi
+  log "free host port 22 for the gitea-ssh LoadBalancer (stop sshd; VM is run-command driven)"
+  systemctl disable --now ssh.socket ssh 2>/dev/null || true
+  pkill -x sshd 2>/dev/null || true
+}
+
 pulumi_up() {
   log "pulumi up -s ${PULUMI_STACK} (IMDS discovers THIS VM's resource group)"
   # Local state backend: the VM is ephemeral per run and teardown is `az group
@@ -218,6 +235,7 @@ main() {
   fi
   setup_venv
   setup_capz_fork
+  free_ssh_port
   pulumi_up
   log "bootstrap complete"
   # Success sentinel: the pipeline's `az vm run-command invoke` returns success even
