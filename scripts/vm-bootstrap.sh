@@ -157,11 +157,13 @@ setup_repo() {
   if [[ -n "$GIT_TOKEN" && "$REPO_URL" == https://* ]]; then
     url="https://x-access-token:${GIT_TOKEN}@${REPO_URL#https://}"
   fi
+  # NOT a shallow clone: the GitOps gitops-sync pushes this repo's tree to the in-cluster
+  # gitea, and git rejects pushing from a shallow repo ("shallow update not allowed").
   if [[ -d "$REPO_DIR/.git" ]]; then
-    git -C "$REPO_DIR" fetch --depth 1 origin "$REPO_BRANCH"
+    git -C "$REPO_DIR" fetch origin "$REPO_BRANCH"
     git -C "$REPO_DIR" checkout -B "$REPO_BRANCH" "origin/$REPO_BRANCH"
   else
-    git clone --depth 1 --branch "$REPO_BRANCH" "$url" "$REPO_DIR"
+    git clone --branch "$REPO_BRANCH" "$url" "$REPO_DIR"
   fi
 }
 
