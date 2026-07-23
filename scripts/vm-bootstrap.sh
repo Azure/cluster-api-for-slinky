@@ -28,6 +28,10 @@
 #                  Pulumi.<stack>.yaml are used. `pulumi config set --path` type-infers
 #                  the replica count as an int (StrictPositiveInt in the config model).
 #   GO_VERSION     Go toolchain to install (default 1.23.4).
+#   ORAS_VERSION   oras CLI version for the capz-artifact OCI build (default 1.2.0).
+#   CAPZ_FORK_URL / CAPZ_FORK_BRANCH / CAPZ_FORK_DIR
+#                  public CAPZ VMSS-Flex fork checked out for the Pulumi customImages build;
+#                  CAPZ_FORK_DIR must match Pulumi.<stack>.yaml sourcePath (/home/azureuser/capz-vmss-flex).
 #   PULUMI_CONFIG_PASSPHRASE   default empty (matches the current mgmt VM).
 #   ARM_CLIENT_ID / ARM_CLIENT_SECRET / ARM_TENANT_ID / ARM_SUBSCRIPTION_ID
 #                  OPTIONAL service-principal override. Normally UNSET: the VM's
@@ -55,6 +59,13 @@ CONTROL_PLANE_VM_SIZE="${CONTROL_PLANE_VM_SIZE:-}"
 WORKER_VM_SIZE="${WORKER_VM_SIZE:-}"
 WORKER_REPLICAS="${WORKER_REPLICAS:-}"
 GO_VERSION="${GO_VERSION:-1.23.4}"
+ORAS_VERSION="${ORAS_VERSION:-1.2.0}"
+# CAPZ VMSS-Flex fork built by the Pulumi customImages/capzArtifact resources; the stack's
+# Pulumi.<stack>.yaml pins sourcePath + sourceRef=origin/arsdragonfly/md-vmss, so the source
+# must be checked out at CAPZ_FORK_DIR before `pulumi up`.
+CAPZ_FORK_URL="${CAPZ_FORK_URL:-https://github.com/arsdragonfly/cluster-api-provider-azure.git}"
+CAPZ_FORK_BRANCH="${CAPZ_FORK_BRANCH:-arsdragonfly/md-vmss}"
+CAPZ_FORK_DIR="${CAPZ_FORK_DIR:-/home/azureuser/capz-vmss-flex}"
 
 export PULUMI_CONFIG_PASSPHRASE="${PULUMI_CONFIG_PASSPHRASE:-}"
 export DEBIAN_FRONTEND=noninteractive
@@ -106,6 +117,14 @@ install_pulumi() {
   curl -fsSL https://get.pulumi.com | sh
 }
 
+install_oras() {
+  log "install oras ${ORAS_VERSION} (OCI artifact CLI used by the capz-artifact build)"
+  command -v oras >/dev/null 2>&1 && return 0
+  curl -fsSL "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz" -o /tmp/oras.tgz
+  tar -xzf /tmp/oras.tgz -C /usr/local/bin oras
+  rm -f /tmp/oras.tgz
+}
+
 install_kubectl_helm() {
   log "install kubectl + helm"
   local kver
@@ -136,6 +155,18 @@ setup_repo() {
   else
     git clone --depth 1 --branch "$REPO_BRANCH" "$url" "$REPO_DIR"
   fi
+}
+
+setup_capz_fork() {
+  log "checkout CAPZ VMSS-Flex fork -> ${CAPZ_FORK_DIR} (${CAPZ_FORK_BRANCH})"
+  # Pulumi's customImages/capzArtifact resources run `git -C <sourcePath> rev-parse
+  # <sourceRef>` and docker-build the CAPZ controller from it, so the PUBLIC fork must be
+  # checked out at the sourcePath the stack config pins.
+  mkdir -p "$(dirname "$CAPZ_FORK_DIR")"
+  if [[ ! -d "$CAPZ_FORK_DIR/.git" ]]; then
+    git clone --filter=blob:none "$CAPZ_FORK_URL" "$CAPZ_FORK_DIR"
+  fi
+  git -C "$CAPZ_FORK_DIR" fetch origin "$CAPZ_FORK_BRANCH"
 }
 
 setup_venv() {
@@ -178,6 +209,7 @@ main() {
   install_go_tools
   install_pulumi
   install_kubectl_helm
+  install_oras
   set_inotify
   if [[ -n "${SKIP_SETUP_REPO:-}" ]]; then
     log "SKIP_SETUP_REPO set - using pre-provisioned repo at ${REPO_DIR}"
@@ -185,6 +217,7 @@ main() {
     setup_repo
   fi
   setup_venv
+  setup_capz_fork
   pulumi_up
   log "bootstrap complete"
   # Success sentinel: the pipeline's `az vm run-command invoke` returns success even
