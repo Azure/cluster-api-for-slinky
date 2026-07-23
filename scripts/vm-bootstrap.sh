@@ -58,8 +58,15 @@ GO_VERSION="${GO_VERSION:-1.23.4}"
 
 export PULUMI_CONFIG_PASSPHRASE="${PULUMI_CONFIG_PASSPHRASE:-}"
 export DEBIAN_FRONTEND=noninteractive
+# az vm run-command runs as root in a minimal, non-login shell where HOME is unset, so Go
+# can't derive GOPATH/GOMODCACHE/GOCACHE ("neither GOMODCACHE nor GOPATH is set") and pulumi
+# can't find ~/.pulumi. Pin them explicitly.
+export HOME="${HOME:-/root}"
+export GOPATH="${GOPATH:-${HOME}/go}"
+export GOMODCACHE="${GOMODCACHE:-${GOPATH}/pkg/mod}"
+export GOCACHE="${GOCACHE:-${HOME}/.cache/go-build}"
 export GOBIN=/usr/local/bin
-export PATH="/usr/local/go/bin:/usr/local/bin:${HOME:-/root}/.pulumi/bin:${PATH}"
+export PATH="/usr/local/go/bin:/usr/local/bin:${GOPATH}/bin:${HOME}/.pulumi/bin:${PATH}"
 
 install_base_packages() {
   log "apt: base packages (git, curl, jq, python venv)"
