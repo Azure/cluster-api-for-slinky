@@ -17,7 +17,10 @@ from stacks.control_plane.control_plane_config import (
     InfrastructureProvidersConfig,
     UserAssignedMSIClusterIdentityConfig,
 )
-from pko.pko_bootstrap import _init_stack_config_with_flux_source
+from pko.pko_bootstrap import (
+    _init_stack_config_to_config,
+    _init_stack_config_with_flux_source,
+)
 from stacks.workload_cluster.registry_setting import LocalPortRegistrySetting
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
 from stacks.workload_cluster.tenants import TenantsConfig
@@ -170,6 +173,39 @@ def test_output_init_stack_config_accepts_output_base_config() -> None:
         assert resolved.control_plane.infrastructure_providers.azure.controller_image == (
             "custom-registry:5000/capz/controller:tag"
         )
+    finally:
+        asyncio.set_event_loop(previous_loop)
+        loop.close()
+
+
+def test_init_stack_config_serializes_nested_output_values() -> None:
+    previous_loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        config = InitStackConfig(
+            tenants=TenantsConfig(
+                workload_clusters={
+                    "local": LocalWorkloadClusterConfig(
+                        registry=LocalPortRegistrySetting(
+                            port=pulumi.Output.from_input(5002)
+                        ),
+                    )
+                }
+            )
+        )
+
+        serialized = _init_stack_config_to_config(config)
+        assert loop.run_until_complete(serialized.future()) == {
+            "tenants": {
+                "workloadClusters": {
+                    "local": {
+                        "className": "local",
+                        "registry": {"kind": "local-port", "port": 5002},
+                    }
+                }
+            }
+        }
     finally:
         asyncio.set_event_loop(previous_loop)
         loop.close()

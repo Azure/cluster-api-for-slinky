@@ -1037,6 +1037,7 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             repo_url=self.url,
             repo_branch=self.default_branch,
             git_auth_secret_name=flux_git_auth.name,
+            expected_revision=sync.head_sha,
             opts=ResourceOptions(
                 parent=self,
                 depends_on=[sync, flux_infrastructure, flux_git_auth],

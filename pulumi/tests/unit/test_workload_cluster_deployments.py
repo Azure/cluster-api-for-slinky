@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from stacks.workload_cluster.workload_cluster_deployments import (
     _cert_manager_values,
+    _coredns_controller_placement_spec,
     _keda_release_name,
     _keda_scaled_object_name,
     _keda_scaled_object_spec,
@@ -10,6 +11,8 @@ from stacks.workload_cluster.workload_cluster_deployments import (
     _prometheus_service_name,
     _prometheus_values,
     _slurm_nodeset_name,
+    _slurm_nodeset_values,
+    SlurmNodeSetSpec,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     controller_node_affinity,
@@ -92,6 +95,32 @@ def test_cert_manager_values_pin_every_chart_pod_to_controller_node() -> None:
     assert values["webhook"] == expected_placement
     assert values["cainjector"] == expected_placement
     assert values["startupapicheck"] == expected_placement
+
+
+def test_coredns_patch_only_sets_controller_affinity() -> None:
+    assert _coredns_controller_placement_spec() == {
+        "template": {"spec": {"affinity": controller_node_affinity()}}
+    }
+
+
+def test_slurm_nodeset_values_pin_pods_to_initial_node() -> None:
+    values = _slurm_nodeset_values(
+        SlurmNodeSetSpec(name="compute", node_type="compute", replicas=1)
+    )
+
+    assert values["pinToNode"] is True
+    assert values["taintKubeNodes"] is False
+    assert values["podSpec"]["affinity"]["nodeAffinity"][
+        "requiredDuringSchedulingIgnoredDuringExecution"
+    ]["nodeSelectorTerms"][0]["matchExpressions"][0] == {
+        "key": "slinky.slurm.net/node-type",
+        "operator": "In",
+        "values": ["compute"],
+    }
+    assert values["podSpec"]["affinity"]["podAntiAffinity"][
+        "requiredDuringSchedulingIgnoredDuringExecution"
+    ][0]["topologyKey"] == "kubernetes.io/hostname"
+
 
 def test_prometheus_server_address_uses_helm_release_name() -> None:
     assert (

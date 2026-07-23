@@ -104,6 +104,24 @@ def _init_stack_config_with_flux_source(
     ).apply(merge_flux_source)
 
 
+def _init_stack_config_to_config(
+    init_stack_config: pulumi.Input[InitStackConfig],
+) -> pulumi.Output[dict[str, object]]:
+    def unresolved_config(config: InitStackConfig) -> dict[str, object]:
+        return config.model_dump(
+            by_alias=False,
+            mode="python",
+            exclude_none=True,
+            exclude_defaults=True,
+        )
+
+    return pulumi.Output.from_input(init_stack_config).apply(
+        lambda config: pulumi.Output.from_input(unresolved_config(config))
+    ).apply(
+        lambda config: InitStackConfig.model_validate(config).to_config()
+    )
+
+
 class PKOBootstrap(pulumi.ComponentResource):
     """Install PKO and hand off control to the inner Stack CRs.
 
@@ -220,13 +238,13 @@ class PKOBootstrap(pulumi.ComponentResource):
             env=env,
             repo_dir=INIT_REPO_DIR,
             config={
-                INIT_STACK_CONFIG_KEY: pulumi.Output.from_input(
-                    _init_stack_config_with_flux_source(
+                INIT_STACK_CONFIG_KEY: _init_stack_config_to_config(
+                    init_stack_config=_init_stack_config_with_flux_source(
                         init_stack_config=init_stack_config,
                         flux_source_name=flux_source.source_name,
                         flux_source_namespace=flux_source.namespace,
                     )
-                ).apply(lambda config: config.to_config())
+                )
             },
         )
         init_stack = k8s.apiextensions.CustomResource(

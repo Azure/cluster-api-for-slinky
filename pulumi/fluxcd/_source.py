@@ -11,6 +11,8 @@ import pulumi_kubernetes as k8s
 import pulumi_random as random
 from pulumi import Output, ResourceOptions
 
+from stacks.kubernetes_annotations import pulumi_wait_for
+
 
 FLUX_NAMESPACE = "flux-system"
 FLUX_CHART_OCI = "oci://ghcr.io/fluxcd-community/charts/flux2"
@@ -34,6 +36,12 @@ def _secret_data(value: str) -> str:
 def _receiver_path(token: str, name: str, namespace: str) -> str:
     digest = hashlib.sha256(f"{token}{name}{namespace}".encode("utf-8")).hexdigest()
     return f"/hook/{digest}"
+
+
+def _wait_for_artifact_revision(branch: str, revision: str) -> dict[str, str]:
+    return pulumi_wait_for(
+        f"jsonpath={{.status.artifact.revision}}={branch}@sha1:{revision}"
+    )
 
 
 class FluxInfrastructure(pulumi.ComponentResource):
@@ -157,21 +165,34 @@ class FluxSource(pulumi.ComponentResource):
         repo_url: pulumi.Input[str],
         repo_branch: pulumi.Input[str],
         git_auth_secret_name: pulumi.Input[str],
+        expected_revision: pulumi.Input[str] | None = None,
         opts: ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:fluxcd:FluxSource", name, props={}, opts=opts)
 
         self.api_version = FLUX_SOURCE_API_VERSION
         self.kind = FLUX_SOURCE_KIND
+        child_opts = ResourceOptions.merge(
+            opts,
+            ResourceOptions(parent=self, provider=provider),
+        )
+        git_repository_annotations = None
+        if expected_revision is not None:
+            git_repository_annotations = Output.all(repo_branch, expected_revision).apply(
+                lambda args: _wait_for_artifact_revision(args[0], args[1])
+            )
+        git_repository_metadata: dict[str, pulumi.Input[object]] = {
+            "name": FLUX_SOURCE_NAME,
+            "namespace": namespace,
+        }
+        if git_repository_annotations is not None:
+            git_repository_metadata["annotations"] = git_repository_annotations
 
         git_repository = k8s.apiextensions.CustomResource(
             f"{name}-git-repository",
             api_version=self.api_version,
             kind=self.kind,
-            metadata={
-                "name": FLUX_SOURCE_NAME,
-                "namespace": namespace,
-            },
+            metadata=git_repository_metadata,
             spec={
                 "interval": "30s",
                 "url": repo_url,
@@ -179,10 +200,7 @@ class FluxSource(pulumi.ComponentResource):
                 "secretRef": {"name": git_auth_secret_name},
                 "timeout": "2m0s",
             },
-            opts=ResourceOptions(
-                parent=self,
-                provider=provider,
-            ),
+            opts=child_opts,
         )
 
         receiver_token = random.RandomPassword(
@@ -225,13 +243,13 @@ class FluxSource(pulumi.ComponentResource):
                     }
                 ],
             },
-            opts=ResourceOptions(
-                parent=self,
-                provider=provider,
-                depends_on=[
-                    receiver_token_secret,
-                    git_repository,
-                ],
+            opts=ResourceOptions.merge(
+                opts,
+                ResourceOptions(
+                    parent=self,
+                    provider=provider,
+                    depends_on=[receiver_token_secret, git_repository],
+                ),
             ),
         )
 

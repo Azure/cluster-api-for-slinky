@@ -213,6 +213,10 @@ def _prometheus_values() -> dict[str, object]:
     }
 
 
+def _coredns_controller_placement_spec() -> dict[str, object]:
+    return {"template": {"spec": {"affinity": controller_node_affinity()}}}
+
+
 def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
     return {
         "enabled": True,
@@ -238,10 +242,15 @@ def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
             "type": "RollingUpdate",
             "rollingUpdate": {"maxUnavailable": "25%"},
         },
+        "pinToNode": True,
         "taintKubeNodes": False,
         "podSpec": {
             "affinity": {
                 **node_type_affinity(node_set.node_type),
+                # TODO: move the one-slurmd-per-node anti-affinity and
+                # slurm-bridge node-name labeling into slurm-operator so
+                # StatefulSet NodeSets can maintain the Kubernetes Node
+                # slinky.slurm.net/slurm-nodename label for pinned pods.
                 "podAntiAffinity": {
                     "requiredDuringSchedulingIgnoredDuringExecution": [
                         {
@@ -473,11 +482,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
             k8s.apps.v1.DeploymentPatch(
                 "coredns-controller-placement",
                 metadata={"name": "coredns", "namespace": "kube-system"},
-                spec={
-                    "template": {
-                        "spec": controller_pod_spec()
-                    }
-                },
+                spec=_coredns_controller_placement_spec(),
                 opts=child_options(provider=workload_provider),
             )
 
