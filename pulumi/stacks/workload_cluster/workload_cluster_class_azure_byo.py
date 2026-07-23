@@ -89,6 +89,13 @@ class AzureBYOWorkloadSpec(PulumiConfigModel):
     # Unset => CAPZ default Ubuntu (CPU-only). TODO(caps): add control_plane_image
     # when the head node also needs the HPC image; CP stays CPU for NCCL host-launch.
     worker_image: AzureBYOMarketplaceImage | None = None
+    # Shared Image Gallery image-version resource IDs to boot the nodes from (e.g. the HPC
+    # image under validation, passed through from the pipeline). Rendered as CAPZ image.id
+    # and take precedence over worker_image; the image ships no Kubernetes, so CAPZ installs
+    # it at bootstrap. control_plane_image_id defaults to worker_image_id when unset so both
+    # roles boot the same image; set it explicitly to keep the control plane on another image.
+    worker_image_id: NonEmptyStr | None = None
+    control_plane_image_id: NonEmptyStr | None = None
     ssh_username: NonEmptyStr = _DEFAULT_SSH_USERNAME
     ssh_authorized_keys: tuple[NonEmptyStr, ...] = ()
     vnet: AzureBYOVNetConfig | None = None
@@ -173,6 +180,8 @@ def _default_node_pools(
                 "vm_size": parameters.control_plane_vm_size,
                 "replicas": 1,
                 "controller": True,
+                # The control plane boots the same gallery image unless overridden.
+                "image_id": parameters.control_plane_image_id or parameters.worker_image_id,
             }
         ),
         AzureBYONodePoolSpec.model_validate(
@@ -186,6 +195,7 @@ def _default_node_pools(
                 # Compute (worker) nodes get the optional V100 image; the control
                 # plane above intentionally stays on the CAPZ default Ubuntu image.
                 "image": parameters.worker_image,
+                "image_id": parameters.worker_image_id,
             }
         ),
     )

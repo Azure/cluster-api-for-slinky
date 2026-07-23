@@ -130,9 +130,13 @@ class AzureBYONodePoolSpec(PulumiConfigModel):
     attach_to_flex: StrictBool = False
     failure_domain: NonEmptyStr = _DEFAULT_FLEX_ZONE
     autoscaler_bounds: tuple[StrictPositiveInt, StrictPositiveInt] | None = None
-    # Optional V100-compatible image for the NDV2 GPU/NCCL path; None keeps the
-    # CAPZ default Ubuntu image (CPU-only clusters, e.g. caps-val).
+    # Optional V100-compatible marketplace image for the NDV2 GPU/NCCL path; None keeps
+    # the CAPZ default Ubuntu image (CPU-only clusters, e.g. caps-val).
     image: AzureBYOMarketplaceImage | None = None
+    # Optional Shared Image Gallery image-version resource ID to boot instead (e.g. the
+    # HPC image under validation). Rendered as CAPZ image.id and takes precedence over
+    # ``image``. The image carries no Kubernetes; the bootstrap config installs it.
+    image_id: NonEmptyStr | None = None
 
 
 def _autoscaler_annotations(
@@ -361,7 +365,11 @@ def _machine_template_spec(
         "networkInterfaces": [{"subnetName": subnet_name}],
         "additionalTags": dict(additional_tags),
     }
-    if node.image is not None:
+    if node.image_id is not None:
+        # Boot a Shared Image Gallery image-version by resource ID (e.g. the HPC image
+        # under validation). It ships no Kubernetes; the bootstrap config installs it.
+        spec["image"] = {"id": node.image_id}
+    elif node.image is not None:
         # NDV2/V100 nodes must boot a V100-compatible image (HPC-X/CUDA/NCCL);
         # the default CAPZ Ubuntu image has no GPU/IB tooling.
         spec["image"] = {"marketplace": node.image.to_marketplace()}

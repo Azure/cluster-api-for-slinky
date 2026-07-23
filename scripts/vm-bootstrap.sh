@@ -27,6 +27,10 @@
 #                  SKUs + worker count. Unset => the values committed in
 #                  Pulumi.<stack>.yaml are used. `pulumi config set --path` type-infers
 #                  the replica count as an int (StrictPositiveInt in the config model).
+#   WORKER_IMAGE_ID / CONTROL_PLANE_IMAGE_ID
+#                  OPTIONAL Shared Image Gallery image-version resource IDs for the worker /
+#                  control-plane nodes (e.g. the HPC image under validation). Rendered as CAPZ
+#                  image.id; control-plane defaults to the worker image when only WORKER_IMAGE_ID set.
 #   GO_VERSION     Go toolchain to install (default 1.23.4).
 #   ORAS_VERSION   oras CLI version for the capz-artifact OCI build (default 1.2.0).
 #   CAPZ_FORK_URL / CAPZ_FORK_BRANCH / CAPZ_FORK_DIR
@@ -60,6 +64,8 @@ TENANT_NAME="${TENANT_NAME:-caps-self}"
 CONTROL_PLANE_VM_SIZE="${CONTROL_PLANE_VM_SIZE:-}"
 WORKER_VM_SIZE="${WORKER_VM_SIZE:-}"
 WORKER_REPLICAS="${WORKER_REPLICAS:-}"
+WORKER_IMAGE_ID="${WORKER_IMAGE_ID:-}"
+CONTROL_PLANE_IMAGE_ID="${CONTROL_PLANE_IMAGE_ID:-}"
 GO_VERSION="${GO_VERSION:-1.23.4}"
 ORAS_VERSION="${ORAS_VERSION:-1.2.0}"
 # CAPZ VMSS-Flex fork built by the Pulumi customImages/capzArtifact resources; the stack's
@@ -215,6 +221,12 @@ pulumi_up() {
   fi
   if [[ -n "$WORKER_REPLICAS" ]]; then
     pulumi config set --path "${base}.workerReplicas" "$WORKER_REPLICAS"
+  fi
+  if [[ -n "$WORKER_IMAGE_ID" ]]; then
+    pulumi config set --path "${base}.workerImageId" "$WORKER_IMAGE_ID"
+  fi
+  if [[ -n "$CONTROL_PLANE_IMAGE_ID" ]]; then
+    pulumi config set --path "${base}.controlPlaneImageId" "$CONTROL_PLANE_IMAGE_ID"
   fi
   pulumi up -s "$PULUMI_STACK" --yes --non-interactive
 }
