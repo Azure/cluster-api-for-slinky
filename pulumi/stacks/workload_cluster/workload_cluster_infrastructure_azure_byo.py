@@ -412,6 +412,78 @@ def _ssh_users(
     ]
 
 
+def _node_needs_kubernetes_install(node: AzureBYONodePoolSpec) -> bool:
+    """True when the node boots an explicit image that ships no Kubernetes.
+
+    A Shared Image Gallery image (``image_id``, e.g. the azhpc HPC image under
+    validation) or a Marketplace image carries GPU/IB bits but no kubeadm. The
+    default CAPI reference image has kubeadm/kubelet/containerd baked in, so those
+    nodes skip the install.
+    """
+    return node.image_id is not None or node.image is not None
+
+
+def _kubernetes_install_commands(kubernetes_version: str) -> list[str]:
+    """preKubeadmCommands that install containerd + pinned kubelet/kubeadm/kubectl.
+
+    For a node booting an image with no Kubernetes (the HPC image under validation),
+    CAPZ installs Kubernetes at bootstrap so ``kubeadm init``/``join`` can run. Mirrors
+    the proven list in selfmanaged-validation.flex.yaml.
+
+    TODO(caps): only the Debian/Ubuntu (apt + pkgs.k8s.io) path is implemented; RPM-based
+    HPC images (AlmaLinux / AzureLinux) need a dnf/tdnf equivalent.
+    """
+    version = kubernetes_version.lstrip("v")  # e.g. 1.36.1
+    minor = "v" + ".".join(version.split(".")[:2])  # e.g. v1.36
+    package = f"{version}-1.1"  # pkgs.k8s.io deb revision, e.g. 1.36.1-1.1
+    repo = f"https://pkgs.k8s.io/core:/stable:/{minor}/deb/"
+    return [
+        "set -eux",
+        "export DEBIAN_FRONTEND=noninteractive",
+        "apt-get -o DPkg::Lock::Timeout=600 update -y",
+        (
+            "apt-get -o DPkg::Lock::Timeout=600 install -y "
+            "apt-transport-https ca-certificates curl gpg"
+        ),
+        (
+            "command -v containerd >/dev/null 2>&1 || "
+            "apt-get -o DPkg::Lock::Timeout=600 install -y containerd"
+        ),
+        "mkdir -p /etc/containerd",
+        "containerd config default > /etc/containerd/config.toml",
+        "sed -ri 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml",
+        "systemctl restart containerd",
+        "systemctl enable containerd",
+        "modprobe overlay",
+        "modprobe br_netfilter",
+        "printf 'overlay\\nbr_netfilter\\n' > /etc/modules-load.d/k8s.conf",
+        (
+            "printf 'net.bridge.bridge-nf-call-iptables=1\\n"
+            "net.bridge.bridge-nf-call-ip6tables=1\\n"
+            "net.ipv4.ip_forward=1\\n' > /etc/sysctl.d/k8s.conf"
+        ),
+        "sysctl --system",
+        "swapoff -a",
+        r"sed -ri '/\sswap\s/s/^/#/' /etc/fstab",
+        "mkdir -p /etc/apt/keyrings",
+        (
+            f"curl -fsSL {repo}Release.key | "
+            "gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg"
+        ),
+        (
+            "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] "
+            f"{repo} /' > /etc/apt/sources.list.d/kubernetes.list"
+        ),
+        "apt-get -o DPkg::Lock::Timeout=600 update -y",
+        (
+            "apt-get -o DPkg::Lock::Timeout=600 install -y "
+            f"kubelet={package} kubeadm={package} kubectl={package}"
+        ),
+        "apt-mark hold kubelet kubeadm kubectl",
+        "systemctl enable kubelet",
+    ]
+
+
 def _kubeadm_control_plane_spec(
     *,
     node: AzureBYONodePoolSpec,
@@ -421,6 +493,21 @@ def _kubeadm_control_plane_spec(
     ssh_username: str = "capi",
     ssh_authorized_keys: tuple[str, ...] = (),
 ) -> dict[str, object]:
+    # Restore the apiserver hostname the kubeadm files reference. When the control plane
+    # boots an image without Kubernetes (SIG/Marketplace), install containerd + kubelet/
+    # kubeadm/kubectl first so `kubeadm init` can run.
+    control_plane_pre_kubeadm: list[str] = [
+        (
+            "if [ -f /tmp/kubeadm.yaml ] || "
+            "[ -f /run/kubeadm/kubeadm.yaml ]; then "
+            f"echo '127.0.0.1 apiserver.{cluster_name}.capz.io apiserver' "
+            ">> /etc/hosts; fi"
+        )
+    ]
+    if _node_needs_kubernetes_install(node):
+        control_plane_pre_kubeadm = (
+            _kubernetes_install_commands(kubernetes_version) + control_plane_pre_kubeadm
+        )
     kubeadm_config_spec: dict[str, object] = {
         "clusterConfiguration": {
             "controllerManager": {
@@ -443,14 +530,7 @@ def _kubeadm_control_plane_spec(
         "joinConfiguration": {
             "nodeRegistration": _node_registration(node_type=node.node_type)
         },
-        "preKubeadmCommands": [
-            (
-                "if [ -f /tmp/kubeadm.yaml ] || "
-                "[ -f /run/kubeadm/kubeadm.yaml ]; then "
-                f"echo '127.0.0.1 apiserver.{cluster_name}.capz.io apiserver' "
-                ">> /etc/hosts; fi"
-            )
-        ],
+        "preKubeadmCommands": control_plane_pre_kubeadm,
         "postKubeadmCommands": [
             (
                 "if [ -f /tmp/kubeadm-join-config.yaml ] || "
@@ -531,6 +611,7 @@ def _kubeadm_config_template_spec(
     *,
     node: AzureBYONodePoolSpec,
     worker_name: str,
+    kubernetes_version: str,
     ssh_username: str = "capi",
     ssh_authorized_keys: tuple[str, ...] = (),
 ) -> dict[str, object]:
@@ -545,6 +626,12 @@ def _kubeadm_config_template_spec(
             "nodeRegistration": _node_registration(node_type=node.node_type)
         },
     }
+    if _node_needs_kubernetes_install(node):
+        # The worker image (SIG/Marketplace, e.g. the HPC image under validation) ships no
+        # Kubernetes; install containerd + kubelet/kubeadm/kubectl before `kubeadm join`.
+        template_spec["preKubeadmCommands"] = _kubernetes_install_commands(
+            kubernetes_version
+        )
     ssh_users = _ssh_users(
         ssh_username=ssh_username,
         ssh_authorized_keys=ssh_authorized_keys,
@@ -910,6 +997,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 spec=_kubeadm_config_template_spec(
                     node=worker_node,
                     worker_name=worker_name,
+                    kubernetes_version=kubernetes_version,
                     ssh_username=ssh_username,
                     ssh_authorized_keys=ssh_authorized_keys,
                 ),

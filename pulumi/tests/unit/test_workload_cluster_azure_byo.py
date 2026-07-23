@@ -825,6 +825,7 @@ def test_worker_config_template_injects_ssh_keys() -> None:
     spec = _kubeadm_config_template_spec(
         node=_compute_node(),
         worker_name="caps-self-md-0",
+        kubernetes_version="v1.36.1",
         ssh_username="capi",
         ssh_authorized_keys=("ssh-ed25519 AAAAC3NzaC1 debug@caps",),
     )
@@ -966,6 +967,7 @@ def test_worker_kubeadm_template_mounts_azure_config_and_labels_node() -> None:
     spec = _kubeadm_config_template_spec(
         node=_compute_node(),
         worker_name="caps-self-compute",
+        kubernetes_version="v1.36.1",
         ssh_username="debugger",
         ssh_authorized_keys=(
             "ssh-rsa AAAAfirst first@example.invalid",
