@@ -525,7 +525,17 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
             atomic=True,
             wait_for_jobs=True,
             timeout=600,
-            values={"crds": {"enabled": True}},
+            # crds.enabled installs the CRDs with the release. Disable the
+            # startupapicheck post-install hook: it runs `cert-manager check api` and
+            # frequently times out ("timed out waiting for the condition") before the
+            # freshly-installed webhook is reachable, which -- with atomic=True -- rolls
+            # the ENTIRE release back and deadlocks the retry loop. cert-manager's core
+            # is already gated by atomic + wait (the controller/webhook/cainjector
+            # Deployments must go Ready), so the extra end-to-end self-check is redundant.
+            values={
+                "crds": {"enabled": True},
+                "startupapicheck": {"enabled": False},
+            },
             opts=child_options(
                 provider=workload_provider,
                 depends_on=[cert_manager_namespace],
