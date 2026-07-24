@@ -509,6 +509,14 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         )
         cert_manager = k8s.helm.v3.Release(
             "workload-cert-manager",
+            # Pin a stable Helm release name. Without it Pulumi auto-generates a
+            # random suffix (workload-cert-manager-<hex>) that changes on every
+            # attempt. cert-manager's CRDs carry helm.sh/resource-policy: keep, so
+            # an atomic rollback of a failed install leaves the CRDs behind owned
+            # by the old random name; the next attempt's new name then fails with
+            # "invalid ownership metadata ... must equal ..." forever. A fixed name
+            # lets a retry adopt the kept CRDs and recover.
+            name=_CERT_MANAGER_CHART_NAME,
             chart=_CERT_MANAGER_CHART_NAME,
             version=_CERT_MANAGER_CHART_VERSION,
             repository_opts={"repo": _CERT_MANAGER_CHART_REPO},
@@ -580,6 +588,10 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         )
         slurm_operator_crds = k8s.helm.v3.Release(
             "slurm-operator-crds",
+            # Stable release name for the same reason as cert-manager above: this is
+            # a CRD-only chart, so a random auto-name churning across retries would
+            # deadlock on Helm CRD ownership metadata after any failed attempt.
+            name="slurm-operator-crds",
             chart=_SLINKY_OPERATOR_CRDS_CHART,
             version=_SLINKY_CHART_VERSION,
             namespace=_SLINKY_OPERATOR_NAMESPACE,
