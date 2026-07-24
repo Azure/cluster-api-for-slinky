@@ -36,8 +36,10 @@
 #   CAPZ_FORK_URL / CAPZ_FORK_BRANCH / CAPZ_FORK_DIR
 #                  public CAPZ VMSS-Flex fork checked out for the Pulumi customImages build;
 #                  CAPZ_FORK_DIR must match Pulumi.<stack>.yaml sourcePath (/home/azureuser/capz-vmss-flex).
-#   CAPS_KEEP_SSHD keep sshd on port 22 (default: stop it so the gitea-ssh LoadBalancer can
-#                  bind host:22). Set this when you rely on ssh into this VM.
+#   CAPS_KEEP_SSHD keep sshd on port 22 (default: MOVE it to CAPS_SSHD_PORT so the gitea-ssh
+#                  LoadBalancer can bind host:22 while the box stays ssh-reachable). Set this to
+#                  leave sshd on :22 (gitea-ssh LB may then stay <pending>).
+#   CAPS_SSHD_PORT alternate port to move the host sshd to when freeing :22 (default 2222).
 #   PULUMI_CONFIG_PASSPHRASE   default empty (matches the current mgmt VM).
 #   ARM_CLIENT_ID / ARM_CLIENT_SECRET / ARM_TENANT_ID / ARM_SUBSCRIPTION_ID
 #                  OPTIONAL service-principal override. Normally UNSET: the VM's
@@ -191,16 +193,30 @@ setup_venv() {
 free_ssh_port() {
   # The GitOps gitea-ssh Service is type=LoadBalancer on port 22; cloud-provider-kind
   # publishes LB services on the HOST, so it needs host:22 -- which collides with the VM's
-  # sshd and leaves gitea-ssh EXTERNAL-IP <pending> (the git sync then hangs forever). This
-  # mgmt VM is driven via `az vm run-command` (not ssh), so free port 22 by stopping sshd.
-  # Set CAPS_KEEP_SSHD=1 to skip (e.g. if you ssh into this box).
+  # sshd and leaves gitea-ssh EXTERNAL-IP <pending> (the git sync then hangs forever).
+  # Rather than KILLING sshd (which would end SSH debugging right when `pulumi up` runs and
+  # things fail), MOVE the host sshd to an alternate port so :22 frees up for gitea-ssh while
+  # the box stays reachable for debugging. Set CAPS_KEEP_SSHD=1 to leave sshd on :22.
   if [[ -n "${CAPS_KEEP_SSHD:-}" ]]; then
     log "CAPS_KEEP_SSHD set - leaving sshd on :22 (gitea-ssh LoadBalancer may stay <pending>)"
     return 0
   fi
-  log "free host port 22 for the gitea-ssh LoadBalancer (stop sshd; VM is run-command driven)"
-  systemctl disable --now ssh.socket ssh 2>/dev/null || true
-  pkill -x sshd 2>/dev/null || true
+  local port="${CAPS_SSHD_PORT:-2222}"
+  log "move host sshd to :${port} so gitea-ssh LoadBalancer can claim :22 (box stays ssh-reachable)"
+  # Ubuntu 24.04 uses socket activation (ssh.socket pins :22 and hands sshd the listener FD,
+  # so a Port directive alone is ignored). Disable the socket, pin the alt port via a drop-in,
+  # and run sshd as a normal standalone service so it binds ONLY :${port}.
+  mkdir -p /etc/ssh/sshd_config.d
+  printf 'Port %s\n' "$port" > /etc/ssh/sshd_config.d/10-caps-altport.conf
+  systemctl disable --now ssh.socket 2>/dev/null || true
+  systemctl reset-failed ssh.service 2>/dev/null || true
+  systemctl enable --now ssh.service 2>/dev/null || systemctl restart ssh.service 2>/dev/null || true
+  systemctl restart ssh.service 2>/dev/null || true
+  if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ':22 '; then
+    log "WARN: something still listens on :22 after moving sshd to :${port}"
+  else
+    log "host :22 is free for gitea-ssh (sshd now on :${port})"
+  fi
 }
 
 pulumi_up() {
