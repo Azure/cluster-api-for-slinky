@@ -89,15 +89,29 @@ export GOCACHE="${GOCACHE:-${HOME}/.cache/go-build}"
 export GOBIN=/usr/local/bin
 export PATH="/usr/local/go/bin:/usr/local/bin:${GOPATH}/bin:${HOME}/.pulumi/bin:${PATH}"
 
+apt_get() {
+  # Fresh Azure VMs run apt-daily / unattended-upgrades at boot, which hold the apt/dpkg
+  # locks; racing them makes apt fail with "Could not get lock ... lock-frontend". Wait
+  # (bounded) for the locks to release, then also let apt wait on the dpkg lock itself.
+  local waited=0
+  while command -v fuser >/dev/null 2>&1 \
+      && fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock >/dev/null 2>&1; do
+    [[ $waited -eq 0 ]] && log "waiting for boot-time apt/dpkg locks to release..."
+    if [[ $waited -ge 600 ]]; then log "WARN: apt locks still held after ${waited}s; proceeding"; break; fi
+    sleep 5; waited=$((waited + 5))
+  done
+  apt-get -o DPkg::Lock::Timeout=600 "$@"
+}
+
 install_base_packages() {
   log "apt: base packages (git, curl, jq, python venv)"
-  apt-get update -y
-  apt-get install -y git curl jq python3-venv python3-pip ca-certificates
+  apt_get update -y
+  apt_get install -y git curl jq python3-venv python3-pip ca-certificates
 }
 
 install_docker() {
   log "install Docker + Docker Hub mirror (README recommendation)"
-  apt-get install -y docker.io docker-buildx
+  apt_get install -y docker.io docker-buildx
   mkdir -p /etc/docker
   # Route host-side docker.io pulls (kindest/node, CAPD node, envoy) via the mirror.
   echo '{"registry-mirrors":["https://mirror.gcr.io"]}' > /etc/docker/daemon.json
