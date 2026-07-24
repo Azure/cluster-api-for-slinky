@@ -208,21 +208,24 @@ free_ssh_port() {
   # The GitOps gitea-ssh Service is type=LoadBalancer on port 22; cloud-provider-kind
   # publishes LB services on the HOST, so it needs host:22 -- which collides with the VM's
   # sshd and leaves gitea-ssh EXTERNAL-IP <pending> (the git sync then hangs forever).
-  # Rather than KILLING sshd (which would end SSH debugging right when `pulumi up` runs and
-  # things fail), MOVE the host sshd to an alternate port so :22 frees up for gitea-ssh while
-  # the box stays reachable for debugging. Set CAPS_KEEP_SSHD=1 to leave sshd on :22.
+  # Rather than KILLING sshd (which would end SSH debugging), MOVE the host sshd to an alternate
+  # port so :22 frees up for gitea-ssh while the box stays reachable for debugging. Runs EARLY so
+  # SSH works even if a later step fails; note Azure NRMS denies inbound :22 from the Internet but
+  # not :2222, so the alt port is also what makes SSH reachable at all. CAPS_KEEP_SSHD=1 skips.
   if [[ -n "${CAPS_KEEP_SSHD:-}" ]]; then
     log "CAPS_KEEP_SSHD set - leaving sshd on :22 (gitea-ssh LoadBalancer may stay <pending>)"
     return 0
   fi
   local port="${CAPS_SSHD_PORT:-2222}"
   log "move host sshd to :${port} so gitea-ssh LoadBalancer can claim :22 (box stays ssh-reachable)"
-  # Ubuntu 24.04 uses socket activation (ssh.socket pins :22 and hands sshd the listener FD,
-  # so a Port directive alone is ignored). Disable the socket, pin the alt port via a drop-in,
-  # and run sshd as a normal standalone service so it binds ONLY :${port}.
+  # Ubuntu 24.04 socket-activates ssh on :22 (ssh.socket hands sshd the listener FD, so a Port
+  # directive alone is ignored). `disable` is not enough -- the socket gets pulled back in and a
+  # lingering socket-spawned sshd keeps :22. MASK the socket, kill any running sshd, pin the alt
+  # port via a drop-in, then run sshd as a standalone service so it binds ONLY :${port}.
   mkdir -p /etc/ssh/sshd_config.d
   printf 'Port %s\n' "$port" > /etc/ssh/sshd_config.d/10-caps-altport.conf
-  systemctl disable --now ssh.socket 2>/dev/null || true
+  systemctl mask --now ssh.socket 2>/dev/null || true
+  pkill -x sshd 2>/dev/null || true
   systemctl reset-failed ssh.service 2>/dev/null || true
   systemctl enable --now ssh.service 2>/dev/null || systemctl restart ssh.service 2>/dev/null || true
   systemctl restart ssh.service 2>/dev/null || true
@@ -264,6 +267,9 @@ pulumi_up() {
 }
 
 main() {
+  # Move sshd to :2222 FIRST so the box is SSH-reachable for debugging even if a later step fails
+  # (Azure NRMS blocks inbound :22 from the Internet; this also frees :22 for the gitea-ssh LB).
+  free_ssh_port
   install_base_packages
   install_docker
   install_go
@@ -279,7 +285,6 @@ main() {
   fi
   setup_venv
   setup_capz_fork
-  free_ssh_port
   pulumi_up
   log "bootstrap complete"
   # Success sentinel: the pipeline's `az vm run-command invoke` returns success even
