@@ -67,6 +67,14 @@ def _calico_vxlan_values(*, pod_cidr: str) -> dict[str, object]:
     return {
         "installation": {
             "calicoNetwork": {
+                # HPC images expose an InfiniBand interface (ib0) whose address is on a
+                # separate fabric (e.g. 172.16.x.x) that other nodes cannot reach.
+                # Calico's default IP autodetection can pick ib0 as the node address,
+                # which sets the VXLAN tunnel endpoint to an unreachable IP and breaks
+                # cross-node pod networking -- admission webhooks that land on such a
+                # node then time out ("context deadline exceeded"). Pin autodetection to
+                # the Kubernetes node InternalIP (the routable eth0 / 10.x address).
+                "nodeAddressAutodetectionV4": {"kubernetes": "NodeInternalIP"},
                 "ipPools": [
                     {
                         "name": "default-ipv4-ippool",
