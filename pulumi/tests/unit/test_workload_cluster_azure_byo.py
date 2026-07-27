@@ -33,6 +33,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _effective_tags,
     _kubeadm_config_template_spec,
     _kubeadm_control_plane_spec,
+    _kubernetes_install_commands,
     _machine_deployment_spec,
     _machine_template_spec,
     _partition_node_pools,
@@ -907,6 +908,26 @@ def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
     assert "127.0.0.1 apiserver.caps-self.capz.io" in kubeadm[
         "preKubeadmCommands"
     ][0]
+
+
+def test_kubernetes_install_commands_cover_apt_dnf_tdnf() -> None:
+    script = "\n".join(_kubernetes_install_commands("v1.36.1"))
+    # A single OS switch selects the package manager (cloud-init runs these as one script).
+    assert 'case "${ID:-}"' in script
+    assert "ubuntu|debian)" in script
+    assert "almalinux|rhel|centos|rocky|fedora)" in script
+    assert "azurelinux|mariner)" in script
+    # Version pinning per package manager: apt uses <ver>-1.1, dnf/tdnf use <ver>.
+    assert "kubelet=1.36.1-1.1" in script
+    assert "kubelet-1.36.1" in script
+    # Correct pkgs.k8s.io channel for the minor, both flavors.
+    assert "core:/stable:/v1.36/deb/" in script
+    assert "core:/stable:/v1.36/rpm/" in script
+    # OS-agnostic prep is shared across all branches.
+    assert "swapoff -a" in script
+    assert "systemctl enable kubelet" in script
+    # An unrecognized OS fails loudly instead of silently skipping the install.
+    assert "unsupported OS for kubernetes install" in script
 
 
 def test_kubeadm_control_plane_adds_ssh_authorized_keys() -> None:

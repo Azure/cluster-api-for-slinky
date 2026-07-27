@@ -427,33 +427,61 @@ def _kubernetes_install_commands(kubernetes_version: str) -> list[str]:
     """preKubeadmCommands that install containerd + pinned kubelet/kubeadm/kubectl.
 
     For a node booting an image with no Kubernetes (the HPC image under validation),
-    CAPZ installs Kubernetes at bootstrap so ``kubeadm init``/``join`` can run. Mirrors
-    the proven list in selfmanaged-validation.flex.yaml.
+    CAPZ installs Kubernetes at bootstrap so ``kubeadm init``/``join`` can run. The apt
+    (Debian/Ubuntu) path mirrors the proven list in selfmanaged-validation.flex.yaml; the
+    dnf (AlmaLinux/RHEL) and tdnf (AzureLinux) paths follow upstream's Kubernetes RPM
+    instructions. cloud-init concatenates preKubeadmCommands into a single script, so the
+    leading ``set -eux`` and the ``case "$ID"`` OS switch persist across the whole list.
 
-    TODO(caps): only the Debian/Ubuntu (apt + pkgs.k8s.io) path is implemented; RPM-based
-    HPC images (AlmaLinux / AzureLinux) need a dnf/tdnf equivalent.
+    NOTE: only the apt path is validated end-to-end (the azhpc images under test are
+    Ubuntu-based today); the RPM paths are provided per upstream docs and untested here.
     """
     version = kubernetes_version.lstrip("v")  # e.g. 1.36.1
     minor = "v" + ".".join(version.split(".")[:2])  # e.g. v1.36
-    package = f"{version}-1.1"  # pkgs.k8s.io deb revision, e.g. 1.36.1-1.1
-    repo = f"https://pkgs.k8s.io/core:/stable:/{minor}/deb/"
+    deb_pkg = f"{version}-1.1"  # pkgs.k8s.io deb revision, e.g. 1.36.1-1.1
+    deb_repo = f"https://pkgs.k8s.io/core:/stable:/{minor}/deb/"
+    rpm_repo = f"https://pkgs.k8s.io/core:/stable:/{minor}/rpm/"
+    rpm_repo_file = (
+        "printf '[kubernetes]\\nname=Kubernetes\\n"
+        f"baseurl={rpm_repo}\\nenabled=1\\ngpgcheck=1\\n"
+        f"gpgkey={rpm_repo}repodata/repomd.xml.key\\n' > /etc/yum.repos.d/kubernetes.repo"
+    )
+    # OS-aware containerd + kubelet/kubeadm/kubectl install (one shell `case`).
+    install_block = "\n".join(
+        [
+            ". /etc/os-release",
+            'case "${ID:-}" in',
+            "  ubuntu|debian)",
+            "    export DEBIAN_FRONTEND=noninteractive",
+            "    apt-get -o DPkg::Lock::Timeout=600 update -y",
+            "    apt-get -o DPkg::Lock::Timeout=600 install -y apt-transport-https ca-certificates curl gpg",
+            "    command -v containerd >/dev/null 2>&1 || apt-get -o DPkg::Lock::Timeout=600 install -y containerd",
+            "    mkdir -p /etc/apt/keyrings",
+            f"    curl -fsSL {deb_repo}Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg",
+            f"    echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] {deb_repo} /' > /etc/apt/sources.list.d/kubernetes.list",
+            "    apt-get -o DPkg::Lock::Timeout=600 update -y",
+            f"    apt-get -o DPkg::Lock::Timeout=600 install -y kubelet={deb_pkg} kubeadm={deb_pkg} kubectl={deb_pkg}",
+            "    apt-mark hold kubelet kubeadm kubectl",
+            "    ;;",
+            "  almalinux|rhel|centos|rocky|fedora)",
+            f"    {rpm_repo_file}",
+            "    command -v containerd >/dev/null 2>&1 || dnf install -y containerd || dnf install -y containerd.io",
+            f"    dnf install -y --disableexcludes=kubernetes kubelet-{version} kubeadm-{version} kubectl-{version}",
+            "    (dnf install -y python3-dnf-plugin-versionlock && dnf versionlock add kubelet kubeadm kubectl) || true",
+            "    ;;",
+            "  azurelinux|mariner)",
+            f"    {rpm_repo_file}",
+            "    command -v containerd >/dev/null 2>&1 || tdnf install -y containerd",
+            f"    tdnf install -y kubelet-{version} kubeadm-{version} kubectl-{version}",
+            "    ;;",
+            "  *)",
+            '    echo "caps: unsupported OS for kubernetes install: ${ID:-unknown}" >&2; exit 1',
+            "    ;;",
+            "esac",
+        ]
+    )
     return [
         "set -eux",
-        "export DEBIAN_FRONTEND=noninteractive",
-        "apt-get -o DPkg::Lock::Timeout=600 update -y",
-        (
-            "apt-get -o DPkg::Lock::Timeout=600 install -y "
-            "apt-transport-https ca-certificates curl gpg"
-        ),
-        (
-            "command -v containerd >/dev/null 2>&1 || "
-            "apt-get -o DPkg::Lock::Timeout=600 install -y containerd"
-        ),
-        "mkdir -p /etc/containerd",
-        "containerd config default > /etc/containerd/config.toml",
-        "sed -ri 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml",
-        "systemctl restart containerd",
-        "systemctl enable containerd",
         "modprobe overlay",
         "modprobe br_netfilter",
         "printf 'overlay\\nbr_netfilter\\n' > /etc/modules-load.d/k8s.conf",
@@ -465,21 +493,12 @@ def _kubernetes_install_commands(kubernetes_version: str) -> list[str]:
         "sysctl --system",
         "swapoff -a",
         r"sed -ri '/\sswap\s/s/^/#/' /etc/fstab",
-        "mkdir -p /etc/apt/keyrings",
-        (
-            f"curl -fsSL {repo}Release.key | "
-            "gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg"
-        ),
-        (
-            "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] "
-            f"{repo} /' > /etc/apt/sources.list.d/kubernetes.list"
-        ),
-        "apt-get -o DPkg::Lock::Timeout=600 update -y",
-        (
-            "apt-get -o DPkg::Lock::Timeout=600 install -y "
-            f"kubelet={package} kubeadm={package} kubectl={package}"
-        ),
-        "apt-mark hold kubelet kubeadm kubectl",
+        install_block,
+        "mkdir -p /etc/containerd",
+        "containerd config default > /etc/containerd/config.toml",
+        "sed -ri 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml",
+        "systemctl restart containerd",
+        "systemctl enable containerd",
         "systemctl enable kubelet",
     ]
 
