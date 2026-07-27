@@ -6,6 +6,7 @@ from typing import Any
 
 import pulumi
 import pulumi_kubernetes as k8s
+import pulumi_random as random
 from pydantic import BaseModel, ConfigDict
 
 from lib.config import (
@@ -46,6 +47,24 @@ _SLINKY_OPERATOR_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator"
 _SLURM_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm"
 _SLINKY_OPERATOR_NAMESPACE = "slinky"
 _SLURM_NAMESPACE = "slurm"
+
+# MariaDB backend for Slurm accounting (slurmdbd). The slinky slurm chart v1.1.1
+# bundles no database, so a minimal MariaDB is deployed and accounting points at
+# the `mariadb` Service. This is the Slurm analog of hpc-image-val2's PBS
+# job_history_enable=t: durable `sacct` history so a finished job's exit state
+# survives past MinJobAge (how the benchmark harness detects failures).
+_MARIADB_IMAGE = "mariadb:11.4"
+_MARIADB_SERVICE = "mariadb"
+_MARIADB_PVC = "mariadb-data"
+_MARIADB_PORT = 3306
+_MARIADB_DATABASE = "slurm_acct_db"
+_MARIADB_USER = "slurm"
+_MARIADB_SECRET = "mariadb-password"
+_MARIADB_STORAGE_SIZE = "8Gi"
+_MARIADB_LABELS = {
+    "app.kubernetes.io/name": "mariadb",
+    "app.kubernetes.io/part-of": "slurm",
+}
 
 
 class SlurmNodeSetSpec(PulumiConfigModel):
@@ -295,8 +314,24 @@ def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
     }
 
 
+def _accounting_values() -> dict[str, object]:
+    """slurmdbd accounting values pointing at the in-cluster MariaDB service."""
+    return {
+        "enabled": True,
+        "external": False,
+        "storageConfig": {
+            "host": _MARIADB_SERVICE,
+            "port": _MARIADB_PORT,
+            "database": _MARIADB_DATABASE,
+            "username": _MARIADB_USER,
+            "passwordKeyRef": {"name": _MARIADB_SECRET, "key": "password"},
+        },
+    }
+
+
 def _slurm_values(node_sets: tuple[SlurmNodeSetSpec, ...]) -> dict[str, object]:
     return {
+        "accounting": _accounting_values(),
         "configFiles": {
             "cgroup.conf": "CgroupPlugin=disabled\n",
         },
@@ -596,6 +631,132 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 retain_on_delete=True,
             ),
         )
+        # MariaDB backend for Slurm accounting (slurmdbd). Minimal single-replica
+        # deployment with generated credentials, pinned to the controller node,
+        # exposed as the `mariadb` Service that accounting.storageConfig targets.
+        mariadb_password = random.RandomPassword(
+            "mariadb-password",
+            length=24,
+            special=False,
+            opts=child_options(provider=workload_provider),
+        )
+        mariadb_root_password = random.RandomPassword(
+            "mariadb-root-password",
+            length=24,
+            special=False,
+            opts=child_options(provider=workload_provider),
+        )
+        mariadb_secret = k8s.core.v1.Secret(
+            "mariadb-password",
+            metadata={"name": _MARIADB_SECRET, "namespace": _SLURM_NAMESPACE},
+            string_data={
+                "password": mariadb_password.result,
+                "mariadb-root-password": mariadb_root_password.result,
+            },
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[slurm_namespace],
+                retain_on_delete=True,
+            ),
+        )
+        mariadb_pvc = k8s.core.v1.PersistentVolumeClaim(
+            "mariadb-data",
+            metadata={"name": _MARIADB_PVC, "namespace": _SLURM_NAMESPACE},
+            spec={
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": _MARIADB_STORAGE_SIZE}},
+            },
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[slurm_namespace],
+                retain_on_delete=True,
+            ),
+        )
+        mariadb_deployment = k8s.apps.v1.Deployment(
+            "mariadb",
+            metadata={"name": _MARIADB_SERVICE, "namespace": _SLURM_NAMESPACE},
+            spec={
+                "replicas": 1,
+                "selector": {"matchLabels": _MARIADB_LABELS},
+                "strategy": {"type": "Recreate"},
+                "template": {
+                    "metadata": {"labels": _MARIADB_LABELS},
+                    "spec": {
+                        "affinity": _node_type_affinity(CONTROLLER_NODE_TYPE),
+                        "containers": [
+                            {
+                                "name": "mariadb",
+                                "image": _MARIADB_IMAGE,
+                                "ports": [{"containerPort": _MARIADB_PORT}],
+                                "env": [
+                                    {
+                                        "name": "MARIADB_DATABASE",
+                                        "value": _MARIADB_DATABASE,
+                                    },
+                                    {"name": "MARIADB_USER", "value": _MARIADB_USER},
+                                    {
+                                        "name": "MARIADB_PASSWORD",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "name": _MARIADB_SECRET,
+                                                "key": "password",
+                                            }
+                                        },
+                                    },
+                                    {
+                                        "name": "MARIADB_ROOT_PASSWORD",
+                                        "valueFrom": {
+                                            "secretKeyRef": {
+                                                "name": _MARIADB_SECRET,
+                                                "key": "mariadb-root-password",
+                                            }
+                                        },
+                                    },
+                                ],
+                                "volumeMounts": [
+                                    {"name": "data", "mountPath": "/var/lib/mysql"}
+                                ],
+                                "readinessProbe": {
+                                    "exec": {
+                                        "command": [
+                                            "healthcheck.sh",
+                                            "--connect",
+                                            "--innodb_initialized",
+                                        ]
+                                    },
+                                    "initialDelaySeconds": 15,
+                                    "periodSeconds": 10,
+                                },
+                            }
+                        ],
+                        "volumes": [
+                            {
+                                "name": "data",
+                                "persistentVolumeClaim": {"claimName": _MARIADB_PVC},
+                            }
+                        ],
+                    },
+                },
+            },
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[slurm_namespace, mariadb_secret, mariadb_pvc],
+                retain_on_delete=True,
+            ),
+        )
+        mariadb_service = k8s.core.v1.Service(
+            "mariadb",
+            metadata={"name": _MARIADB_SERVICE, "namespace": _SLURM_NAMESPACE},
+            spec={
+                "selector": _MARIADB_LABELS,
+                "ports": [{"port": _MARIADB_PORT, "targetPort": _MARIADB_PORT}],
+            },
+            opts=child_options(
+                provider=workload_provider,
+                depends_on=[slurm_namespace],
+                retain_on_delete=True,
+            ),
+        )
         slurm_operator_crds = k8s.helm.v3.Release(
             "slurm-operator-crds",
             # Stable release name for the same reason as cert-manager above: this is
@@ -646,6 +807,9 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 depends_on=[
                     slurm_namespace,
                     slurm_operator,
+                    mariadb_secret,
+                    mariadb_service,
+                    mariadb_deployment,
                 ],
                 retain_on_delete=True,
             ),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from stacks.workload_cluster.workload_cluster_deployments import (
+    _accounting_values,
     _keda_release_name,
     _keda_scaled_object_name,
     _keda_scaled_object_spec,
@@ -9,7 +10,26 @@ from stacks.workload_cluster.workload_cluster_deployments import (
     _prometheus_service_name,
     _prometheus_values,
     _slurm_nodeset_name,
+    _slurm_values,
 )
+
+
+def test_accounting_values_point_at_mariadb() -> None:
+    accounting = _accounting_values()
+    assert accounting["enabled"] is True
+    assert accounting["external"] is False
+    storage = accounting["storageConfig"]
+    assert storage["host"] == "mariadb"
+    assert storage["port"] == 3306
+    assert storage["database"] == "slurm_acct_db"
+    assert storage["username"] == "slurm"
+    assert storage["passwordKeyRef"] == {"name": "mariadb-password", "key": "password"}
+
+
+def test_slurm_values_enable_accounting() -> None:
+    values = _slurm_values(())
+    assert values["accounting"]["enabled"] is True
+    assert values["accounting"]["storageConfig"]["host"] == "mariadb"
 
 
 def test_prometheus_values_pin_components_to_controller_node() -> None:
