@@ -13,6 +13,8 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     AzureBYOVNetConfig,
     AzureBYOWorkloadClusterConfig,
     AzureBYOWorkloadSpec,
+    _azure_byo_keda_scaled_node_sets,
+    _azure_byo_slurm_node_sets,
     _default_node_pools,
     _explicit_byo_subnet,
     _resolve_byo_subnet,
@@ -141,6 +143,26 @@ def test_default_node_pools_applies_worker_image_to_compute_only() -> None:
     assert len(workers) == 1
     assert workers[0].image == image
     assert workers[0].vm_size == "Standard_ND40rs_v2"
+
+
+def test_slurm_and_keda_node_sets_track_worker_replicas() -> None:
+    node_sets = _azure_byo_slurm_node_sets(4)
+    assert len(node_sets) == 1
+    assert node_sets[0].name == "compute"
+    assert node_sets[0].replicas == 4
+
+    scaled = _azure_byo_keda_scaled_node_sets(4)
+    assert len(scaled) == 1
+    assert scaled[0].node_set_name == "compute"
+    # Floor at the provisioned worker count; keep headroom for autoscaling.
+    assert scaled[0].min_replicas == 4
+    assert scaled[0].max_replicas == 10
+
+
+def test_keda_max_replicas_never_below_min() -> None:
+    scaled = _azure_byo_keda_scaled_node_sets(16)
+    assert scaled[0].min_replicas == 16
+    assert scaled[0].max_replicas == 16
 
 
 def test_cluster_lifecycle_annotations_defer_readiness_to_late_patch() -> None:

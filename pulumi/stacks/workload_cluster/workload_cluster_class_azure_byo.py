@@ -44,12 +44,38 @@ _DEFAULT_SSH_USERNAME = "capi"
 _CONTROLLER_NODE_TYPE = "controller"
 _COMPUTE_NODE_TYPE = "compute"
 
-_AZURE_BYO_SLURM_NODE_SETS = (
-    SlurmNodeSetSpec(name="compute", node_type=_COMPUTE_NODE_TYPE, replicas=1),
-)
-_AZURE_BYO_KEDA_SCALED_NODE_SETS = (
-    KEDANodeSetScalerSpec(node_set_name="compute", min_replicas=1, max_replicas=10),
-)
+_AZURE_BYO_KEDA_MAX_REPLICAS = 10
+
+
+def _azure_byo_slurm_node_sets(worker_replicas: int) -> tuple[SlurmNodeSetSpec, ...]:
+    """One compute NodeSet whose slurmd replica floor matches the worker VMs.
+
+    Sizing the NodeSet to the provisioned worker count makes ``sinfo`` report all
+    N compute nodes as soon as Slurm is up (rather than the KEDA idle floor of 1),
+    so the scheduling-validation matrix spans the real cluster.
+    """
+    return (
+        SlurmNodeSetSpec(
+            name="compute", node_type=_COMPUTE_NODE_TYPE, replicas=worker_replicas
+        ),
+    )
+
+
+def _azure_byo_keda_scaled_node_sets(
+    worker_replicas: int,
+) -> tuple[KEDANodeSetScalerSpec, ...]:
+    """KEDA bounds for the compute NodeSet: floor at the worker count, headroom above.
+
+    ``min_replicas`` = the provisioned worker count so KEDA does not scale the
+    NodeSet below the statically provisioned nodes when the queue drains.
+    """
+    return (
+        KEDANodeSetScalerSpec(
+            node_set_name="compute",
+            min_replicas=worker_replicas,
+            max_replicas=max(worker_replicas, _AZURE_BYO_KEDA_MAX_REPLICAS),
+        ),
+    )
 
 
 class AzureBYOSubnetConfig(PulumiConfigModel):
@@ -281,12 +307,8 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
         azure_tenant_id: pulumi.Input[str] | None,
         azure_identity_resource_id: pulumi.Input[str] | None,
         node_pools: tuple[AzureBYONodePoolSpec, ...] | None = None,
-        slurm_node_sets: tuple[
-            SlurmNodeSetSpec, ...
-        ] = _AZURE_BYO_SLURM_NODE_SETS,
-        keda_scaled_node_sets: tuple[
-            KEDANodeSetScalerSpec, ...
-        ] = _AZURE_BYO_KEDA_SCALED_NODE_SETS,
+        slurm_node_sets: tuple[SlurmNodeSetSpec, ...] | None = None,
+        keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -310,6 +332,12 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
 
         parameters = config.parameters
         node_pools = node_pools or _default_node_pools(parameters)
+        if slurm_node_sets is None:
+            slurm_node_sets = _azure_byo_slurm_node_sets(parameters.worker_replicas)
+        if keda_scaled_node_sets is None:
+            keda_scaled_node_sets = _azure_byo_keda_scaled_node_sets(
+                parameters.worker_replicas
+            )
         byo_subnet = _resolve_byo_subnet(parameters)
         resource_group_name = _resolve_resource_group(parameters)
         infrastructure = AzureBYOWorkloadClusterInfrastructure(
