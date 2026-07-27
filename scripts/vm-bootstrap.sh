@@ -205,34 +205,47 @@ setup_venv() {
 }
 
 free_ssh_port() {
-  # The GitOps gitea-ssh Service is type=LoadBalancer on port 22; cloud-provider-kind
-  # publishes LB services on the HOST, so it needs host:22 -- which collides with the VM's
-  # sshd and leaves gitea-ssh EXTERNAL-IP <pending> (the git sync then hangs forever).
-  # Rather than KILLING sshd (which would end SSH debugging), MOVE the host sshd to an alternate
-  # port so :22 frees up for gitea-ssh while the box stays reachable for debugging. Runs EARLY so
-  # SSH works even if a later step fails; note Azure NRMS denies inbound :22 from the Internet but
-  # not :2222, so the alt port is also what makes SSH reachable at all. CAPS_KEEP_SSHD=1 skips.
+  # The GitOps gitea-ssh Service is type=LoadBalancer on port 22; cloud-provider-kind publishes
+  # LB services on the HOST, so it needs host:22 -- which collides with the VM's sshd and leaves
+  # gitea-ssh EXTERNAL-IP <pending> (the git sync then hangs forever). Free :22 for gitea-ssh and
+  # run a DEDICATED sshd on an alternate port for debugging. Runs EARLY so SSH works even if a
+  # later step fails. Azure NRMS denies inbound :22 from the Internet but not :2222, so the alt
+  # port is also what makes SSH reachable at all. CAPS_KEEP_SSHD=1 leaves sshd on :22.
   if [[ -n "${CAPS_KEEP_SSHD:-}" ]]; then
     log "CAPS_KEEP_SSHD set - leaving sshd on :22 (gitea-ssh LoadBalancer may stay <pending>)"
     return 0
   fi
   local port="${CAPS_SSHD_PORT:-2222}"
-  log "move host sshd to :${port} so gitea-ssh LoadBalancer can claim :22 (box stays ssh-reachable)"
-  # Ubuntu 24.04 socket-activates ssh on :22 (ssh.socket hands sshd the listener FD, so a Port
-  # directive alone is ignored). `disable` is not enough -- the socket gets pulled back in and a
-  # lingering socket-spawned sshd keeps :22. MASK the socket, kill any running sshd, pin the alt
-  # port via a drop-in, then run sshd as a standalone service so it binds ONLY :${port}.
-  mkdir -p /etc/ssh/sshd_config.d
-  printf 'Port %s\n' "$port" > /etc/ssh/sshd_config.d/10-caps-altport.conf
+  log "free :22 for gitea-ssh; run a dedicated sshd on :${port} (box stays ssh-reachable)"
+  # Ubuntu socket-activates ssh on :22 via ssh.socket, and ssh.service has Requires=ssh.socket --
+  # so we cannot just move ssh.service to another port (masking the socket then prevents
+  # ssh.service from starting). Instead mask/stop the stock ssh (freeing :22) and run our OWN
+  # sshd unit that does NOT depend on the socket; -p overrides the config Port so it binds ONLY
+  # :${port}. Enabled so it survives reboots.
+  systemctl disable --now ssh.service 2>/dev/null || true
   systemctl mask --now ssh.socket 2>/dev/null || true
   pkill -x sshd 2>/dev/null || true
-  systemctl reset-failed ssh.service 2>/dev/null || true
-  systemctl enable --now ssh.service 2>/dev/null || systemctl restart ssh.service 2>/dev/null || true
-  systemctl restart ssh.service 2>/dev/null || true
-  if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ':22 '; then
-    log "WARN: something still listens on :22 after moving sshd to :${port}"
+  cat > /etc/systemd/system/caps-sshd.service <<UNIT
+[Unit]
+Description=CAPS debug sshd on port ${port}
+After=network-online.target
+Wants=network-online.target
+[Service]
+RuntimeDirectory=sshd
+RuntimeDirectoryMode=0755
+ExecStartPre=/usr/sbin/sshd -t
+ExecStart=/usr/sbin/sshd -D -e -p ${port}
+Restart=on-failure
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now caps-sshd.service 2>/dev/null || systemctl restart caps-sshd.service 2>/dev/null || true
+  if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ":${port} "; then
+    log "dedicated sshd listening on :${port}"
   else
-    log "host :22 is free for gitea-ssh (sshd now on :${port})"
+    log "WARN: dedicated sshd not listening on :${port} (check caps-sshd.service)"
   fi
 }
 
