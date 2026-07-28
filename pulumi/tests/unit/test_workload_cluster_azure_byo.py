@@ -580,7 +580,7 @@ def test_default_node_pools_match_minimum_cluster_sizing() -> None:
         vm_size="Standard_D8as_v5",
         replicas=2,
         attach_to_flex=True,
-        autoscaler_bounds=(1, 10),
+        autoscaler_bounds=(2, 10),
     )
 
 

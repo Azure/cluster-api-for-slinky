@@ -683,6 +683,11 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                     "metadata": {"labels": _MARIADB_LABELS},
                     "spec": {
                         "affinity": _node_type_affinity(CONTROLLER_NODE_TYPE),
+                        # MariaDB is pinned to the controller node, which in the
+                        # BYO path is the tainted k8s control-plane node; tolerate
+                        # that taint like the slurm control-plane pods do, else the
+                        # pod stays Pending and slurm accounting never comes up.
+                        "tolerations": _controller_tolerations(),
                         "containers": [
                             {
                                 "name": "mariadb",

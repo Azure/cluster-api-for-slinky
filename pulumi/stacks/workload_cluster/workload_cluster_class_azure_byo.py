@@ -217,7 +217,13 @@ def _default_node_pools(
                 "vm_size": parameters.worker_vm_size,
                 "replicas": parameters.worker_replicas,
                 "attach_to_flex": True,
-                "autoscaler_bounds": (1, 10),
+                # Floor the compute pool at the provisioned worker count so the
+                # Slurm slurmd NodeSet (also floored at worker_replicas) always has
+                # nodes; cluster-autoscaler still scales up to 10 for pending jobs.
+                "autoscaler_bounds": (
+                    parameters.worker_replicas,
+                    max(parameters.worker_replicas, 10),
+                ),
                 # Compute (worker) nodes get the optional V100 image; the control
                 # plane above intentionally stays on the CAPZ default Ubuntu image.
                 "image": parameters.worker_image,
