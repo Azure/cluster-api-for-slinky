@@ -34,7 +34,13 @@ from stacks.workload_cluster.workload_cluster_storage import LocalPathStorage
 
 
 _FLEX_ORCHESTRATION_MODE = "Flexible"
-_DEFAULT_FLEX_ZONE = "1"
+# Availability zone for the Flex VMSS, the internal API-server LB, and the
+# machine failureDomain. southcentralus offers the RDMA GPU SKUs (e.g.
+# Standard_ND96amsr_A100_v4) ONLY in zone 3, and the D-series control-plane /
+# CPU SKUs are available in zone 3 too, so zone 3 is the broadest fit for this
+# subscription's southcentralus clusters. TODO(caps): make this a per-run config
+# value once multi-region/zone provisioning is needed (SKU zones vary by region).
+_DEFAULT_FLEX_ZONE = "3"
 _DEFAULT_PLATFORM_FAULT_DOMAIN_COUNT = 1
 _CAPI_API_VERSION = "cluster.x-k8s.io/v1beta1"
 _BOOTSTRAP_API_VERSION = "bootstrap.cluster.x-k8s.io/v1beta1"

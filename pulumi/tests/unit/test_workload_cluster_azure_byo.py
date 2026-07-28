@@ -651,7 +651,7 @@ def test_vmss_flex_args_describe_empty_placement_container() -> None:
     assert args.location == "southcentralus"
     assert args.orchestration_mode == "Flexible"
     assert args.platform_fault_domain_count == 1
-    assert args.zones == ["1"]
+    assert args.zones == ["3"]
     assert args.sku is None
     assert args.tags == {"Owner": "zheyushen"}
 
@@ -735,7 +735,7 @@ def test_azure_cluster_spec_reuses_cluster_subnet_and_internal_lb() -> None:
         "apiServerLB": {
             "name": "caps-self-internal-lb",
             "type": "Internal",
-            "availabilityZones": ["1"],
+            "availabilityZones": ["3"],
         },
         "controlPlaneOutboundLB": {"frontendIPsCount": 1},
         "nodeOutboundLB": {"frontendIPsCount": 1},
@@ -995,7 +995,7 @@ def test_compute_machine_deployment_references_flex_worker_templates() -> None:
         "slinky.slurm.net/node-type": "compute",
         "caps-self.worker": "compute",
     }
-    assert spec["template"]["spec"]["failureDomain"] == "1"
+    assert spec["template"]["spec"]["failureDomain"] == "3"
     assert spec["template"]["metadata"]["labels"][
         "slinky.slurm.net/node-type"
     ] == "compute"
