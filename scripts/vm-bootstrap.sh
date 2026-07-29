@@ -34,6 +34,10 @@
 #   WORKLOAD_SSH_PUBLIC_KEYS
 #                  OPTIONAL semicolon-separated public keys authorized for the workload
 #                  control-plane and worker `capi` user (debug access via the mgmt VM).
+#   GENERATE_WORKLOAD_SSH_KEY / WORKLOAD_SSH_KEY_PATH
+#                  Set GENERATE_WORKLOAD_SSH_KEY=1 to create a management-VM-owned
+#                  key (default path /root/.ssh/caps-workload) and authorize it on
+#                  workload nodes for Slurm host-launch benchmarks.
 #   GO_VERSION     Go toolchain to install (default 1.23.4).
 #   ORAS_VERSION   oras CLI version for the capz-artifact OCI build (default 1.2.0).
 #   CAPZ_FORK_URL / CAPZ_FORK_BRANCH / CAPZ_FORK_DIR
@@ -72,6 +76,8 @@ WORKER_REPLICAS="${WORKER_REPLICAS:-}"
 WORKER_IMAGE_ID="${WORKER_IMAGE_ID:-}"
 CONTROL_PLANE_IMAGE_ID="${CONTROL_PLANE_IMAGE_ID:-}"
 WORKLOAD_SSH_PUBLIC_KEYS="${WORKLOAD_SSH_PUBLIC_KEYS:-}"
+GENERATE_WORKLOAD_SSH_KEY="${GENERATE_WORKLOAD_SSH_KEY:-0}"
+WORKLOAD_SSH_KEY_PATH="${WORKLOAD_SSH_KEY_PATH:-${HOME:-/root}/.ssh/caps-workload}"
 GO_VERSION="${GO_VERSION:-1.23.4}"
 ORAS_VERSION="${ORAS_VERSION:-1.2.0}"
 # CAPZ VMSS-Flex fork built by the Pulumi customImages/capzArtifact resources; the stack's
@@ -253,6 +259,33 @@ UNIT
   fi
 }
 
+prepare_workload_ssh_key() {
+  case "${GENERATE_WORKLOAD_SSH_KEY,,}" in
+    1|true|yes|on) ;;
+    *) return ;;
+  esac
+
+  log "prepare management-owned workload SSH key"
+  install -d -m 0700 "$(dirname "$WORKLOAD_SSH_KEY_PATH")"
+  if [[ ! -s "$WORKLOAD_SSH_KEY_PATH" || ! -s "${WORKLOAD_SSH_KEY_PATH}.pub" ]]; then
+    rm -f "$WORKLOAD_SSH_KEY_PATH" "${WORKLOAD_SSH_KEY_PATH}.pub"
+    ssh-keygen -q -t ed25519 -N '' -C 'caps-host-launch' -f "$WORKLOAD_SSH_KEY_PATH"
+  fi
+  chmod 0600 "$WORKLOAD_SSH_KEY_PATH"
+  chmod 0644 "${WORKLOAD_SSH_KEY_PATH}.pub"
+
+  local public_key
+  public_key="$(<"${WORKLOAD_SSH_KEY_PATH}.pub")"
+  if [[ ";${WORKLOAD_SSH_PUBLIC_KEYS};" != *";${public_key};"* ]]; then
+    if [[ -n "$WORKLOAD_SSH_PUBLIC_KEYS" ]]; then
+      WORKLOAD_SSH_PUBLIC_KEYS+=";${public_key}"
+    else
+      WORKLOAD_SSH_PUBLIC_KEYS="$public_key"
+    fi
+  fi
+  log "workload host-launch key ready at ${WORKLOAD_SSH_KEY_PATH}"
+}
+
 pulumi_up() {
   log "pulumi up -s ${PULUMI_STACK} (IMDS discovers THIS VM's resource group)"
   # Local state backend: the VM is ephemeral per run and teardown is `az group
@@ -310,6 +343,7 @@ main() {
   fi
   setup_venv
   setup_capz_fork
+  prepare_workload_ssh_key
   pulumi_up
   log "bootstrap complete"
   # Success sentinel: the pipeline's `az vm run-command invoke` returns success even

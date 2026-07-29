@@ -428,7 +428,11 @@ def _node_needs_kubernetes_install(node: AzureBYONodePoolSpec) -> bool:
     return node.image_id is not None or node.image is not None
 
 
-def _kubernetes_install_commands(kubernetes_version: str) -> list[str]:
+def _kubernetes_install_commands(
+    kubernetes_version: str,
+    *,
+    ssh_username: str = "capi",
+) -> list[str]:
     """preKubeadmCommands that install containerd + pinned kubelet/kubeadm/kubectl.
 
     For a node booting an image with no Kubernetes (the HPC image under validation),
@@ -505,6 +509,10 @@ def _kubernetes_install_commands(kubernetes_version: str) -> list[str]:
         "systemctl restart containerd",
         "systemctl enable containerd",
         "systemctl enable kubelet",
+        (
+            f"if getent group docker >/dev/null 2>&1 && id -u {ssh_username!r} "
+            f">/dev/null 2>&1; then usermod -aG docker {ssh_username!r}; fi"
+        ),
     ]
 
 
@@ -530,7 +538,11 @@ def _kubeadm_control_plane_spec(
     ]
     if _node_needs_kubernetes_install(node):
         control_plane_pre_kubeadm = (
-            _kubernetes_install_commands(kubernetes_version) + control_plane_pre_kubeadm
+            _kubernetes_install_commands(
+                kubernetes_version,
+                ssh_username=ssh_username,
+            )
+            + control_plane_pre_kubeadm
         )
     kubeadm_config_spec: dict[str, object] = {
         "clusterConfiguration": {
@@ -654,7 +666,8 @@ def _kubeadm_config_template_spec(
         # The worker image (SIG/Marketplace, e.g. the HPC image under validation) ships no
         # Kubernetes; install containerd + kubelet/kubeadm/kubectl before `kubeadm join`.
         template_spec["preKubeadmCommands"] = _kubernetes_install_commands(
-            kubernetes_version
+            kubernetes_version,
+            ssh_username=ssh_username,
         )
     ssh_users = _ssh_users(
         ssh_username=ssh_username,

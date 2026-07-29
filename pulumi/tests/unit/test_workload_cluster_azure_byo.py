@@ -933,7 +933,9 @@ def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
 
 
 def test_kubernetes_install_commands_cover_apt_dnf_tdnf() -> None:
-    script = "\n".join(_kubernetes_install_commands("v1.36.1"))
+    script = "\n".join(
+        _kubernetes_install_commands("v1.36.1", ssh_username="debugger")
+    )
     # A single OS switch selects the package manager (cloud-init runs these as one script).
     assert 'case "${ID:-}"' in script
     assert "ubuntu|debian)" in script
@@ -948,6 +950,8 @@ def test_kubernetes_install_commands_cover_apt_dnf_tdnf() -> None:
     # OS-agnostic prep is shared across all branches.
     assert "swapoff -a" in script
     assert "systemctl enable kubelet" in script
+    assert "getent group docker" in script
+    assert "usermod -aG docker 'debugger'" in script
     # An unrecognized OS fails loudly instead of silently skipping the install.
     assert "unsupported OS for kubernetes install" in script
 

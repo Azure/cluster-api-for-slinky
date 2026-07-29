@@ -15,8 +15,9 @@
 #
 # Flow:
 #   1. salloc --no-shell -N$NODES     Slurm reserves the nodes exclusively (ALLOCATE).
-#   2. srun --jobid=... hostname -I    discover the allocated HOST IPs
-#                                      (slurmd is hostNetwork -> host addresses).
+#   2. Resolve allocated HOST IPs       use `hostname -I` for host-networked
+#                                      slurmd; otherwise map Slurm NodeAddr
+#                                      (pod IP) -> K8s node -> InternalIP.
 #   3. ssh capi@<head-host>            run mpirun --host <ip:slots,...> on the HOST,
 #                                      loading HPC-X from the host image. Delegated
 #                                      to scripts/ib-osu-loopback.sh (HOSTS=... mode).
@@ -33,12 +34,16 @@
 #   UCX_TLS=tcp                transport: tcp (Ethernet) | rc,sm,self (InfiniBand)
 #   UCX_NET_DEVICES=eth0       NIC/HCA: eth0 (TCP) | mlx5_ib0:1 (InfiniBand)
 #   WORKER_SSH_USER=capi       worker host SSH user
-#   WORKER_SSH_KEY=~/.ssh/capz-workload   private key for worker host SSH (this key's
+#   WORKER_SSH_KEY=~/.ssh/caps-workload   private key for worker host SSH (this key's
 #                              pubkey is in every worker's authorized_keys via the
 #                              manifest sshPublicKey)
 #   SETUP_SSH=1                bootstrap passwordless host->host SSH for mpirun's
 #                              remote orted launch (copies WORKER_SSH_KEY onto the
 #                              head host; removed again on exit). Set 0 to skip.
+#   REMOTE_ARTIFACT_PATH        optional path produced by the launcher on HEAD.
+#   LOCAL_ARTIFACT_DIR          copy REMOTE_ARTIFACT_PATH here after a successful
+#                              launch (required when REMOTE_ARTIFACT_PATH is set).
+#   CLEAN_REMOTE_ARTIFACT=1     remove the remote artifact after a successful copy.
 #   SLURM_NS=slurm             namespace of the slurm pods
 #   KC=/tmp/caps-self.kubeconfig  workload kubeconfig path (auto-fetched if absent)
 #
@@ -50,7 +55,7 @@ NTASKS_PER_NODE="${NTASKS_PER_NODE:-1}"
 UCX_TLS="${UCX_TLS:-tcp}"
 UCX_NET_DEVICES="${UCX_NET_DEVICES:-eth0}"
 WORKER_SSH_USER="${WORKER_SSH_USER:-capi}"
-WORKER_SSH_KEY="${WORKER_SSH_KEY:-$HOME/.ssh/capz-workload}"
+WORKER_SSH_KEY="${WORKER_SSH_KEY:-$HOME/.ssh/caps-workload}"
 SETUP_SSH="${SETUP_SSH:-1}"
 SLURM_NS="${SLURM_NS:-slurm}"
 KC="${KC:-/tmp/caps-self.kubeconfig}"
@@ -67,6 +72,9 @@ LAUNCH_EXTRA_ENV="${LAUNCH_EXTRA_ENV:-}"
 # replaced with the Slurm allocation job id). Lets the caller preserve the PBS
 # `<jobname>.o<jobid>` raw-log convention so benchmark ingestion is unchanged.
 OUT_FILE="${OUT_FILE:-}"
+REMOTE_ARTIFACT_PATH="${REMOTE_ARTIFACT_PATH:-}"
+LOCAL_ARTIFACT_DIR="${LOCAL_ARTIFACT_DIR:-}"
+CLEAN_REMOTE_ARTIFACT="${CLEAN_REMOTE_ARTIFACT:-1}"
 
 SSH_OPTS=(-i "$WORKER_SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR)
 
@@ -103,6 +111,9 @@ JOBID="$(grep -oE 'Granted job allocation [0-9]+' <<<"$ALLOC_OUT" | grep -oE '[0
 [[ -n "$JOBID" ]] || die "salloc did not grant an allocation:\n$ALLOC_OUT"
 log "Slurm job allocation: $JOBID"
 
+# Artifact paths may use the same Slurm-style %j token as OUT_FILE.
+REMOTE_ARTIFACT_PATH="${REMOTE_ARTIFACT_PATH//%j/$JOBID}"
+
 cleanup() {
   if [[ -n "${JOBID:-}" ]]; then
     log "releasing Slurm allocation $JOBID (scancel)"
@@ -122,13 +133,57 @@ for _ in $(seq 1 30); do
 done
 [[ "${st:-}" == "RUNNING" ]] || die "allocation $JOBID not RUNNING (state='${st:-unknown}')"
 
-# --- 2. DISCOVER the allocated HOST IPs (slurmd is hostNetwork -> host addrs) ----
+# --- 2. DISCOVER the allocated HOST IPs -----------------------------------------
 log "discovering host IPs for the allocation"
 IPS_RAW="$(sexec "srun --jobid=$JOBID -N$NODES --ntasks-per-node=1 hostname -I 2>/dev/null" || true)"
-# Keep node-subnet addresses only (10.x), de-dup, preserve discovery order.
+# Host-networked slurmd returns the worker's 10.x address directly. Keep this
+# fast path for the original caps-self deployment.
 mapfile -t HOST_IPS < <(tr ' ' '\n' <<<"$IPS_RAW" | grep -E '^10\.' | awk '!seen[$0]++')
+
+# Pulumi-managed Slinky uses overlay-networked slurmd pods. In that topology,
+# `hostname -I` and Slurm NodeAddr are pod addresses (for example 192.168.x.x),
+# not SSH-reachable worker addresses. Resolve each allocated Slurm node through
+# the pod IP to its Kubernetes node, then read that node's InternalIP.
+if [[ "${#HOST_IPS[@]}" -lt "$NODES" ]]; then
+  mapfile -t SLURM_NODES < <(
+    sexec "srun --jobid=$JOBID -N$NODES --ntasks-per-node=1 hostname 2>/dev/null" \
+      | awk 'NF && !seen[$0]++'
+  )
+  HOST_IPS=()
+  for slurm_node in "${SLURM_NODES[@]}"; do
+    node_addr="$(
+      sexec "scontrol show node '$slurm_node' -o" \
+        | sed -n 's/.* NodeAddr=\([^ ]*\).*/\1/p' \
+        | head -1
+    )"
+    [[ -n "$node_addr" ]] || continue
+
+    if [[ "$node_addr" == 10.* ]]; then
+      host_ip="$node_addr"
+    else
+      k8s_node="$(
+        kc get pods -n "$SLURM_NS" -l app.kubernetes.io/name=slurmd \
+          -o "jsonpath={range .items[?(@.status.podIP=='$node_addr')]}{.spec.nodeName}{'\n'}{end}" \
+          2>/dev/null | head -1
+      )"
+      [[ -n "$k8s_node" ]] || continue
+      host_ip="$(
+        kc get node "$k8s_node" \
+          -o "jsonpath={range .status.addresses[?(@.type=='InternalIP')]}{.address}{'\n'}{end}" \
+          2>/dev/null | head -1
+      )"
+    fi
+
+    [[ -n "$host_ip" ]] || continue
+    host_ip_seen=0
+    for existing_ip in "${HOST_IPS[@]}"; do
+      [[ "$existing_ip" == "$host_ip" ]] && host_ip_seen=1 && break
+    done
+    [[ "$host_ip_seen" == "1" ]] || HOST_IPS+=("$host_ip")
+  done
+fi
 [[ "${#HOST_IPS[@]}" -ge "$NODES" ]] || \
-  die "discovered ${#HOST_IPS[@]} host IP(s), expected $NODES:\n$IPS_RAW"
+  die "discovered ${#HOST_IPS[@]} host IP(s), expected $NODES (hostname -I: $IPS_RAW)"
 HEAD="${HOST_IPS[0]}"
 log "allocated host IPs: ${HOST_IPS[*]}  (head: $HEAD)"
 
@@ -154,6 +209,7 @@ log "launching on host $HEAD via $(basename "$LAUNCHER") (HOSTS=$HOSTS, UCX_TLS=
 # Tell OpenMPI's rsh launcher which key + ssh opts to use for host->host orted
 # spawn (only when we staged a key), so we never have to touch ~/.ssh/config.
 LAUNCH_ENV="HOSTS='$HOSTS' UCX_TLS='$UCX_TLS' UCX_NET_DEVICES='$UCX_NET_DEVICES'"
+LAUNCH_ENV="HOST_LAUNCH_JOB_ID='$JOBID' $LAUNCH_ENV"
 if [[ "${SSH_KEY_PUSHED:-0}" == "1" ]]; then
   LAUNCH_ENV="OMPI_MCA_plm_rsh_args='$RSH_ARGS' $LAUNCH_ENV"
 fi
@@ -175,6 +231,21 @@ if [[ -n "$OUT_FILE" ]]; then
 else
   ssh "${SSH_OPTS[@]}" "$WORKER_SSH_USER@$HEAD" "$LAUNCH_ENV bash -s" < "$LAUNCHER"
   LAUNCH_RC=$?
+fi
+
+if [[ "$LAUNCH_RC" -eq 0 && -n "$REMOTE_ARTIFACT_PATH" ]]; then
+  [[ -n "$LOCAL_ARTIFACT_DIR" ]] \
+    || die "LOCAL_ARTIFACT_DIR is required when REMOTE_ARTIFACT_PATH is set"
+  mkdir -p "$LOCAL_ARTIFACT_DIR"
+  log "copying remote artifact $HEAD:$REMOTE_ARTIFACT_PATH -> $LOCAL_ARTIFACT_DIR"
+  scp -r "${SSH_OPTS[@]}" \
+    "$WORKER_SSH_USER@$HEAD:$REMOTE_ARTIFACT_PATH" "$LOCAL_ARTIFACT_DIR/"
+  if [[ "$CLEAN_REMOTE_ARTIFACT" == "1" ]]; then
+    if ! ssh "${SSH_OPTS[@]}" "$WORKER_SSH_USER@$HEAD" \
+      "rm -rf -- '$REMOTE_ARTIFACT_PATH'"; then
+      log "WARNING: copied artifact but could not remove remote path $REMOTE_ARTIFACT_PATH"
+    fi
+  fi
 fi
 
 log "launcher exit code: $LAUNCH_RC (allocation $JOBID released on exit)"
