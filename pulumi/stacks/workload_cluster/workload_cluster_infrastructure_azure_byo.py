@@ -432,6 +432,7 @@ def _kubernetes_install_commands(
     kubernetes_version: str,
     *,
     ssh_username: str = "capi",
+    configure_nvidia_runtime: bool = False,
 ) -> list[str]:
     """preKubeadmCommands that install containerd + pinned kubelet/kubeadm/kubectl.
 
@@ -489,7 +490,7 @@ def _kubernetes_install_commands(
             "esac",
         ]
     )
-    return [
+    commands = [
         "set -eux",
         "modprobe overlay",
         "modprobe br_netfilter",
@@ -506,14 +507,24 @@ def _kubernetes_install_commands(
         "mkdir -p /etc/containerd",
         "containerd config default > /etc/containerd/config.toml",
         "sed -ri 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml",
-        "systemctl restart containerd",
-        "systemctl enable containerd",
-        "systemctl enable kubelet",
-        (
-            f"if getent group docker >/dev/null 2>&1 && id -u {ssh_username!r} "
-            f">/dev/null 2>&1; then usermod -aG docker {ssh_username!r}; fi"
-        ),
     ]
+    if configure_nvidia_runtime:
+        commands.append(
+            "if command -v nvidia-ctk >/dev/null 2>&1; then "
+            "nvidia-ctk runtime configure --runtime=containerd; fi"
+        )
+    commands.extend(
+        [
+            "systemctl restart containerd",
+            "systemctl enable containerd",
+            "systemctl enable kubelet",
+            (
+                f"if getent group docker >/dev/null 2>&1 && id -u {ssh_username!r} "
+                f">/dev/null 2>&1; then usermod -aG docker {ssh_username!r}; fi"
+            ),
+        ]
+    )
+    return commands
 
 
 def _kubeadm_control_plane_spec(
@@ -668,6 +679,7 @@ def _kubeadm_config_template_spec(
         template_spec["preKubeadmCommands"] = _kubernetes_install_commands(
             kubernetes_version,
             ssh_username=ssh_username,
+            configure_nvidia_runtime=True,
         )
     ssh_users = _ssh_users(
         ssh_username=ssh_username,

@@ -954,6 +954,30 @@ def test_kubernetes_install_commands_cover_apt_dnf_tdnf() -> None:
     assert "usermod -aG docker 'debugger'" in script
     # An unrecognized OS fails loudly instead of silently skipping the install.
     assert "unsupported OS for kubernetes install" in script
+    assert "nvidia-ctk runtime configure" not in script
+
+
+def test_explicit_image_worker_configures_nvidia_containerd_runtime() -> None:
+    node = AzureBYONodePoolSpec(
+        name="compute",
+        node_type="compute",
+        vm_size="Standard_ND40rs_v2",
+        replicas=2,
+        attach_to_flex=True,
+        image=_v100_image(),
+    )
+
+    spec = _kubeadm_config_template_spec(
+        node=node,
+        worker_name="caps-self-compute",
+        kubernetes_version="v1.36.1",
+    )
+
+    template = cast(dict[str, Any], cast(dict[str, Any], spec["template"])["spec"])
+    script = "\n".join(cast(list[str], template["preKubeadmCommands"]))
+    assert (
+        "nvidia-ctk runtime configure --runtime=containerd" in script
+    )
 
 
 def test_kubeadm_control_plane_adds_ssh_authorized_keys() -> None:
