@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import ipaddress
 import re
 from collections.abc import Mapping
 
@@ -262,6 +263,17 @@ def _resource_id_name(resource_id: str | None) -> str | None:
     return resource_id.rstrip("/").rsplit("/", 1)[-1] if resource_id else None
 
 
+def _internal_api_server_ip(address_prefix: str | None) -> str:
+    if address_prefix is None:
+        raise ValueError("internal API server requires a subnet address prefix")
+    network = ipaddress.ip_network(address_prefix, strict=False)
+    if not isinstance(network, ipaddress.IPv4Network) or network.num_addresses <= 101:
+        raise ValueError(
+            "internal API server subnet must be IPv4 with room for host address 100"
+        )
+    return str(network.network_address + 100)
+
+
 def _cluster_spec(*, cluster_name: str, control_plane_name: str) -> dict[str, object]:
     return {
         "clusterNetwork": {
@@ -324,6 +336,12 @@ def _azure_cluster_spec(
             "name": f"{cluster_name}-internal-lb",
             "type": "Internal",
             "availabilityZones": [_DEFAULT_FLEX_ZONE],
+            "frontendIPs": [
+                {
+                    "name": f"{cluster_name}-internal-lb-frontEnd",
+                    "privateIP": _internal_api_server_ip(subnet.address_prefix),
+                }
+            ],
         }
 
     return {

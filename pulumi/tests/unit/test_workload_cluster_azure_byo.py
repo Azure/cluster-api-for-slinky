@@ -33,6 +33,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _azure_cluster_spec,
     _cluster_spec,
     _effective_tags,
+    _internal_api_server_ip,
     _kubeadm_config_template_spec,
     _kubeadm_control_plane_spec,
     _kubernetes_install_commands,
@@ -737,10 +738,26 @@ def test_azure_cluster_spec_reuses_cluster_subnet_and_internal_lb() -> None:
             "name": "caps-self-internal-lb",
             "type": "Internal",
             "availabilityZones": ["2"],
+            "frontendIPs": [
+                {
+                    "name": "caps-self-internal-lb-frontEnd",
+                    "privateIP": "10.0.0.100",
+                }
+            ],
         },
         "controlPlaneOutboundLB": {"frontendIPsCount": 1},
         "nodeOutboundLB": {"frontendIPsCount": 1},
     }
+
+
+def test_internal_api_server_ip_uses_discovered_subnet() -> None:
+    assert _internal_api_server_ip("10.6.0.0/24") == "10.6.0.100"
+
+
+@pytest.mark.parametrize("prefix", [None, "10.6.0.0/26", "2001:db8::/64"])
+def test_internal_api_server_ip_rejects_unsupported_subnet(prefix: str | None) -> None:
+    with pytest.raises(ValueError, match="internal API server"):
+        _internal_api_server_ip(prefix)
 
 
 def test_azure_cluster_spec_exposes_public_api_server_when_requested() -> None:
