@@ -298,6 +298,8 @@ def _azure_cluster_spec(
         "name": subnet.subnet_name,
         "role": "cluster",
     }
+    if subnet.address_prefix is not None:
+        cluster_subnet["cidrBlocks"] = [subnet.address_prefix]
     security_group_name = _resource_id_name(subnet.network_security_group_id)
     route_table_name = _resource_id_name(subnet.route_table_id)
     nat_gateway_name = _resource_id_name(subnet.nat_gateway_id)

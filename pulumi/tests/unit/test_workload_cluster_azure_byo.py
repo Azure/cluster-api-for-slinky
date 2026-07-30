@@ -727,6 +727,7 @@ def test_azure_cluster_spec_reuses_cluster_subnet_and_internal_lb() -> None:
             {
                 "name": "default",
                 "role": "cluster",
+                "cidrBlocks": ["10.0.0.0/24"],
                 "securityGroup": {"name": "host-nsg"},
                 "routeTable": {"name": "host-routes"},
                 "natGateway": {"name": "host-nat"},
