@@ -143,6 +143,7 @@ class AzureBYONodePoolSpec(PulumiConfigModel):
     # HPC image under validation). Rendered as CAPZ image.id and takes precedence over
     # ``image``. The image carries no Kubernetes; the bootstrap config installs it.
     image_id: NonEmptyStr | None = None
+    additional_identity_resource_ids: tuple[NonEmptyStr, ...] = ()
 
 
 def _autoscaler_annotations(
@@ -378,6 +379,16 @@ def _machine_template_spec(
     additional_tags: Mapping[str, str],
     virtual_machine_scale_set_id: pulumi.Input[str] | None = None,
 ) -> dict[str, object]:
+    identities = [{"providerID": node_identity_provider_id}]
+    identities.extend(
+        {
+            "providerID": pulumi.Output.concat(
+                _AZURE_PROVIDER_ID_PREFIX,
+                resource_id,
+            )
+        }
+        for resource_id in node.additional_identity_resource_ids
+    )
     spec: dict[str, object] = {
         "vmSize": node.vm_size,
         "osDisk": {
@@ -386,7 +397,7 @@ def _machine_template_spec(
             "osType": "Linux",
         },
         "identity": "UserAssigned",
-        "userAssignedIdentities": [{"providerID": node_identity_provider_id}],
+        "userAssignedIdentities": identities,
         "networkInterfaces": [{"subnetName": subnet_name}],
         "additionalTags": dict(additional_tags),
     }

@@ -909,6 +909,27 @@ def test_machine_template_attaches_uami_subnet_and_flex_vmss() -> None:
     }
 
 
+def test_machine_template_attaches_additional_worker_identities() -> None:
+    node = AzureBYONodePoolSpec(
+        name="compute",
+        node_type="compute",
+        vm_size="Standard_ND96amsr_A100_v4",
+        replicas=2,
+        additional_identity_resource_ids=("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/GHRMI",),
+    )
+
+    spec = _machine_template_spec(
+        node=node,
+        subnet_name="default",
+        node_identity_provider_id="azure:///infra-identity",
+        additional_tags={},
+    )
+
+    identities = spec["template"]["spec"]["userAssignedIdentities"]
+    assert identities[0] == {"providerID": "azure:///infra-identity"}
+    assert len(identities) == 2
+
+
 def test_machine_template_omits_flex_vmss_for_non_flex_node_pool() -> None:
     node = AzureBYONodePoolSpec(
         name="services",
