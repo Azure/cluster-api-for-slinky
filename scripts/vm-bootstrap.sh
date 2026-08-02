@@ -48,6 +48,9 @@
 #                  leave sshd on :22 (gitea-ssh LB may then stay <pending>).
 #   CAPS_SSHD_PORT alternate port to move the host sshd to when freeing :22 (default 2222).
 #   PULUMI_CONFIG_PASSPHRASE   default empty (matches the current mgmt VM).
+#   AZURE_IDENTITY_CLIENT_ID    selects the infrastructure UAMI when the VM has
+#                               additional reporting identities attached.
+#   AZURE_IDENTITY_RESOURCE_ID  resource ID for that infrastructure UAMI.
 #   ARM_CLIENT_ID / ARM_CLIENT_SECRET / ARM_TENANT_ID / ARM_SUBSCRIPTION_ID
 #                  OPTIONAL service-principal override. Normally UNSET: the VM's
 #                  attached UAMI (Option A) is used via IMDS. Only set these to force
@@ -69,6 +72,8 @@ REPO_BRANCH="${REPO_BRANCH:-capz-phase1-dev}"
 REPO_DIR="${REPO_DIR:-/opt/caps-pulumi}"
 GIT_TOKEN="${GIT_TOKEN:-}"
 PULUMI_STACK="${PULUMI_STACK:-azurebyo}"
+AZURE_IDENTITY_CLIENT_ID="${AZURE_IDENTITY_CLIENT_ID:-}"
+AZURE_IDENTITY_RESOURCE_ID="${AZURE_IDENTITY_RESOURCE_ID:-}"
 TENANT_NAME="${TENANT_NAME:-caps-self}"
 CONTROL_PLANE_VM_SIZE="${CONTROL_PLANE_VM_SIZE:-}"
 WORKER_VM_SIZE="${WORKER_VM_SIZE:-}"
@@ -298,6 +303,14 @@ pulumi_up() {
   # RG is reused -- are committed in Pulumi.<stack>.yaml. Optionally override the
   # control-plane / worker SKUs + worker count per run; `--path` type-infers the int.
   local base="ca4s-infra:initStack.tenants.workloadClusters[\"${TENANT_NAME}\"].parameters"
+  local azure_identity="ca4s-infra:initStack.controlPlane.infrastructureProviders.azure.identity"
+  if [[ -n "$AZURE_IDENTITY_CLIENT_ID" ]]; then
+    pulumi config set --path "${azure_identity}.type" UserAssignedMSI
+    pulumi config set --path "${azure_identity}.clientId" "$AZURE_IDENTITY_CLIENT_ID"
+    if [[ -n "$AZURE_IDENTITY_RESOURCE_ID" ]]; then
+      pulumi config set --path "${azure_identity}.resourceId" "$AZURE_IDENTITY_RESOURCE_ID"
+    fi
+  fi
   if [[ -n "$CONTROL_PLANE_VM_SIZE" ]]; then
     pulumi config set --path "${base}.controlPlaneVmSize" "$CONTROL_PLANE_VM_SIZE"
   fi
