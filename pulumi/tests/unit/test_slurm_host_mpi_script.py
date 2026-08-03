@@ -11,3 +11,5 @@ def test_host_launcher_is_staged_instead_of_streamed() -> None:
     assert 'bash /home/$WORKER_SSH_USER/$REMOTE_LAUNCHER' in source
     assert '"$LAUNCH_ENV bash -s" < "$LAUNCHER"' not in source
     assert '"rm -f ~/$REMOTE_KEY ~/$REMOTE_LAUNCHER"' in source
+    assert "| head -1" not in source
+    assert "-o jsonpath='{.items[0].metadata.name}'" in source

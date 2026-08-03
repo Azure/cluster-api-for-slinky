@@ -102,14 +102,17 @@ kc() { kubectl --kubeconfig "$KC" "$@"; }
 
 # --- pick a slurmd pod to drive the Slurm client commands -----------------------
 POD="$(kc get pods -n "$SLURM_NS" -l app.kubernetes.io/name=slurmd \
-        -o name 2>/dev/null | head -1)"
+  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)"
 [[ -n "$POD" ]] || die "no slurmd pod found in namespace '$SLURM_NS'"
 sexec() { kc exec -n "$SLURM_NS" "$POD" -- bash -lc "$1"; }
 
 # --- 1. ALLOCATE: Slurm reserves the nodes (and only allocates) -----------------
 log "allocating $NODES node(s) via Slurm (salloc --no-shell, exclusive)"
 ALLOC_OUT="$(sexec "salloc -N$NODES --ntasks-per-node=$NTASKS_PER_NODE --exclusive --no-shell -J hostmpi 2>&1" || true)"
-JOBID="$(grep -oE 'Granted job allocation [0-9]+' <<<"$ALLOC_OUT" | grep -oE '[0-9]+' | head -1)"
+JOBID=""
+if [[ "$ALLOC_OUT" =~ Granted\ job\ allocation\ ([0-9]+) ]]; then
+  JOBID="${BASH_REMATCH[1]}"
+fi
 [[ -n "$JOBID" ]] || die "salloc did not grant an allocation:\n$ALLOC_OUT"
 REMOTE_LAUNCHER=".caps-host-launch-${JOBID}.sh"
 log "Slurm job allocation: $JOBID"
@@ -157,8 +160,7 @@ if [[ "${#HOST_IPS[@]}" -lt "$NODES" ]]; then
   for slurm_node in "${SLURM_NODES[@]}"; do
     node_addr="$(
       sexec "scontrol show node '$slurm_node' -o" \
-        | sed -n 's/.* NodeAddr=\([^ ]*\).*/\1/p' \
-        | head -1
+        | sed -n 's/.* NodeAddr=\([^ ]*\).*/\1/p'
     )"
     [[ -n "$node_addr" ]] || continue
 
@@ -168,13 +170,13 @@ if [[ "${#HOST_IPS[@]}" -lt "$NODES" ]]; then
       k8s_node="$(
         kc get pods -n "$SLURM_NS" -l app.kubernetes.io/name=slurmd \
           -o "jsonpath={range .items[?(@.status.podIP=='$node_addr')]}{.spec.nodeName}{'\n'}{end}" \
-          2>/dev/null | head -1
+          2>/dev/null
       )"
       [[ -n "$k8s_node" ]] || continue
       host_ip="$(
         kc get node "$k8s_node" \
           -o "jsonpath={range .status.addresses[?(@.type=='InternalIP')]}{.address}{'\n'}{end}" \
-          2>/dev/null | head -1
+          2>/dev/null
       )"
     fi
 
