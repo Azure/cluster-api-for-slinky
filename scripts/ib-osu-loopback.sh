@@ -3,8 +3,8 @@
 # HPC-X MPI over InfiniBand validation for Standard_ND96asr_v4 (caps-self workers)
 # =============================================================================
 # Runs OSU micro-benchmarks over the Mellanox HDR InfiniBand fabric via HPC-X/UCX.
-# Meant to run ON a worker host (user `capi`); it is fed to the node over SSH with
-# `ssh capi@<ip> 'bash -s' < scripts/ib-osu-loopback.sh`.
+# Meant to run ON a worker host (user `capi`); slurm-host-mpi.sh stages it on the
+# allocated head node and executes it with stdin detached.
 #
 # Modes:
 #   (default) single-node 2-rank IB *loopback*  -> UCX_TLS=rc,self
@@ -68,9 +68,7 @@ fi
 COMMON="--allow-run-as-root -np $NP $PLACE --bind-to core \
   -x LD_LIBRARY_PATH -x UCX_NET_DEVICES=$DEV -x UCX_TLS=$TLS"
 
-# NOTE: `< /dev/null` on every mpirun — otherwise mpirun forwards (and consumes)
-# this script's stdin, which eats the remaining lines when the script is piped in
-# via `bash -s`.
+# Keep mpirun detached from caller stdin so it cannot interfere with automation.
 echo
 echo "=== osu_latency (UCX_TLS=$TLS) ==="
 mpirun $COMMON "$LAT" </dev/null

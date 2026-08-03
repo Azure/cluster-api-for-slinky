@@ -15,8 +15,7 @@
 # EXIT CODE: each SKU branch ends on `exec mpirun ... </dev/null`, so this script's
 # exit code IS mpirun's. slurm-host-mpi.sh captures it and exits with it, so the
 # orchestrator (submit-nccl-host.sh) can fail on a crashed run — the host-launch
-# analog of PR 740's exit-code gate. The `</dev/null` is required because the script
-# is piped in via `bash -s` (mpirun would otherwise consume the remaining stdin).
+# analog of PR 740's exit-code gate. Keep mpirun detached from caller stdin.
 #
 # NOT set -e: we want mpirun's status to be the exit code, not an early abort.
 # NOT set -u either: HPC-X's hpcx-init.sh references unset vars (e.g.

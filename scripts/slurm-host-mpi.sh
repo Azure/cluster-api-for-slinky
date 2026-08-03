@@ -18,7 +18,8 @@
 #   2. Resolve allocated HOST IPs       use `hostname -I` for host-networked
 #                                      slurmd; otherwise map Slurm NodeAddr
 #                                      (pod IP) -> K8s node -> InternalIP.
-#   3. ssh capi@<head-host>            run mpirun --host <ip:slots,...> on the HOST,
+#   3. ssh capi@<head-host>            stage and run the launcher on the HOST,
+#                                      then mpirun --host <ip:slots,...>,
 #                                      loading HPC-X from the host image. Delegated
 #                                      to scripts/ib-osu-loopback.sh (HOSTS=... mode).
 #   4. scancel                         release the allocation.
@@ -83,6 +84,7 @@ SSH_OPTS=(-i "$WORKER_SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile
 # launcher. Using plm_rsh_args avoids writing ~/.ssh/config on the worker, so the
 # bootstrap leaves no residue beyond this single key file (removed on exit).
 REMOTE_KEY=".ssh/caps-hostmpi-id"
+REMOTE_LAUNCHER=""
 RSH_ARGS="-i /home/$WORKER_SSH_USER/$REMOTE_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 
 log()  { printf '>> %s\n' "$*"; }
@@ -109,6 +111,7 @@ log "allocating $NODES node(s) via Slurm (salloc --no-shell, exclusive)"
 ALLOC_OUT="$(sexec "salloc -N$NODES --ntasks-per-node=$NTASKS_PER_NODE --exclusive --no-shell -J hostmpi 2>&1" || true)"
 JOBID="$(grep -oE 'Granted job allocation [0-9]+' <<<"$ALLOC_OUT" | grep -oE '[0-9]+' | head -1)"
 [[ -n "$JOBID" ]] || die "salloc did not grant an allocation:\n$ALLOC_OUT"
+REMOTE_LAUNCHER=".caps-host-launch-${JOBID}.sh"
 log "Slurm job allocation: $JOBID"
 
 # Artifact paths may use the same Slurm-style %j token as OUT_FILE.
@@ -119,8 +122,9 @@ cleanup() {
     log "releasing Slurm allocation $JOBID (scancel)"
     sexec "scancel $JOBID" 2>/dev/null || true
   fi
-  if [[ -n "${HEAD:-}" && "${SSH_KEY_PUSHED:-0}" == "1" ]]; then
-    ssh "${SSH_OPTS[@]}" "$WORKER_SSH_USER@$HEAD" "rm -f ~/$REMOTE_KEY" 2>/dev/null || true
+  if [[ -n "${HEAD:-}" ]]; then
+    ssh "${SSH_OPTS[@]}" "$WORKER_SSH_USER@$HEAD" \
+      "rm -f ~/$REMOTE_KEY ~/$REMOTE_LAUNCHER" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
@@ -206,6 +210,8 @@ fi
 
 # --- 3. LAUNCH from the HOST namespace: mpirun runs on the worker VM, not the pod -
 log "launching on host $HEAD via $(basename "$LAUNCHER") (HOSTS=$HOSTS, UCX_TLS=$UCX_TLS, dev=$UCX_NET_DEVICES)"
+scp "${SSH_OPTS[@]}" "$LAUNCHER" "$WORKER_SSH_USER@$HEAD:$REMOTE_LAUNCHER" >/dev/null
+ssh "${SSH_OPTS[@]}" "$WORKER_SSH_USER@$HEAD" "chmod 700 ~/$REMOTE_LAUNCHER"
 # Tell OpenMPI's rsh launcher which key + ssh opts to use for host->host orted
 # spawn (only when we staged a key), so we never have to touch ~/.ssh/config.
 LAUNCH_ENV="HOSTS='$HOSTS' UCX_TLS='$UCX_TLS' UCX_NET_DEVICES='$UCX_NET_DEVICES'"
@@ -225,11 +231,14 @@ fi
 if [[ -n "$OUT_FILE" ]]; then
   OUT_FILE="${OUT_FILE//%j/$JOBID}"
   mkdir -p "$(dirname "$OUT_FILE")"
-  ssh "${SSH_OPTS[@]}" "$WORKER_SSH_USER@$HEAD" "$LAUNCH_ENV bash -s" < "$LAUNCHER" 2>&1 | tee "$OUT_FILE"
+  ssh "${SSH_OPTS[@]}" "$WORKER_SSH_USER@$HEAD" \
+    "$LAUNCH_ENV bash /home/$WORKER_SSH_USER/$REMOTE_LAUNCHER" \
+    </dev/null 2>&1 | tee "$OUT_FILE"
   LAUNCH_RC=${PIPESTATUS[0]}
   log "raw log written to $OUT_FILE"
 else
-  ssh "${SSH_OPTS[@]}" "$WORKER_SSH_USER@$HEAD" "$LAUNCH_ENV bash -s" < "$LAUNCHER"
+  ssh "${SSH_OPTS[@]}" "$WORKER_SSH_USER@$HEAD" \
+    "$LAUNCH_ENV bash /home/$WORKER_SSH_USER/$REMOTE_LAUNCHER" </dev/null
   LAUNCH_RC=$?
 fi
 
