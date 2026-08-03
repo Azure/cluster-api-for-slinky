@@ -960,6 +960,7 @@ def test_worker_bootstrap_installs_scoped_health_wrapper() -> None:
     wrapper = next(item for item in files if item["path"] == "/usr/local/sbin/caps-health-root")
     sudoers = next(item for item in files if item["path"] == "/etc/sudoers.d/90-caps-health")
     assert "unsupported health command" in wrapper["content"]
+    assert "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1" in wrapper["content"]
     assert wrapper["permissions"] == "0755"
     assert sudoers["content"] == (
         "capi ALL=(root) NOPASSWD: /usr/local/sbin/caps-health-root *\n"

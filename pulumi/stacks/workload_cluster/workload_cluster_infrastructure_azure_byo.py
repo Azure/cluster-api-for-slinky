@@ -430,25 +430,24 @@ command_name=${1:-}
 shift || true
 case "$command_name" in
     sanity)
+        export OMPI_ALLOW_RUN_AS_ROOT=1
+        export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
         exec /opt/azurehpc/test/run-tests.sh "${1:-NVIDIA}" -v
         ;;
     aznhc)
-        output=${1:?health output path is required}
-        exec /opt/azurehpc/test/azurehpc-health-checks/run-health-checks.sh -o "$output" -v
+        exec /opt/azurehpc/test/azurehpc-health-checks/run-health-checks.sh -o /tmp/caps-health-aznhc.out -v
         ;;
     dcgmi)
         exec /usr/bin/dcgmi diag -r 2
         ;;
     ghr)
         object_id=${1:?GHR object ID is required}
-        health_file=${2:?health output path is required}
-        fault_map=${3:?fault map path is required}
         root=/opt/azurehpc/test/azurehpc-health-checks/triggerGHR
         backup=$(mktemp)
         cp "$root/config/user.env" "$backup"
         trap 'cp "$backup" "$root/config/user.env"; rm -f "$backup"' EXIT
         sed -i "s/^OBJECT_ID=.*/OBJECT_ID=\"$object_id\"/" "$root/config/user.env"
-        "$root/triggerGHR.sh" -f "$health_file" -c "$fault_map"
+        "$root/triggerGHR.sh" -f /tmp/caps-health-aznhc.out -c /tmp/caps-nhc-fault-map.json
         ;;
     *)
         echo "unsupported health command: $command_name" >&2

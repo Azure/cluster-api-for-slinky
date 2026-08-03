@@ -54,7 +54,7 @@ trigger_ghr() {
   [[ -n "$GHR_OBJECT_ID" && -n "$GHR_FAULT_MAP_B64" ]] || return 0
   local output="$ARTIFACT_DIR/nodes/${ip//./-}/trigger-ghr.log"
   local command
-  command="set -e -o pipefail; printf '%s' '$GHR_FAULT_MAP_B64' | base64 -d > /tmp/caps-nhc-fault-map.json; trap 'rm -f /tmp/caps-nhc-fault-map.json' EXIT; sudo -n /usr/local/sbin/caps-health-root ghr '$GHR_OBJECT_ID' /tmp/caps-health-aznhc.out /tmp/caps-nhc-fault-map.json"
+  command="set -e -o pipefail; printf '%s' '$GHR_FAULT_MAP_B64' | base64 -d > /tmp/caps-nhc-fault-map.json; trap 'rm -f /tmp/caps-nhc-fault-map.json' EXIT; sudo -n /usr/local/sbin/caps-health-root ghr '$GHR_OBJECT_ID'"
   if ! run_remote "$ip" "$command" >"$output" 2>&1; then
     return 0
   fi
@@ -97,7 +97,7 @@ PY
 for entry in "${host_entries[@]}"; do
   ip="${entry%%:*}"
   image_command='test -x /opt/azurehpc/test/run-tests.sh || exit 3; timeout 1200 sudo -n /usr/local/sbin/caps-health-root sanity NVIDIA > /tmp/caps-health-sanity.out 2>&1; command_rc=$?; cat /tmp/caps-health-sanity.out; test "$command_rc" -eq 0 && grep -q "ALL OK!" /tmp/caps-health-sanity.out'
-  aznhc_command='test -x /opt/azurehpc/test/azurehpc-health-checks/run-health-checks.sh || exit 3; timeout 1200 sudo -n /usr/local/sbin/caps-health-root aznhc /tmp/caps-health-aznhc.out >/dev/null 2>&1; command_rc=$?; cat /tmp/caps-health-aznhc.out; test "$command_rc" -eq 0 && grep -q "Health checks completed with exit code: 0." /tmp/caps-health-aznhc.out'
+  aznhc_command='test -x /opt/azurehpc/test/azurehpc-health-checks/run-health-checks.sh || exit 3; timeout 1200 sudo -n /usr/local/sbin/caps-health-root aznhc >/dev/null 2>&1; command_rc=$?; cat /tmp/caps-health-aznhc.out; test "$command_rc" -eq 0 && grep -q "Health checks completed with exit code: 0." /tmp/caps-health-aznhc.out'
   dcgmi_command='command -v dcgmi >/dev/null || exit 3; timeout 900 sudo -n /usr/local/sbin/caps-health-root dcgmi'
   ib_command='set -e -o pipefail; command -v ofed_info >/dev/null; ofed_info -s; lspci | grep -E "Infiniband controller|Network controller"; ibstat | grep -q "LinkUp"; ibstat'
 
@@ -116,7 +116,7 @@ for entry in "${host_entries[@]}"; do
   fi
 done
 
-python3 - "$status_file" "$ARTIFACT_DIR/health-summary.json" <<'PY'
+if ! python3 - "$status_file" "$ARTIFACT_DIR/health-summary.json" <<'PY'
 import json
 import pathlib
 import sys
@@ -138,6 +138,10 @@ summary = {
 }
 pathlib.Path(destination).write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
 PY
+then
+  echo "failed to generate health summary" >&2
+  exit 1
+fi
 
+[[ -s "$ARTIFACT_DIR/health-summary.json" ]] || exit 1
 cat "$ARTIFACT_DIR/health-summary.json"
-exit 0
