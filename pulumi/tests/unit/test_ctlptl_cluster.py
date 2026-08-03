@@ -119,6 +119,59 @@ def test_create_connects_cache_and_custom_registries(
     assert "containerPath: /etc/containerd/certs.d" in applied_manifests[0]
 
 
+def test_apply_cluster_retries_after_scoped_cleanup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], str | None, bool]] = []
+    results = iter(
+        [
+            subprocess.CompletedProcess(
+                ["ctlptl", "apply"], 1, stdout="", stderr="bootstrap timeout"
+            ),
+            subprocess.CompletedProcess(["ctlptl", "delete"], 0, stdout="", stderr=""),
+            subprocess.CompletedProcess(["ctlptl", "apply"], 0, stdout="ok", stderr=""),
+        ]
+    )
+
+    def fake_run(
+        cmd: list[str],
+        *,
+        stdin: str | None = None,
+        check: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append((cmd, stdin, check))
+        return next(results)
+
+    monkeypatch.setattr(ctlptl_cluster, "_run", fake_run)
+    monkeypatch.setattr(ctlptl_cluster.time, "sleep", lambda _seconds: None)
+
+    ctlptl_cluster._apply_cluster("kind-mgmt-test", "manifest")
+
+    assert calls == [
+        (["ctlptl", "apply", "-f", "-"], "manifest", False),
+        (["ctlptl", "delete", "cluster", "kind-mgmt-test"], None, False),
+        (["ctlptl", "apply", "-f", "-"], "manifest", False),
+    ]
+
+
+def test_apply_cluster_surfaces_captured_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        ctlptl_cluster,
+        "_run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(
+            ["ctlptl", "apply"], 1, stdout="kind stdout", stderr="kind stderr"
+        ),
+    )
+    monkeypatch.setattr(ctlptl_cluster.time, "sleep", lambda _seconds: None)
+
+    with pytest.raises(RuntimeError, match="kind stderr") as error:
+        ctlptl_cluster._apply_cluster("kind-mgmt-test", "manifest")
+
+    assert "kind stdout" in str(error.value)
+
+
 def test_render_requires_registry_name(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("HOME", raising=False)
 

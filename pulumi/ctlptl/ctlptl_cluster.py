@@ -125,6 +125,8 @@ from __future__ import annotations
 import secrets
 import shutil
 import subprocess
+import sys
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -215,6 +217,38 @@ def _run(
         capture_output=True,
         text=True,
         check=check,
+    )
+
+
+def _apply_cluster(cluster_name: str, rendered: str, attempts: int = 2) -> None:
+    """Apply a kind cluster, retrying one transient bootstrap failure."""
+    result: subprocess.CompletedProcess | None = None
+    for attempt in range(1, attempts + 1):
+        result = _run(
+            ["ctlptl", "apply", "-f", "-"],
+            stdin=rendered,
+            check=False,
+        )
+        if result.returncode == 0:
+            return
+        if attempt < attempts:
+            print(
+                f"ctlptl cluster apply attempt {attempt}/{attempts} failed "
+                f"for {cluster_name!r}; deleting partial state before retry",
+                file=sys.stderr,
+            )
+            _run(
+                ["ctlptl", "delete", "cluster", cluster_name],
+                check=False,
+            )
+            time.sleep(5)
+
+    assert result is not None
+    raise RuntimeError(
+        f"ctlptl cluster apply failed after {attempts} attempts for "
+        f"{cluster_name!r} (exit {result.returncode})\n"
+        f"stdout:\n{result.stdout.strip() or '(empty)'}\n"
+        f"stderr:\n{result.stderr.strip() or '(empty)'}"
     )
 
 
@@ -374,7 +408,7 @@ class _CtlptlClusterProvider(ResourceProvider):
         custom_registry_names = _registry_names(props.get("custom_registry_names"))
         rendered = _render(cluster_name, registry_name, custom_registry_names)
 
-        _run(["ctlptl", "apply", "-f", "-"], stdin=rendered)
+        _apply_cluster(cluster_name, rendered)
         for connected_registry_name in _registry_names(
             [registry_name, *custom_registry_names]
         ):
