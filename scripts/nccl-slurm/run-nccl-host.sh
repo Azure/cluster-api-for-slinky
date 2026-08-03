@@ -74,6 +74,8 @@ case ${TEST} in
     "allreduce") TEST="all_reduce_perf" ;;
     "allgather") TEST="all_gather_perf" ;;
     "alltoall")  TEST="alltoall_perf" ;;
+    "reducescatter") TEST="reduce_scatter_perf" ;;
+    "broadcast") TEST="broadcast_perf" ;;
     *) echo "Error! Incorrect test provided"; exit 1 ;;
 esac
 
