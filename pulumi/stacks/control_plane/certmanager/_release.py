@@ -48,11 +48,19 @@ from pulumi import ResourceOptions
 CERT_MANAGER_CHART_REPO = "https://charts.jetstack.io"
 CERT_MANAGER_CHART_NAME = "cert-manager"
 CERT_MANAGER_CHART_VERSION = "v1.20.2"
+CERT_MANAGER_RELEASE_NAME = "cert-manager"
 
 # Conventional namespace. Not configurable: downstream consumers that
 # care about cert-manager's presence (CAPI operator, future Issuers)
 # assume the standard ``cert-manager`` namespace.
 CERT_MANAGER_NAMESPACE = "cert-manager"
+
+
+def _cert_manager_values() -> dict[str, object]:
+  return {
+    "crds": {"enabled": True},
+    "startupapicheck": {"enabled": False},
+  }
 
 
 class CertManager(pulumi.ComponentResource):
@@ -93,6 +101,10 @@ class CertManager(pulumi.ComponentResource):
         # clean up partial state so a later destroy doesn't strand it.
         release = k8s.helm.v3.Release(
             f"{name}-helm",
+          # Keep ownership stable across failed inner-stack attempts. The CRDs
+          # survive atomic rollback, so a random Helm suffix makes the next
+          # attempt reject them as owned by a different release.
+            name=CERT_MANAGER_RELEASE_NAME,
             chart=CERT_MANAGER_CHART_NAME,
             version=CERT_MANAGER_CHART_VERSION,
             repository_opts={"repo": CERT_MANAGER_CHART_REPO},
@@ -103,7 +115,7 @@ class CertManager(pulumi.ComponentResource):
             timeout=600,
             # Manage the CRDs as part of this release so they share its
             # lifecycle (cert-manager v1.15+ value name).
-            values={"crds": {"enabled": True}},
+            values=_cert_manager_values(),
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,
