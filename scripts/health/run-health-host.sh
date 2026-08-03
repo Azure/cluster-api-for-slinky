@@ -54,7 +54,7 @@ trigger_ghr() {
   [[ -n "$GHR_OBJECT_ID" && -n "$GHR_FAULT_MAP_B64" ]] || return 0
   local output="$ARTIFACT_DIR/nodes/${ip//./-}/trigger-ghr.log"
   local command
-  command="set -e -o pipefail; root=/opt/azurehpc/test/azurehpc-health-checks/triggerGHR; test -x \"\$root/triggerGHR.sh\"; printf '%s' '$GHR_FAULT_MAP_B64' | base64 -d > /tmp/caps-nhc-fault-map.json; cd \"\$root\"; sudo cp config/user.env /tmp/caps-ghr-user.env; sudo chmod 0644 /tmp/caps-ghr-user.env; trap 'sudo cp /tmp/caps-ghr-user.env config/user.env; rm -f /tmp/caps-ghr-user.env /tmp/caps-nhc-fault-map.json' EXIT; sudo sed -i 's/^OBJECT_ID=.*/OBJECT_ID=\"$GHR_OBJECT_ID\"/' config/user.env; sudo ./triggerGHR.sh -f /tmp/caps-health-aznhc.out -c /tmp/caps-nhc-fault-map.json"
+  command="set -e -o pipefail; printf '%s' '$GHR_FAULT_MAP_B64' | base64 -d > /tmp/caps-nhc-fault-map.json; trap 'rm -f /tmp/caps-nhc-fault-map.json' EXIT; sudo -n /usr/local/sbin/caps-health-root ghr '$GHR_OBJECT_ID' /tmp/caps-health-aznhc.out /tmp/caps-nhc-fault-map.json"
   if ! run_remote "$ip" "$command" >"$output" 2>&1; then
     return 0
   fi
@@ -96,9 +96,9 @@ PY
 
 for entry in "${host_entries[@]}"; do
   ip="${entry%%:*}"
-  image_command='test -x /opt/azurehpc/test/run-tests.sh || exit 3; timeout 1200 /opt/azurehpc/test/run-tests.sh NVIDIA -v > /tmp/caps-health-sanity.out 2>&1; command_rc=$?; cat /tmp/caps-health-sanity.out; test "$command_rc" -eq 0 && grep -q "ALL OK!" /tmp/caps-health-sanity.out'
-  aznhc_command='test -x /opt/azurehpc/test/azurehpc-health-checks/run-health-checks.sh || exit 3; sudo timeout 1200 /opt/azurehpc/test/azurehpc-health-checks/run-health-checks.sh -o /tmp/caps-health-aznhc.out -v >/dev/null 2>&1; command_rc=$?; cat /tmp/caps-health-aznhc.out; test "$command_rc" -eq 0 && grep -q "Health checks completed with exit code: 0." /tmp/caps-health-aznhc.out'
-  dcgmi_command='command -v dcgmi >/dev/null || exit 3; sudo timeout 900 dcgmi diag -r 2'
+  image_command='test -x /opt/azurehpc/test/run-tests.sh || exit 3; timeout 1200 sudo -n /usr/local/sbin/caps-health-root sanity NVIDIA > /tmp/caps-health-sanity.out 2>&1; command_rc=$?; cat /tmp/caps-health-sanity.out; test "$command_rc" -eq 0 && grep -q "ALL OK!" /tmp/caps-health-sanity.out'
+  aznhc_command='test -x /opt/azurehpc/test/azurehpc-health-checks/run-health-checks.sh || exit 3; timeout 1200 sudo -n /usr/local/sbin/caps-health-root aznhc /tmp/caps-health-aznhc.out >/dev/null 2>&1; command_rc=$?; cat /tmp/caps-health-aznhc.out; test "$command_rc" -eq 0 && grep -q "Health checks completed with exit code: 0." /tmp/caps-health-aznhc.out'
+  dcgmi_command='command -v dcgmi >/dev/null || exit 3; timeout 900 sudo -n /usr/local/sbin/caps-health-root dcgmi'
   ib_command='set -e -o pipefail; command -v ofed_info >/dev/null; ofed_info -s; lspci | grep -E "Infiniband controller|Network controller"; ibstat | grep -q "LinkUp"; ibstat'
 
   check_remote "$ip" image-sanity "$image_command" 0 || true

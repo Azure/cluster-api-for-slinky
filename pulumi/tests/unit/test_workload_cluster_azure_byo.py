@@ -948,6 +948,25 @@ def test_machine_template_omits_flex_vmss_for_non_flex_node_pool() -> None:
     assert "virtualMachineScaleSetID" not in spec["template"]["spec"]
 
 
+def test_worker_bootstrap_installs_scoped_health_wrapper() -> None:
+    spec = _kubeadm_config_template_spec(
+        node=_compute_node(),
+        worker_name="caps-compute",
+        kubernetes_version="v1.36.1",
+        ssh_username="capi",
+    )
+
+    files = spec["template"]["spec"]["files"]
+    wrapper = next(item for item in files if item["path"] == "/usr/local/sbin/caps-health-root")
+    sudoers = next(item for item in files if item["path"] == "/etc/sudoers.d/90-caps-health")
+    assert "unsupported health command" in wrapper["content"]
+    assert wrapper["permissions"] == "0755"
+    assert sudoers["content"] == (
+        "capi ALL=(root) NOPASSWD: /usr/local/sbin/caps-health-root *\n"
+    )
+    assert sudoers["permissions"] == "0440"
+
+
 def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
     spec = _kubeadm_control_plane_spec(
         node=_controller_node(),

@@ -423,6 +423,59 @@ def _cloud_config_file(*, secret_name: str, key: str) -> dict[str, object]:
     }
 
 
+def _health_check_files(*, ssh_username: str) -> list[dict[str, object]]:
+        wrapper = """#!/usr/bin/env bash
+set -euo pipefail
+command_name=${1:-}
+shift || true
+case "$command_name" in
+    sanity)
+        exec /opt/azurehpc/test/run-tests.sh "${1:-NVIDIA}" -v
+        ;;
+    aznhc)
+        output=${1:?health output path is required}
+        exec /opt/azurehpc/test/azurehpc-health-checks/run-health-checks.sh -o "$output" -v
+        ;;
+    dcgmi)
+        exec /usr/bin/dcgmi diag -r 2
+        ;;
+    ghr)
+        object_id=${1:?GHR object ID is required}
+        health_file=${2:?health output path is required}
+        fault_map=${3:?fault map path is required}
+        root=/opt/azurehpc/test/azurehpc-health-checks/triggerGHR
+        backup=$(mktemp)
+        cp "$root/config/user.env" "$backup"
+        trap 'cp "$backup" "$root/config/user.env"; rm -f "$backup"' EXIT
+        sed -i "s/^OBJECT_ID=.*/OBJECT_ID=\"$object_id\"/" "$root/config/user.env"
+        "$root/triggerGHR.sh" -f "$health_file" -c "$fault_map"
+        ;;
+    *)
+        echo "unsupported health command: $command_name" >&2
+        exit 64
+        ;;
+esac
+"""
+        sudoers = (
+                f"{ssh_username} ALL=(root) NOPASSWD: "
+                "/usr/local/sbin/caps-health-root *\n"
+        )
+        return [
+                {
+                        "content": wrapper,
+                        "owner": "root:root",
+                        "path": "/usr/local/sbin/caps-health-root",
+                        "permissions": "0755",
+                },
+                {
+                        "content": sudoers,
+                        "owner": "root:root",
+                        "path": "/etc/sudoers.d/90-caps-health",
+                        "permissions": "0440",
+                },
+        ]
+
+
 def _node_registration(*, node_type: str | None = None) -> dict[str, object]:
     extra_args: dict[str, str] = {"cloud-provider": "external"}
     if node_type is not None:
@@ -699,7 +752,7 @@ def _kubeadm_config_template_spec(
                 secret_name=f"{worker_name}-azure-json",
                 key="worker-node-azure.json",
             )
-        ],
+        ] + _health_check_files(ssh_username=ssh_username),
         "joinConfiguration": {
             "nodeRegistration": _node_registration(node_type=node.node_type)
         },
