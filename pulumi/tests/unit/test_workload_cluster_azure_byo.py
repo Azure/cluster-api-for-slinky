@@ -909,27 +909,6 @@ def test_machine_template_attaches_uami_subnet_and_flex_vmss() -> None:
     }
 
 
-def test_machine_template_attaches_additional_worker_identities() -> None:
-    node = AzureBYONodePoolSpec(
-        name="compute",
-        node_type="compute",
-        vm_size="Standard_ND96amsr_A100_v4",
-        replicas=2,
-        additional_identity_resource_ids=("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/GHRMI",),
-    )
-
-    spec = _machine_template_spec(
-        node=node,
-        subnet_name="default",
-        node_identity_provider_id="azure:///infra-identity",
-        additional_tags={},
-    )
-
-    identities = spec["template"]["spec"]["userAssignedIdentities"]
-    assert identities[0] == {"providerID": "azure:///infra-identity"}
-    assert len(identities) == 2
-
-
 def test_machine_template_omits_flex_vmss_for_non_flex_node_pool() -> None:
     node = AzureBYONodePoolSpec(
         name="services",
@@ -948,7 +927,7 @@ def test_machine_template_omits_flex_vmss_for_non_flex_node_pool() -> None:
     assert "virtualMachineScaleSetID" not in spec["template"]["spec"]
 
 
-def test_worker_bootstrap_installs_scoped_health_wrapper() -> None:
+def test_worker_bootstrap_only_installs_required_config_files() -> None:
     spec = _kubeadm_config_template_spec(
         node=_compute_node(),
         worker_name="caps-compute",
@@ -957,15 +936,7 @@ def test_worker_bootstrap_installs_scoped_health_wrapper() -> None:
     )
 
     files = spec["template"]["spec"]["files"]
-    wrapper = next(item for item in files if item["path"] == "/usr/local/sbin/caps-health-root")
-    sudoers = next(item for item in files if item["path"] == "/etc/sudoers.d/90-caps-health")
-    assert "unsupported health command" in wrapper["content"]
-    assert "OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1" in wrapper["content"]
-    assert wrapper["permissions"] == "0755"
-    assert sudoers["content"] == (
-        "capi ALL=(root) NOPASSWD: /usr/local/sbin/caps-health-root *\n"
-    )
-    assert sudoers["permissions"] == "0440"
+    assert [item["path"] for item in files] == ["/etc/kubernetes/azure.json"]
 
 
 def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:

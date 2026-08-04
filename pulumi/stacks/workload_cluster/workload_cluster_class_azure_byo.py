@@ -122,7 +122,6 @@ class AzureBYOWorkloadSpec(PulumiConfigModel):
     # roles boot the same image; set it explicitly to keep the control plane on another image.
     worker_image_id: NonEmptyStr | None = None
     control_plane_image_id: NonEmptyStr | None = None
-    worker_identity_resource_ids: tuple[NonEmptyStr, ...] = ()
     ssh_username: NonEmptyStr = _DEFAULT_SSH_USERNAME
     ssh_authorized_keys: tuple[NonEmptyStr, ...] = ()
     vnet: AzureBYOVNetConfig | None = None
@@ -229,7 +228,6 @@ def _default_node_pools(
                 # plane above intentionally stays on the CAPZ default Ubuntu image.
                 "image": parameters.worker_image,
                 "image_id": parameters.worker_image_id,
-                "additional_identity_resource_ids": parameters.worker_identity_resource_ids,
             }
         ),
     )

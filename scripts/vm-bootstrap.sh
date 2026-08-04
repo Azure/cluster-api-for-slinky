@@ -51,7 +51,6 @@
 #   AZURE_IDENTITY_CLIENT_ID    selects the infrastructure UAMI when the VM has
 #                               additional reporting identities attached.
 #   AZURE_IDENTITY_RESOURCE_ID  resource ID for that infrastructure UAMI.
-#   WORKER_IDENTITY_RESOURCE_IDS semicolon-separated additional worker UAMIs.
 #   ARM_CLIENT_ID / ARM_CLIENT_SECRET / ARM_TENANT_ID / ARM_SUBSCRIPTION_ID
 #                  OPTIONAL service-principal override. Normally UNSET: the VM's
 #                  attached UAMI (Option A) is used via IMDS. Only set these to force
@@ -75,7 +74,6 @@ GIT_TOKEN="${GIT_TOKEN:-}"
 PULUMI_STACK="${PULUMI_STACK:-azurebyo}"
 AZURE_IDENTITY_CLIENT_ID="${AZURE_IDENTITY_CLIENT_ID:-}"
 AZURE_IDENTITY_RESOURCE_ID="${AZURE_IDENTITY_RESOURCE_ID:-}"
-WORKER_IDENTITY_RESOURCE_IDS="${WORKER_IDENTITY_RESOURCE_IDS:-}"
 TENANT_NAME="${TENANT_NAME:-caps-self}"
 CONTROL_PLANE_VM_SIZE="${CONTROL_PLANE_VM_SIZE:-}"
 WORKER_VM_SIZE="${WORKER_VM_SIZE:-}"
@@ -324,15 +322,6 @@ pulumi_up() {
   fi
   if [[ -n "$WORKER_IMAGE_ID" ]]; then
     pulumi config set --path "${base}.workerImageId" "$WORKER_IMAGE_ID"
-  fi
-  if [[ -n "$WORKER_IDENTITY_RESOURCE_IDS" ]]; then
-    IFS=';' read -r -a worker_identity_ids <<< "$WORKER_IDENTITY_RESOURCE_IDS"
-    for index in "${!worker_identity_ids[@]}"; do
-      if [[ -n "${worker_identity_ids[$index]}" ]]; then
-        pulumi config set --path "${base}.workerIdentityResourceIds[$index]" \
-          "${worker_identity_ids[$index]}"
-      fi
-    done
   fi
   if [[ -n "$CONTROL_PLANE_IMAGE_ID" ]]; then
     pulumi config set --path "${base}.controlPlaneImageId" "$CONTROL_PLANE_IMAGE_ID"

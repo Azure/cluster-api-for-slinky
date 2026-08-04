@@ -83,9 +83,9 @@ SSH_OPTS=(-i "$WORKER_SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile
 # existing default key), and the matching ssh options mpirun passes to its rsh
 # launcher. Using plm_rsh_args avoids writing ~/.ssh/config on the worker, so the
 # bootstrap leaves no residue beyond this single key file (removed on exit).
-REMOTE_KEY=".ssh/caps-hostmpi-id"
+REMOTE_KEY=""
 REMOTE_LAUNCHER=""
-RSH_ARGS="-i /home/$WORKER_SSH_USER/$REMOTE_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+RSH_ARGS=""
 
 log()  { printf '>> %s\n' "$*"; }
 die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -114,7 +114,9 @@ if [[ "$ALLOC_OUT" =~ Granted\ job\ allocation\ ([0-9]+) ]]; then
   JOBID="${BASH_REMATCH[1]}"
 fi
 [[ -n "$JOBID" ]] || die "salloc did not grant an allocation:\n$ALLOC_OUT"
+REMOTE_KEY=".ssh/caps-hostmpi-id-${JOBID}"
 REMOTE_LAUNCHER=".caps-host-launch-${JOBID}.sh"
+RSH_ARGS="-i /home/$WORKER_SSH_USER/$REMOTE_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 log "Slurm job allocation: $JOBID"
 
 # Artifact paths may use the same Slurm-style %j token as OUT_FILE.

@@ -143,7 +143,6 @@ class AzureBYONodePoolSpec(PulumiConfigModel):
     # HPC image under validation). Rendered as CAPZ image.id and takes precedence over
     # ``image``. The image carries no Kubernetes; the bootstrap config installs it.
     image_id: NonEmptyStr | None = None
-    additional_identity_resource_ids: tuple[NonEmptyStr, ...] = ()
 
 
 def _autoscaler_annotations(
@@ -379,16 +378,6 @@ def _machine_template_spec(
     additional_tags: Mapping[str, str],
     virtual_machine_scale_set_id: pulumi.Input[str] | None = None,
 ) -> dict[str, object]:
-    identities = [{"providerID": node_identity_provider_id}]
-    identities.extend(
-        {
-            "providerID": pulumi.Output.concat(
-                _AZURE_PROVIDER_ID_PREFIX,
-                resource_id,
-            )
-        }
-        for resource_id in node.additional_identity_resource_ids
-    )
     spec: dict[str, object] = {
         "vmSize": node.vm_size,
         "osDisk": {
@@ -397,7 +386,7 @@ def _machine_template_spec(
             "osType": "Linux",
         },
         "identity": "UserAssigned",
-        "userAssignedIdentities": identities,
+        "userAssignedIdentities": [{"providerID": node_identity_provider_id}],
         "networkInterfaces": [{"subnetName": subnet_name}],
         "additionalTags": dict(additional_tags),
     }
@@ -421,58 +410,6 @@ def _cloud_config_file(*, secret_name: str, key: str) -> dict[str, object]:
         "path": "/etc/kubernetes/azure.json",
         "permissions": "0644",
     }
-
-
-def _health_check_files(*, ssh_username: str) -> list[dict[str, object]]:
-        wrapper = """#!/usr/bin/env bash
-set -euo pipefail
-command_name=${1:-}
-shift || true
-case "$command_name" in
-    sanity)
-        export OMPI_ALLOW_RUN_AS_ROOT=1
-        export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-        exec /opt/azurehpc/test/run-tests.sh "${1:-NVIDIA}" -v
-        ;;
-    aznhc)
-        exec /opt/azurehpc/test/azurehpc-health-checks/run-health-checks.sh -o /tmp/caps-health-aznhc.out -v
-        ;;
-    dcgmi)
-        exec /usr/bin/dcgmi diag -r 2
-        ;;
-    ghr)
-        object_id=${1:?GHR object ID is required}
-        root=/opt/azurehpc/test/azurehpc-health-checks/triggerGHR
-        backup=$(mktemp)
-        cp "$root/config/user.env" "$backup"
-        trap 'cp "$backup" "$root/config/user.env"; rm -f "$backup"' EXIT
-        sed -i "s/^OBJECT_ID=.*/OBJECT_ID=\"$object_id\"/" "$root/config/user.env"
-        "$root/triggerGHR.sh" -f /tmp/caps-health-aznhc.out -c /tmp/caps-nhc-fault-map.json
-        ;;
-    *)
-        echo "unsupported health command: $command_name" >&2
-        exit 64
-        ;;
-esac
-"""
-        sudoers = (
-                f"{ssh_username} ALL=(root) NOPASSWD: "
-                "/usr/local/sbin/caps-health-root *\n"
-        )
-        return [
-                {
-                        "content": wrapper,
-                        "owner": "root:root",
-                        "path": "/usr/local/sbin/caps-health-root",
-                        "permissions": "0755",
-                },
-                {
-                        "content": sudoers,
-                        "owner": "root:root",
-                        "path": "/etc/sudoers.d/90-caps-health",
-                        "permissions": "0440",
-                },
-        ]
 
 
 def _node_registration(*, node_type: str | None = None) -> dict[str, object]:
@@ -751,7 +688,7 @@ def _kubeadm_config_template_spec(
                 secret_name=f"{worker_name}-azure-json",
                 key="worker-node-azure.json",
             )
-        ] + _health_check_files(ssh_username=ssh_username),
+        ],
         "joinConfiguration": {
             "nodeRegistration": _node_registration(node_type=node.node_type)
         },
