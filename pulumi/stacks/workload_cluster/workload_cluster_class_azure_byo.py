@@ -37,6 +37,9 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
 
 
 _CLUSTER_CLASS = "azure-byo"
+# Pinned to the version validated with the current CAPZ/CAPI and image bootstrap
+# path. TODO(caps-handoff): make this an explicitly tested compatibility choice
+# before upgrading it independently of CAPZ, CAPI, or the image's package repos.
 _DEFAULT_KUBERNETES_VERSION = "v1.36.1"
 _DEFAULT_CONTROL_PLANE_VM_SIZE = "Standard_D2as_v5"
 _DEFAULT_WORKER_VM_SIZE = "Standard_D2as_v5"
@@ -44,6 +47,9 @@ _DEFAULT_SSH_USERNAME = "capi"
 _CONTROLLER_NODE_TYPE = "controller"
 _COMPUTE_NODE_TYPE = "compute"
 
+# Experiment ceiling used to exercise queue-driven scale-out. TODO(caps-handoff):
+# expose this per workload and derive its upper bound from quota/cost policy rather
+# than assuming every subscription and GPU SKU may scale to ten workers.
 _AZURE_BYO_KEDA_MAX_REPLICAS = 10
 
 
