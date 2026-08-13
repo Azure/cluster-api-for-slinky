@@ -281,13 +281,16 @@ block scale-in by themselves.
 Every project-managed controller worker/System pool has one taint:
 
 ```yaml
-slinky.slurm.net/controller:NoSchedule
+CriticalAddonsOnly=true:NoSchedule
 ```
 
-Platform pods tolerate this taint and use required controller-role affinity.
-Compute workers are untainted, and Slurm `NodeSet` pods select them with
-compute-role affinity. The taint keeps unconstrained tenant pods off controller
-workers, while affinity keeps platform Deployments off compute workers.
+CAPS treats its pinned platform controllers as critical add-ons across CAPD,
+Azure BYO, and AKS. Platform pods explicitly tolerate this conventional taint
+and use required controller-role affinity. Compute workers are untainted, and
+Slurm `NodeSet` pods select them with compute-role affinity. The taint keeps
+unconstrained tenant pods off controller workers, while the project-specific
+`slinky.slurm.net/node-type` label keeps platform Deployments off compute
+workers.
 
 Self-managed Kubernetes control-plane nodes retain kubeadm's standard
 `node-role.kubernetes.io/control-plane:NoSchedule` taint. That provider-owned
@@ -299,10 +302,10 @@ no separate root-level Helm values files for the managed local stack.
 
 ### Who Tolerates the Taint
 
-| Component | Tolerates project controller taint? | How |
-|-----------|---------------------------------------|-----|
-| Slurm controller/login/restapi | Yes | Generated chart values add the custom toleration and controller-role affinity |
-| Pinned platform Deployments | Yes | Generated Pulumi/Helm values add the custom toleration plus controller-role affinity |
+| Component | Tolerates `CriticalAddonsOnly`? | How |
+|-----------|-----------------------------------|-----|
+| Slurm controller/login/restapi | Yes | Generated chart values add the toleration and controller-role affinity |
+| Pinned platform Deployments | Yes | Generated Pulumi/Helm values add the toleration plus controller-role affinity |
 | slurmd NodeSet workers | No | They select compute nodes by `slinky.slurm.net/node-type: compute` |
 | DaemonSets | Usually yes | Kubernetes DaemonSet defaults or chart tolerations allow node agents everywhere |
 | Tenant workloads | No | They stay off controller nodes unless explicitly configured |

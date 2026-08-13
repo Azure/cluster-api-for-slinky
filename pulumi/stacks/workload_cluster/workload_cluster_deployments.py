@@ -21,6 +21,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     controller_tolerations,
     node_type_affinity,
 )
+from stacks.kubernetes_annotations import pulumi_patch_force
 
 
 _CERT_MANAGER_CHART_REPO = "https://charts.jetstack.io"
@@ -214,7 +215,7 @@ def _prometheus_values() -> dict[str, object]:
 
 
 def _coredns_controller_placement_spec() -> dict[str, object]:
-    return {"template": {"spec": {"affinity": controller_node_affinity()}}}
+    return {"template": {"spec": controller_pod_spec()}}
 
 
 def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
@@ -481,7 +482,11 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         if pin_coredns_to_controller:
             k8s.apps.v1.DeploymentPatch(
                 "coredns-controller-placement",
-                metadata={"name": "coredns", "namespace": "kube-system"},
+                metadata={
+                    "name": "coredns",
+                    "namespace": "kube-system",
+                    "annotations": pulumi_patch_force(),
+                },
                 spec=_coredns_controller_placement_spec(),
                 opts=child_options(provider=workload_provider),
             )

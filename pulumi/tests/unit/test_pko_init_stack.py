@@ -247,7 +247,14 @@ def test_build_stack_spec_uses_flux_source_namespace() -> None:
         {
             "name": "pulumi",
             "image": "pulumi/pulumi-python:3.202.0",
-            "volumeMounts": [{"name": "state", "mountPath": "/state"}],
+            "volumeMounts": [
+                {"name": "state", "mountPath": "/state"},
+                {
+                    "name": "state",
+                    "mountPath": "/share/source/.venv",
+                    "subPath": "venv",
+                },
+            ],
         }
     ]
 

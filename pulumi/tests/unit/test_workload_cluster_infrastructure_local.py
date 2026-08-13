@@ -64,7 +64,7 @@ def test_local_control_plane_registration_has_no_custom_label_or_taint() -> None
     }
 
 
-def test_local_controller_worker_registration_adds_custom_taint() -> None:
+def test_local_controller_worker_registration_adds_critical_addons_taint() -> None:
     registration = _node_registration(CONTROLLER_NODE_TYPE)
 
     assert registration["taints"] == [controller_taint()]

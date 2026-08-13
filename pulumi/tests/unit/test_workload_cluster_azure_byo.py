@@ -826,7 +826,7 @@ def test_worker_kubeadm_template_mounts_azure_config_and_labels_node() -> None:
     ]
 
 
-def test_controller_worker_kubeadm_template_adds_custom_taint() -> None:
+def test_controller_worker_kubeadm_template_adds_critical_addons_taint() -> None:
     spec = _kubeadm_config_template_spec(
         node=_head_node(),
         worker_name="caps-self-head",

@@ -10,7 +10,8 @@ import pulumi_kubernetes as k8s
 from pydantic import BaseModel, ConfigDict
 
 NODE_TYPE_LABEL = "slinky.slurm.net/node-type"
-CONTROLLER_TAINT_KEY = "slinky.slurm.net/controller"
+CRITICAL_ADDONS_ONLY_TAINT_KEY = "CriticalAddonsOnly"
+CRITICAL_ADDONS_ONLY_TAINT_VALUE = "true"
 CONTROLLER_NODE_TYPE = "controller"
 COMPUTE_NODE_TYPE = "compute"
 AUTOSCALER_MIN_ANNOTATION = (
@@ -67,8 +68,8 @@ def controller_node_affinity() -> dict[str, object]:
 
 def controller_taint() -> dict[str, str]:
     return {
-        "key": CONTROLLER_TAINT_KEY,
-        "value": "",
+        "key": CRITICAL_ADDONS_ONLY_TAINT_KEY,
+        "value": CRITICAL_ADDONS_ONLY_TAINT_VALUE,
         "effect": "NoSchedule",
     }
 
@@ -76,7 +77,7 @@ def controller_taint() -> dict[str, str]:
 def controller_tolerations() -> list[dict[str, str]]:
     return [
         {
-            "key": CONTROLLER_TAINT_KEY,
+            "key": CRITICAL_ADDONS_ONLY_TAINT_KEY,
             "operator": "Exists",
             "effect": "NoSchedule",
         }

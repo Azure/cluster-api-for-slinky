@@ -16,19 +16,30 @@ from stacks.workload_cluster.workload_cluster_deployments import (
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     controller_node_affinity,
+    controller_taint,
+    controller_tolerations,
 )
+
+
+def test_controller_pool_uses_critical_addons_only_taint() -> None:
+    assert controller_taint() == {
+        "key": "CriticalAddonsOnly",
+        "value": "true",
+        "effect": "NoSchedule",
+    }
+    assert controller_tolerations() == [
+        {
+            "key": "CriticalAddonsOnly",
+            "operator": "Exists",
+            "effect": "NoSchedule",
+        }
+    ]
 
 
 def test_prometheus_values_pin_components_to_controller_node() -> None:
     values = _prometheus_values()
     expected_affinity = controller_node_affinity()
-    expected_tolerations = [
-        {
-            "key": "slinky.slurm.net/controller",
-            "operator": "Exists",
-            "effect": "NoSchedule",
-        },
-    ]
+    expected_tolerations = controller_tolerations()
 
     assert values["prometheus"]["prometheusSpec"] == {
         "serviceMonitorSelectorNilUsesHelmValues": False,
@@ -59,13 +70,7 @@ def test_keda_names_are_instance_scoped() -> None:
 
 def test_keda_values_pin_components_to_controller_node() -> None:
     values = _keda_values()
-    expected_tolerations = [
-        {
-            "key": "slinky.slurm.net/controller",
-            "operator": "Exists",
-            "effect": "NoSchedule",
-        },
-    ]
+    expected_tolerations = controller_tolerations()
     expected_placement = {
         "affinity": controller_node_affinity(),
         "tolerations": expected_tolerations,
@@ -81,13 +86,7 @@ def test_cert_manager_values_pin_every_chart_pod_to_controller_node() -> None:
     values = _cert_manager_values()
     expected_placement = {
         "affinity": controller_node_affinity(),
-        "tolerations": [
-            {
-                "key": "slinky.slurm.net/controller",
-                "operator": "Exists",
-                "effect": "NoSchedule",
-            }
-        ],
+        "tolerations": controller_tolerations(),
     }
 
     assert values["affinity"] == expected_placement["affinity"]
@@ -97,9 +96,14 @@ def test_cert_manager_values_pin_every_chart_pod_to_controller_node() -> None:
     assert values["startupapicheck"] == expected_placement
 
 
-def test_coredns_patch_only_sets_controller_affinity() -> None:
+def test_coredns_patch_pins_to_controller_node() -> None:
     assert _coredns_controller_placement_spec() == {
-        "template": {"spec": {"affinity": controller_node_affinity()}}
+        "template": {
+            "spec": {
+                "affinity": controller_node_affinity(),
+                "tolerations": controller_tolerations(),
+            }
+        }
     }
 
 

@@ -32,7 +32,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_aks import (
 _CLUSTER_CLASS = "aks"
 
 _DEFAULT_AKS_INSTANCE_NAME = "caps-aks"
-_DEFAULT_AKS_KUBERNETES_VERSION = "v1.33.12"
+_DEFAULT_AKS_KUBERNETES_VERSION = "v1.34.0"
 _DEFAULT_AKS_NODE_SKU = "Standard_D2as_v5"
 _DEFAULT_AKS_NODE_COUNT = 1
 
@@ -215,7 +215,6 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             slurm_node_sets=slurm_node_sets,
             keda_scaled_node_sets=keda_scaled_node_sets,
             workload_provider=infrastructure.workload_provider,
-            pin_coredns_to_controller=True,
             opts=child_options(depends_on=[infrastructure]),
         )
 

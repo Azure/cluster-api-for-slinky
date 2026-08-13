@@ -152,7 +152,7 @@ def test_amcp_spec_stamps_additional_tags_for_node_rg_policy() -> None:
         location="westus2",
         resource_group="rg-capz-mi-dev2",
         subscription_id="d2c9544f-4329-4642-b73d-020e7fef844f",
-        version="v1.33.12",
+        version="v1.34.0",
         additional_tags={"Owner": "t-hernandezc"},
     )
 

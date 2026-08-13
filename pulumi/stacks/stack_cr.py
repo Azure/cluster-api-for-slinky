@@ -54,6 +54,8 @@ _HOME = "/share"
 _PULUMI_HOME = "/share/.pulumi"
 _PULUMI_USER = "pulumi"
 _PYTHONPATH = "/share/source/pulumi"
+_PYTHON_VIRTUALENV_PATH = "/share/source/.venv"
+_PYTHON_VIRTUALENV_SUBPATH = "venv"
 
 # Volume name used inside the workspace pod for the file:// backend's
 # PVC mount. Arbitrary string, just has to match between volume and
@@ -202,6 +204,11 @@ def build_stack_spec(
                                 {
                                     "name": _STATE_VOLUME_NAME,
                                     "mountPath": _STATE_MOUNT_PATH,
+                                },
+                                {
+                                    "name": _STATE_VOLUME_NAME,
+                                    "mountPath": _PYTHON_VIRTUALENV_PATH,
+                                    "subPath": _PYTHON_VIRTUALENV_SUBPATH,
                                 },
                             ],
                         },

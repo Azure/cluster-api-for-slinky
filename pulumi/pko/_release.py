@@ -28,7 +28,7 @@ from pko import PKO_NAMESPACE
 # Pinned PKO chart. See https://github.com/pulumi/pulumi-kubernetes-operator
 # for the release matrix. v2.x is the current major.
 PKO_CHART_OCI = "oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator"
-PKO_CHART_VERSION = "2.7.0"
+PKO_CHART_VERSION = "2.8.0"
 _BOOTSTRAP_HELM_TIMEOUT_SECONDS = 30 * 60
 _BOOTSTRAP_HELM_TIMEOUT = "30m"
 
