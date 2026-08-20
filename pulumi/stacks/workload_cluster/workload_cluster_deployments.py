@@ -248,10 +248,12 @@ def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
         "podSpec": {
             "affinity": {
                 **node_type_affinity(node_set.node_type),
-                # TODO: move the one-slurmd-per-node anti-affinity and
-                # slurm-bridge node-name labeling into slurm-operator so
-                # StatefulSet NodeSets can maintain the Kubernetes Node
-                # slinky.slurm.net/slurm-nodename label for pinned pods.
+                # TODO: after upgrading from Slinky chart 1.1.1 to a release
+                # with NodeSet oversubscribeNode, set it to false and remove
+                # this hand-rolled one-slurmd-per-node anti-affinity. Node-name
+                # labeling still needs upstream slurm-operator support so
+                # pinned StatefulSet pods can maintain the Kubernetes Node
+                # slinky.slurm.net/slurm-nodename label for slurm-bridge.
                 "podAntiAffinity": {
                     "requiredDuringSchedulingIgnoredDuringExecution": [
                         {
