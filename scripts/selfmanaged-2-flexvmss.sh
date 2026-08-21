@@ -33,6 +33,9 @@ OWNER="${OWNER:-t-hernandezc}"
 
 az account show >/dev/null 2>&1 || az login --identity -o none
 
+# TODO: Use --single-placement-group true as the placement constraint instead of
+# hard-coding ZONE. Azure preserves it on an empty zoneless Flex VMSS; validate the
+# first ND40 member's AZ and matching IB pkey before removing the zone workaround.
 # --- empty Flexible VMSS (placement container; FD=1 => one implicit AS => one IB partition) ---
 if az vmss show -g "$RG" -n "$VMSS" >/dev/null 2>&1; then
   echo ">> VMSS $VMSS already exists"
