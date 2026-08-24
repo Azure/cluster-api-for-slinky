@@ -56,7 +56,9 @@ from stacks.stack_cr import StackCRConfig, build_stack_spec
 # moment the Stack CR is submitted and operators must poll for the init
 # stack themselves — brittle for CI and for our test runbook.
 _WAIT_FOR_READY = "condition=Ready"
-_INIT_STACK_TIMEOUT = "60m"
+# The enclosing Stack delete must outlast the inner workload delete timeout
+# plus PKO retry and finalization overhead.
+_INIT_STACK_TIMEOUT = "150m"
 
 
 def _init_stack_config_with_flux_source(

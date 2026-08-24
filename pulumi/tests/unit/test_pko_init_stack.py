@@ -18,6 +18,7 @@ from stacks.control_plane.control_plane_config import (
     UserAssignedMSIClusterIdentityConfig,
 )
 from pko.pko_bootstrap import (
+    _INIT_STACK_TIMEOUT,
     _init_stack_config_to_config,
     _init_stack_config_with_flux_source,
 )
@@ -243,6 +244,7 @@ def test_build_stack_spec_uses_flux_source_namespace() -> None:
     assert "PULUMI_K8S_DELETE_UNREACHABLE" not in spec["envRefs"]
     assert "updateTemplate" not in spec
     assert spec["destroyOnFinalize"] is True
+    assert _INIT_STACK_TIMEOUT == "150m"
     assert spec["workspaceTemplate"]["spec"]["podTemplate"]["spec"]["containers"] == [
         {
             "name": "pulumi",

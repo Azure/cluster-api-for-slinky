@@ -32,6 +32,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_aks import (
     _AMCP_KIND,
     _AMCP_IMMUTABLE_DEFAULTED_FIELDS,
     _AMMP_KIND,
+    _AKS_DELETE_TIMEOUT,
     _AKS_POOL_NAME_MAX_LENGTH,
     _AZURE_CLUSTER_IDENTITY_KIND,
     _CAPI_API_VERSION,
@@ -129,6 +130,10 @@ def test_amcp_spec_carries_identity_and_placement() -> None:
 
 def test_amcp_ignores_capz_defaulted_immutable_fields() -> None:
     assert _AMCP_IMMUTABLE_DEFAULTED_FIELDS == ["spec.sshPublicKey"]
+
+
+def test_aks_delete_timeout_allows_slow_azure_cleanup() -> None:
+    assert _AKS_DELETE_TIMEOUT == "120m"
 
 
 def test_amcp_spec_stamps_additional_tags_for_node_rg_policy() -> None:
