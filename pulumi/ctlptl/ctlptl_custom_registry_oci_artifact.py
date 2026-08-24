@@ -106,7 +106,7 @@ def _manifest_exists(registry_port: int, artifact_name: str, artifact_tag: str) 
 def _build_and_push_artifact(
     *,
     source_path: str,
-    source_ref: str,
+    source_commit: str,
     host_artifact_ref: str,
     artifact_files: list[str],
 ) -> None:
@@ -115,7 +115,9 @@ def _build_and_push_artifact(
     _require_binary("oras")
     worktree = tempfile.mkdtemp(prefix="ca4s-artifact-")
     try:
-        _run(["git", "-C", source_path, "worktree", "add", "--detach", worktree, source_ref])
+        _run(
+            ["git", "-C", source_path, "worktree", "add", "--detach", worktree, source_commit]
+        )
         _run(["make", "release-manifests", "release-metadata"], cwd=worktree)
         out_dir = Path(worktree) / "out"
         missing = [item for item in artifact_files if not (out_dir / item).is_file()]
@@ -131,10 +133,10 @@ def _ensure_artifact(props: dict) -> dict[str, object]:
     artifact_name = _artifact_name_prop(props)
     artifact_files = _artifact_files_prop(props)
 
-    def build(source_path: str, source_ref: str, host_artifact_ref: str) -> None:
+    def build(source_path: str, source_commit: str, host_artifact_ref: str) -> None:
         _build_and_push_artifact(
             source_path=source_path,
-            source_ref=source_ref,
+            source_commit=source_commit,
             host_artifact_ref=host_artifact_ref,
             artifact_files=artifact_files,
         )
@@ -174,6 +176,7 @@ class _CtlptlCustomRegistryOCIArtifactProvider(ResourceProvider):
     def diff(self, id_: str, olds: dict, news: dict) -> DiffResult:
         keys = (
             "source_path",
+            "repository_url",
             "source_ref",
             "registry_name",
             "registry_port",
@@ -199,12 +202,21 @@ class _CtlptlCustomRegistryOCIArtifactProvider(ResourceProvider):
         except Exception as exc:
             print(f"failed to refresh ctlptl OCI artifact {id_!r}: {exc}", file=sys.stderr)
             return ReadResult(id_=id_, outs=props)
-        return ReadResult(id_=id_, outs=props)
+        return ReadResult(
+            id_=id_,
+            outs={
+                **props,
+                "source_commit": source_commit,
+                "artifact_tag": artifact_tag,
+            },
+        )
 
 
 class CtlptlCustomRegistryOCIArtifact(Resource):
     """Build and push CAPZ release artifacts as an OCI artifact."""
 
+    source_path: Output[str | None]
+    repository_url: Output[str | None]
     source_ref: Output[str]
     source_commit: Output[str]
     artifact_name: Output[str]
@@ -218,10 +230,11 @@ class CtlptlCustomRegistryOCIArtifact(Resource):
         self,
         name: str,
         *,
-        source_path: Input[str],
         source_ref: Input[str],
         registry_name: Input[str],
         registry_port: Input[int],
+        source_path: Optional[Input[str]] = None,
+        repository_url: Optional[Input[str]] = None,
         artifact_name: Optional[Input[str]] = None,
         artifact_files: Optional[Input[list[Input[str]]]] = None,
         opts: Optional[ResourceOptions] = None,
@@ -231,6 +244,7 @@ class CtlptlCustomRegistryOCIArtifact(Resource):
             name,
             {
                 "source_path": source_path,
+                "repository_url": repository_url,
                 "source_ref": source_ref,
                 "registry_name": registry_name,
                 "registry_port": registry_port,

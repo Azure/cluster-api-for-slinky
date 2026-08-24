@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
+from contextlib import contextmanager
+from typing import Iterator
 
 _MANIFEST_ACCEPT = ", ".join(
     (
@@ -75,6 +78,62 @@ def resolve_source_commit(source_path: str, source_ref: str) -> str:
     return commit
 
 
+@contextmanager
+def remote_source_repository(
+    repository_url: str,
+    source_ref: str,
+) -> Iterator[tuple[str, str]]:
+    require_binary("git")
+    repository_path = tempfile.mkdtemp(prefix="ca4s-source-")
+    try:
+        run(["git", "init", "--bare", repository_path])
+        run(
+            [
+                "git",
+                "-C",
+                repository_path,
+                "fetch",
+                "--depth=1",
+                repository_url,
+                source_ref,
+            ]
+        )
+        result = run(
+            ["git", "-C", repository_path, "rev-parse", "FETCH_HEAD^{commit}"]
+        )
+        source_commit = result.stdout.strip()
+        if not source_commit:
+            raise RuntimeError(f"source_ref {source_ref!r} did not resolve to a commit")
+        yield repository_path, source_commit
+    finally:
+        shutil.rmtree(repository_path, ignore_errors=True)
+
+
+@contextmanager
+def source_repository(
+    props: dict,
+    *,
+    resolve_commit: Callable[[str, str], str] = resolve_source_commit,
+) -> Iterator[tuple[str, str, str | None, str | None]]:
+    source_path = props.get("source_path")
+    repository_url = props.get("repository_url")
+    if source_path is not None and repository_url is not None:
+        raise RuntimeError("source_path and repository_url are mutually exclusive")
+    source_ref = required_str(props, "source_ref")
+    if source_path is not None:
+        if not isinstance(source_path, str) or not source_path:
+            raise RuntimeError("source_path must be a non-empty string")
+        yield source_path, resolve_commit(source_path, source_ref), source_path, None
+        return
+    if not isinstance(repository_url, str) or not repository_url:
+        raise RuntimeError("exactly one of source_path or repository_url is required")
+    with remote_source_repository(repository_url, source_ref) as (
+        repository_path,
+        source_commit,
+    ):
+        yield repository_path, source_commit, None, repository_url
+
+
 def source_tag(source_commit: str) -> str:
     return f"source-{source_commit[:12]}"
 
@@ -118,22 +177,27 @@ def ensure_source_ref_object(
     resolve_commit: Callable[[str, str], str] = resolve_source_commit,
     probe_manifest: Callable[[int, str, str], bool] = manifest_exists,
 ) -> dict[str, object]:
-    source_path = required_str(props, "source_path")
     source_ref = required_str(props, "source_ref")
     registry_name = required_str(props, "registry_name")
     registry_port = required_int(props, "registry_port")
-    source_commit = resolve_commit(source_path, source_ref)
-    object_tag = source_tag(source_commit)
-    object_host_ref = host_ref(registry_port, object_name, object_tag)
-    object_cluster_ref = cluster_ref(registry_name, object_name, object_tag)
+    with source_repository(props, resolve_commit=resolve_commit) as (
+        repository_path,
+        source_commit,
+        source_path,
+        repository_url,
+    ):
+        object_tag = source_tag(source_commit)
+        object_host_ref = host_ref(registry_port, object_name, object_tag)
+        object_cluster_ref = cluster_ref(registry_name, object_name, object_tag)
 
-    built = False
-    if not probe_manifest(registry_port, object_name, object_tag):
-        build(source_path, source_ref, object_host_ref)
-        built = True
+        built = False
+        if not probe_manifest(registry_port, object_name, object_tag):
+            build(repository_path, source_commit, object_host_ref)
+            built = True
 
     outs = {
         "source_path": source_path,
+        "repository_url": repository_url,
         "source_ref": source_ref,
         "source_commit": source_commit,
         "registry_name": registry_name,
@@ -154,13 +218,8 @@ def source_commit_for_read(
     *,
     resolve_commit: Callable[[str, str], str] = resolve_source_commit,
 ) -> str:
-    source_commit = str(props.get("source_commit") or "")
-    if source_commit:
-        return source_commit
-    return resolve_commit(
-        required_str(props, "source_path"),
-        required_str(props, "source_ref"),
-    )
+    with source_repository(props, resolve_commit=resolve_commit) as (_, commit, _, _):
+        return commit
 
 
 def has_diff(olds: dict, news: dict, keys: tuple[str, ...]) -> bool:

@@ -3,14 +3,14 @@ config:
   ca4s-infra:customImages:
     images:
       capz-controller:
-        sourcePath: /home/zheyushen/cluster-api-provider-azure
-        sourceRef: origin/arsdragonfly/md-vmss
+        repositoryUrl: https://github.com/kubernetes-sigs/cluster-api-provider-azure.git
+        sourceRef: 69ec3a40a818ccbc32b8ce88c84609404d8cb7a2
         imageName: capz/cluster-api-azure-controller
         buildArgs:
           ARCH: amd64
   ca4s-infra:capzArtifact:
-    sourcePath: /home/zheyushen/cluster-api-provider-azure
-    sourceRef: origin/arsdragonfly/md-vmss
+    repositoryUrl: https://github.com/kubernetes-sigs/cluster-api-provider-azure.git
+    sourceRef: 69ec3a40a818ccbc32b8ce88c84609404d8cb7a2
   ca4s-infra:initStack:
     controlPlane:
       infrastructureProviders:

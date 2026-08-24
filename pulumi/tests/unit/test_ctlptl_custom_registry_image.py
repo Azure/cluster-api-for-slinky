@@ -81,7 +81,7 @@ def test_create_builds_and_pushes_when_source_image_is_missing(
     assert builds == [
         {
             "source_path": "/src/capz",
-            "source_ref": "arsdragonfly/md-vmss",
+            "source_commit": _SOURCE_COMMIT,
             "host_image_ref": "localhost:5002/capz/controller:source-1234567890ab",
             "build_args": {"ARCH": "amd64"},
         }
@@ -106,6 +106,26 @@ def test_create_accepts_pulumi_integer_values_deserialized_as_float(
     assert result.outs is not None
     assert result.outs["registry_port"] == 5002
     assert result.outs["host_image_ref"] == "localhost:5002/capz/controller:source-1234567890ab"
+
+
+def test_read_updates_resolved_source_commit(
+    provider: ctlptl_custom_registry_image._CtlptlCustomRegistryImageProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        ctlptl_custom_registry_image,
+        "_resolve_source_commit",
+        lambda source_path, source_ref: _SOURCE_COMMIT,
+    )
+    monkeypatch.setattr(ctlptl_custom_registry_image, "_manifest_exists", lambda *args: True)
+    props = _props()
+    props["source_commit"] = "old-commit"
+
+    result = provider.read("existing-image", props)
+
+    assert result.outs is not None
+    assert result.outs["source_commit"] == _SOURCE_COMMIT
+    assert result.outs["image_tag"] == "source-1234567890ab"
 
 
 def test_build_and_push_uses_detached_git_worktree(
@@ -136,13 +156,22 @@ def test_build_and_push_uses_detached_git_worktree(
 
     ctlptl_custom_registry_image._build_and_push_image(
         source_path="/src/capz",
-        source_ref="feature",
+        source_commit=_SOURCE_COMMIT,
         host_image_ref="localhost:5002/capz/controller:source-1234567890ab",
         build_args={"ARCH": "amd64"},
     )
 
     assert calls == [
-        ["git", "-C", "/src/capz", "worktree", "add", "--detach", "/tmp/worktree", "feature"],
+        [
+            "git",
+            "-C",
+            "/src/capz",
+            "worktree",
+            "add",
+            "--detach",
+            "/tmp/worktree",
+            _SOURCE_COMMIT,
+        ],
         [
             "docker",
             "build",

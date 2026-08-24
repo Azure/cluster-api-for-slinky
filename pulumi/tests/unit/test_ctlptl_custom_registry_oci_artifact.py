@@ -106,7 +106,7 @@ def test_create_builds_and_pushes_when_source_artifact_is_missing(
     assert builds == [
         {
             "source_path": "/src/capz",
-            "source_ref": "origin/arsdragonfly/md-vmss",
+            "source_commit": _SOURCE_COMMIT,
             "host_artifact_ref": (
                 "localhost:5002/capz/cluster-api-provider-azure:source-1234567890ab"
             ),
@@ -139,6 +139,30 @@ def test_create_accepts_pulumi_integer_values_deserialized_as_float(
     assert result.outs["host_artifact_ref"] == (
         "localhost:5002/capz/cluster-api-provider-azure:source-1234567890ab"
     )
+
+
+def test_read_updates_resolved_source_commit(
+    provider: ctlptl_custom_registry_oci_artifact._CtlptlCustomRegistryOCIArtifactProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        ctlptl_custom_registry_oci_artifact,
+        "_resolve_source_commit",
+        lambda source_path, source_ref: _SOURCE_COMMIT,
+    )
+    monkeypatch.setattr(
+        ctlptl_custom_registry_oci_artifact,
+        "_manifest_exists",
+        lambda *args: True,
+    )
+    props = _props()
+    props["source_commit"] = "old-commit"
+
+    result = provider.read("existing-artifact", props)
+
+    assert result.outs is not None
+    assert result.outs["source_commit"] == _SOURCE_COMMIT
+    assert result.outs["artifact_tag"] == "source-1234567890ab"
 
 
 def test_build_and_push_uses_capz_release_targets_and_oras(
@@ -188,14 +212,23 @@ def test_build_and_push_uses_capz_release_targets_and_oras(
 
     ctlptl_custom_registry_oci_artifact._build_and_push_artifact(
         source_path="/src/capz",
-        source_ref="feature",
+        source_commit=_SOURCE_COMMIT,
         host_artifact_ref="localhost:5002/capz/cluster-api-provider-azure:source-1234567890ab",
         artifact_files=["metadata.yaml", "infrastructure-components.yaml"],
     )
 
     assert calls == [
         (
-            ["git", "-C", "/src/capz", "worktree", "add", "--detach", str(worktree), "feature"],
+            [
+                "git",
+                "-C",
+                "/src/capz",
+                "worktree",
+                "add",
+                "--detach",
+                str(worktree),
+                _SOURCE_COMMIT,
+            ],
             None,
         ),
         (["make", "release-manifests", "release-metadata"], str(worktree)),
@@ -257,7 +290,7 @@ def test_build_and_push_requires_generated_files(
     with pytest.raises(RuntimeError, match="infrastructure-components.yaml"):
         ctlptl_custom_registry_oci_artifact._build_and_push_artifact(
             source_path="/src/capz",
-            source_ref="feature",
+            source_commit=_SOURCE_COMMIT,
             host_artifact_ref="localhost:5002/capz/cluster-api-provider-azure:source-1234567890ab",
             artifact_files=["metadata.yaml", "infrastructure-components.yaml"],
         )

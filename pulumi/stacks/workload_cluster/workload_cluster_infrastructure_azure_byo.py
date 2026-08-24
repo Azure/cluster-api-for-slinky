@@ -523,7 +523,7 @@ def _vmss_flex_args(
     """Azure Native inputs for an empty Flex placement container.
 
     The VMSS intentionally has no virtual-machine profile. CAPZ creates each
-    AzureMachine independently and attaches it through the fork's
+    AzureMachine independently and attaches it through the upstream
     ``virtualMachineScaleSetID`` field.
     """
     return azure_native.compute.VirtualMachineScaleSetArgs(

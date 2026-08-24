@@ -117,6 +117,26 @@ def test_custom_images_config_defaults_to_dedicated_registry() -> None:
     assert image.build_args is None
 
 
+def test_custom_images_config_accepts_remote_git_source() -> None:
+    config = CustomImagesConfig.model_validate(
+        {
+            "images": {
+                "controller": {
+                    "repositoryUrl": "https://github.com/kubernetes-sigs/cluster-api-provider-azure.git",
+                    "sourceRef": "69ec3a40a818ccbc32b8ce88c84609404d8cb7a2",
+                    "imageName": "custom/controller",
+                }
+            },
+        }
+    )
+
+    image = config.images["controller"]
+    assert image.source_path is None
+    assert image.repository_url == (
+        "https://github.com/kubernetes-sigs/cluster-api-provider-azure.git"
+    )
+
+
 def test_capz_artifact_config_defaults_to_capz_artifact_name() -> None:
     config = CAPZArtifactConfig.model_validate(
         {
@@ -130,15 +150,38 @@ def test_capz_artifact_config_defaults_to_capz_artifact_name() -> None:
     assert config.artifact_name == "capz/cluster-api-provider-azure"
 
 
+def test_capz_artifact_config_accepts_remote_git_source() -> None:
+    config = CAPZArtifactConfig.model_validate(
+        {
+            "repositoryUrl": "https://github.com/kubernetes-sigs/cluster-api-provider-azure.git",
+            "sourceRef": "69ec3a40a818ccbc32b8ce88c84609404d8cb7a2",
+        }
+    )
+
+    assert config.source_path is None
+    assert config.repository_url == (
+        "https://github.com/kubernetes-sigs/cluster-api-provider-azure.git"
+    )
+
+
 @pytest.mark.parametrize(
     "value, expected_errors",
     [
         (
             {},
+            {(("sourceRef",), "missing")},
+        ),
+        (
+            {"sourceRef": "HEAD"},
+            {((), "value_error")},
+        ),
+        (
             {
-                (("sourcePath",), "missing"),
-                (("sourceRef",), "missing"),
+                "sourcePath": "/src/capz",
+                "repositoryUrl": "https://example.invalid/capz.git",
+                "sourceRef": "HEAD",
             },
+            {((), "value_error")},
         ),
         (
             {
@@ -174,10 +217,22 @@ def test_capz_artifact_config_rejects_invalid_values(
         (
             {"images": {"controller": {}}},
             {
-                (('images', 'controller', 'sourcePath'), 'missing'),
                 (('images', 'controller', 'sourceRef'), 'missing'),
                 (('images', 'controller', 'imageName'), 'missing'),
             },
+        ),
+        (
+            {
+                "images": {
+                    "controller": {
+                        "sourcePath": "/src/controller",
+                        "repositoryUrl": "https://example.invalid/controller.git",
+                        "sourceRef": "HEAD",
+                        "imageName": "custom/controller",
+                    }
+                }
+            },
+            {(('images', 'controller'), 'value_error')},
         ),
         (
             {

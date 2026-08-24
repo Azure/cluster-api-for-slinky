@@ -8,6 +8,7 @@ from collections.abc import Mapping
 
 import pulumi
 import pulumi_kubernetes as k8s
+from pydantic import model_validator
 
 from ctlptl import (
     CloudProviderKind,
@@ -47,9 +48,19 @@ _CAPZ_ARTIFACT_NAME = "capz/cluster-api-provider-azure"
 _CAPZ_CONTROLLER_IMAGE_KEY = "capz-controller"
 
 
-class CustomImageConfig(PulumiConfigModel):
-    source_path: NonEmptyStr
+class GitSourceConfig(PulumiConfigModel):
+    source_path: NonEmptyStr | None = None
+    repository_url: NonEmptyStr | None = None
     source_ref: NonEmptyStr
+
+    @model_validator(mode="after")
+    def validate_source(self) -> GitSourceConfig:
+        if (self.source_path is None) == (self.repository_url is None):
+            raise ValueError("exactly one of sourcePath or repositoryUrl is required")
+        return self
+
+
+class CustomImageConfig(GitSourceConfig):
     image_name: NonEmptyStr
     build_args: Mapping[NonEmptyStr, NonEmptyStr] | None = None
 
@@ -60,9 +71,7 @@ class CustomImagesConfig(PulumiConfigModel):
     images: Mapping[NonEmptyStr, CustomImageConfig] = {}
 
 
-class CAPZArtifactConfig(PulumiConfigModel):
-    source_path: NonEmptyStr
-    source_ref: NonEmptyStr
+class CAPZArtifactConfig(GitSourceConfig):
     artifact_name: NonEmptyStr = _CAPZ_ARTIFACT_NAME
 
 
@@ -114,6 +123,7 @@ def run_stack() -> None:
             custom_images[image_key] = CtlptlCustomRegistryImage(
                 f"custom-image-{image_key}",
                 source_path=image_config.source_path,
+                repository_url=image_config.repository_url,
                 source_ref=image_config.source_ref,
                 registry_name=custom_registry.registry_name,
                 registry_port=custom_registry.port,
@@ -126,6 +136,7 @@ def run_stack() -> None:
         capz_artifact = CtlptlCustomRegistryOCIArtifact(
             "capz-artifact",
             source_path=capz_artifact_config.source_path,
+            repository_url=capz_artifact_config.repository_url,
             source_ref=capz_artifact_config.source_ref,
             registry_name=custom_registry.registry_name,
             registry_port=custom_registry.port,

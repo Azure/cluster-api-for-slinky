@@ -17,10 +17,6 @@ from stacks.kubernetes_annotations import (
     foreground_delete_annotations,
     pulumi_wait_for,
 )
-from stacks.workload_cluster.aso_detach_reconciler import (
-    ASODetachReconciler,
-    aso_agent_pool_detach_label_patch,
-)
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     CONTROLLER_NODE_TYPE,
     NODE_TYPE_LABEL,
@@ -201,7 +197,6 @@ def _azure_managed_machine_pool_spec(
     node_labels: Mapping[str, str],
     taints: Sequence[Mapping[str, str]] = (),
     autoscaling_bounds: tuple[int, int] | None = None,
-    aso_managed_clusters_agent_pool_patches: Sequence[str] = (),
 ) -> dict[str, object]:
     """``AzureManagedMachinePool.spec`` for one AKS managed node pool.
 
@@ -223,10 +218,6 @@ def _azure_managed_machine_pool_spec(
     if autoscaling_bounds is not None:
         min_count, max_count = autoscaling_bounds
         spec["scaling"] = {"minSize": min_count, "maxSize": max_count}
-    if aso_managed_clusters_agent_pool_patches:
-        spec["asoManagedClustersAgentPoolPatches"] = list(
-            aso_managed_clusters_agent_pool_patches
-        )
     return spec
 
 
@@ -235,16 +226,6 @@ def _decode_secret_data_value(data: Mapping[str, str], key: str) -> str:
     if not encoded_value:
         raise KeyError(f"Secret data[{key!r}] is missing")
     return base64.b64decode(encoded_value).decode("utf-8")
-
-
-def _machine_pool_delete_annotations(*, controller: bool) -> dict[str, str]:
-    if controller:
-        return {}
-    return foreground_delete_annotations()
-
-
-def _aso_agent_pool_detach_patches(*, cluster_name: str) -> list[str]:
-    return [aso_agent_pool_detach_label_patch(cluster_name=cluster_name)]
 
 
 class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
@@ -340,18 +321,6 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             ),
         )
 
-        # Workaround until CAPZ owns this teardown transition itself. The
-        # reconciler keeps ASO agent-pool children on detach-on-delete so ASO
-        # does not issue a child agent-pool delete while AKS parent cluster
-        # deletion owns cleanup. Root-cause fix: kubernetes-sigs/CAPZ#6447.
-        aso_detach_reconciler = ASODetachReconciler(
-            f"{name}-aso-detach-reconciler",
-            namespace=_NAMESPACE,
-            cluster_name=cluster_name,
-            provider=provider,
-            opts=ResourceOptions(parent=self),
-        )
-
         cluster = k8s.apiextensions.CustomResource(
             f"{name}-cluster",
             api_version=_CAPI_API_VERSION,
@@ -366,9 +335,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 infrastructure_name=cluster_name,
             ),
             opts=pulumi.ResourceOptions.merge(
-                child_opts(
-                    depends_on=[azure_managed_control_plane, aso_detach_reconciler]
-                ),
+                child_opts(depends_on=[azure_managed_control_plane]),
                 pulumi.ResourceOptions(
                     custom_timeouts=pulumi.CustomTimeouts(delete=_AKS_DELETE_TIMEOUT)
                 ),
@@ -384,17 +351,9 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
         for pool, cr_pool_name in zip(node_pools, machine_pool_cr_names, strict=True):
             aks_pool_name = _aks_pool_name(pool)
             pool_mode = _SYSTEM_NODE_POOL_MODE if pool.controller else _USER_NODE_POOL_MODE
-            pool_delete_annotations = _machine_pool_delete_annotations(
-                controller=pool.controller
-            )
-            aso_agent_pool_patches = _aso_agent_pool_detach_patches(
-                cluster_name=cluster_name
-            )
-            delete_with_cluster_opts = (
-                pulumi.ResourceOptions(deleted_with=cluster)
-                if pool.controller
-                else pulumi.ResourceOptions()
-            )
+            # CAPZ owns pool cleanup once the CAPI Cluster starts deleting.
+            # Keep Pulumi from independently deleting child pool CRs first.
+            delete_with_cluster_opts = pulumi.ResourceOptions(deleted_with=cluster)
             azure_managed_machine_pool = k8s.apiextensions.CustomResource(
                 f"{name}-{pool.name}-managed-machine-pool",
                 api_version=_INFRASTRUCTURE_API_VERSION,
@@ -402,7 +361,6 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 metadata={
                     "name": cr_pool_name,
                     "namespace": _NAMESPACE,
-                    "annotations": pool_delete_annotations,
                 },
                 spec=_azure_managed_machine_pool_spec(
                     mode=pool_mode,
@@ -412,15 +370,11 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     node_labels=node_labels(pool.node_type),
                     taints=[controller_taint()] if pool.controller else [],
                     autoscaling_bounds=pool.autoscaling_bounds,
-                    aso_managed_clusters_agent_pool_patches=aso_agent_pool_patches,
                 ),
                 opts=pulumi.ResourceOptions.merge(
                     pulumi.ResourceOptions.merge(
                         child_opts(
-                            depends_on=[
-                                azure_managed_control_plane,
-                                aso_detach_reconciler,
-                            ]
+                            depends_on=[azure_managed_control_plane]
                         ),
                         pulumi.ResourceOptions(
                             custom_timeouts=pulumi.CustomTimeouts(
@@ -439,7 +393,6 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 metadata={
                     "name": cr_pool_name,
                     "namespace": _NAMESPACE,
-                    "annotations": pool_delete_annotations,
                 },
                 spec=_machine_pool_spec(
                     cluster_name=cluster_name,

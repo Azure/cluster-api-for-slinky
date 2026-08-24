@@ -102,7 +102,7 @@ def _manifest_exists(registry_port: int, image_name: str, image_tag: str) -> boo
 def _build_and_push_image(
     *,
     source_path: str,
-    source_ref: str,
+    source_commit: str,
     host_image_ref: str,
     build_args: dict[str, str],
 ) -> None:
@@ -110,7 +110,9 @@ def _build_and_push_image(
     _require_binary("git")
     worktree = tempfile.mkdtemp(prefix="ca4s-image-")
     try:
-        _run(["git", "-C", source_path, "worktree", "add", "--detach", worktree, source_ref])
+        _run(
+            ["git", "-C", source_path, "worktree", "add", "--detach", worktree, source_commit]
+        )
         build_cmd = [
             "docker",
             "build",
@@ -129,10 +131,10 @@ def _ensure_image(props: dict) -> dict[str, object]:
     image_name = _image_name_prop(props)
     build_args = _build_args_prop(props)
 
-    def build(source_path: str, source_ref: str, host_image_ref: str) -> None:
+    def build(source_path: str, source_commit: str, host_image_ref: str) -> None:
         _build_and_push_image(
             source_path=source_path,
-            source_ref=source_ref,
+            source_commit=source_commit,
             host_image_ref=host_image_ref,
             build_args=build_args,
         )
@@ -172,6 +174,7 @@ class _CtlptlCustomRegistryImageProvider(ResourceProvider):
     def diff(self, id_: str, olds: dict, news: dict) -> DiffResult:
         keys = (
             "source_path",
+            "repository_url",
             "source_ref",
             "registry_name",
             "registry_port",
@@ -197,12 +200,17 @@ class _CtlptlCustomRegistryImageProvider(ResourceProvider):
         except Exception as exc:
             print(f"failed to refresh ctlptl registry image {id_!r}: {exc}", file=sys.stderr)
             return ReadResult(id_=id_, outs=props)
-        return ReadResult(id_=id_, outs=props)
+        return ReadResult(
+            id_=id_,
+            outs={**props, "source_commit": source_commit, "image_tag": image_tag},
+        )
 
 
 class CtlptlCustomRegistryImage(Resource):
     """Build and push a git source ref image into a local custom registry."""
 
+    source_path: Output[str | None]
+    repository_url: Output[str | None]
     source_ref: Output[str]
     source_commit: Output[str]
     image_name: Output[str]
@@ -215,10 +223,11 @@ class CtlptlCustomRegistryImage(Resource):
         self,
         name: str,
         *,
-        source_path: Input[str],
         source_ref: Input[str],
         registry_name: Input[str],
         registry_port: Input[int],
+        source_path: Optional[Input[str]] = None,
+        repository_url: Optional[Input[str]] = None,
         image_name: Optional[Input[str]] = None,
         build_args: Optional[Input[dict[str, Input[str]]]] = None,
         opts: Optional[ResourceOptions] = None,
@@ -228,6 +237,7 @@ class CtlptlCustomRegistryImage(Resource):
             name,
             {
                 "source_path": source_path,
+                "repository_url": repository_url,
                 "source_ref": source_ref,
                 "registry_name": registry_name,
                 "registry_port": registry_port,
