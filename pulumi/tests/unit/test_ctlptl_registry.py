@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for :mod:`ctlptl.ctlptl_registry`.
 
 The provider wraps the ``ctlptl`` CLI plus a couple of ``docker`` shell-outs.

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Azure AKS workload-cluster infrastructure."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Entrypoint for the ``ca4s-init`` PKO-owned stack.
 
 This is the only Stack CR the outer host-side Pulumi program creates. Once PKO

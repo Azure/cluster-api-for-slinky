@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Reusable builder for ``pulumi.com/v1`` Stack Custom Resources.
 
 Both :class:`pko.pko_bootstrap.PKOBootstrap` (the init Stack CR) and the

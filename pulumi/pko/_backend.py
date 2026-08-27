@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """``file://`` state backend for inner Pulumi stacks run by PKO.
 
 PKO's workspace pods need a Pulumi state backend to store the state of

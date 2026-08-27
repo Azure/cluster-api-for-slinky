@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for :mod:`ctlptl.cloud_provider_kind`.
 
 The provider spawns a detached host process. Tests here need to mock

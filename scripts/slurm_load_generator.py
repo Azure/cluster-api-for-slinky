@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Generate cyclic Slurm load for autoscaling tests.
 
 The script submits exclusive placeholder jobs with a continuously varying

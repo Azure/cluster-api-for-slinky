@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Azure BYO workload infrastructure owned by the PKO init stack."""
 
 from __future__ import annotations

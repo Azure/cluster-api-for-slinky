@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Cluster API Operator and provider installation.
 
 Owns the tenant-agnostic CAPI management-plane layer:

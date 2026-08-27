@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests: fast, hermetic, no Docker / no network.
 
 Conventions for tests in this directory:

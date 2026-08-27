@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """AWX custom resource for the management-cluster AWX instance.
 
 Owns one ``awx.ansible.com/v1beta1`` ``AWX`` resource named ``awx`` in

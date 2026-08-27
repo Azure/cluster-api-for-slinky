@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Shared helpers for source-ref OCI objects in a local ctlptl registry."""
 
 from __future__ import annotations

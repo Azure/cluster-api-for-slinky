@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Workspace ``ServiceAccount`` + ClusterRoleBindings for inner stacks.
 
 Every PKO Stack CR references a ``spec.serviceAccountName`` that the

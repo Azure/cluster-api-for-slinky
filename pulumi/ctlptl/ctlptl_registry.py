@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pulumi dynamic resource: a local image registry managed by `ctlptl`.
 
 Design notes

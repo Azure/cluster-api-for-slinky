@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Top-level PKO bootstrap component.
 
 Composes the building blocks in this package into a single

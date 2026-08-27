@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pulumi-mock-based tests for the ``gitops`` ComponentResource factory.
 
 Unlike the dynamic-provider tests in the other modules of this directory,

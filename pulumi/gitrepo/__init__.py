@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Provider-agnostic GitOps source package.
 
 Re-exports dispatching :class:`GitOpsRepository` and :class:`GitOpsWebhook`

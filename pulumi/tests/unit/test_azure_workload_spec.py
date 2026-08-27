@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for the AzureWorkloadSpec parse/build round-trip + validation."""
 
 from __future__ import annotations

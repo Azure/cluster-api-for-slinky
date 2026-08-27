@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Built-in Gitea ``GitOpsRepository`` implementation.
 
 This module stands up a self-contained, ephemeral Gitea instance inside the

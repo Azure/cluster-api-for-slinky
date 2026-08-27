@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """cert-manager install for the management cluster.
 
 cert-manager is a foundational dependency of the control plane: the

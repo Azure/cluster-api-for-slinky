@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 name: ca4s-infra
 description: |
   End-to-end Pulumi bootstrap for a Kind-backed management cluster. The resource

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """AWX install for the management cluster.
 
 Tenant-agnostic AWX control surface. This package is split into

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for AzureClusterIdentity manifest normalization."""
 
 from __future__ import annotations

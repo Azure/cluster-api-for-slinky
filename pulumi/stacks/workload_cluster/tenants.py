@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Workload-cluster inventory and fan-out."""
 
 from __future__ import annotations

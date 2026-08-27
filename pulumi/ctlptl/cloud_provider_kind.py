@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pulumi dynamic resource: the ``cloud-provider-kind`` host daemon.
 
 Design notes

@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """AWX dynamic inventory for CAPI/Slinky workload clusters.
 
 The script is designed for the stock AWX execution environment. It uses the

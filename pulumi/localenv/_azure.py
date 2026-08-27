@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pure Python Azure environment discovery for local stack defaulting."""
 
 from __future__ import annotations

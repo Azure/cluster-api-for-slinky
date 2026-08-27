@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Local workload-cluster infrastructure for ``local`` instances.
 
 Produces a local CAPD-backed workload-cluster infrastructure resource graph

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Tests for the umbrella Pulumi stack at ``pulumi/__main__.py``.
 
 Two tiers, separated by directory:

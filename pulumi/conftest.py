@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Shared pytest fixtures for the umbrella Pulumi stack's test suite.
 
 This file is intentionally minimal. Add fixtures here when they're useful

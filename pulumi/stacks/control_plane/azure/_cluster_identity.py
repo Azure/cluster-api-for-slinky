@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """AzureClusterIdentity component for secretless CAPZ identity flavors.
 
 This component creates a **single** Kubernetes object that CAPZ needs in

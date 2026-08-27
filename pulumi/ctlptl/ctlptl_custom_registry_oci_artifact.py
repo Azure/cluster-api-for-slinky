@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pulumi dynamic resource: build a CAPZ OCI artifact into a local registry."""
 
 from __future__ import annotations

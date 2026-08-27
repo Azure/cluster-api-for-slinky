@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Provider-agnostic GitOps repository and webhook dispatchers.
 
 This module defines the public dispatching components used by stack entrypoints

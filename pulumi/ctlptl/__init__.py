@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """ctlptl-based dynamic-resource bindings for Kind-backed outer stacks.
 
 Pulumi dynamic providers that wrap the ``ctlptl`` and

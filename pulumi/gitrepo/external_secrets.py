@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """External Secrets Operator install for GitOps bootstrap secrets."""
 
 from __future__ import annotations

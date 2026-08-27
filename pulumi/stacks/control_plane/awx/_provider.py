@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """AWX API provider configuration for the management-cluster AWX instance."""
 
 from __future__ import annotations

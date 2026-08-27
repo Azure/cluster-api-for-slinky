@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """AKS workload-cluster class composition."""
 
 from __future__ import annotations

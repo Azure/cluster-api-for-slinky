@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Kind management-cluster control plane with optional capabilities."""
 
 from __future__ import annotations

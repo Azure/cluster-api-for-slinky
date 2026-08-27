@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Project entrypoint for the Kind-backed outer stack.
 
 Pulumi requires exactly one project entrypoint (``main:`` in

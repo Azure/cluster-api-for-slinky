@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for :mod:`ctlptl.ctlptl_cluster`.
 
 Mocks ``subprocess.run`` for the ``ctlptl`` and ``kubectl`` shell-outs.

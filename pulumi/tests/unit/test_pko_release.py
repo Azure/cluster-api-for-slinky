@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 from __future__ import annotations
 
 from pko._release import _helm_values

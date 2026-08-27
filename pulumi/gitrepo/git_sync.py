@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pulumi dynamic resource that pushes a local Git commit to an SSH remote.
 
 ``GitSync`` hydrates a Git remote from the local working tree that Pulumi is

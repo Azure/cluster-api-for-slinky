@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for Azure control-plane config parsing and rendering."""
 
 from __future__ import annotations

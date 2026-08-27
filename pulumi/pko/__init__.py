@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """PKO bootstrap package.
 
 Re-exports the single public entrypoint :class:`PKOBootstrap`. Inner building

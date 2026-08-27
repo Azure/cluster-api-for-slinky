@@ -1,4 +1,8 @@
 #!/bin/bash
+
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 #SBATCH --job-name=sleep60
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

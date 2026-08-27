@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Shared workload-cluster addon value rendering tests."""
 
 from __future__ import annotations

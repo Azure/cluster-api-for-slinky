@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Local workload-cluster class composition."""
 
 from __future__ import annotations

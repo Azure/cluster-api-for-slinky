@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Config parsing for Kind management-cluster control-plane capabilities."""
 
 from __future__ import annotations

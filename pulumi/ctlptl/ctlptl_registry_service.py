@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Expose a ctlptl registry container through an in-cluster Service.
 
 The kind node containerd registry wiring lets kubelet pull images from a

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for shared source-ref OCI object helpers."""
 
 from __future__ import annotations

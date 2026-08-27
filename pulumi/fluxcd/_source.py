@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Flux CD plumbing for GitRepository sources and webhook receivers."""
 
 from __future__ import annotations

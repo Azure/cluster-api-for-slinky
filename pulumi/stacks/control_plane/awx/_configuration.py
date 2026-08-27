@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Shared AWX objects owned by the control-plane layer."""
 
 from __future__ import annotations

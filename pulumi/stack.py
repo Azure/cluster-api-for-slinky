@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Outer stack body for Kind-backed management clusters."""
 
 from __future__ import annotations

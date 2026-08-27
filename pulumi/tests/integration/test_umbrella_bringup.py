@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """End-to-end integration tests for the umbrella stack.
 
 These tests are SLOW (~2 min per up + ~30s per destroy), require a working

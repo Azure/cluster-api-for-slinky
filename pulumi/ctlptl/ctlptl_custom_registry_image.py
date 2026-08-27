@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pulumi dynamic resource: build a custom image into a local ctlptl registry."""
 
 from __future__ import annotations

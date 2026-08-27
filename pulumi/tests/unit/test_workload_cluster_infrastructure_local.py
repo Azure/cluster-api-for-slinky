@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 from __future__ import annotations
 
 from stacks.kubernetes_annotations import (

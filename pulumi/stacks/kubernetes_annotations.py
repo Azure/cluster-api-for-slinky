@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Shared Pulumi Kubernetes annotation helpers."""
 
 from __future__ import annotations

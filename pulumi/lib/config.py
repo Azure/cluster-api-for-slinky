@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pydantic helpers for JSON-like Pulumi config payloads."""
 
 from __future__ import annotations

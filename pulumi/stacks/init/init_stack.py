@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Init-stack contract and config dispatcher.
 
 The outer stack should own exactly one ``pulumi.com/v1`` Stack CR after PKO is

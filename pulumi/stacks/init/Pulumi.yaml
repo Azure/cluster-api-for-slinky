@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 name: ca4s-init
 description: |
   First PKO-owned stack. The outer host-side Pulumi stack creates exactly this

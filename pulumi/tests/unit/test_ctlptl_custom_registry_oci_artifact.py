@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for :mod:`ctlptl.ctlptl_custom_registry_oci_artifact`."""
 
 from __future__ import annotations

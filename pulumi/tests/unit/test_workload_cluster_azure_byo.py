@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Azure BYO workload-class config and empty Flex VMSS tests."""
 
 from __future__ import annotations

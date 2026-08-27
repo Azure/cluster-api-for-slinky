@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Registry config contract for local workload-cluster components.
 
 The outer stack forwards this shape through the init Stack CR's typed tenants

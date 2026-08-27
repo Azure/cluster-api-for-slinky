@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pure Python local host discovery helpers."""
 
 from __future__ import annotations

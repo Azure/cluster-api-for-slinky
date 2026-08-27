@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for the AKS CR spec helpers + name derivation.
 
 The full Pulumi resource graph (the five ``CustomResource`` objects and the

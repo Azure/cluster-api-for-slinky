@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Temporary local-node storage for self-managed workload clusters."""
 
 from __future__ import annotations

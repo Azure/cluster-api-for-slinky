@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Azure-side shared components for the control-plane stack.
 
 Phase 1 contents:
