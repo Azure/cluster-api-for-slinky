@@ -10,6 +10,7 @@ from stacks.workload_cluster.workload_cluster_deployments import (
     _prometheus_server_address,
     _prometheus_service_name,
     _prometheus_values,
+    _SLINKY_CHART_VERSION,
     _slurm_nodeset_name,
     _slurm_nodeset_values,
     SlurmNodeSetSpec,
@@ -113,7 +114,11 @@ def test_slurm_nodeset_values_pin_pods_to_initial_node() -> None:
     )
 
     assert values["pinToNode"] is True
-    assert values["taintKubeNodes"] is False
+    assert values["oversubscribeNode"] is False
+    assert values["slurmd"]["image"] == {
+        "repository": "ghcr.io/slinkyproject/slurmd",
+        "tag": "26.05-ubuntu24.04",
+    }
     assert values["podSpec"]["affinity"]["nodeAffinity"][
         "requiredDuringSchedulingIgnoredDuringExecution"
     ]["nodeSelectorTerms"][0]["matchExpressions"][0] == {
@@ -121,9 +126,11 @@ def test_slurm_nodeset_values_pin_pods_to_initial_node() -> None:
         "operator": "In",
         "values": ["compute"],
     }
-    assert values["podSpec"]["affinity"]["podAntiAffinity"][
-        "requiredDuringSchedulingIgnoredDuringExecution"
-    ][0]["topologyKey"] == "kubernetes.io/hostname"
+    assert "podAntiAffinity" not in values["podSpec"]["affinity"]
+
+
+def test_slinky_chart_supports_nodeset_oversubscription_control() -> None:
+    assert _SLINKY_CHART_VERSION == "1.2.1"
 
 
 def test_prometheus_server_address_uses_helm_release_name() -> None:

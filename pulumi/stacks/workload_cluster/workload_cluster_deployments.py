@@ -43,7 +43,7 @@ _SLURM_PENDING_JOBS_QUERY = 'sum(slurm_partition_jobs_pending{partition="all"})'
 _PROMETHEUS_PORT = 9090
 
 _SLINKY_CHART_OCI_PREFIX = "oci://ghcr.io/slinkyproject/charts"
-_SLINKY_CHART_VERSION = "1.1.1"
+_SLINKY_CHART_VERSION = "1.2.1"
 _SLINKY_OPERATOR_CRDS_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator-crds"
 _SLINKY_OPERATOR_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator"
 _SLURM_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm"
@@ -225,7 +225,7 @@ def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
         "slurmd": {
             "image": {
                 "repository": "ghcr.io/slinkyproject/slurmd",
-                "tag": "25.11-ubuntu24.04",
+                "tag": "26.05-ubuntu24.04",
             },
             "args": [],
             "resources": {},
@@ -244,33 +244,9 @@ def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
             "rollingUpdate": {"maxUnavailable": "25%"},
         },
         "pinToNode": True,
-        "taintKubeNodes": False,
+        "oversubscribeNode": False,
         "podSpec": {
-            "affinity": {
-                **node_type_affinity(node_set.node_type),
-                # TODO: after upgrading from Slinky chart 1.1.1 to a release
-                # with NodeSet oversubscribeNode, set it to false and remove
-                # this hand-rolled one-slurmd-per-node anti-affinity. Node-name
-                # labeling still needs upstream slurm-operator support so
-                # pinned StatefulSet pods can maintain the Kubernetes Node
-                # slinky.slurm.net/slurm-nodename label for slurm-bridge.
-                "podAntiAffinity": {
-                    "requiredDuringSchedulingIgnoredDuringExecution": [
-                        {
-                            "labelSelector": {
-                                "matchExpressions": [
-                                    {
-                                        "key": "app.kubernetes.io/name",
-                                        "operator": "In",
-                                        "values": ["slurmd"],
-                                    }
-                                ]
-                            },
-                            "topologyKey": "kubernetes.io/hostname",
-                        }
-                    ]
-                },
-            },
+            "affinity": node_type_affinity(node_set.node_type),
         },
     }
 

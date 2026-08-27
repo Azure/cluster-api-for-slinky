@@ -63,7 +63,7 @@ configured minimum.
 
 ### 3. Unschedulable Pods → Cluster Autoscaler → MachineDeployment
 
-Because of the **anti-affinity** rule (see below), each slurmd pod requires
+Because NodeSet oversubscription is disabled (see below), each slurmd pod requires
 its own dedicated Kubernetes node. When KEDA requests more NodeSet
 replicas than there are available compute nodes, the new pods become
 *unschedulable*.
@@ -185,62 +185,19 @@ compute Node label    → slurmd pod affinity
 
 ---
 
-## Anti-Affinity: One slurmd Per Node
+## NodeSet Oversubscription: One slurmd Per Node
 
-The generated Slurm Helm values declare a **hard pod anti-affinity** rule on the
-compute NodeSet pods:
+The generated Slurm Helm values disable NodeSet oversubscription:
 
 ```yaml
 nodesets:
-  slinky:
-    podSpec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: "slinky.slurm.net/node-type"
-                operator: In
-                values:
-                - "compute"
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: app.kubernetes.io/name
-                operator: In
-                values:
-                - "slurmd"
-            topologyKey: "kubernetes.io/hostname"
+  compute:
+    oversubscribeNode: false
 ```
 
-This enforces two constraints:
-
-1. **Node affinity** — slurmd pods can only land on nodes labeled
-  `slinky.slurm.net/node-type: compute`. This keeps them off controller and
-  control-plane nodes.
-2. **Pod anti-affinity** — no two pods with label
-   `app.kubernetes.io/name: slurmd` may share the same hostname (node).
-   This guarantees a strict **1:1 mapping between slurmd pods and compute
-   nodes**.
-
-### Why Anti-Affinity is Critical for Autoscaling
-
-The anti-affinity rule is what *bridges* KEDA scaling to infrastructure
-scaling:
-
-1. KEDA increases the NodeSet to N replicas (N slurmd pods requested).
-2. If only M < N compute nodes exist, the remaining N − M pods are
-   **unschedulable** — the scheduler cannot place two slurmd pods on the
-   same node.
-3. Cluster Autoscaler sees the unschedulable pods and grows the compute MachineDeployment
-   until N compute nodes exist.
-4. New nodes get the `compute` label via CAPI label passthrough, and the
-   pending slurmd pods are immediately scheduled.
-
-Without anti-affinity, Kubernetes could pack multiple slurmd pods onto the
-same node, and the Cluster Autoscaler would never be triggered — defeating
-the purpose of dedicated compute node provisioning.
+The Slurm Operator then adds hostname-level pod anti-affinity, keeping one
+slurmd pod on each compute node. Excess replicas remain pending, prompting
+Cluster Autoscaler to grow the compute MachineDeployment.
 
 ---
 
