@@ -107,7 +107,7 @@ _DEFAULT_ADMIN_EMAIL = "caps-admin@example.invalid"
 # Repo coordinates the sync phase will use. ``_DEFAULT_REPO_OWNER`` is the
 # Gitea org / user that will own the synced repo; defaulting it to the admin
 # username keeps the URL self-describing.
-_DEFAULT_REPO_NAME = "cluster-api-provider-slinky"
+_DEFAULT_REPO_NAME = "cluster-api-for-slinky"
 _DEFAULT_BRANCH = "main"
 
 # In-cluster service coordinates. The upstream Gitea chart names its HTTP

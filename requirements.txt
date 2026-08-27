@@ -1,4 +1,4 @@
-# Python dependencies for cluster-api-provider-slinky Pulumi stacks and tests
+# Python dependencies for cluster-api-for-slinky Pulumi stacks and tests
 
 # Pulumi Python SDK (used by the umbrella stack at pulumi/)
 pulumi>=3.0,<4.0
