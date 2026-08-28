@@ -40,6 +40,11 @@ TARGETS = (
     ),
 )
 
+TARGETS_BY_NAME = {
+    "capi-core": TARGETS[0],
+    "flux": TARGETS[1],
+}
+
 
 def _replacement(target: Target, function_name: str) -> str:
     if function_name == "get_resource_opts_defaults":
@@ -100,10 +105,21 @@ def main() -> int:
         action="store_true",
         help="report files that need patching without modifying them",
     )
+    parser.add_argument(
+        "--target",
+        choices=TARGETS_BY_NAME,
+        action="append",
+        help="patch only the named SDK (may be repeated; default: all)",
+    )
     args = parser.parse_args()
 
     failed = False
-    for target in TARGETS:
+    targets = (
+        [TARGETS_BY_NAME[name] for name in args.target]
+        if args.target
+        else TARGETS
+    )
+    for target in targets:
         path = args.root / target.relative_path
         try:
             source = path.read_text(encoding="utf-8")

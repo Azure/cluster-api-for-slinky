@@ -84,6 +84,29 @@ def test_command_patches_generated_sdk_tree(tmp_path: Path) -> None:
     subprocess.run([*command, "--check"], check=True)
 
 
+def test_command_can_patch_one_sdk(tmp_path: Path) -> None:
+    selected = TARGETS[0]
+    path = tmp_path / selected.relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_GENERATED_SOURCE, encoding="utf-8")
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(_REPO_ROOT / "scripts/patch_crd_sdk_provider_defaults.py"),
+            "--root",
+            str(tmp_path),
+            "--target",
+            "capi-core",
+        ],
+        check=True,
+    )
+
+    assert patch_source(path.read_text(encoding="utf-8"), selected) == (
+        path.read_text(encoding="utf-8")
+    )
+
+
 def test_committed_sdk_provider_defaults_are_canonical() -> None:
     for target in TARGETS:
         path = _REPO_ROOT / target.relative_path
