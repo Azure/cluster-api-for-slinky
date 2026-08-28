@@ -1,0 +1,39 @@
+Cluster API for Slinky includes generated Pulumi SDK source derived from the
+projects listed below. The generated SDKs are retained in source form to make
+the repository importable without requiring code-generation tools at setup
+time. Exact inputs and generator versions are recorded in
+pulumi/sdks/sources.json.
+
+AWX Terraform Provider 1.8.0
+Source: https://github.com/josh-silvas/terraform-provider-awx/tree/v1.8.0
+License: MIT (pulumi/sdks/awx/LICENSE)
+Copyright (c) 2023 Antoine Leveugle
+
+Gitea Terraform Provider 0.7.0
+Source: https://github.com/go-gitea/terraform-provider-gitea/tree/v0.7.0
+License: MIT (pulumi/sdks/gitea/LICENSE)
+Copyright (c) 2022 lerentis, https://git.uploadfilter24.eu/lerentis
+Copyright (c) 2022 The Gitea Authors
+
+HashiCorp Local Terraform Provider 2.9.0
+Source: https://github.com/hashicorp/terraform-provider-local/tree/v2.9.0
+License: MPL-2.0 (pulumi/sdks/local/LICENSE)
+Copyright IBM Corp. 2017, 2026
+
+Kubernetes SIGs Cluster API 1.13.2
+Source: https://github.com/kubernetes-sigs/cluster-api/tree/v1.13.2
+License: Apache-2.0 (pulumi/sdks/capi-core/LICENSE)
+
+Flux source-controller 1.8.5
+Source: https://github.com/fluxcd/source-controller/tree/v1.8.5
+License: Apache-2.0 (pulumi/sdks/flux/LICENSE)
+
+Pulumi crd2pulumi 1.6.2
+Source: https://github.com/pulumi/crd2pulumi/tree/v1.6.2
+License: Apache-2.0
+Copyright 2016-2026 Pulumi Corporation
+
+Pulumi Terraform Provider Bridge 1.1.3
+Source: https://github.com/pulumi/pulumi-terraform-provider
+License: Apache-2.0
+Copyright Pulumi Corporation

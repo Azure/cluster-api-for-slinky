@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for :mod:`gitrepo.git_sync`."""
 
 from __future__ import annotations
@@ -12,7 +15,7 @@ from gitrepo.git_sync import _GitSyncProvider, _split_ssh_url
 
 def _props(**overrides: object) -> dict[str, object]:
     props: dict[str, object] = {
-        "repo_url": "ssh://git@gitea-ssh.gitea.svc.cluster.local:22/caps-admin/cluster-api-provider-slinky.git",
+        "repo_url": "ssh://git@gitea-ssh.gitea.svc.cluster.local:22/caps-admin/cluster-api-for-slinky.git",
         "repo_branch": "main",
         "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
         "ssh_host_public_key": "ssh-ed25519 AAAAFake",
@@ -43,7 +46,7 @@ def test_build_git_url_uses_external_host_and_canonical_path() -> None:
     provider = _GitSyncProvider()
 
     assert provider._build_git_url(_props()) == (
-        "ssh://git@172.18.0.5:22/caps-admin/cluster-api-provider-slinky.git"
+        "ssh://git@172.18.0.5:22/caps-admin/cluster-api-for-slinky.git"
     )
 
 

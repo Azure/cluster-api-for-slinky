@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """``file://`` state backend for inner Pulumi stacks run by PKO.
 
 PKO's workspace pods need a Pulumi state backend to store the state of
@@ -24,7 +27,7 @@ Owns
 
 The PVC is mounted at ``/state`` in every workspace pod and the inner
 Stack CRs all use ``spec.backend: file:///state``. See
-:func:`pko._stack_cr.build_stack_spec` for the patch that wires it in.
+:func:`stacks.stack_cr.build_stack_spec` for the patch that wires it in.
 """
 
 from __future__ import annotations
@@ -33,11 +36,6 @@ import pulumi
 import pulumi_kubernetes as k8s
 import pulumi_random as random
 from pulumi import ResourceOptions
-
-from pko._workspace_env import (
-    PULUMI_DELETE_UNREACHABLE_ENV,
-    PULUMI_DELETE_UNREACHABLE_SECRET_NAME,
-)
 
 # Convention: the PVC and Secret live in the PKO namespace alongside the
 # operator pod. The names are NOT configurable — every Stack CR's
@@ -108,17 +106,6 @@ class StateBackend(pulumi.ComponentResource):
             string_data={PASSPHRASE_SECRET_KEY: passphrase.result},
             type="Opaque",
             immutable=True,
-            opts=ResourceOptions(parent=self, provider=provider),
-        )
-
-        k8s.core.v1.SecretPatch(
-            f"{name}-delete-unreachable-secret",
-            metadata={
-                "name": PULUMI_DELETE_UNREACHABLE_SECRET_NAME,
-                "namespace": namespace,
-            },
-            string_data={PULUMI_DELETE_UNREACHABLE_ENV: "true"},
-            type="Opaque",
             opts=ResourceOptions(parent=self, provider=provider),
         )
 

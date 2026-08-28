@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Cluster API management-plane installation."""
 
 from __future__ import annotations

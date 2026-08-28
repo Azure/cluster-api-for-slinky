@@ -1,1 +1,14 @@
-encryptionsalt: v1:6rzpxemuQ90=:v1:2AdOEecLqLpId37I:CUJIEmw6x5bSlbrgDwgAxtPkBvtTCQ==
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+encryptionsalt: v1:rYyJwlvWbf8=:v1:i6q8HBx3zuJMnYPW:W0kFQbNIFTt3r5lGzcSI/jkIeWRZwA==
+config:
+  ca4s-infra:initStack:
+    controlPlane:
+      infrastructureProviders:
+        docker:
+          enabled: true
+    tenants:
+      workloadClusters:
+        local:
+          className: local

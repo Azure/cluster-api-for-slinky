@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Helm OCI install of the Pulumi Kubernetes Operator (PKO).
 
 Owns:
@@ -22,16 +25,33 @@ import pulumi
 import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
+from pko import PKO_NAMESPACE
+
 
 # Pinned PKO chart. See https://github.com/pulumi/pulumi-kubernetes-operator
 # for the release matrix. v2.x is the current major.
 PKO_CHART_OCI = "oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator"
-PKO_CHART_VERSION = "2.7.0"
+PKO_CHART_VERSION = "2.8.0"
+_BOOTSTRAP_HELM_TIMEOUT_SECONDS = 30 * 60
+_BOOTSTRAP_HELM_TIMEOUT = "30m"
 
-# The conventional namespace for PKO. We don't make this configurable —
-# downstream Stack CRs are pinned to land in the same namespace by the
-# component and there is no real use case for renaming it.
-PKO_NAMESPACE = "pulumi-kubernetes-operator"
+
+def _helm_values() -> dict[str, object]:
+    return {
+        "rbac": {
+            "extraRules": [
+                {
+                    "apiGroups": ["source.toolkit.fluxcd.io"],
+                    "resources": ["*"],
+                    "verbs": ["get", "list", "watch"],
+                },
+            ],
+        },
+        "resources": {
+            "limits": {"cpu": "200m", "memory": "512Mi"},
+            "requests": {"cpu": "200m", "memory": "512Mi"},
+        },
+    }
 
 
 class PKORelease(pulumi.ComponentResource):
@@ -75,22 +95,17 @@ class PKORelease(pulumi.ComponentResource):
             cleanup_on_fail=True,
             atomic=True,
             wait_for_jobs=True,
-            timeout=600,
-            values={
-                "rbac": {
-                    "extraRules": [
-                        {
-                            "apiGroups": ["source.toolkit.fluxcd.io"],
-                            "resources": ["*"],
-                            "verbs": ["get", "list", "watch"],
-                        },
-                    ],
-                },
-            },
+            timeout=_BOOTSTRAP_HELM_TIMEOUT_SECONDS,
+            values=_helm_values(),
             opts=ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=[namespace_resource],
+                custom_timeouts=pulumi.CustomTimeouts(
+                    create=_BOOTSTRAP_HELM_TIMEOUT,
+                    update=_BOOTSTRAP_HELM_TIMEOUT,
+                    delete=_BOOTSTRAP_HELM_TIMEOUT,
+                ),
             ),
         )
 

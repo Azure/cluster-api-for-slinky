@@ -1,0 +1,256 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+"""AKS workload-cluster class composition."""
+
+from __future__ import annotations
+
+from typing import Any, Literal, Mapping
+from uuid import UUID
+
+import pulumi
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_serializer
+
+from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
+from localenv import discover_azure_resource_placement
+
+from stacks.workload_cluster.workload_cluster_deployments import (
+    KEDAOutputs,
+    KEDANodeSetScalerSpec,
+    SlurmNodeSetSpec,
+    _PROMETHEUS_CHART_VERSION,
+    _SLINKY_CHART_VERSION,
+    WorkloadClusterDeployments,
+)
+from stacks.workload_cluster.workload_cluster_infrastructure import (
+    COMPUTE_NODE_TYPE,
+    CONTROLLER_NODE_TYPE,
+)
+from stacks.workload_cluster.workload_cluster_infrastructure_aks import (
+    AKSNodePoolSpec,
+    AKSWorkloadClusterInfrastructure,
+)
+
+
+_CLUSTER_CLASS = "aks"
+
+_DEFAULT_AKS_INSTANCE_NAME = "caps-aks"
+_DEFAULT_AKS_KUBERNETES_VERSION = "v1.34.0"
+_DEFAULT_AKS_NODE_SKU = "Standard_D2as_v5"
+_DEFAULT_AKS_NODE_COUNT = 1
+
+
+class AKSWorkloadSizingConfig(PulumiConfigModel):
+    """Optional AKS version and node-pool sizing overrides."""
+
+    kubernetes_version: NonEmptyStr = _DEFAULT_AKS_KUBERNETES_VERSION
+    node_sku: NonEmptyStr = _DEFAULT_AKS_NODE_SKU
+    node_count: StrictPositiveInt = _DEFAULT_AKS_NODE_COUNT
+
+
+class AzureWorkloadSpec(PulumiConfigModel):
+    """AKS placement and sizing parameters for one workload-cluster entry.
+
+    ``subscription_id``, ``location``, and ``resource_group`` may be omitted
+    from config because they default from local Azure resource placement discovery.
+    """
+
+    subscription_id: UUID = Field(
+        default_factory=lambda: UUID(
+            discover_azure_resource_placement(raise_on_missing=True).subscription_id
+        )
+    )
+    location: NonEmptyStr = Field(
+        default_factory=lambda: (
+            discover_azure_resource_placement(raise_on_missing=True).location
+        )
+    )
+    resource_group: NonEmptyStr = Field(
+        default_factory=lambda: (
+            discover_azure_resource_placement(raise_on_missing=True).resource_group
+        )
+    )
+    use_discovered_resource_group: StrictBool = False
+    additional_tags: Mapping[NonEmptyStr, str] = Field(default_factory=dict)
+    aks: AKSWorkloadSizingConfig = AKSWorkloadSizingConfig()
+
+    @field_serializer("subscription_id", "location", "resource_group", check_fields=False)
+    def serialize_placement(self, value: UUID | str) -> str:
+        return str(value)
+
+    @field_serializer("additional_tags", check_fields=False)
+    def serialize_additional_tags(
+        self,
+        additional_tags: Mapping[NonEmptyStr, str],
+    ) -> dict[str, str]:
+        return dict(additional_tags)
+
+
+def _resolve_resource_group(parameters: AzureWorkloadSpec) -> str:
+    if not parameters.use_discovered_resource_group:
+        return parameters.resource_group
+
+    placement = discover_azure_resource_placement(raise_on_missing=True)
+    if placement.subscription_id.casefold() != str(parameters.subscription_id).casefold():
+        raise ValueError(
+            "auto-discovered resource group subscription does not match "
+            "AKS subscriptionId"
+        )
+    return placement.resource_group
+
+
+class AKSWorkloadClusterConfig(PulumiConfigModel):
+    class_name: Literal["aks"] = _CLUSTER_CLASS
+    parameters: AzureWorkloadSpec
+
+    @field_serializer("class_name")
+    def serialize_class_name(self, class_name: str) -> str:
+        return class_name
+
+
+class AKSWorkloadClusterOutputs(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    cluster_class: str
+    cluster_instance: str
+    cluster_name: str
+    control_plane_name: str
+    machine_pool_name: str
+    machine_pool_names: list[str]
+    control_plane_ready: bool
+    keda: KEDAOutputs | None
+    prometheus_chart_version: str
+    prometheus_namespace: str
+    prometheus_status: Any
+    workload_cluster_ready: bool
+    slurm_operator_chart_version: str
+    slurm_operator_status: Any
+    slurm_chart_version: str
+    slurm_status: Any
+    todo: str
+
+
+def _default_aks_node_pools(node_count: int) -> tuple[AKSNodePoolSpec, ...]:
+    return (
+        AKSNodePoolSpec(
+            name="head",
+            node_type=CONTROLLER_NODE_TYPE,
+            replicas=node_count,
+            controller=True,
+        ),
+        AKSNodePoolSpec(
+            name="compute",
+            node_type=COMPUTE_NODE_TYPE,
+            replicas=1,
+            autoscaling_bounds=(1, 10),
+        ),
+    )
+
+
+_AKS_SLURM_NODE_SETS = (
+    SlurmNodeSetSpec(name="compute", node_type=COMPUTE_NODE_TYPE, replicas=1),
+)
+_AKS_KEDA_SCALED_NODE_SETS = (
+    KEDANodeSetScalerSpec(node_set_name="compute", min_replicas=1, max_replicas=10),
+)
+
+
+class AKSWorkloadClusterClass(pulumi.ComponentResource):
+    """Reusable AKS workload-cluster class."""
+
+    outputs: pulumi.Output[AKSWorkloadClusterOutputs]
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        instance: str,
+        config: AKSWorkloadClusterConfig,
+        identity_name: pulumi.Input[str] | None = None,
+        identity_namespace: pulumi.Input[str] | None = None,
+        node_pools: tuple[AKSNodePoolSpec, ...] | None = None,
+        slurm_node_sets: tuple[SlurmNodeSetSpec, ...] = _AKS_SLURM_NODE_SETS,
+        keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = _AKS_KEDA_SCALED_NODE_SETS,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__(
+            "ca4s:workload:AKSWorkloadClusterClass",
+            name,
+            props={},
+            opts=opts,
+        )
+        workload_spec = config.parameters
+        if identity_name is None:
+            raise ValueError("aks workload cluster class requires identity_name")
+        if identity_namespace is None:
+            raise ValueError("aks workload cluster class requires identity_namespace")
+        location = workload_spec.location
+        resource_group = _resolve_resource_group(workload_spec)
+
+        def child_options(
+            *,
+            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+        ) -> pulumi.ResourceOptions:
+            return pulumi.ResourceOptions(
+                parent=self,
+                depends_on=depends_on,
+            )
+
+        node_pools = node_pools or _default_aks_node_pools(workload_spec.aks.node_count)
+
+        infrastructure = AKSWorkloadClusterInfrastructure(
+            "infrastructure",
+            instance=instance,
+            subscription_id=str(workload_spec.subscription_id),
+            identity_name=identity_name,
+            identity_namespace=identity_namespace,
+            location=location,
+            resource_group=resource_group,
+            kubernetes_version=workload_spec.aks.kubernetes_version,
+            node_sku=workload_spec.aks.node_sku,
+            node_pools=node_pools,
+            additional_tags=workload_spec.additional_tags,
+            opts=child_options(),
+        )
+        deployments = WorkloadClusterDeployments(
+            "deployments",
+            instance=instance,
+            slurm_node_sets=slurm_node_sets,
+            keda_scaled_node_sets=keda_scaled_node_sets,
+            workload_provider=infrastructure.workload_provider,
+            opts=child_options(depends_on=[infrastructure]),
+        )
+
+        outputs = {
+            "cluster_class": pulumi.Output.from_input(_CLUSTER_CLASS),
+            "cluster_instance": pulumi.Output.from_input(instance),
+            "cluster_name": infrastructure.cluster_name,
+            "control_plane_name": infrastructure.control_plane_name,
+            "machine_pool_name": infrastructure.machine_pool_name,
+            "machine_pool_names": pulumi.Output.all(*infrastructure.machine_pool_names),
+            "control_plane_ready": infrastructure.control_plane_ready,
+            "keda": (
+                deployments.keda.apply(lambda value: value.model_dump())
+                if deployments.keda is not None
+                else None
+            ),
+            "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
+            "prometheus_namespace": deployments.prometheus_namespace,
+            "prometheus_status": deployments.prometheus_status,
+            "workload_cluster_ready": deployments.workload_cluster_ready,
+            "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_operator_status": deployments.slurm_operator_status,
+            "slurm_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_status": deployments.slurm_status,
+            "todo": pulumi.Output.from_input(
+                "Validate AKS workload-driven autoscaling end-to-end."
+            ),
+        }
+
+        self.outputs = pulumi.Output.all(**outputs).apply(
+            AKSWorkloadClusterOutputs.model_validate
+        )
+        self.register_outputs(outputs)
+
+
+WorkloadClusterClass = AKSWorkloadClusterClass

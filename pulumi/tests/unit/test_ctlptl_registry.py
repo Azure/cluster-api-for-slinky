@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for :mod:`ctlptl.ctlptl_registry`.
 
 The provider wraps the ``ctlptl`` CLI plus a couple of ``docker`` shell-outs.
@@ -203,6 +206,42 @@ def test_create_falls_back_to_apply_when_no_adopt_match(
         ["ctlptl", "apply", "-f", "-"],
         ["ctlptl", "get", "registry", "wanted", "-o", "json"],
     ]
+
+
+def test_create_skips_adopted_registry_with_mismatched_pinned_port(
+    provider: ctlptl_registry._CtlptlRegistryProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], str | None]] = []
+
+    def fake_run(
+        cmd: list[str],
+        *,
+        input: str | None = None,
+        check: bool = True,
+        capture_output: bool = True,
+        text: bool = True,
+    ) -> subprocess.CompletedProcess:
+        calls.append((cmd, input))
+        if cmd == ["ctlptl", "get", "registry", "-o", "json"]:
+            return _completed(cmd, _registry_list(("registry-image", 46469)))
+        if cmd == ["ctlptl", "apply", "-f", "-"]:
+            assert input is not None
+            assert "name: registry-image" in input
+            assert "port: 5000" in input
+            return _completed(cmd)
+        if cmd == ["ctlptl", "get", "registry", "registry-image", "-o", "json"]:
+            return _completed(cmd, json.dumps({"name": "registry-image", "port": 5000}))
+        raise AssertionError(f"unexpected command: {cmd!r}")
+
+    monkeypatch.setattr(ctlptl_registry.subprocess, "run", fake_run)
+
+    result = provider.create({"registry_name": "registry-image", "port": 5000})
+
+    assert result.id == "registry-image"
+    assert result.outs is not None
+    assert result.outs["port"] == 5000
+    assert result.outs["adopted"] is False
 
 
 @pytest.mark.parametrize("delete_on_destroy", [False, True])

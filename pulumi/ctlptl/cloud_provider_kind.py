@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pulumi dynamic resource: the ``cloud-provider-kind`` host daemon.
 
 Design notes
@@ -89,6 +92,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from pydantic import StrictBool
 from pulumi import Output, ResourceOptions, log
 from pulumi.dynamic import (
     CheckResult,
@@ -98,6 +102,8 @@ from pulumi.dynamic import (
     Resource,
     ResourceProvider,
 )
+
+from lib.config import PulumiConfigModel
 
 
 # ---------------------------------------------------------------------------
@@ -234,14 +240,16 @@ def _check_binary_caps(binary: str) -> Optional[set]:
     if len(parts) < 2:
         return set()
     # "cap_a,cap_b=eip" → drop the "=mode" suffix, split on commas.
-    rhs = parts[1].split("=", 1)[0]
-    return {c.strip().lower() for c in rhs.split(",") if c.strip()}
+    return {
+        c.strip().lower()
+        for c in parts[1].split("=", 1)[0].split(",")
+        if c.strip()
+    }
 
 
 def _setcap_command(binary: str) -> str:
     """Return the exact one-liner the user should paste."""
-    caps = ",".join(_OPTIONAL_CAPS)
-    return f"sudo setcap '{caps}=+eip' {binary}"
+    return f"sudo setcap '{','.join(_OPTIONAL_CAPS)}=+eip' {binary}"
 
 
 def _missing_caps(binary: str) -> Optional[set]:
@@ -390,8 +398,9 @@ class _CloudProviderKindProvider(ResourceProvider):
         # respawns the daemon with the new argv.
         replaces: list[str] = []
         old_flag = olds.get("enable_lb_port_mapping")
-        new_flag = news.get("enable_lb_port_mapping", True)
-        if old_flag is None or bool(old_flag) != bool(new_flag):
+        if old_flag is None or bool(old_flag) != bool(
+            news.get("enable_lb_port_mapping", True)
+        ):
             replaces.append("enable_lb_port_mapping")
         return DiffResult(changes=bool(replaces), replaces=replaces)
 
@@ -410,6 +419,10 @@ class _CloudProviderKindProvider(ResourceProvider):
 # ---------------------------------------------------------------------------
 # Resource class consumed by user code.
 # ---------------------------------------------------------------------------
+
+
+class CloudProviderKindConfig(PulumiConfigModel):
+    enable_lb_port_mapping: StrictBool = True
 
 
 class CloudProviderKind(Resource):
@@ -436,7 +449,7 @@ class CloudProviderKind(Resource):
     def __init__(
         self,
         name: str,
-        enable_lb_port_mapping: bool = True,
+        config: CloudProviderKindConfig = CloudProviderKindConfig(),
         opts: Optional[ResourceOptions] = None,
     ):
         super().__init__(
@@ -445,7 +458,7 @@ class CloudProviderKind(Resource):
             {
                 # Tracked input — toggling this triggers a replace
                 # (daemon restart with new argv).
-                "enable_lb_port_mapping": enable_lb_port_mapping,
+                "enable_lb_port_mapping": config.enable_lb_port_mapping,
                 # Outputs only — declared as ``None`` inputs so Pulumi
                 # treats them as expected output names during preview.
                 "pid": None,

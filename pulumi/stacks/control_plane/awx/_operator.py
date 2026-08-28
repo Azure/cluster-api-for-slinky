@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Helm install of the AWX Operator on the management cluster.
 
 Owns:

@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests for :mod:`ctlptl.cloud_provider_kind`.
 
 The provider spawns a detached host process. Tests here need to mock
@@ -26,7 +29,7 @@ def test_read_detects_dead_daemon() -> None:
     pass
 
 
-@pytest.mark.skip(reason="TODO: assert .diff() marks ``enable_lb_port_mapping`` as replace=True \u2014 the daemon must restart with new argv to honor the flag flip")
+@pytest.mark.skip(reason="TODO: assert .diff() marks ``enable_lb_port_mapping`` as replace=True -- the daemon must restart with new argv to honor the flag flip")
 def test_diff_flag_change_triggers_replace() -> None:
     pass
 

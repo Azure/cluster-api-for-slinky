@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pulumi dynamic resource: a local image registry managed by `ctlptl`.
 
 Design notes
@@ -185,13 +188,19 @@ def _run(
     stdin: Optional[str] = None,
     check: bool = True,
 ) -> subprocess.CompletedProcess:
-    return subprocess.run(
+    result = subprocess.run(
         cmd,
         input=stdin,
         capture_output=True,
         text=True,
-        check=check,
     )
+    if check and result.returncode != 0:
+        raise RuntimeError(
+            f"command {cmd!r} failed with exit code {result.returncode}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+    return result
 
 
 def _registry_manifest(
@@ -256,8 +265,10 @@ def _registry_port(data: dict) -> Optional[int]:
 
 def _registry_env(data: dict) -> list[str]:
     """Return a registry object's live container environment."""
-    env = data.get("env") or data.get("status", {}).get("env") or []
-    return [str(item) for item in env]
+    return [
+        str(item)
+        for item in data.get("env") or data.get("status", {}).get("env") or []
+    ]
 
 
 def _env_is_compatible(data: dict, desired_env: Optional[list[str]]) -> bool:
@@ -271,6 +282,7 @@ def _env_is_compatible(data: dict, desired_env: Optional[list[str]]) -> bool:
 def _first_registry_with_prefix(
     prefix: str,
     desired_env: Optional[list[str]],
+    desired_port: Optional[int] = None,
 ) -> Optional[tuple[str, int]]:
     """Return the first existing registry whose name starts with *prefix*.
 
@@ -298,6 +310,8 @@ def _first_registry_with_prefix(
                 f"ctlptl registry {name!r} has no observed port; "
                 f"raw JSON: {json.dumps(item, sort_keys=True)!r}"
             )
+        if desired_port is not None and port != desired_port:
+            continue
         return name, port
     return None
 
@@ -353,7 +367,8 @@ class _CtlptlRegistryProvider(ResourceProvider):
         env = _env_prop(props)
         if adopt_existing:
             prefix = props.get("registry_name") or ""
-            adopted = _first_registry_with_prefix(prefix, env)
+            desired_port = _registry_port({"port": props.get("port")})
+            adopted = _first_registry_with_prefix(prefix, env, desired_port)
             if adopted is not None:
                 registry_name, port = adopted
                 return CreateResult(
@@ -372,21 +387,19 @@ class _CtlptlRegistryProvider(ResourceProvider):
         registry_name: str = props.get("registry_name") or (
             f"{props.get('_autoname_seed') or 'ctlptl-registry'}-{secrets.token_hex(4)}"
         )
-        desired_port: Optional[int] = props.get("port")
         _run(
             ["ctlptl", "apply", "-f", "-"],
             stdin=_registry_manifest(
                 registry_name,
-                desired_port,
+                props.get("port"),
                 env,
             ),
         )
-        port = _observe_port(registry_name)
         return CreateResult(
             id_=registry_name,
             outs={
                 "registry_name": registry_name,
-                "port": port,
+                "port": _observe_port(registry_name),
                 "env": env,
                 "adopt_existing": adopt_existing,
                 "adopted": False,
@@ -430,7 +443,7 @@ class _CtlptlRegistryProvider(ResourceProvider):
         # and the comparison is a no-op.
         new_port = int(news.get("port") or 0)
         old_port = int(olds.get("port") or 0)
-        if not adopt_existing and new_port and new_port != old_port:
+        if new_port and new_port != old_port:
             replaces.append("port")
         if _env_prop(news) != _env_prop(olds):
             replaces.append("env")

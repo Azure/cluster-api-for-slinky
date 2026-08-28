@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Helm install of cert-manager on the management cluster.
 
 Owns:

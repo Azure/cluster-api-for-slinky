@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """ESO-managed Flux SSH auth Secret for Kubernetes-generated git keys."""
 
 from __future__ import annotations

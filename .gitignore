@@ -4,6 +4,10 @@
 .venv
 .vscode/
 
+# Local environment and configuration overrides
+*.env
+*.local.yaml
+
 # CAPD workload cluster kubeconfig shall not be committed to source control
 *.kubeconfig
 

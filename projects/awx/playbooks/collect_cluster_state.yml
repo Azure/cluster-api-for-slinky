@@ -1,5 +1,9 @@
 # code: language=ansible
 
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+
 - name: Collect CAPI and Slurm workload cluster state
   hosts: localhost
   connection: local

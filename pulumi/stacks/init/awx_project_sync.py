@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """AWX project synchronization fence importable from the init project root."""
 
 from __future__ import annotations

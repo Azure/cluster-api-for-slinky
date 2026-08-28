@@ -1,0 +1,263 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+from __future__ import annotations
+
+from typing import Any
+
+import pulumi
+import pytest
+
+from stacks.control_plane import control_plane_kind
+from stacks.control_plane.control_plane_config import (
+    AllowedNamespacesConfig,
+    ControlPlaneAWXConfig,
+    ControlPlaneDeploymentsConfig,
+    ControlPlaneKindConfig,
+    DockerInfrastructureProviderConfig,
+    InfrastructureProvidersConfig,
+    UserAssignedMSIClusterIdentityConfig,
+    WorkloadIdentityClusterIdentityConfig,
+)
+from stacks.control_plane.control_plane_kind import (
+    ControlPlaneKind,
+    KindAzureControlPlane,
+    KindAzureControlPlaneSpec,
+    ManagementAWXControlPlaneOutputs,
+)
+
+
+def test_control_plane_kind_config_defaults_awx_disabled() -> None:
+    assert ControlPlaneKindConfig().deployments.awx.enabled is False
+
+
+def test_control_plane_kind_config_reads_awx_enabled() -> None:
+    parsed = ControlPlaneKindConfig.model_validate(
+        {"deployments": {"awx": {"enabled": True}}}
+    )
+
+    assert parsed == ControlPlaneKindConfig.model_validate(
+        {
+            "deployments": ControlPlaneDeploymentsConfig.model_validate(
+                {"awx": {"enabled": True}}
+            )
+        }
+    )
+    assert parsed.deployments.awx.enabled is True
+
+
+def test_control_plane_kind_config_rejects_non_bool_awx_enabled() -> None:
+    with pytest.raises(ValueError, match="enabled"):
+        ControlPlaneKindConfig.model_validate(
+            {"deployments": {"awx": {"enabled": "false"}}}
+        )
+
+
+class _FakeCertManager:
+    namespace = "cert-manager"
+
+    def __init__(self, name: str, *, opts: pulumi.ResourceOptions | None = None) -> None:
+        self.name = name
+        self.opts = opts
+
+
+class _FakeClusterAPIOperator(pulumi.ComponentResource):
+    namespace = "capi-system"
+    provider_version = "v1.13.2"
+    provider_namespaces = {"docker": "capd-system"}
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        cert_manager: _FakeCertManager,
+        infrastructure_providers: InfrastructureProvidersConfig = (
+            InfrastructureProvidersConfig(
+                docker=DockerInfrastructureProviderConfig(enabled=True)
+            )
+        ),
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        self.name = name
+        self.cert_manager = cert_manager
+        self.infrastructure_providers = infrastructure_providers
+        self.opts = opts
+
+
+class _FakeManagementAWXControlPlane:
+    calls: list[dict[str, object]] = []
+
+    def __init__(self, name: str, **kwargs: object) -> None:
+        self.calls.append({"name": name, **kwargs})
+        self.outputs = pulumi.Output.from_input(
+            ManagementAWXControlPlaneOutputs(
+                operator_namespace="awx",
+                instance_name="awx",
+                service_name="awx-service",
+                api_url="http://awx-service.awx.svc.cluster.local",
+                admin_user="admin",
+                admin_password="password",
+                admin_password_secret="awx-admin-password",
+                organization_id=1.0,
+                project_id=2.0,
+                project_name="gitops",
+                scm_credential_id=3.0,
+                management_kubernetes_credential_id=4.0,
+                dynamic_inventory_id=5.0,
+                dynamic_inventory_source_id=6.0,
+                cluster_state_job_template_id=7.0,
+                ready=True,
+            ),
+        )
+
+
+class _FakeAzureClusterIdentity:
+    calls: list[dict[str, object]] = []
+
+    def __init__(self, name: str, **kwargs: object) -> None:
+        self.calls.append({"name": name, **kwargs})
+        self.identity_name = pulumi.Output.from_input("cluster-identity")
+        self.identity_namespace = pulumi.Output.from_input("default")
+
+
+def _patch_pulumi_component(monkeypatch: Any) -> None:
+    def init(
+        self: pulumi.ComponentResource,
+        t: str,
+        name: str,
+        props: dict[str, object] | None = None,
+        opts: pulumi.ResourceOptions | None = None,
+        remote: bool = False,
+        package_ref: object | None = None,
+    ) -> None:
+        self._test_type = t
+        self._test_name = name
+
+    def register_outputs(
+        self: pulumi.ComponentResource,
+        outputs: dict[str, object],
+    ) -> None:
+        self._test_outputs = outputs
+
+    monkeypatch.setattr(pulumi.ComponentResource, "__init__", init)
+    monkeypatch.setattr(pulumi.ComponentResource, "register_outputs", register_outputs)
+
+
+def _patch_local_children(monkeypatch: Any) -> None:
+    _FakeManagementAWXControlPlane.calls = []
+    monkeypatch.setattr(control_plane_kind, "CertManager", _FakeCertManager)
+    monkeypatch.setattr(
+        control_plane_kind,
+        "ClusterAPIOperator",
+        _FakeClusterAPIOperator,
+    )
+    monkeypatch.setattr(
+        control_plane_kind,
+        "ManagementAWXControlPlane",
+        _FakeManagementAWXControlPlane,
+    )
+
+
+def _patch_azure_children(monkeypatch: Any) -> None:
+    _FakeAzureClusterIdentity.calls = []
+    monkeypatch.setattr(
+        control_plane_kind,
+        "AzureClusterIdentity",
+        _FakeAzureClusterIdentity,
+    )
+
+
+def test_control_plane_local_skips_awx_when_disabled(monkeypatch: Any) -> None:
+    _patch_pulumi_component(monkeypatch)
+    _patch_local_children(monkeypatch)
+
+    control_plane = ControlPlaneKind(
+        "control-plane",
+        config=ControlPlaneKindConfig.model_validate(
+            {"deployments": {"awx": {"enabled": False}}}
+        ),
+    )
+
+    assert _FakeManagementAWXControlPlane.calls == []
+    assert control_plane.awx is None
+    assert "awx_enabled" in control_plane._test_outputs
+    assert control_plane._test_outputs["awx"] is None
+
+
+def test_control_plane_local_instantiates_awx_when_enabled(monkeypatch: Any) -> None:
+    _patch_pulumi_component(monkeypatch)
+    _patch_local_children(monkeypatch)
+
+    control_plane = ControlPlaneKind(
+        "control-plane",
+        config=ControlPlaneKindConfig(
+            deployments=ControlPlaneDeploymentsConfig(
+                awx=ControlPlaneAWXConfig(
+                    enabled=True,
+                    flux_source_namespace="pko-system",
+                    flux_source_name="gitops-source",
+                )
+            )
+        ),
+    )
+
+    assert len(_FakeManagementAWXControlPlane.calls) == 1
+    call = _FakeManagementAWXControlPlane.calls[0]
+    assert call["name"] == "awx"
+    assert call["flux_source_namespace"] == "pko-system"
+    assert call["flux_source_name"] == "gitops-source"
+    assert control_plane.awx is not None
+    assert control_plane._test_outputs["awx"] is not None
+
+
+def test_kind_azure_control_plane_creates_identity_for_user_assigned_msi(
+    monkeypatch: Any,
+) -> None:
+    _patch_pulumi_component(monkeypatch)
+    _patch_azure_children(monkeypatch)
+
+    control_plane = KindAzureControlPlane(
+        "azure",
+        spec=KindAzureControlPlaneSpec(
+            identity=UserAssignedMSIClusterIdentityConfig(
+                client_id="11111111-1111-1111-1111-111111111111",
+                tenant_id="33333333-3333-3333-3333-333333333333",
+            ),
+        ),
+        capi=_FakeClusterAPIOperator(
+            "cluster-api",
+            cert_manager=_FakeCertManager("cert-manager"),
+        ),
+    )
+
+    identity = _FakeAzureClusterIdentity.calls[0]["identity"]
+    assert isinstance(identity, UserAssignedMSIClusterIdentityConfig)
+    assert identity.allowed_namespaces == AllowedNamespacesConfig()
+    identity_opts = _FakeAzureClusterIdentity.calls[0]["opts"]
+    assert isinstance(identity_opts, pulumi.ResourceOptions)
+    assert control_plane.outputs is not None
+
+
+def test_kind_azure_control_plane_creates_identity_for_workload_identity(
+    monkeypatch: Any,
+) -> None:
+    _patch_pulumi_component(monkeypatch)
+    _patch_azure_children(monkeypatch)
+
+    control_plane = KindAzureControlPlane(
+        "azure",
+        spec=KindAzureControlPlaneSpec(
+            identity=WorkloadIdentityClusterIdentityConfig(
+                client_id="11111111-1111-1111-1111-111111111111",
+                tenant_id="33333333-3333-3333-3333-333333333333",
+            ),
+        ),
+        capi=_FakeClusterAPIOperator(
+            "cluster-api",
+            cert_manager=_FakeCertManager("cert-manager"),
+        ),
+    )
+
+    identity = _FakeAzureClusterIdentity.calls[0]["identity"]
+    assert isinstance(identity, WorkloadIdentityClusterIdentityConfig)
+    assert control_plane.outputs is not None

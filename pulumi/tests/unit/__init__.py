@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Unit tests: fast, hermetic, no Docker / no network.
 
 Conventions for tests in this directory:
@@ -10,6 +13,6 @@ Conventions for tests in this directory:
 * One assertion concept per test. Use parametrize for combinatorial
   variants instead of cramming multiple cases into one function.
 * Test the provider lifecycle methods (``create``, ``diff``, ``update``,
-  ``delete``, ``read``, ``check``) directly \u2014 they're plain methods that
+  ``delete``, ``read``, ``check``) directly -- they're plain methods that
   take dicts and return dicts; they don't need Pulumi's runtime.
 """

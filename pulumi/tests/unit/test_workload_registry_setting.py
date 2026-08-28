@@ -1,28 +1,30 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 from __future__ import annotations
 
 import pytest
 
 from stacks.workload_cluster.registry_setting import (
-    LOCAL_PORT_REGISTRY_KIND,
-    REGISTRY_CONFIG_KEY,
-    local_port_registry_setting,
-    parse_registry_setting,
+    LocalPortRegistrySetting,
 )
 
 
-def test_local_port_registry_setting_round_trips() -> None:
-    setting = local_port_registry_setting(5002)
+def test_local_port_registry_model_round_trips() -> None:
+    setting = LocalPortRegistrySetting(port=5002).to_config()
+    parsed = LocalPortRegistrySetting.model_validate(setting)
 
-    assert setting == {"kind": LOCAL_PORT_REGISTRY_KIND, "port": 5002}
-    assert parse_registry_setting(setting) == setting
+    assert setting == {"kind": "local-port", "port": 5002}
+    assert parsed is not None
+    assert parsed.to_config() == setting
 
 
 @pytest.mark.parametrize("port", [0, -1, True, "5002"])
-def test_local_port_registry_setting_rejects_invalid_ports(port: object) -> None:
-    with pytest.raises(ValueError, match=f"{REGISTRY_CONFIG_KEY}.port"):
-        parse_registry_setting({"kind": LOCAL_PORT_REGISTRY_KIND, "port": port})
+def test_local_port_registry_model_rejects_invalid_ports(port: object) -> None:
+    with pytest.raises(ValueError, match="positive integer"):
+        LocalPortRegistrySetting.model_validate({"kind": "local-port", "port": port})
 
 
 def test_registry_setting_rejects_unknown_kind() -> None:
-    with pytest.raises(ValueError, match="unsupported"):
-        parse_registry_setting({"kind": "service", "name": "registry"})
+    with pytest.raises(ValueError, match="kind"):
+        LocalPortRegistrySetting.model_validate({"kind": "service", "name": "registry"})

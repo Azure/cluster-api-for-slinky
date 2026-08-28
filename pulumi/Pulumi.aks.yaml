@@ -1,0 +1,26 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+encryptionsalt: v1:VjgtcOTgSeI=:v1:Qk+1kfEEW+5Qj98l:26uVqeGXBdx4OW/LvLPHhaX3sPPb7Q==
+config:
+  ca4s-infra:customImages:
+    images:
+      capz-controller:
+        repositoryUrl: https://github.com/kubernetes-sigs/cluster-api-provider-azure.git
+        sourceRef: 69ec3a40a818ccbc32b8ce88c84609404d8cb7a2
+        imageName: capz/cluster-api-azure-controller
+        buildArgs:
+          ARCH: amd64
+  ca4s-infra:capzArtifact:
+    repositoryUrl: https://github.com/kubernetes-sigs/cluster-api-provider-azure.git
+    sourceRef: 69ec3a40a818ccbc32b8ce88c84609404d8cb7a2
+  ca4s-infra:initStack:
+    controlPlane:
+      infrastructureProviders:
+        azure:
+          enabled: true
+    tenants:
+      workloadClusters:
+        caps-aks:
+          className: aks
+          parameters: {}

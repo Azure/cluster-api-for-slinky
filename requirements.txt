@@ -1,4 +1,4 @@
-# Python dependencies for cluster-api-provider-slinky Pulumi stacks and tests
+# Python dependencies for cluster-api-for-slinky Pulumi stacks and tests
 
 # Pulumi Python SDK (used by the umbrella stack at pulumi/)
 pulumi>=3.0,<4.0
@@ -6,6 +6,18 @@ pulumi>=3.0,<4.0
 # Pulumi providers used by the gitops phase of pulumi/__main__.py
 pulumi-kubernetes>=4.0,<5.0
 pulumi-random>=4.0,<5.0
+# Azure resources owned directly by PKO workload classes (for example the
+# empty Flexible VMSS consumed by the CAPZ BYO attachment path).
+pulumi-azure-native>=3.20,<4.0
+
+# Runtime validation for JSON-like Pulumi config payloads.
+pydantic>=2.0,<3.0
+
+# Azure identity discovery for local Azure-enabled management stacks.
+azure-identity>=1.19,<2.0
+# Keep the Azure identity/MSAL cryptography dependency above known vulnerable
+# releases. MSAL currently supports cryptography versions below 51.
+cryptography>=50.0.1,<51.0
 
 # Generated Pulumi local-provider SDK used by the workload-cluster inner stack
 # to build an explicit management-cluster provider from projected kubeconfig files.
@@ -23,6 +35,10 @@ pulumi-random>=4.0,<5.0
 # spec of the PKO GitRepository source.
 -e ./pulumi/sdks/flux
 
+# Generated CAPI core CRD shim used by workload-cluster stacks for typed
+# Cluster API core resources.
+-e ./pulumi/sdks/capi-core
+
 # HTTP for Pulumi dynamic resources that wrap the Gitea REST API.
 # Imported lazily inside provider methods (gitrepo/gitea_repo.py,
 # gitrepo/gitea_sshkey.py, gitrepo/gitea_sync.py) so it must be in
@@ -36,7 +52,7 @@ requests>=2.31,<3.0
 # ---------------------------------------------------------------------------
 
 # Test runner + plugins.
-pytest>=8.0,<9.0
+pytest>=9.1.1,<10.0
 pytest-mock>=3.10,<4.0
 
 # HTTP mocking for the Gitea API wrappers in pulumi/gitrepo/gitea_*.py.

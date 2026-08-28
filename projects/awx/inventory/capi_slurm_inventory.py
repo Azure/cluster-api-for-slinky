@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """AWX dynamic inventory for CAPI/Slinky workload clusters.
 
 The script is designed for the stock AWX execution environment. It uses the
@@ -15,8 +19,9 @@ import re
 import sys
 import tempfile
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict
 
 CAPI_GROUP = "cluster.x-k8s.io"
 CAPI_VERSION = "v1beta2"
@@ -37,8 +42,9 @@ _CA_CERT_ENV = ("CA4S_K8S_SSL_CA_CERT", "K8S_AUTH_SSL_CA_CERT")
 _VERIFY_SSL_ENV = ("CA4S_K8S_VERIFY_SSL", "K8S_AUTH_VERIFY_SSL")
 
 
-@dataclass(frozen=True)
-class KubernetesAuth:
+class KubernetesAuth(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     host: str
     token: str
     ca_cert: str | None
@@ -125,8 +131,7 @@ def _list_machines(api: Any, args: argparse.Namespace) -> list[dict[str, Any]]:
 
 
 def _sanitize_group(value: str) -> str:
-    sanitized = re.sub(r"[^A-Za-z0-9_]", "_", value).strip("_").lower()
-    return sanitized or "unknown"
+    return re.sub(r"[^A-Za-z0-9_]", "_", value).strip("_").lower() or "unknown"
 
 
 def _address(machine: Mapping[str, Any], address_type: str) -> str | None:
@@ -137,13 +142,10 @@ def _address(machine: Mapping[str, Any], address_type: str) -> str | None:
 
 
 def _machine_hostname(machine: Mapping[str, Any]) -> str:
-    metadata = machine.get("metadata", {})
-    status = machine.get("status", {})
-    node_ref = status.get("nodeRef") or {}
     return (
         _address(machine, "Hostname")
-        or node_ref.get("name")
-        or metadata.get("name")
+        or (machine.get("status", {}).get("nodeRef") or {}).get("name")
+        or machine.get("metadata", {}).get("name")
         or "unknown"
     )
 
@@ -151,14 +153,12 @@ def _machine_hostname(machine: Mapping[str, Any]) -> str:
 def _machine_hostvars(machine: Mapping[str, Any], *, node_type_label: str) -> dict[str, Any]:
     metadata = machine.get("metadata", {})
     labels = metadata.get("labels") or {}
-    cluster_name = labels.get(CLUSTER_NAME_LABEL, "unknown")
-    node_type = labels.get(node_type_label, "unknown")
     ansible_host = _address(machine, "ExternalIP") or _address(machine, "InternalIP")
     hostvars: dict[str, Any] = {
-        "capi_cluster": cluster_name,
+        "capi_cluster": labels.get(CLUSTER_NAME_LABEL, "unknown"),
         "capi_machine": metadata.get("name"),
         "capi_namespace": metadata.get("namespace"),
-        "node_type": node_type,
+        "node_type": labels.get(node_type_label, "unknown"),
     }
     if ansible_host:
         hostvars["ansible_host"] = ansible_host

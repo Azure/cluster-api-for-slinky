@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Pulumi dynamic resource that pushes a local Git commit to an SSH remote.
 
 ``GitSync`` hydrates a Git remote from the local working tree that Pulumi is
@@ -93,29 +96,33 @@ class _GitSyncProvider(ResourceProvider):
     def _build_git_url(self, props: dict) -> str:
         parsed = _split_ssh_url(str(props["repo_url"]))
         userinfo = f"{quote(parsed.username)}@" if parsed.username else ""
-        return f"ssh://{userinfo}{props['ssh_host']}:{int(props['ssh_port'])}{parsed.path}"
+        return (
+            f"ssh://{userinfo}{props['ssh_host']}:{int(props['ssh_port'])}"
+            f"{parsed.path}"
+        )
 
     def _git_env(self) -> dict[str, str]:
         return {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
 
     def _known_hosts(self, props: dict) -> str:
         parsed = _split_ssh_url(str(props["repo_url"]))
-        host_public_key = str(props["ssh_host_public_key"]).strip()
-        return f"{parsed.hostname} {host_public_key}\n"
+        return f"{parsed.hostname} {str(props['ssh_host_public_key']).strip()}\n"
 
     def _is_transient_push_error(self, stderr: str) -> bool:
         return any(error in stderr for error in _TRANSIENT_SSH_ERRORS)
 
     def _push_once(self, props: dict) -> None:
-        private_key = str(props["ssh_private_key"])
         with (
-            self._temp_file(private_key, 0o600) as key_path,
+            self._temp_file(str(props["ssh_private_key"]), 0o600) as key_path,
             self._temp_file(self._known_hosts(props), 0o644) as known_hosts_path,
         ):
             parsed = _split_ssh_url(str(props["repo_url"]))
             host_alias = parsed.hostname
             if host_alias is None:
-                raise ValueError(f"GitSync SSH URL must include a hostname, got {props['repo_url']!r}")
+                raise ValueError(
+                    "GitSync SSH URL must include a hostname, "
+                    f"got {props['repo_url']!r}"
+                )
             ssh_command = " ".join(
                 [
                     "ssh",

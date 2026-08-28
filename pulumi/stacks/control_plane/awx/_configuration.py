@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Shared AWX objects owned by the control-plane layer."""
 
 from __future__ import annotations
@@ -10,6 +13,8 @@ import pulumi_awx as awx
 from ca4s_flux_crds.source.v1 import GitRepository
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
+
+from stacks.kubernetes_annotations import pulumi_wait_for
 
 from ._provider import AWXProviderConfig, decode_secret_data_value
 
@@ -341,7 +346,7 @@ class AWXConfiguration(pulumi.ComponentResource):
                     "kubernetes.io/service-account.name": (
                         _MANAGEMENT_READER_SERVICE_ACCOUNT
                     ),
-                    "pulumi.com/waitFor": _WAIT_FOR_SERVICE_ACCOUNT_TOKEN,
+                    **pulumi_wait_for(_WAIT_FOR_SERVICE_ACCOUNT_TOKEN),
                 },
             },
             type="kubernetes.io/service-account-token",

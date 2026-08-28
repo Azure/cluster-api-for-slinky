@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """AWX project synchronization fence re-export for control-plane tests."""
 
 from __future__ import annotations

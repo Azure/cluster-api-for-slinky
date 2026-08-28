@@ -1,14 +1,14 @@
-# Cluster API Provider Slinky
+# Cluster API for Slinky
 
 Kubernetes-native declarative infrastructure for [Slinky](https://github.com/SlinkyProject)-based converged Slurm and Kubernetes clusters.
 
-## What is the Cluster API Provider Slinky (CAPS)
+## What is Cluster API for Slinky (CA4S)
 
 The [Cluster API](https://github.com/kubernetes-sigs/cluster-api) (CAPI) brings declarative, Kubernetes-style APIs to cluster creation, configuration and management.
 
-CAPS enables efficient management at scale of Slinky-based converged Slurm and Kubernetes clusters, with the nodes dual-managed by both Ansible AWX for Slurm workloads and CAPI providers (Cluster API Provider Docker/Azure/vCluster/etc.) for containerized workloads on Kubernetes, with slurm-bridge bridging Slurm and Kubernetes for fair-share scheduling across both orchestrators.
+CA4S enables efficient management at scale of Slinky-based converged Slurm and Kubernetes clusters, with the nodes dual-managed by both Ansible AWX for Slurm workloads and CAPI providers (Cluster API Provider Docker/Azure/vCluster/etc.) for containerized workloads on Kubernetes, with slurm-bridge bridging Slurm and Kubernetes for fair-share scheduling across both orchestrators.
 
-![CAPS architecture](docs/images/architecture.svg)
+![CA4S architecture](docs/images/architecture.svg)
 
 ## Getting started
 
@@ -122,6 +122,7 @@ The umbrella stack and its test suite share a single virtualenv at the repo root
 
 ```bash
 python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade "pip>=26.2,<27" "setuptools>=83,<85"
 .venv/bin/pip install -r requirements.txt
 ```
 
@@ -213,6 +214,32 @@ LOGIN_POD=$(kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm \
 kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec -it "$LOGIN_POD" -- sinfo
 ```
 
+### Reuse The Host Resource Group
+
+AKS and Azure BYO workload parameters accept `useDiscoveredResourceGroup`:
+
+```yaml
+tenants:
+  workloadClusters:
+    caps-self:
+      className: azure-byo # or aks
+      parameters:
+        useDiscoveredResourceGroup: true
+```
+
+When enabled, host-side Azure IMDS discovery selects the resource group that
+contains the VM running Docker and the Kind management cluster. The discovered
+resource group must belong to the workload subscription, but its own location
+does not constrain the locations of resources placed in it. Azure BYO then
+references that existing group instead of registering a new Pulumi-owned resource
+group. AKS uses it as the managed cluster resource group; Azure still creates and
+manages the separate `MC_*` node resource group.
+
+CAPZ treats an untagged pre-existing resource group as unmanaged: deleting the
+workload cluster deletes its cluster resources individually but preserves the
+host resource group and Kind host VM. Do not apply CAPZ's cluster ownership tag
+to the shared group.
+
 ### Autoscaling
 
 See [docs/autoscaling.md](docs/autoscaling.md) for the autoscaling design,
@@ -222,11 +249,26 @@ Run the manual demand generator through the login pod:
 
 ```bash
 kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm cp scripts/sleep-exclusive.slurm "$LOGIN_POD:/root/sleep-exclusive.slurm"
-kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm cp scripts/slurm_load_generator.sh "$LOGIN_POD:/root/slurm_load_generator.sh"
-kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec "$LOGIN_POD" -- chmod +x /root/slurm_load_generator.sh
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm cp scripts/slurm_load_generator.py "$LOGIN_POD:/root/slurm_load_generator.py"
+kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec "$LOGIN_POD" -- chmod +x /root/slurm_load_generator.py
 LOAD_PID=$(kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec "$LOGIN_POD" -- \
-  sh -lc 'nohup env MIN_RATE=8 MAX_RATE=8 RATE_ADJUST_INTERVAL_MINUTES=1 JOB_SCRIPT=/root/sleep-exclusive.slurm /root/slurm_load_generator.sh >/root/slurm_load_generator.log 2>&1 & echo $!')
+  sh -lc 'nohup /root/slurm_load_generator.py --profile azure --job-script /root/sleep-exclusive.slurm >/root/slurm_load_generator.log 2>&1 & echo $!')
 ```
+
+`--profile` provides environment-specific defaults:
+
+- `local`: `MIN_RATE=1`, `MAX_RATE=5`, `CYCLE_MINUTES=16`.
+- `azure` or `cloud`: `MIN_RATE=0.25`, `MAX_RATE=4`, `CYCLE_MINUTES=120`.
+
+`MIN_RATE` and `MAX_RATE` are jobs per minute and can be fractional. CLI flags
+such as `--min-rate`, `--max-rate`, and `--cycle-minutes` override environment
+variables, and environment variables such as `LOAD_PROFILE` and `MIN_RATE`
+override profile defaults.
+
+The generator projects angular phase through a sinusoidal wave and
+integrates that instantaneous jobs-per-minute frequency every logical second.
+Use `--tick-seconds` to change the integration interval and `--minute-seconds`
+to accelerate wall-clock time without changing the logical load profile.
 
 Watch Slurm nodes come and go:
 
@@ -312,6 +354,11 @@ provided by the bot. You will only need to do this once across all repos using o
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+
+## Security
+
+Do not report security vulnerabilities through public GitHub issues. Follow
+the private reporting instructions in our [security policy](SECURITY.md).
 
 ## Trademarks
 

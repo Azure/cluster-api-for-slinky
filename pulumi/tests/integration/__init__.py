@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """Integration tests: slow, end-to-end, require Docker.
 
 All tests in this directory must be decorated with

@@ -1,20 +1,19 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 name: ca4s-infra
 description: |
-  End-to-end Pulumi bootstrap for the management cluster, parameterized by
-  *stack* over multiple target environments.
+  End-to-end Pulumi bootstrap for a Kind-backed management cluster. The resource
+  graph is selected by top-level config plus local host discovery.
 
-  Stack-per-target dispatch
-  -------------------------
-  ``main: __main__.py`` is a ~30-line dispatcher that switches on
-  ``pulumi.get_stack()`` and imports the matching ``stack_<name>.py``
-  module:
+  Stack shape
+  -----------
+  ``main: __main__.py`` calls the shared Kind-backed outer stack builder:
 
-    * stack ``local``  → ``stack_local.py`` (kind + ctlptl + Gitea — only
-      target currently implemented)
-    * stack ``azure``  → ``stack_azure.py`` *(TODO)*
+    * no Azure IMDS capability/config → kind + ctlptl + Gitea bootstrap
+    * Azure IMDS capability/config    → same bootstrap plus Azure identity and
+      workload-cluster config
 
-  Each ``stack_<name>.py`` is a self-contained program — it builds its own
-  resources from scratch and exposes its own ``pulumi.export(...)``s.
   Shared building blocks live in sibling packages:
 
     * ``ctlptl/``  — kind / cloud-provider-kind / local image registry
@@ -28,8 +27,9 @@ description: |
   dynamic-Resource worker subprocess. No editable install, no
   ``sys.path`` shim, no ``PYTHONPATH`` wiring.
 
-  Per-target configuration lives in the corresponding stack config file
-  (``Pulumi.local.yaml``, ``Pulumi.azure.yaml``, ...). ``pulumi config
+  Configuration lives in the active stack config file
+  (for example ``Pulumi.local.yaml``, ``Pulumi.aks.yaml``, or
+  ``Pulumi.azurebyo.yaml``). ``pulumi config
   set <key> <value> -s <stack>`` is the canonical way to populate them;
   they are NOT meant to be hand-edited as a primary workflow.
 runtime:
@@ -38,8 +38,8 @@ runtime:
     # Reuse the repo-root .venv so we don't fragment Python environments.
     virtualenv: ../.venv
 
-# Explicit (matches Pulumi's default). ``__main__.py`` is the dispatcher;
-# the per-target stack body it imports is ``stack_<stackname>.py``.
+# Explicit (matches Pulumi's default). ``__main__.py`` calls the shared
+# Kind-backed outer stack builder.
 main: __main__.py
 
 packages:
