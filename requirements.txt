@@ -49,7 +49,7 @@ requests>=2.31,<3.0
 # ---------------------------------------------------------------------------
 
 # Test runner + plugins.
-pytest>=8.0,<9.0
+pytest>=9.1.1,<10.0
 pytest-mock>=3.10,<4.0
 
 # HTTP mocking for the Gitea API wrappers in pulumi/gitrepo/gitea_*.py.
