@@ -107,12 +107,11 @@ _version = _get_semver_version()
 _version_str = str(_version)
 
 def get_resource_opts_defaults() -> pulumi.ResourceOptions:
-    # crd2pulumi generated these classes as a package named
-    # ``ca4s-capi-core-crds``, but the resource tokens are Kubernetes tokens,
-    # e.g. ``kubernetes:cluster.x-k8s.io/v1beta2:Cluster``. Do not attach the
-    # shim package version/download URL here; doing so makes Pulumi try to
-    # install a nonexistent ``pulumi-resource-ca4s-capi-core-crds`` provider
-    # plugin.
+    # crd2pulumi generated this shim as ``ca4s-capi-core-crds``, but its
+    # resource tokens are Kubernetes tokens, for example:
+    # ``kubernetes:cluster.x-k8s.io/v1beta2:Cluster``.
+    # Attaching shim defaults makes Pulumi try to install the nonexistent
+    # ``pulumi-resource-ca4s-capi-core-crds`` provider plugin.
     return pulumi.ResourceOptions()
 
 def get_invoke_opts_defaults() -> pulumi.InvokeOptions:

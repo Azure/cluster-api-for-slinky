@@ -18,8 +18,12 @@ crd2pulumi \
   --version 1.13.2 \
   --force \
   pulumi/sdks/capi-core/crds/core-components.yaml
+
+python3 scripts/patch_crd_sdk_provider_defaults.py
 ```
 
-After regeneration, keep the local `_utilities.py` provider-default patch so
-Pulumi uses the Kubernetes provider rather than trying to install a nonexistent
-shim provider plugin.
+The post-generation script removes package plugin defaults from the generated
+resource and invoke options. The generated resource tokens belong to the
+Kubernetes provider; retaining those defaults makes Pulumi try to install a
+nonexistent shim provider plugin. Run the script with `--check` to verify that
+committed SDK output contains the canonical patch.
