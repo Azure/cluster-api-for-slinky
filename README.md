@@ -354,6 +354,11 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
+## Security
+
+Do not report security vulnerabilities through public GitHub issues. Follow
+the private reporting instructions in our [security policy](SECURITY.md).
+
 ## Trademarks
 
 Slurm® and Slinky® are registered trademarks of SchedMD LLC.

@@ -1,11 +1,16 @@
 # Support
 
-## How to file issues and get help  
+## How to file issues and get help
 
-This project uses GitHub Issues to track bugs and feature requests. Please search the existing 
-issues before filing new issues to avoid duplicates.  For new issues, file your bug or 
-feature request as a new Issue.
+Cluster API for Slinky uses [GitHub Issues](https://github.com/Azure/cluster-api-for-slinky/issues)
+to track bugs and feature requests. Search existing issues before opening a new
+one to avoid duplicates.
 
-## Microsoft Support Policy  
+Do not use GitHub Issues to report security vulnerabilities. Follow the private
+reporting instructions in [SECURITY.md](SECURITY.md).
 
-Support for this **PROJECT or PRODUCT** is limited to the resources listed above.
+## Microsoft Support Policy
+
+Support for Cluster API for Slinky is limited to the community resources listed
+above. It is not covered by a Microsoft commercial support contract or service
+level agreement.
