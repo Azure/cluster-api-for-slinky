@@ -15,6 +15,9 @@ pydantic>=2.0,<3.0
 
 # Azure identity discovery for local Azure-enabled management stacks.
 azure-identity>=1.19,<2.0
+# Keep the Azure identity/MSAL cryptography dependency above known vulnerable
+# releases. MSAL currently supports cryptography versions below 51.
+cryptography>=50.0.1,<51.0
 
 # Generated Pulumi local-provider SDK used by the workload-cluster inner stack
 # to build an explicit management-cluster provider from projected kubeconfig files.

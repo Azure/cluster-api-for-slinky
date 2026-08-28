@@ -122,6 +122,7 @@ The umbrella stack and its test suite share a single virtualenv at the repo root
 
 ```bash
 python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade "pip>=26.2,<27" "setuptools>=83,<85"
 .venv/bin/pip install -r requirements.txt
 ```
 
