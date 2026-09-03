@@ -9,7 +9,7 @@ from typing import Any
 
 import pulumi
 import pulumi_kubernetes as k8s
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from lib.config import (
     NonEmptyStr,
@@ -47,11 +47,41 @@ _PROMETHEUS_PORT = 9090
 
 _SLINKY_CHART_OCI_PREFIX = "oci://ghcr.io/slinkyproject/charts"
 _SLINKY_CHART_VERSION = "1.2.1"
-_SLINKY_OPERATOR_CRDS_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator-crds"
-_SLINKY_OPERATOR_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator"
-_SLURM_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm"
 _SLINKY_OPERATOR_NAMESPACE = "slinky"
 _SLURM_NAMESPACE = "slurm"
+
+
+class SlinkyImageConfig(PulumiConfigModel):
+    repository: NonEmptyStr
+    tag: NonEmptyStr | None = None
+    digest: NonEmptyStr | None = None
+
+    @model_validator(mode="after")
+    def validate_reference(self) -> SlinkyImageConfig:
+        if (self.tag is None) == (self.digest is None):
+            raise ValueError("exactly one of tag or digest is required")
+        return self
+
+    def to_helm_values(self) -> dict[str, str]:
+        values = {"repository": self.repository}
+        if self.tag is not None:
+            values["tag"] = self.tag
+        if self.digest is not None:
+            values["digest"] = self.digest
+        return values
+
+
+class SlinkyDeploymentConfig(PulumiConfigModel):
+    chart_oci_prefix: NonEmptyStr = _SLINKY_CHART_OCI_PREFIX
+    operator_crds_chart_version: NonEmptyStr = _SLINKY_CHART_VERSION
+    operator_chart_version: NonEmptyStr = _SLINKY_CHART_VERSION
+    slurm_chart_version: NonEmptyStr = _SLINKY_CHART_VERSION
+    operator_image: SlinkyImageConfig | None = None
+    webhook_image: SlinkyImageConfig | None = None
+    image_pull_secrets: tuple[NonEmptyStr, ...] = ()
+
+    def chart(self, name: str) -> str:
+        return f"{self.chart_oci_prefix.rstrip('/')}/{name}"
 
 
 class SlurmNodeSetSpec(PulumiConfigModel):
@@ -157,8 +187,11 @@ def _keda_scaled_object_spec(
     }
 
 
-def _slurm_operator_values() -> dict[str, object]:
-    return {
+def _slurm_operator_values(
+    config: SlinkyDeploymentConfig | None = None,
+) -> dict[str, object]:
+    config = config or SlinkyDeploymentConfig()
+    values: dict[str, object] = {
         "operator": {
             **controller_pod_spec(),
         },
@@ -166,6 +199,15 @@ def _slurm_operator_values() -> dict[str, object]:
             **controller_pod_spec(),
         },
     }
+    if config.operator_image is not None:
+        values["operator"]["image"] = config.operator_image.to_helm_values()
+    if config.webhook_image is not None:
+        values["webhook"]["image"] = config.webhook_image.to_helm_values()
+    if config.image_pull_secrets:
+        values["imagePullSecrets"] = [
+            {"name": name} for name in config.image_pull_secrets
+        ]
+    return values
 
 
 def _cert_manager_values() -> dict[str, object]:
@@ -437,6 +479,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         instance: str,
         slurm_node_sets: tuple[SlurmNodeSetSpec, ...],
         keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = (),
+        slinky: SlinkyDeploymentConfig | None = None,
         workload_provider: k8s.Provider,
         pin_coredns_to_controller: bool = False,
         opts: pulumi.ResourceOptions | None = None,
@@ -447,6 +490,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
             props={},
             opts=opts,
         )
+        slinky = slinky or SlinkyDeploymentConfig()
         def child_options(
             *,
             provider: pulumi.ProviderResource | None = None,
@@ -553,8 +597,8 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         )
         slurm_operator_crds = k8s.helm.v3.Release(
             "slurm-operator-crds",
-            chart=_SLINKY_OPERATOR_CRDS_CHART,
-            version=_SLINKY_CHART_VERSION,
+            chart=slinky.chart("slurm-operator-crds"),
+            version=slinky.operator_crds_chart_version,
             namespace=_SLINKY_OPERATOR_NAMESPACE,
             cleanup_on_fail=True,
             atomic=True,
@@ -568,14 +612,14 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         )
         slurm_operator = k8s.helm.v3.Release(
             "slurm-operator",
-            chart=_SLINKY_OPERATOR_CHART,
-            version=_SLINKY_CHART_VERSION,
+            chart=slinky.chart("slurm-operator"),
+            version=slinky.operator_chart_version,
             namespace=_SLINKY_OPERATOR_NAMESPACE,
             cleanup_on_fail=True,
             atomic=True,
             wait_for_jobs=True,
             timeout=600,
-            values=_slurm_operator_values(),
+            values=_slurm_operator_values(slinky),
             opts=child_options(
                 provider=workload_provider,
                 depends_on=[slinky_namespace, cert_manager, slurm_operator_crds],
@@ -584,8 +628,8 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         )
         slurm_release = k8s.helm.v3.Release(
             "slurm",
-            chart=_SLURM_CHART,
-            version=_SLINKY_CHART_VERSION,
+            chart=slinky.chart("slurm"),
+            version=slinky.slurm_chart_version,
             namespace=_SLURM_NAMESPACE,
             cleanup_on_fail=True,
             atomic=True,
@@ -639,9 +683,9 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 "prometheus_namespace": self.prometheus_namespace,
                 "prometheus_status": self.prometheus_status,
                 "workload_cluster_ready": self.workload_cluster_ready,
-                "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+                "slurm_operator_chart_version": slinky.operator_chart_version,
                 "slurm_operator_status": self.slurm_operator_status,
-                "slurm_chart_version": _SLINKY_CHART_VERSION,
+                "slurm_chart_version": slinky.slurm_chart_version,
                 "slurm_status": self.slurm_status,
             }
         )

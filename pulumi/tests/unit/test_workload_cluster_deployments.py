@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from stacks.workload_cluster.workload_cluster_deployments import (
     _cert_manager_values,
     _coredns_controller_placement_spec,
@@ -14,12 +16,16 @@ from stacks.workload_cluster.workload_cluster_deployments import (
     _prometheus_service_name,
     _prometheus_values,
     _SLINKY_CHART_VERSION,
+    _slurm_operator_values,
     _slurm_nodeset_name,
     _slurm_nodeset_values,
+    SlinkyDeploymentConfig,
+    SlinkyImageConfig,
     SlurmNodeSetSpec,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     controller_node_affinity,
+    controller_pod_spec,
     controller_taint,
     controller_tolerations,
 )
@@ -98,6 +104,76 @@ def test_cert_manager_values_pin_every_chart_pod_to_controller_node() -> None:
     assert values["webhook"] == expected_placement
     assert values["cainjector"] == expected_placement
     assert values["startupapicheck"] == expected_placement
+
+
+def test_slinky_deployment_config_preserves_published_defaults() -> None:
+    config = SlinkyDeploymentConfig()
+
+    assert config.chart("slurm-operator-crds") == (
+        "oci://ghcr.io/slinkyproject/charts/slurm-operator-crds"
+    )
+    assert config.operator_crds_chart_version == _SLINKY_CHART_VERSION
+    assert config.operator_chart_version == _SLINKY_CHART_VERSION
+    assert config.slurm_chart_version == _SLINKY_CHART_VERSION
+    assert "image" not in _slurm_operator_values(config)["operator"]
+    assert "image" not in _slurm_operator_values(config)["webhook"]
+
+
+def test_slurm_operator_values_apply_custom_images_and_pull_secrets() -> None:
+    config = SlinkyDeploymentConfig(
+        chart_oci_prefix="oci://registry.example/charts/",
+        operator_crds_chart_version="1.3.0-dev.1",
+        operator_chart_version="1.3.0-dev.2",
+        slurm_chart_version="1.3.0-dev.3",
+        operator_image=SlinkyImageConfig(
+            repository="registry.example/slurm-operator",
+            tag="feature",
+        ),
+        webhook_image=SlinkyImageConfig(
+            repository="registry.example/slurm-operator-webhook",
+            digest="sha256:abc123",
+        ),
+        image_pull_secrets=("registry-credentials",),
+    )
+
+    assert config.chart("slurm-operator") == (
+        "oci://registry.example/charts/slurm-operator"
+    )
+    assert _slurm_operator_values(config) == {
+        "operator": {
+            **controller_pod_spec(),
+            "image": {
+                "repository": "registry.example/slurm-operator",
+                "tag": "feature",
+            },
+        },
+        "webhook": {
+            **controller_pod_spec(),
+            "image": {
+                "repository": "registry.example/slurm-operator-webhook",
+                "digest": "sha256:abc123",
+            },
+        },
+        "imagePullSecrets": [{"name": "registry-credentials"}],
+    }
+
+
+@pytest.mark.parametrize(
+    "image",
+    [
+        {"repository": "registry.example/slurm-operator"},
+        {
+            "repository": "registry.example/slurm-operator",
+            "tag": "feature",
+            "digest": "sha256:abc123",
+        },
+    ],
+)
+def test_slinky_image_requires_exactly_one_version_selector(
+    image: dict[str, str],
+) -> None:
+    with pytest.raises(ValueError, match="exactly one of tag or digest"):
+        SlinkyImageConfig.model_validate(image)
 
 
 def test_coredns_patch_pins_to_controller_node() -> None:

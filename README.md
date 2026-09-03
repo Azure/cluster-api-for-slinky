@@ -161,6 +161,9 @@ pulumi up -s local --yes
 popd
 ```
 
+Custom CAPI infrastructure-provider, CAPZ, and Slinky development workflows are
+documented in [Custom CAPI, CAPZ, and Slinky Builds](docs/custom-components.md).
+
 The outer `pulumi up` waits for the PKO init stack to finish reconciliation.
 
 Optional troubleshooting snippets:

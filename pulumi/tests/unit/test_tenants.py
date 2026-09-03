@@ -5,6 +5,10 @@ from __future__ import annotations
 
 import pytest
 
+from stacks.workload_cluster.workload_cluster_deployments import (
+    SlinkyDeploymentConfig,
+    SlinkyImageConfig,
+)
 from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     AzureBYOWorkloadClusterConfig,
 )
@@ -71,6 +75,66 @@ def test_tenants_config_accepts_empty_mapping() -> None:
     spec = TenantsConfig.model_validate({"workloadClusters": {}})
 
     assert spec.workload_clusters == {}
+
+
+def test_tenants_config_serializes_slinky_overrides() -> None:
+    spec = TenantsConfig.model_validate(
+        {
+            "workloadClusters": {
+                "local": {
+                    "className": "local",
+                    "slinky": {
+                        "chartOciPrefix": "oci://registry.example/charts",
+                        "operatorCrdsChartVersion": "1.3.0-dev.1",
+                        "operatorChartVersion": "1.3.0-dev.2",
+                        "slurmChartVersion": "1.3.0-dev.3",
+                        "operatorImage": {
+                            "repository": "registry.example/slurm-operator",
+                            "tag": "feature",
+                        },
+                        "webhookImage": {
+                            "repository": "registry.example/slurm-operator-webhook",
+                            "digest": "sha256:abc123",
+                        },
+                        "imagePullSecrets": ["registry-credentials"],
+                    },
+                }
+            }
+        }
+    )
+
+    local = spec.workload_clusters["local"]
+    assert isinstance(local, LocalWorkloadClusterConfig)
+    assert local.slinky == SlinkyDeploymentConfig(
+        chart_oci_prefix="oci://registry.example/charts",
+        operator_crds_chart_version="1.3.0-dev.1",
+        operator_chart_version="1.3.0-dev.2",
+        slurm_chart_version="1.3.0-dev.3",
+        operator_image=SlinkyImageConfig(
+            repository="registry.example/slurm-operator",
+            tag="feature",
+        ),
+        webhook_image=SlinkyImageConfig(
+            repository="registry.example/slurm-operator-webhook",
+            digest="sha256:abc123",
+        ),
+        image_pull_secrets=("registry-credentials",),
+    )
+    assert spec.to_config()["workloadClusters"]["local"]["slinky"] == {
+        "chartOciPrefix": "oci://registry.example/charts",
+        "operatorCrdsChartVersion": "1.3.0-dev.1",
+        "operatorChartVersion": "1.3.0-dev.2",
+        "slurmChartVersion": "1.3.0-dev.3",
+        "operatorImage": {
+            "repository": "registry.example/slurm-operator",
+            "tag": "feature",
+        },
+        "webhookImage": {
+            "repository": "registry.example/slurm-operator-webhook",
+            "digest": "sha256:abc123",
+        },
+        "imagePullSecrets": ["registry-credentials"],
+    }
 
 
 def test_tenants_config_accepts_azure_byo_class() -> None:
