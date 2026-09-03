@@ -85,6 +85,7 @@ def test_tenants_config_serializes_slinky_overrides() -> None:
                     "className": "local",
                     "slinky": {
                         "chartOciPrefix": "oci://registry.example/charts",
+                        "chartPlainHttp": True,
                         "operatorCrdsChartVersion": "1.3.0-dev.1",
                         "operatorChartVersion": "1.3.0-dev.2",
                         "slurmChartVersion": "1.3.0-dev.3",
@@ -107,6 +108,7 @@ def test_tenants_config_serializes_slinky_overrides() -> None:
     assert isinstance(local, LocalWorkloadClusterConfig)
     assert local.slinky == SlinkyDeploymentConfig(
         chart_oci_prefix="oci://registry.example/charts",
+        chart_plain_http=True,
         operator_crds_chart_version="1.3.0-dev.1",
         operator_chart_version="1.3.0-dev.2",
         slurm_chart_version="1.3.0-dev.3",
@@ -122,6 +124,7 @@ def test_tenants_config_serializes_slinky_overrides() -> None:
     )
     assert spec.to_config()["workloadClusters"]["local"]["slinky"] == {
         "chartOciPrefix": "oci://registry.example/charts",
+        "chartPlainHttp": True,
         "operatorCrdsChartVersion": "1.3.0-dev.1",
         "operatorChartVersion": "1.3.0-dev.2",
         "slurmChartVersion": "1.3.0-dev.3",

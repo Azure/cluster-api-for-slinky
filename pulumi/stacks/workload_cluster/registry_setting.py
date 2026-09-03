@@ -19,7 +19,7 @@ from typing import Any, Literal, TypeAlias
 
 from pydantic import field_serializer, field_validator
 
-from lib.config import PulumiConfigModel
+from lib.config import NonEmptyStr, PulumiConfigModel
 
 
 class LocalPortRegistrySetting(PulumiConfigModel):
@@ -47,4 +47,24 @@ class LocalPortRegistrySetting(PulumiConfigModel):
 
 
 RegistryConfig: TypeAlias = LocalPortRegistrySetting
+
+
+class LocalCustomRegistrySetting(PulumiConfigModel):
+    """Reach a named ctlptl registry through its host-published port."""
+
+    registry_name: NonEmptyStr
+    port: Any
+
+    @field_validator("port")
+    @classmethod
+    def _validate_literal_port(cls, value: Any) -> Any:
+        if isinstance(value, bool):
+            raise ValueError("port must be a positive integer")
+        if isinstance(value, int):
+            if value < 1:
+                raise ValueError("port must be a positive integer")
+            return value
+        if isinstance(value, str | float):
+            raise ValueError("port must be a positive integer")
+        return value
 

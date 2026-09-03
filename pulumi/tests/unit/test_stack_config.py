@@ -11,9 +11,13 @@ from pydantic import ValidationError
 from stack import (
     CAPZArtifactConfig,
     CustomImagesConfig,
+    SlinkyChartsConfig,
     _azure_infrastructure_enabled,
     _discover_username,
     _merge_capz_provider_overrides,
+    _merge_local_slinky_overrides,
+    _slinky_image_config,
+    _validate_slinky_build_config,
     _with_local_registry_config,
     _with_owner_tag_config,
 )
@@ -86,6 +90,7 @@ def test_custom_images_config_parses_source_and_registry_options() -> None:
                     "sourcePath": "/src/controller",
                     "sourceRef": "feature",
                     "imageName": "custom/controller",
+                    "target": "manager",
                     "buildArgs": {"ARCH": "amd64", "package": "./cmd"},
                 }
             },
@@ -98,7 +103,118 @@ def test_custom_images_config_parses_source_and_registry_options() -> None:
     assert image.source_path == "/src/controller"
     assert image.source_ref == "feature"
     assert image.image_name == "custom/controller"
+    assert image.target == "manager"
     assert image.build_args == {"ARCH": "amd64", "package": "./cmd"}
+
+
+def test_slinky_charts_config_accepts_local_source() -> None:
+    config = SlinkyChartsConfig.model_validate(
+        {
+            "sourcePath": "/src/slurm-operator",
+            "sourceRef": "feature/slinky",
+        }
+    )
+
+    assert config.source_path == "/src/slurm-operator"
+    assert config.source_ref == "feature/slinky"
+
+
+def test_slinky_custom_images_require_expected_targets() -> None:
+    with pytest.raises(ValueError, match="requires target 'manager'"):
+        CustomImagesConfig.model_validate(
+            {
+                "images": {
+                    "slurm-operator": {
+                        "sourcePath": "/src/slurm-operator",
+                        "sourceRef": "HEAD",
+                        "imageName": "slurm-operator",
+                        "target": "webhook",
+                    }
+                }
+            }
+        )
+
+
+def test_slinky_charts_require_both_custom_images() -> None:
+    images = CustomImagesConfig.model_validate(
+        {
+            "images": {
+                "slurm-operator": {
+                    "sourcePath": "/src/slurm-operator",
+                    "sourceRef": "HEAD",
+                    "imageName": "slurm-operator",
+                    "target": "manager",
+                }
+            }
+        }
+    )
+    charts = SlinkyChartsConfig(
+        source_path="/src/slurm-operator",
+        source_ref="HEAD",
+    )
+
+    with pytest.raises(ValueError, match="slurm-operator-webhook"):
+        _validate_slinky_build_config(images, charts)
+
+
+def test_slinky_image_config_parses_registry_port_and_tag() -> None:
+    image = _slinky_image_config(
+        "custom-registry:5000/slurm-operator:source-1234567890ab"
+    )
+
+    assert image is not None
+    assert image.repository == "custom-registry:5000/slurm-operator"
+    assert image.tag == "source-1234567890ab"
+
+
+def test_local_slinky_overrides_update_only_local_workload_clusters() -> None:
+    config = InitStackConfig(
+        tenants=TenantsConfig(
+            workload_clusters={
+                "local": LocalWorkloadClusterConfig(),
+                "caps-aks": AKSWorkloadClusterConfig(
+                    parameters=AzureWorkloadSpec(
+                        subscription_id=_SUBSCRIPTION_ID,
+                        location="westus2",
+                        resource_group="rg-capz-mi-dev2",
+                    )
+                ),
+            }
+        )
+    )
+
+    updated = _merge_local_slinky_overrides(
+        config,
+        chart_oci_prefix=(
+            "oci://custom-registry.pulumi-kubernetes-operator."
+            "svc.cluster.local:5000/charts"
+        ),
+        chart_version="0.0.0-source1234567890ab",
+        operator_image=(
+            "custom-registry:5000/slurm-operator:source-1234567890ab"
+        ),
+        webhook_image=(
+            "custom-registry:5000/slurm-operator-webhook:source-1234567890ab"
+        ),
+        registry_name="custom-registry",
+        registry_port=5003,
+    )
+
+    local = updated.tenants.workload_clusters["local"]
+    assert isinstance(local, LocalWorkloadClusterConfig)
+    assert local.custom_registry is not None
+    assert local.custom_registry.registry_name == "custom-registry"
+    assert local.custom_registry.port == 5003
+    assert local.slinky.chart_plain_http is True
+    assert local.slinky.operator_chart_version == "0.0.0-source1234567890ab"
+    assert local.slinky.operator_image is not None
+    assert local.slinky.operator_image.repository == (
+        "custom-registry:5000/slurm-operator"
+    )
+
+    aks = updated.tenants.workload_clusters["caps-aks"]
+    assert isinstance(aks, AKSWorkloadClusterConfig)
+    assert aks.slinky.operator_image is None
 
 
 def test_custom_images_config_defaults_to_dedicated_registry() -> None:

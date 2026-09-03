@@ -115,6 +115,7 @@ def test_slinky_deployment_config_preserves_published_defaults() -> None:
     assert config.operator_crds_chart_version == _SLINKY_CHART_VERSION
     assert config.operator_chart_version == _SLINKY_CHART_VERSION
     assert config.slurm_chart_version == _SLINKY_CHART_VERSION
+    assert config.chart_plain_http is False
     assert "image" not in _slurm_operator_values(config)["operator"]
     assert "image" not in _slurm_operator_values(config)["webhook"]
 
@@ -174,6 +175,14 @@ def test_slinky_image_requires_exactly_one_version_selector(
 ) -> None:
     with pytest.raises(ValueError, match="exactly one of tag or digest"):
         SlinkyImageConfig.model_validate(image)
+
+
+def test_plain_http_requires_oci_chart_source() -> None:
+    with pytest.raises(ValueError, match="oci://"):
+        SlinkyDeploymentConfig(
+            chart_oci_prefix="http://registry.example/charts",
+            chart_plain_http=True,
+        )
 
 
 def test_coredns_patch_pins_to_controller_node() -> None:

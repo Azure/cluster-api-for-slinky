@@ -27,7 +27,8 @@ sourceRef: 69ec3a40a818ccbc32b8ce88c84609404d8cb7a2
 
 The automated source-build path uses a ctlptl registry attached to the local
 management cluster. It requires Docker and Git. CAPZ artifact generation also
-requires Make and ORAS.
+requires Make and ORAS. Pulumi-managed Slinky chart builds require Make and
+Helm.
 
 ## CAPI
 
@@ -86,30 +87,88 @@ from the workload cluster nodes because kubelet pulls the operator and webhook
 images there. A single registry used for both purposes must be reachable from
 both environments.
 
-### Build and Publish
+### Local Pulumi-Managed Build
 
-From a slurm-operator checkout, build and publish both application images:
+The outer Pulumi stack can build the manager image, webhook image, and all three
+Slinky charts from one slurm-operator Git revision. Configure two targeted
+images and the chart source:
+
+```yaml
+ca4s-infra:customImages:
+  images:
+    slurm-operator:
+      sourcePath: /home/user/slurm-operator
+      sourceRef: HEAD
+      imageName: slurm-operator
+      target: manager
+    slurm-operator-webhook:
+      sourcePath: /home/user/slurm-operator
+      sourceRef: HEAD
+      imageName: slurm-operator-webhook
+      target: webhook
+ca4s-infra:slinkyCharts:
+  sourcePath: /home/user/slurm-operator
+  sourceRef: HEAD
+```
+
+`repositoryUrl` can replace `sourcePath`. Use the same `sourceRef` for both
+images and the charts. As with CAPZ builds, the source revision must be
+committed because builds use detached Git worktrees.
+
+When `slinkyCharts` is configured, both well-known custom images are required.
+CA4S also validates that `slurm-operator` uses the `manager` target and
+`slurm-operator-webhook` uses the `webhook` target, preventing a chart from
+referencing an image that was built from the wrong final stage.
+
+Pulumi performs the remaining wiring automatically for local workload clusters:
+
+1. The manager and webhook Dockerfile targets are built and pushed to the
+   ctlptl custom registry.
+1. The three charts are assigned a deterministic version derived from the Git
+   commit, packaged, and pushed to the same registry.
+1. The registry is exposed through a Service in the PKO namespace. The inner
+   Pulumi stack pulls charts through that Service using plain-HTTP OCI.
+1. CAPD nodes receive a containerd `hosts.toml` entry for
+   `custom-registry:5000`. Pulls are redirected to the registry's host-published
+   port through `host.docker.internal`, or through the Docker gateway on Linux.
+1. The resolved image references, chart source, and chart version are injected
+   into each local workload cluster's Slinky configuration.
+
+The local ctlptl registry intentionally uses unauthenticated plain HTTP and is
+for development environments only.
+
+No `slinky` block is required under the local workload cluster when using this
+automated path. Explicit values there remain useful for external registries or
+partial overrides.
+
+The local plain-HTTP path uses Pulumi's Helm v4 `Chart` resource because the
+Helm v3 `Release` resource does not expose a plain-HTTP OCI option. Resources
+are still awaited and dependency ordered, but they are managed directly by
+Pulumi rather than recorded as native Helm releases. Consequently, `helm list`
+does not show these three local chart deployments.
+
+After `pulumi up`, inspect the generated references:
+
+```bash
+pulumi stack output custom_image_refs -s <stack>
+pulumi stack output slinky_chart_oci_prefix -s <stack>
+pulumi stack output slinky_chart_version -s <stack>
+```
+
+### External Registry
+
+AKS and Azure BYO nodes cannot access the developer machine's ctlptl registry.
+Build and publish images and charts to a registry reachable from both PKO and
+the workload nodes, then add an explicit `slinky` block under the selected
+workload-cluster entry:
 
 ```bash
 docker build --target manager -t registry.example/slurm-operator:feature .
 docker build --target webhook -t registry.example/slurm-operator-webhook:feature .
 docker push registry.example/slurm-operator:feature
 docker push registry.example/slurm-operator-webhook:feature
-```
-
-To publish matching charts, use a valid semantic version and run the repository's
-version synchronization before packaging:
-
-```bash
 make REGISTRY=registry.example VERSION=1.3.0-dev.1 version-match push-charts
 ```
-
-This publishes `slurm-operator-crds`, `slurm-operator`, and `slurm` beneath
-`oci://registry.example/charts`.
-
-### Configure a Workload Cluster
-
-Add the override under the selected workload-cluster entry:
 
 ```yaml
 ca4s-infra:initStack:
@@ -166,6 +225,7 @@ kubectl -n slinky get deployment slurm-operator \
   -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 kubectl -n slinky get deployment slurm-operator-webhook \
   -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+# For external-registry deployments backed by Helm v3 Release:
 helm list -n slinky
 helm list -n slurm
 ```

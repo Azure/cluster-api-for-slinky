@@ -82,6 +82,15 @@ def _build_args_prop(props: dict) -> dict[str, str]:
     return {str(key): str(item) for key, item in value.items()}
 
 
+def _target_prop(props: dict) -> str | None:
+    value = props.get("target")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise RuntimeError("target must be a non-empty string")
+    return value
+
+
 def _resolve_source_commit(source_path: str, source_ref: str) -> str:
     return oci_object.resolve_source_commit(source_path, source_ref)
 
@@ -108,6 +117,7 @@ def _build_and_push_image(
     source_commit: str,
     host_image_ref: str,
     build_args: dict[str, str],
+    target: str | None,
 ) -> None:
     _require_binary("docker")
     _require_binary("git")
@@ -122,6 +132,8 @@ def _build_and_push_image(
         ]
         for key, value in sorted(build_args.items()):
             build_cmd.extend(["--build-arg", f"{key}={value}"])
+        if target is not None:
+            build_cmd.extend(["--target", target])
         build_cmd.extend(["-t", host_image_ref, worktree])
         _run(build_cmd)
         _run(["docker", "push", host_image_ref])
@@ -133,6 +145,7 @@ def _build_and_push_image(
 def _ensure_image(props: dict) -> dict[str, object]:
     image_name = _image_name_prop(props)
     build_args = _build_args_prop(props)
+    target = _target_prop(props)
 
     def build(source_path: str, source_commit: str, host_image_ref: str) -> None:
         _build_and_push_image(
@@ -140,6 +153,7 @@ def _ensure_image(props: dict) -> dict[str, object]:
             source_commit=source_commit,
             host_image_ref=host_image_ref,
             build_args=build_args,
+            target=target,
         )
 
     return oci_object.ensure_source_ref_object(
@@ -149,7 +163,7 @@ def _ensure_image(props: dict) -> dict[str, object]:
         object_tag_key="image_tag",
         host_ref_key="host_image_ref",
         cluster_ref_key="image_ref",
-        extra_outputs={"build_args": build_args},
+        extra_outputs={"build_args": build_args, "target": target},
         build=build,
         resolve_commit=_resolve_source_commit,
         probe_manifest=_manifest_exists,
@@ -182,6 +196,7 @@ class _CtlptlCustomRegistryImageProvider(ResourceProvider):
             "registry_name",
             "registry_port",
             "image_name",
+            "target",
             "build_args",
         )
         return DiffResult(changes=oci_object.has_diff(olds, news, keys))
@@ -218,6 +233,7 @@ class CtlptlCustomRegistryImage(Resource):
     source_commit: Output[str]
     image_name: Output[str]
     image_tag: Output[str]
+    target: Output[str | None]
     host_image_ref: Output[str]
     image_ref: Output[str]
     built: Output[bool]
@@ -232,6 +248,7 @@ class CtlptlCustomRegistryImage(Resource):
         source_path: Optional[Input[str]] = None,
         repository_url: Optional[Input[str]] = None,
         image_name: Optional[Input[str]] = None,
+        target: Optional[Input[str]] = None,
         build_args: Optional[Input[dict[str, Input[str]]]] = None,
         opts: Optional[ResourceOptions] = None,
     ):
@@ -245,6 +262,7 @@ class CtlptlCustomRegistryImage(Resource):
                 "registry_name": registry_name,
                 "registry_port": registry_port,
                 "image_name": image_name,
+                "target": target,
                 "build_args": build_args,
                 "source_commit": None,
                 "image_tag": None,

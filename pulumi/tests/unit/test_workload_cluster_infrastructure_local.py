@@ -19,8 +19,10 @@ from stacks.workload_cluster.workload_cluster_class_local import (
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_local import (
     _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
+    _containerd_custom_registry_commands,
     _node_registration,
 )
+from stacks.workload_cluster.registry_setting import LocalCustomRegistrySetting
 
 
 def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
@@ -75,3 +77,19 @@ def test_local_controller_worker_registration_adds_critical_addons_taint() -> No
         "name": "node-labels",
         "value": "slinky.slurm.net/node-type=controller",
     }
+
+
+def test_custom_registry_redirects_logical_name_to_host_port() -> None:
+    commands = _containerd_custom_registry_commands(
+        LocalCustomRegistrySetting(
+            registry_name="custom-registry",
+            port=5003,
+        )
+    )
+
+    assert commands[0] == (
+        "mkdir -p /etc/containerd/certs.d/custom-registry:5000"
+    )
+    assert 'server = "http://custom-registry:5000"' in commands[1]
+    assert '[host."http://${_CA4S_REGISTRY_HOST}:5003"]' in commands[1]
+    assert commands[-1] == "systemctl restart containerd"

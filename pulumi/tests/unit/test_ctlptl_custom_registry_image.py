@@ -87,6 +87,7 @@ def test_create_builds_and_pushes_when_source_image_is_missing(
             "source_commit": _SOURCE_COMMIT,
             "host_image_ref": "localhost:5002/capz/controller:source-1234567890ab",
             "build_args": {"ARCH": "amd64"},
+            "target": None,
         }
     ]
 
@@ -162,6 +163,7 @@ def test_build_and_push_uses_detached_git_worktree(
         source_commit=_SOURCE_COMMIT,
         host_image_ref="localhost:5002/capz/controller:source-1234567890ab",
         build_args={"ARCH": "amd64"},
+        target="manager",
     )
 
     assert calls == [
@@ -180,6 +182,8 @@ def test_build_and_push_uses_detached_git_worktree(
             "build",
             "--build-arg",
             "ARCH=amd64",
+            "--target",
+            "manager",
             "-t",
             "localhost:5002/capz/controller:source-1234567890ab",
             "/tmp/worktree",

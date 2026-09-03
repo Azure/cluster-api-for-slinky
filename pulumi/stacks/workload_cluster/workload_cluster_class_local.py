@@ -11,7 +11,10 @@ import pulumi
 from pydantic import BaseModel, ConfigDict, field_serializer
 
 from lib.config import PulumiConfigModel
-from stacks.workload_cluster.registry_setting import RegistryConfig
+from stacks.workload_cluster.registry_setting import (
+    LocalCustomRegistrySetting,
+    RegistryConfig,
+)
 
 from stacks.workload_cluster.workload_cluster_deployments import (
     KEDAOutputs,
@@ -58,6 +61,7 @@ _LOCAL_KEDA_SCALED_NODE_SETS = (
 class LocalWorkloadClusterConfig(PulumiConfigModel):
     class_name: Literal["local"] = _CLUSTER_CLASS
     registry: RegistryConfig | None = None
+    custom_registry: LocalCustomRegistrySetting | None = None
     slinky: SlinkyDeploymentConfig = SlinkyDeploymentConfig()
 
     @field_serializer("class_name")
@@ -132,6 +136,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             instance=instance,
             worker_machine_deployments=machine_deployments,
             registry=config.registry,
+            custom_registry=config.custom_registry,
             opts=child_options(),
         )
         deployments = WorkloadClusterDeployments(
