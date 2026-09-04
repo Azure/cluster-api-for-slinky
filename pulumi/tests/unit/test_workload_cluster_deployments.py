@@ -19,6 +19,7 @@ from stacks.workload_cluster.workload_cluster_deployments import (
     _slurm_operator_values,
     _slurm_nodeset_name,
     _slurm_nodeset_values,
+    _slurm_values,
     SlinkyDeploymentConfig,
     SlinkyImageConfig,
     SlurmNodeSetSpec,
@@ -215,6 +216,14 @@ def test_slurm_nodeset_values_pin_pods_to_initial_node() -> None:
         "values": ["compute"],
     }
     assert "podAntiAffinity" not in values["podSpec"]["affinity"]
+
+
+def test_slurm_values_use_container_compatible_cgroups() -> None:
+    values = _slurm_values(())
+
+    assert values["configFiles"]["cgroup.conf"] == (
+        "CgroupPlugin=cgroup/v2\nIgnoreSystemd=yes\n"
+    )
 
 
 def test_slinky_chart_supports_nodeset_oversubscription_control() -> None:

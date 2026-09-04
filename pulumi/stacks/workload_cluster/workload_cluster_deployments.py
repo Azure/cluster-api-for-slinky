@@ -310,7 +310,7 @@ def _slurm_values(
 ) -> dict[str, object]:
     return {
         "configFiles": {
-            "cgroup.conf": "CgroupPlugin=disabled\n",
+            "cgroup.conf": "CgroupPlugin=cgroup/v2\nIgnoreSystemd=yes\n",
         },
         "controller": {
             "logfile": {
