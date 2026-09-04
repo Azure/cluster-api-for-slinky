@@ -4,15 +4,16 @@ Kubernetes-native declarative infrastructure for [Slinky](https://github.com/Sli
 
 ## What is Cluster API for Slinky (CA4S)
 
-The [Cluster API](https://github.com/kubernetes-sigs/cluster-api) (CAPI) brings declarative, Kubernetes-style APIs to cluster creation, configuration and management.
+[Cluster API](https://github.com/kubernetes-sigs/cluster-api) (CAPI) brings declarative, Kubernetes-style APIs to Kubernetes cluster creation, configuration and management.
 
-CA4S enables efficient management at scale of Slinky-based converged Slurm and Kubernetes clusters, with the nodes dual-managed by both Ansible AWX for Slurm workloads and CAPI providers (Cluster API Provider Docker/Azure/vCluster/etc.) for containerized workloads on Kubernetes, with slurm-bridge bridging Slurm and Kubernetes for fair-share scheduling across both orchestrators.
+Built on top of [Cluster API](https://github.com/kubernetes-sigs/cluster-api), [Slinky](https://github.com/SlinkyProject) and [Pulumi](https://www.pulumi.com/), CA4S enables efficient and GitOps-centric creation and management of Slinky-based converged Slurm and Kubernetes clusters at scale, in an environment of your choice, including but not limited to your local machine and cloud.
 
 ![CA4S architecture](docs/images/architecture.svg)
 
 ## Getting started
 
-Currently only local clusters powered by Cluster API Provider Docker (CAPD) is supported.
+CA4S currently supports local clusters powered by [Cluster API Provider Docker (CAPD)](https://github.com/kubernetes-sigs/cluster-api/tree/main/test/infrastructure/docker) and
+Azure clusters powered by [Cluster API Provider Azure (CAPZ)](https://github.com/kubernetes-sigs/cluster-api-provider-azure). The following instructions cover the setup of a local-only CAPD cluster. See [Azure deployment notes](docs/azure.md) for Azure-specific configuration.
 
 ### Prerequisites
 
@@ -213,32 +214,6 @@ LOGIN_POD=$(kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm \
   -o jsonpath='{.items[0].metadata.name}')
 kubectl --kubeconfig "$WORKLOAD_KUBECONFIG" -n slurm exec -it "$LOGIN_POD" -- sinfo
 ```
-
-### Reuse The Host Resource Group
-
-AKS and Azure BYO workload parameters accept `useDiscoveredResourceGroup`:
-
-```yaml
-tenants:
-  workloadClusters:
-    caps-self:
-      className: azure-byo # or aks
-      parameters:
-        useDiscoveredResourceGroup: true
-```
-
-When enabled, host-side Azure IMDS discovery selects the resource group that
-contains the VM running Docker and the Kind management cluster. The discovered
-resource group must belong to the workload subscription, but its own location
-does not constrain the locations of resources placed in it. Azure BYO then
-references that existing group instead of registering a new Pulumi-owned resource
-group. AKS uses it as the managed cluster resource group; Azure still creates and
-manages the separate `MC_*` node resource group.
-
-CAPZ treats an untagged pre-existing resource group as unmanaged: deleting the
-workload cluster deletes its cluster resources individually but preserves the
-host resource group and Kind host VM. Do not apply CAPZ's cluster ownership tag
-to the shared group.
 
 ### Autoscaling
 
