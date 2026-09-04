@@ -3,6 +3,10 @@
 
 from __future__ import annotations
 
+import base64
+
+import yaml
+
 from stacks.kubernetes_annotations import (
     DELETE_PROPAGATION_FOREGROUND,
     PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION,
@@ -19,9 +23,11 @@ from stacks.workload_cluster.workload_cluster_class_local import (
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_local import (
     _NODE_UNHEALTHY_TIMEOUT_SECONDS,
+    _SERVICE_ACCOUNT_TOKEN_PATH,
     _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
     _containerd_custom_registry_commands,
     _health_check,
+    _management_kubeconfig,
     _node_registration,
 )
 from stacks.workload_cluster.registry_setting import LocalCustomRegistrySetting
@@ -56,6 +62,32 @@ def test_local_health_check_allows_initial_addon_convergence() -> None:
                 {"type": "Ready", "status": "Unknown", "timeoutSeconds": 900},
                 {"type": "Ready", "status": "False", "timeoutSeconds": 900},
             ]
+        }
+    }
+
+
+def test_management_kubeconfig_reads_current_service_account_token() -> None:
+    kubeconfig = yaml.safe_load(
+        _management_kubeconfig("https://10.96.0.1:443", "test-ca")
+    )
+
+    assert kubeconfig["clusters"][0]["cluster"] == {
+        "server": "https://10.96.0.1:443",
+        "certificate-authority-data": base64.b64encode(b"test-ca").decode(),
+    }
+    assert kubeconfig["users"][0]["user"] == {
+        "exec": {
+            "apiVersion": "client.authentication.k8s.io/v1",
+            "command": "/bin/sh",
+            "args": [
+                "-c",
+                (
+                    "printf '{\"apiVersion\":\"client.authentication.k8s.io/v1\","
+                    "\"kind\":\"ExecCredential\",\"status\":{\"token\":\"%s\"}}\\n' "
+                    f'"$(cat {_SERVICE_ACCOUNT_TOKEN_PATH})"'
+                ),
+            ],
+            "interactiveMode": "Never",
         }
     }
 

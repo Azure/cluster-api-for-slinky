@@ -586,54 +586,64 @@ class ManagementKubeconfig(pulumi.ComponentResource):
         host = os.environ["KUBERNETES_SERVICE_HOST"]
         port = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
         server = f"https://{host}:{port}"
-        token_file = local.get_sensitive_file_output(
-            filename=_SERVICE_ACCOUNT_TOKEN_PATH,
-            opts=pulumi.InvokeOutputOptions(parent=self),
-        )
         ca_file = local.get_file_output(
             filename=_SERVICE_ACCOUNT_CA_PATH,
             opts=pulumi.InvokeOutputOptions(parent=self),
         )
 
-        def build(args: list[str]) -> str:
-            token, ca = args
-            ca_data = base64.b64encode(ca.encode("utf-8")).decode("ascii")
-            return yaml.safe_dump(
-                {
-                    "apiVersion": "v1",
-                    "kind": "Config",
-                    "clusters": [
-                        {
-                            "name": "management",
-                            "cluster": {
-                                "server": server,
-                                "certificate-authority-data": ca_data,
-                            },
-                        }
-                    ],
-                    "contexts": [
-                        {
-                            "name": "management",
-                            "context": {
-                                "cluster": "management",
-                                "user": "pulumi-runner",
-                            },
-                        }
-                    ],
-                    "current-context": "management",
-                    "users": [
-                        {
-                            "name": "pulumi-runner",
-                            "user": {"token": token.strip()},
-                        }
-                    ],
-                },
-                sort_keys=False,
-            )
-
         return pulumi.Output.secret(
-            pulumi.Output.all(token_file.content, ca_file.content).apply(build)
+            ca_file.content.apply(lambda ca: _management_kubeconfig(server, ca))
         )
+
+
+def _management_kubeconfig(server: str, ca: str) -> str:
+    ca_data = base64.b64encode(ca.encode("utf-8")).decode("ascii")
+    return yaml.safe_dump(
+        {
+            "apiVersion": "v1",
+            "kind": "Config",
+            "clusters": [
+                {
+                    "name": "management",
+                    "cluster": {
+                        "server": server,
+                        "certificate-authority-data": ca_data,
+                    },
+                }
+            ],
+            "contexts": [
+                {
+                    "name": "management",
+                    "context": {
+                        "cluster": "management",
+                        "user": "pulumi-runner",
+                    },
+                }
+            ],
+            "current-context": "management",
+            "users": [
+                {
+                    "name": "pulumi-runner",
+                    "user": {
+                        "exec": {
+                            "apiVersion": "client.authentication.k8s.io/v1",
+                            "command": "/bin/sh",
+                            "args": [
+                                "-c",
+                                (
+                                    "printf '{\"apiVersion\":\"client.authentication.k8s.io/v1\","
+                                    "\"kind\":\"ExecCredential\",\"status\":{\"token\":\"%s\"}}\\n' "
+                                    f'"$(cat {_SERVICE_ACCOUNT_TOKEN_PATH})"'
+                                ),
+                            ],
+                            "interactiveMode": "Never",
+                        }
+                    },
+                }
+            ],
+        },
+        sort_keys=False,
+    )
 
 
 def _decode_secret_data_value(data: Mapping[str, str], key: str) -> str:
