@@ -95,6 +95,7 @@ _DOCKER_IO_SERVER = "https://registry-1.docker.io"
 _DOCKER_HUB_PUBLIC_MIRROR = "https://mirror.gcr.io"
 _DOCKER_DESKTOP_HOST = "host.docker.internal"
 _CONTAINERD_CERTS_DIR = "/etc/containerd/certs.d"
+_NODE_UNHEALTHY_TIMEOUT_SECONDS = 900
 
 
 class LocalMachineDeploymentSpec(PulumiConfigModel):
@@ -195,8 +196,16 @@ def _health_check() -> dict[str, object]:
     return {
         "checks": {
             "unhealthyNodeConditions": [
-                {"type": "Ready", "status": "Unknown", "timeoutSeconds": 300},
-                {"type": "Ready", "status": "False", "timeoutSeconds": 300},
+                {
+                    "type": "Ready",
+                    "status": "Unknown",
+                    "timeoutSeconds": _NODE_UNHEALTHY_TIMEOUT_SECONDS,
+                },
+                {
+                    "type": "Ready",
+                    "status": "False",
+                    "timeoutSeconds": _NODE_UNHEALTHY_TIMEOUT_SECONDS,
+                },
             ],
         },
     }

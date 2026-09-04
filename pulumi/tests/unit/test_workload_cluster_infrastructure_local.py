@@ -18,8 +18,10 @@ from stacks.workload_cluster.workload_cluster_class_local import (
     _LOCAL_MACHINE_DEPLOYMENTS,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_local import (
+    _NODE_UNHEALTHY_TIMEOUT_SECONDS,
     _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
     _containerd_custom_registry_commands,
+    _health_check,
     _node_registration,
 )
 from stacks.workload_cluster.registry_setting import LocalCustomRegistrySetting
@@ -44,6 +46,18 @@ def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
 
 def test_v1beta1_cluster_wait_uses_legacy_control_plane_condition() -> None:
     assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneReady"
+
+
+def test_local_health_check_allows_initial_addon_convergence() -> None:
+    assert _NODE_UNHEALTHY_TIMEOUT_SECONDS == 900
+    assert _health_check() == {
+        "checks": {
+            "unhealthyNodeConditions": [
+                {"type": "Ready", "status": "Unknown", "timeoutSeconds": 900},
+                {"type": "Ready", "status": "False", "timeoutSeconds": 900},
+            ]
+        }
+    }
 
 
 def test_local_topology_has_fixed_head_and_autoscaled_compute_deployments() -> None:
