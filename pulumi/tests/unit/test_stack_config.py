@@ -119,6 +119,21 @@ def test_slinky_charts_config_accepts_local_source() -> None:
     assert config.source_ref == "feature/slinky"
 
 
+def test_slinky_charts_config_accepts_remote_git_source() -> None:
+    config = SlinkyChartsConfig.model_validate(
+        {
+            "repositoryUrl": "https://github.com/SlinkyProject/slurm-operator.git",
+            "sourceRef": "ee37d5aaccacca2a2fddb9bd0581e6f8004d4ece",
+        }
+    )
+
+    assert config.source_path is None
+    assert config.repository_url == (
+        "https://github.com/SlinkyProject/slurm-operator.git"
+    )
+    assert config.source_ref == "ee37d5aaccacca2a2fddb9bd0581e6f8004d4ece"
+
+
 def test_slinky_custom_images_require_expected_targets() -> None:
     with pytest.raises(ValueError, match="requires target 'manager'"):
         CustomImagesConfig.model_validate(

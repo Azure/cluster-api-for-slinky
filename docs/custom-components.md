@@ -115,6 +115,31 @@ ca4s-infra:slinkyCharts:
 images and the charts. As with CAPZ builds, the source revision must be
 committed because builds use detached Git worktrees.
 
+For a portable, committable stack configuration, use the public repository and
+pin all artifacts to the same immutable commit SHA:
+
+```yaml
+ca4s-infra:customImages:
+  images:
+    slurm-operator:
+      repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+      sourceRef: ee37d5aaccacca2a2fddb9bd0581e6f8004d4ece
+      imageName: slurm-operator
+      target: manager
+    slurm-operator-webhook:
+      repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+      sourceRef: ee37d5aaccacca2a2fddb9bd0581e6f8004d4ece
+      imageName: slurm-operator-webhook
+      target: webhook
+ca4s-infra:slinkyCharts:
+  repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+  sourceRef: ee37d5aaccacca2a2fddb9bd0581e6f8004d4ece
+```
+
+GitHub pull request refs such as `refs/pull/255/head` also work, but they are
+mutable. Prefer a full commit SHA when the stack file is intended to reproduce
+an exact build.
+
 When `slinkyCharts` is configured, both well-known custom images are required.
 CA4S also validates that `slurm-operator` uses the `manager` target and
 `slurm-operator-webhook` uses the `webhook` target, preventing a chart from
