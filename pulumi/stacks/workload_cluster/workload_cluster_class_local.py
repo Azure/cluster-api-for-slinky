@@ -93,6 +93,8 @@ class LocalWorkloadClusterOutputs(BaseModel):
     slurm_operator_status: Any
     slurm_chart_version: str
     slurm_status: Any
+    slurm_bridge_chart_version: str
+    slurm_bridge_status: Any
     todo: str
 
 
@@ -181,6 +183,8 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             "slurm_operator_status": deployments.slurm_operator_status,
             "slurm_chart_version": config.slinky.slurm_chart_version,
             "slurm_status": deployments.slurm_status,
+            "slurm_bridge_chart_version": deployments.slurm_bridge_chart_version,
+            "slurm_bridge_status": deployments.slurm_bridge_status,
             "todo": pulumi.Output.from_input(
                 "Wire workload-driven autoscaling and tenant-facing Slurm operations."
             ),

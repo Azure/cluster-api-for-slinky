@@ -143,6 +143,8 @@ class AzureBYOWorkloadClusterOutputs(BaseModel):
     slurm_operator_status: Any
     slurm_chart_version: str
     slurm_status: Any
+    slurm_bridge_chart_version: str
+    slurm_bridge_status: Any
     workload_cluster_ready: bool
     todo: str
 
@@ -371,6 +373,8 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             "slurm_operator_status": deployments.slurm_operator_status,
             "slurm_chart_version": config.slinky.slurm_chart_version,
             "slurm_status": deployments.slurm_status,
+            "slurm_bridge_chart_version": deployments.slurm_bridge_chart_version,
+            "slurm_bridge_status": deployments.slurm_bridge_status,
             "workload_cluster_ready": pulumi.Output.all(
                 infrastructure.workload_cluster_ready,
                 deployments.workload_cluster_ready,

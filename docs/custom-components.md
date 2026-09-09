@@ -202,6 +202,17 @@ are still awaited and dependency ordered, but they are managed directly by
 Pulumi rather than recorded as native Helm releases. Consequently, `helm list`
 does not show these three local chart deployments.
 
+Every workload cluster also installs `slurm-bridge` chart `1.2.2`. CA4S creates
+a `Token` backed by the Slurm chart's `slurm-auth-jwt` key, uses the generated
+`slurm-bridge-token` Secret, and targets the `compute` Slurm partition. Bridge
+admission, controller, and scheduler pods run on controller nodes. Slurm
+NodeSet pods tolerate the bridge's `slinky.slurm.net/managed-node` `NoExecute`
+taint so the bridge can co-schedule Kubernetes workloads on mapped Slurm nodes
+without evicting `slurmd`.
+
+MCS isolation is not configured yet. Bridge workloads must remain exclusive
+until Slurm MCS configuration is added.
+
 After `pulumi up`, inspect the generated references:
 
 ```bash

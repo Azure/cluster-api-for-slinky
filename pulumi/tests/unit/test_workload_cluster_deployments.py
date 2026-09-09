@@ -17,6 +17,9 @@ from stacks.workload_cluster.workload_cluster_deployments import (
     _prometheus_values,
     _SLINKY_CHART_VERSION,
     _slurm_operator_values,
+    _slurm_bridge_token_spec,
+    _slurm_bridge_toleration,
+    _slurm_bridge_values,
     _slurm_nodeset_name,
     _slurm_nodeset_values,
     _slurm_values,
@@ -216,6 +219,30 @@ def test_slurm_nodeset_values_pin_pods_to_initial_node() -> None:
         "values": ["compute"],
     }
     assert "podAntiAffinity" not in values["podSpec"]["affinity"]
+    assert values["podSpec"]["tolerations"] == [_slurm_bridge_toleration()]
+
+
+def test_slurm_bridge_uses_compute_partition_and_controller_placement() -> None:
+    values = _slurm_bridge_values()
+    placement = controller_pod_spec()
+
+    assert values == {
+        "schedulerConfig": {"partition": "compute"},
+        "sharedConfig": {"slurmJwtSecret": "slurm-bridge-token"},
+        "admission": placement,
+        "controllers": placement,
+        "scheduler": placement,
+    }
+
+
+def test_slurm_bridge_token_uses_slurm_chart_jwt_key() -> None:
+    assert _slurm_bridge_token_spec() == {
+        "jwtKeyRef": {"name": "slurm-auth-jwt", "key": "jwt.key"},
+        "secretRef": {"name": "slurm-bridge-token", "key": "auth-token"},
+        "username": "slurm",
+        "refresh": True,
+        "lifetime": "8760h",
+    }
 
 
 def test_slurm_values_use_container_compatible_cgroups() -> None:
