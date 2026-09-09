@@ -50,6 +50,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     ClusterAPIAutoscalerOutputs,
     CONTROLLER_NODE_TYPE,
     NODE_TYPE_LABEL,
+    calico_typha_deployment,
     controller_bootstrap_tolerations,
     controller_node_affinity,
     controller_node_selector,
@@ -282,6 +283,7 @@ def _calico_values() -> dict[str, object]:
         "installation": {
             "controlPlaneNodeSelector": controller_node_selector(),
             "controlPlaneTolerations": controller_tolerations(),
+            "typhaDeployment": calico_typha_deployment(),
             "calicoNetwork": {
                 "ipPools": [
                     {

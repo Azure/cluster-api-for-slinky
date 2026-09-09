@@ -16,6 +16,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
     AUTOSCALER_MIN_ANNOTATION,
     CONTROLLER_NODE_TYPE,
+    calico_typha_deployment,
     controller_taint,
 )
 from stacks.workload_cluster.workload_cluster_class_local import (
@@ -25,6 +26,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_local import (
     _NODE_UNHEALTHY_TIMEOUT_SECONDS,
     _SERVICE_ACCOUNT_TOKEN_PATH,
     _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
+    _calico_values,
     _containerd_registry_commands,
     _health_check,
     _management_kubeconfig,
@@ -127,6 +129,14 @@ def test_local_controller_worker_registration_adds_critical_addons_taint() -> No
         "name": "node-labels",
         "value": "slinky.slurm.net/node-type=controller",
     }
+
+
+def test_local_calico_pins_typha_to_controller_nodes() -> None:
+    values = _calico_values()
+
+    assert values["installation"][
+        "typhaDeployment"
+    ] == calico_typha_deployment()
 
 
 def test_registries_redirect_logical_names_to_host_ports() -> None:

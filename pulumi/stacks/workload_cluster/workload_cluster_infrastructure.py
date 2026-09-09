@@ -102,6 +102,19 @@ def controller_pod_spec() -> dict[str, object]:
     }
 
 
+def calico_typha_deployment() -> dict[str, object]:
+    return {
+        "spec": {
+            "template": {
+                "spec": {
+                    "nodeSelector": controller_node_selector(),
+                    "tolerations": controller_tolerations(),
+                }
+            }
+        }
+    }
+
+
 def _resource_name(tenant: str, suffix: str) -> str:
     normalized = _DNS_LABEL_INVALID_CHARS.sub("-", tenant.lower()).strip("-")
     if not normalized:
