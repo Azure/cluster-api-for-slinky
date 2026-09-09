@@ -153,11 +153,41 @@ Pulumi performs the remaining wiring automatically for local workload clusters:
    commit, packaged, and pushed to the same registry.
 1. The registry is exposed through a Service in the PKO namespace. The inner
    Pulumi stack pulls charts through that Service using plain-HTTP OCI.
-1. CAPD nodes receive a containerd `hosts.toml` entry for
-   `custom-registry:5000`. Pulls are redirected to the registry's host-published
-   port through `host.docker.internal`, or through the Docker gateway on Linux.
+1. CAPD nodes receive one containerd `hosts.toml` entry per configured local
+  registry. Pulls are redirected to each registry's host-published port through
+  `host.docker.internal`, or through the Docker gateway on Linux.
 1. The resolved image references, chart source, and chart version are injected
    into each local workload cluster's Slinky configuration.
+
+The outer stack forwards registry routes to each local workload cluster as one
+`registries` list. Each entry identifies the containerd registry namespace and
+carries a typed representation of its `hosts.toml` configuration:
+
+```yaml
+registries:
+  - registry: docker.io
+    config:
+      server: https://registry-1.docker.io
+      hosts:
+        - gatewayPort: 5002
+  - registry: custom-registry:5000
+    config:
+      server: http://custom-registry:5000
+      hosts:
+        - gatewayPort: 5003
+          capabilities: [pull, resolve]
+```
+
+The outer stack decides what each route means: the `docker.io` entry points at
+the pull-through cache, while the named custom entry points at the writable
+artifact registry. The workload stack only renders the supplied containerd
+configuration. Each host supports `http` or `https` and any non-empty,
+non-duplicated combination of `pull`, `resolve`, and `push` capabilities;
+defaults are `http` and `[pull, resolve]`.
+
+Bootstrap discovers the Docker gateway once, writes all registry host
+configurations, and restarts containerd once. An empty `registries` list writes
+no containerd registry override.
 
 The local ctlptl registry intentionally uses unauthenticated plain HTTP and is
 for development environments only.

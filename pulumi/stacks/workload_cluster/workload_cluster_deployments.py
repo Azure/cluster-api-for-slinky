@@ -604,6 +604,9 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 retain_on_delete=True,
             ),
         )
+        # TODO: Unify on Helm v4 once Pulumi ships a production Release resource
+        # with plain-HTTP OCI support, atomic cleanup, job waits, timeouts, and
+        # release status. The current v4 Chart only renders and manages manifests.
         if slinky.chart_plain_http:
             slurm_operator_crds = k8s.helm.v4.Chart(
                 "slurm-operator-crds",

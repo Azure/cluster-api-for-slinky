@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-import subprocess
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 import pytest
 
@@ -79,7 +80,19 @@ def test_build_packages_and_pushes_all_charts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[tuple[list[str], str | None, bool]] = []
-    removed: list[str] = []
+
+    @contextmanager
+    def fake_worktree(
+        repository_path: str,
+        source_commit: str,
+        *,
+        prefix: str,
+    ) -> Iterator[str]:
+        assert repository_path == "/src/slurm-operator"
+        assert source_commit == _SOURCE_COMMIT
+        assert prefix == "ca4s-slinky-charts-"
+        yield "/tmp/slinky-worktree"
+
     monkeypatch.setattr(
         helm_charts.oci_object,
         "require_binary",
@@ -88,22 +101,14 @@ def test_build_packages_and_pushes_all_charts(
     monkeypatch.setattr(
         helm_charts.oci_object,
         "run",
-        lambda cmd, cwd=None, check=True: (
-            calls.append((cmd, cwd, check))
-            or subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
-        ),
+        lambda cmd, cwd=None, check=True: calls.append((cmd, cwd, check)),
     )
     monkeypatch.setattr(
-        helm_charts.tempfile,
-        "mkdtemp",
-        lambda prefix: "/tmp/slinky-worktree",
+        helm_charts.oci_object,
+        "detached_worktree",
+        fake_worktree,
     )
     monkeypatch.setattr(helm_charts.Path, "mkdir", lambda self: None)
-    monkeypatch.setattr(
-        helm_charts.shutil,
-        "rmtree",
-        lambda path, ignore_errors=False: removed.append(path),
-    )
 
     helm_charts._build_and_push_charts(
         source_path="/src/slurm-operator",
@@ -113,20 +118,6 @@ def test_build_packages_and_pushes_all_charts(
     )
 
     assert calls[0] == (
-        [
-            "git",
-            "-C",
-            "/src/slurm-operator",
-            "worktree",
-            "add",
-            "--detach",
-            "/tmp/slinky-worktree",
-            _SOURCE_COMMIT,
-        ],
-        None,
-        True,
-    )
-    assert calls[1] == (
         ["make", f"VERSION={_CHART_VERSION}", "version-match"],
         "/tmp/slinky-worktree",
         True,
@@ -136,17 +127,3 @@ def test_build_packages_and_pushes_all_charts(
     assert len(package_calls) == 3
     assert len(push_calls) == 3
     assert all("--plain-http" in call[0] for call in push_calls)
-    assert calls[-1] == (
-        [
-            "git",
-            "-C",
-            "/src/slurm-operator",
-            "worktree",
-            "remove",
-            "--force",
-            "/tmp/slinky-worktree",
-        ],
-        None,
-        False,
-    )
-    assert removed == ["/tmp/slinky-worktree"]

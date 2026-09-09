@@ -5,9 +5,7 @@
 
 from __future__ import annotations
 
-import shutil
 import sys
-import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -53,23 +51,13 @@ def _build_and_push_charts(
     chart_version: str,
 ) -> None:
     helm = oci_object.require_binary("helm")
-    oci_object.require_binary("git")
     oci_object.require_binary("make")
-    worktree = tempfile.mkdtemp(prefix="ca4s-slinky-charts-")
-    output_dir = Path(worktree) / "dist"
-    try:
-        oci_object.run(
-            [
-                "git",
-                "-C",
-                source_path,
-                "worktree",
-                "add",
-                "--detach",
-                worktree,
-                source_commit,
-            ]
-        )
+    with oci_object.detached_worktree(
+        source_path,
+        source_commit,
+        prefix="ca4s-slinky-charts-",
+    ) as worktree:
+        output_dir = Path(worktree) / "dist"
         oci_object.run(
             ["make", f"VERSION={chart_version}", "version-match"],
             cwd=worktree,
@@ -99,12 +87,6 @@ def _build_and_push_charts(
                 ],
                 cwd=worktree,
             )
-    finally:
-        oci_object.run(
-            ["git", "-C", source_path, "worktree", "remove", "--force", worktree],
-            check=False,
-        )
-        shutil.rmtree(worktree, ignore_errors=True)
 
 
 def _ensure_charts(props: dict) -> dict[str, object]:

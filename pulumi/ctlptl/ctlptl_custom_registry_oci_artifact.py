@@ -1,16 +1,13 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Pulumi dynamic resource: build a CAPZ OCI artifact into a local registry."""
+"""Pulumi dynamic resource: build a CAPZ provider artifact into a local registry."""
 
 from __future__ import annotations
 
-import shutil
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from pulumi import Input, Output, ResourceOptions
 from pulumi.dynamic import (
@@ -27,44 +24,6 @@ from ctlptl import ctlptl_custom_registry_oci_object as oci_object
 
 _DEFAULT_ARTIFACT_NAME = "capz/cluster-api-provider-azure"
 _DEFAULT_FILES = ("metadata.yaml", "infrastructure-components.yaml")
-
-
-def _require_binary(name: str) -> str:
-    path = shutil.which(name)
-    if path is None:
-        raise RuntimeError(
-            f"required binary '{name}' not found in PATH; install it before running pulumi"
-        )
-    return path
-
-
-def _run(
-    cmd: List[str],
-    *,
-    cwd: Optional[str] = None,
-    check: bool = True,
-) -> subprocess.CompletedProcess:
-    result = subprocess.run(
-        cmd,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-    )
-    if check and result.returncode != 0:
-        raise RuntimeError(
-            f"command {cmd!r} failed with exit code {result.returncode}\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}"
-        )
-    return result
-
-
-def _required_str(props: dict, name: str) -> str:
-    return oci_object.required_str(props, name)
-
-
-def _required_int(props: dict, name: str) -> int:
-    return oci_object.required_int(props, name)
 
 
 def _artifact_name_prop(props: dict) -> str:
@@ -94,14 +53,6 @@ def _artifact_tag(source_commit: str) -> str:
     return oci_object.source_tag(source_commit)
 
 
-def _host_artifact_ref(registry_port: int, artifact_name: str, artifact_tag: str) -> str:
-    return oci_object.host_ref(registry_port, artifact_name, artifact_tag)
-
-
-def _cluster_artifact_ref(registry_name: str, artifact_name: str, artifact_tag: str) -> str:
-    return oci_object.cluster_ref(registry_name, artifact_name, artifact_tag)
-
-
 def _manifest_exists(registry_port: int, artifact_name: str, artifact_tag: str) -> bool:
     return oci_object.manifest_exists(registry_port, artifact_name, artifact_tag)
 
@@ -113,23 +64,25 @@ def _build_and_push_artifact(
     host_artifact_ref: str,
     artifact_files: list[str],
 ) -> None:
-    _require_binary("git")
-    _require_binary("make")
-    _require_binary("oras")
-    worktree = tempfile.mkdtemp(prefix="ca4s-artifact-")
-    try:
-        _run(
-            ["git", "-C", source_path, "worktree", "add", "--detach", worktree, source_commit]
+    oci_object.require_binary("make")
+    oci_object.require_binary("oras")
+    with oci_object.detached_worktree(
+        source_path,
+        source_commit,
+        prefix="ca4s-capz-artifact-",
+    ) as worktree:
+        oci_object.run(
+            ["make", "release-manifests", "release-metadata"],
+            cwd=worktree,
         )
-        _run(["make", "release-manifests", "release-metadata"], cwd=worktree)
         out_dir = Path(worktree) / "out"
         missing = [item for item in artifact_files if not (out_dir / item).is_file()]
         if missing:
             raise RuntimeError(f"CAPZ release artifact generation did not produce {missing!r}")
-        _run(["oras", "push", "--plain-http", host_artifact_ref, *artifact_files], cwd=str(out_dir))
-    finally:
-        _run(["git", "-C", source_path, "worktree", "remove", "--force", worktree], check=False)
-        shutil.rmtree(worktree, ignore_errors=True)
+        oci_object.run(
+            ["oras", "push", "--plain-http", host_artifact_ref, *artifact_files],
+            cwd=str(out_dir),
+        )
 
 
 def _ensure_artifact(props: dict) -> dict[str, object]:
@@ -193,7 +146,7 @@ class _CtlptlCustomRegistryOCIArtifactProvider(ResourceProvider):
 
     def read(self, id_: str, props: dict) -> ReadResult:
         try:
-            registry_port = _required_int(props, "registry_port")
+            registry_port = oci_object.required_int(props, "registry_port")
             artifact_name = _artifact_name_prop(props)
             source_commit = oci_object.source_commit_for_read(
                 props,

@@ -25,8 +25,10 @@ needed.
 from __future__ import annotations
 
 import base64
+import json
 import os
 import re
+import shlex
 import urllib.request
 from typing import Any, Mapping
 
@@ -40,10 +42,7 @@ from stacks.kubernetes_annotations import (
     foreground_delete_annotations,
     pulumi_wait_for,
 )
-from stacks.workload_cluster.registry_setting import (
-    LocalCustomRegistrySetting,
-    RegistryConfig,
-)
+from stacks.workload_cluster.registry_setting import LocalRegistryConfig
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
     AUTOSCALER_MIN_ANNOTATION,
@@ -90,9 +89,6 @@ _WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneReady"
 _SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
-_DOCKER_IO_HOSTS_DIR = "/etc/containerd/certs.d/docker.io"
-_DOCKER_IO_SERVER = "https://registry-1.docker.io"
-_DOCKER_HUB_PUBLIC_MIRROR = "https://mirror.gcr.io"
 _DOCKER_DESKTOP_HOST = "host.docker.internal"
 _CONTAINERD_CERTS_DIR = "/etc/containerd/certs.d"
 _NODE_UNHEALTHY_TIMEOUT_SECONDS = 900
@@ -117,53 +113,35 @@ def _autoscaler_annotations(
     }
 
 
-def _containerd_docker_io_mirror_commands(
-    registry_setting: RegistryConfig | None,
+def _containerd_registry_commands(
+    registry_configs: tuple[LocalRegistryConfig, ...],
 ) -> list[str]:
-    if registry_setting is None:
-        hosts_toml = (
-            f'server = "{_DOCKER_IO_SERVER}"\n\n'
-            f'[host."{_DOCKER_HUB_PUBLIC_MIRROR}"]\n'
-            '  capabilities = ["pull", "resolve"]\n'
-        )
-        return [
-            f"mkdir -p {_DOCKER_IO_HOSTS_DIR}",
-            f"cat >{_DOCKER_IO_HOSTS_DIR}/hosts.toml <<'EOF'\n{hosts_toml}EOF",
-            "systemctl restart containerd",
-        ]
-
-    return [
-        f"mkdir -p {_DOCKER_IO_HOSTS_DIR}",
-        (
-            f"_CA4S_REGISTRY_HOST={_DOCKER_DESKTOP_HOST}\n"
-            'if ! getent hosts "${_CA4S_REGISTRY_HOST}" >/dev/null 2>&1; then\n'
-            "  _CA4S_REGISTRY_HOST=$(ip route show default "
-            "| awk '{print $3; exit}')\n"
-            "fi\n"
-            'if [ -z "${_CA4S_REGISTRY_HOST}" ]; then\n'
-            '  echo "could not determine local registry host" >&2\n'
-            "  exit 1\n"
-            "fi\n"
-            f"cat >{_DOCKER_IO_HOSTS_DIR}/hosts.toml <<EOF\n"
-            f'server = "{_DOCKER_IO_SERVER}"\n\n'
-            f'[host."http://${{_CA4S_REGISTRY_HOST}}:{registry_setting.port}"]\n'
-            '  capabilities = ["pull", "resolve"]\n'
-            "EOF"
-        ),
-        "systemctl restart containerd",
-    ]
-
-
-def _containerd_custom_registry_commands(
-    registry_setting: LocalCustomRegistrySetting | None,
-) -> list[str]:
-    if registry_setting is None:
+    if not registry_configs:
         return []
 
-    registry_endpoint = f"{registry_setting.registry_name}:5000"
-    hosts_dir = f"{_CONTAINERD_CERTS_DIR}/{registry_endpoint}"
+    hosts_dirs = [
+        f"{_CONTAINERD_CERTS_DIR}/{config.registry}"
+        for config in registry_configs
+    ]
+    hosts_files = "\n".join(
+        (
+            f"cat >{hosts_dir}/hosts.toml <<EOF\n"
+            f"server = {json.dumps(config.config.server)}\n"
+            + "".join(
+                (
+                    "\n"
+                    f'[host."{host.scheme}://${{_CA4S_REGISTRY_HOST}}:'
+                    f'{host.gateway_port}"]\n'
+                    f"  capabilities = {json.dumps(list(host.capabilities))}\n"
+                )
+                for host in config.config.hosts
+            )
+            + "EOF"
+        )
+        for config, hosts_dir in zip(registry_configs, hosts_dirs, strict=True)
+    )
     return [
-        f"mkdir -p {hosts_dir}",
+        f"mkdir -p {' '.join(shlex.quote(path) for path in hosts_dirs)}",
         (
             f"_CA4S_REGISTRY_HOST={_DOCKER_DESKTOP_HOST}\n"
             'if ! getent hosts "${_CA4S_REGISTRY_HOST}" >/dev/null 2>&1; then\n'
@@ -171,14 +149,10 @@ def _containerd_custom_registry_commands(
             "| awk '{print $3; exit}')\n"
             "fi\n"
             'if [ -z "${_CA4S_REGISTRY_HOST}" ]; then\n'
-            '  echo "could not determine custom registry host" >&2\n'
+            '  echo "could not determine registry gateway" >&2\n'
             "  exit 1\n"
             "fi\n"
-            f"cat >{hosts_dir}/hosts.toml <<EOF\n"
-            f'server = "http://{registry_endpoint}"\n\n'
-            f'[host."http://${{_CA4S_REGISTRY_HOST}}:{registry_setting.port}"]\n'
-            '  capabilities = ["pull", "resolve"]\n'
-            "EOF"
+            f"{hosts_files}"
         ),
         "systemctl restart containerd",
     ]
@@ -678,8 +652,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         *,
         instance: str,
         worker_machine_deployments: tuple[LocalMachineDeploymentSpec, ...],
-        registry: RegistryConfig | None = None,
-        custom_registry: LocalCustomRegistrySetting | None = None,
+        registries: tuple[LocalRegistryConfig, ...] = (),
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -691,10 +664,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
 
         cluster_name = _resource_name(instance, "workload")
         node_image = f"kindest/node:{_KUBERNETES_VERSION}"
-        pre_kubeadm_commands = [
-            *_containerd_docker_io_mirror_commands(registry),
-            *_containerd_custom_registry_commands(custom_registry),
-        ]
+        pre_kubeadm_commands = _containerd_registry_commands(registries)
 
         def child_options(
             *,

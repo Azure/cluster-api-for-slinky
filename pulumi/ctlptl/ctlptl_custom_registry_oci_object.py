@@ -82,6 +82,45 @@ def resolve_source_commit(source_path: str, source_ref: str) -> str:
 
 
 @contextmanager
+def detached_worktree(
+    repository_path: str,
+    source_commit: str,
+    *,
+    prefix: str = "ca4s-worktree-",
+) -> Iterator[str]:
+    require_binary("git")
+    worktree = tempfile.mkdtemp(prefix=prefix)
+    try:
+        run(
+            [
+                "git",
+                "-C",
+                repository_path,
+                "worktree",
+                "add",
+                "--detach",
+                worktree,
+                source_commit,
+            ]
+        )
+        yield worktree
+    finally:
+        run(
+            [
+                "git",
+                "-C",
+                repository_path,
+                "worktree",
+                "remove",
+                "--force",
+                worktree,
+            ],
+            check=False,
+        )
+        shutil.rmtree(worktree, ignore_errors=True)
+
+
+@contextmanager
 def remote_source_repository(
     repository_url: str,
     source_ref: str,

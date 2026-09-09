@@ -5,11 +5,8 @@
 
 from __future__ import annotations
 
-import shutil
-import subprocess
 import sys
-import tempfile
-from typing import List, Optional
+from typing import Optional
 
 from pulumi import Input, Output, ResourceOptions
 from pulumi.dynamic import (
@@ -26,44 +23,6 @@ from ctlptl import ctlptl_custom_registry_oci_object as oci_object
 
 _DEFAULT_IMAGE_NAME = "capz/cluster-api-azure-controller"
 _DEFAULT_BUILD_ARGS = {"ARCH": "amd64"}
-
-
-def _require_binary(name: str) -> str:
-    path = shutil.which(name)
-    if path is None:
-        raise RuntimeError(
-            f"required binary '{name}' not found in PATH; install it before running pulumi"
-        )
-    return path
-
-
-def _run(
-    cmd: List[str],
-    *,
-    stdin: Optional[str] = None,
-    check: bool = True,
-) -> subprocess.CompletedProcess:
-    result = subprocess.run(
-        cmd,
-        input=stdin,
-        capture_output=True,
-        text=True,
-    )
-    if check and result.returncode != 0:
-        raise RuntimeError(
-            f"command {cmd!r} failed with exit code {result.returncode}\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}"
-        )
-    return result
-
-
-def _required_str(props: dict, name: str) -> str:
-    return oci_object.required_str(props, name)
-
-
-def _required_int(props: dict, name: str) -> int:
-    return oci_object.required_int(props, name)
 
 
 def _image_name_prop(props: dict) -> str:
@@ -99,14 +58,6 @@ def _image_tag(source_commit: str) -> str:
     return oci_object.source_tag(source_commit)
 
 
-def _host_image_ref(registry_port: int, image_name: str, image_tag: str) -> str:
-    return oci_object.host_ref(registry_port, image_name, image_tag)
-
-
-def _cluster_image_ref(registry_name: str, image_name: str, image_tag: str) -> str:
-    return oci_object.cluster_ref(registry_name, image_name, image_tag)
-
-
 def _manifest_exists(registry_port: int, image_name: str, image_tag: str) -> bool:
     return oci_object.manifest_exists(registry_port, image_name, image_tag)
 
@@ -119,13 +70,12 @@ def _build_and_push_image(
     build_args: dict[str, str],
     target: str | None,
 ) -> None:
-    _require_binary("docker")
-    _require_binary("git")
-    worktree = tempfile.mkdtemp(prefix="ca4s-image-")
-    try:
-        _run(
-            ["git", "-C", source_path, "worktree", "add", "--detach", worktree, source_commit]
-        )
+    oci_object.require_binary("docker")
+    with oci_object.detached_worktree(
+        source_path,
+        source_commit,
+        prefix="ca4s-image-",
+    ) as worktree:
         build_cmd = [
             "docker",
             "build",
@@ -135,11 +85,8 @@ def _build_and_push_image(
         if target is not None:
             build_cmd.extend(["--target", target])
         build_cmd.extend(["-t", host_image_ref, worktree])
-        _run(build_cmd)
-        _run(["docker", "push", host_image_ref])
-    finally:
-        _run(["git", "-C", source_path, "worktree", "remove", "--force", worktree], check=False)
-        shutil.rmtree(worktree, ignore_errors=True)
+        oci_object.run(build_cmd)
+        oci_object.run(["docker", "push", host_image_ref])
 
 
 def _ensure_image(props: dict) -> dict[str, object]:
@@ -206,7 +153,7 @@ class _CtlptlCustomRegistryImageProvider(ResourceProvider):
 
     def read(self, id_: str, props: dict) -> ReadResult:
         try:
-            registry_port = _required_int(props, "registry_port")
+            registry_port = oci_object.required_int(props, "registry_port")
             image_name = _image_name_prop(props)
             source_commit = oci_object.source_commit_for_read(
                 props,

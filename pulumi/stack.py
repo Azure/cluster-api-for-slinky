@@ -17,9 +17,9 @@ from ctlptl import (
     CloudProviderKind,
     CloudProviderKindConfig,
     CtlptlCluster,
+    CtlptlCustomRegistryOCIArtifact,
     CtlptlCustomRegistryHelmCharts,
     CtlptlCustomRegistryImage,
-    CtlptlCustomRegistryOCIArtifact,
     CtlptlRegistry,
     CtlptlRegistryService,
 )
@@ -28,8 +28,9 @@ from fluxcd import FluxInfrastructure
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from pko import PKOBootstrap, PKO_NAMESPACE
 from stacks.workload_cluster.registry_setting import (
-    LocalCustomRegistrySetting,
-    LocalPortRegistrySetting,
+    ContainerdHostConfig,
+    ContainerdRegistryConfig,
+    LocalRegistryConfig,
 )
 from stacks.workload_cluster.tenants import (
     WorkloadClusterConfig,
@@ -270,9 +271,21 @@ def run_stack() -> None:
     )
 
     base_init_stack_config = _with_owner_tag_config(
-        _with_local_registry_config(
+        _with_local_registry_configs(
             InitStackConfig.model_validate(config.get_object("initStack") or {}),
-            LocalPortRegistrySetting(port=cache_registry.port),
+            (
+                LocalRegistryConfig(
+                    registry="docker.io",
+                    config=ContainerdRegistryConfig(
+                        server="https://registry-1.docker.io",
+                        hosts=(
+                            ContainerdHostConfig(
+                                gateway_port=cache_registry.port,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
         )
     )
     capz_controller_image_ref: pulumi.Output[str] | None = None
@@ -349,15 +362,29 @@ def run_stack() -> None:
         _export_azure_config_outputs(base_init_stack_config)
 
 
-def _with_local_registry_config(
+def _merge_registry_configs(
+    current: tuple[LocalRegistryConfig, ...],
+    updates: tuple[LocalRegistryConfig, ...],
+) -> tuple[LocalRegistryConfig, ...]:
+    merged = {config.registry: config for config in current}
+    merged.update((config.registry, config) for config in updates)
+    return tuple(merged.values())
+
+
+def _with_local_registry_configs(
     init_stack_config: InitStackConfig,
-    registry: LocalPortRegistrySetting,
+    registries: tuple[LocalRegistryConfig, ...],
 ) -> InitStackConfig:
     workload_clusters: dict[str, WorkloadClusterConfig] = {}
     for name, workload_cluster in init_stack_config.tenants.workload_clusters.items():
         if isinstance(workload_cluster, LocalWorkloadClusterConfig):
             workload_cluster = workload_cluster.model_copy(
-                update={"registry": registry}
+                update={
+                    "registries": _merge_registry_configs(
+                        workload_cluster.registries,
+                        registries,
+                    )
+                }
             )
         workload_clusters[name] = workload_cluster
 
@@ -421,9 +448,22 @@ def _merge_local_slinky_overrides(
                     update=slinky_updates
                 )
             if registry_name is not None and registry_port is not None:
-                cluster_updates["custom_registry"] = LocalCustomRegistrySetting(
-                    registry_name=registry_name,
-                    port=registry_port,
+                registry = f"{registry_name}:5000"
+                cluster_updates["registries"] = _merge_registry_configs(
+                    workload_cluster.registries,
+                    (
+                        LocalRegistryConfig(
+                            registry=registry,
+                            config=ContainerdRegistryConfig(
+                                server=f"http://{registry}",
+                                hosts=(
+                                    ContainerdHostConfig(
+                                        gateway_port=registry_port,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
                 )
             if cluster_updates:
                 workload_cluster = workload_cluster.model_copy(update=cluster_updates)

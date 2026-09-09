@@ -6,9 +6,12 @@
 Pulumi dynamic providers that wrap the ``ctlptl`` and
 ``cloud-provider-kind`` CLIs:
 
+Images, Helm charts, and CAPZ provider bundles are all OCI artifacts. The
+classes below use specific names for the distinct build workflows.
+
 * :class:`CtlptlRegistry` — Docker-backed image registry.
 * :class:`CtlptlCustomRegistryImage` — source-ref image built into a custom registry.
-* :class:`CtlptlCustomRegistryOCIArtifact` — CAPZ provider artifacts built into a custom registry.
+* :class:`CtlptlCustomRegistryOCIArtifact` — CAPZ provider artifact built into a custom registry.
 * :class:`CtlptlCustomRegistryHelmCharts` — Slinky charts built into a custom registry.
 * :class:`CtlptlCluster` — kind cluster wired to the registry.
 * :class:`CtlptlRegistryService` — in-cluster Service for a registry container.
@@ -36,9 +39,9 @@ __all__ = [
   "CloudProviderKind",
   "CloudProviderKindConfig",
   "CtlptlCluster",
+  "CtlptlCustomRegistryOCIArtifact",
   "CtlptlCustomRegistryHelmCharts",
   "CtlptlCustomRegistryImage",
-  "CtlptlCustomRegistryOCIArtifact",
   "CtlptlRegistry",
   "CtlptlRegistryService",
 ]

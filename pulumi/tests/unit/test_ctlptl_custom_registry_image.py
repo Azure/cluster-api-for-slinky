@@ -5,7 +5,8 @@
 
 from __future__ import annotations
 
-import subprocess
+from contextlib import contextmanager
+from collections.abc import Iterator
 
 import pytest
 
@@ -17,10 +18,7 @@ _SOURCE_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 
 
 @pytest.fixture
-def provider(
-    monkeypatch: pytest.MonkeyPatch,
-) -> ctlptl_custom_registry_image._CtlptlCustomRegistryImageProvider:
-    monkeypatch.setattr(ctlptl_custom_registry_image.shutil, "which", lambda name: f"/bin/{name}")
+def provider() -> ctlptl_custom_registry_image._CtlptlCustomRegistryImageProvider:
     return ctlptl_custom_registry_image._CtlptlCustomRegistryImageProvider()
 
 
@@ -136,27 +134,34 @@ def test_build_and_push_uses_detached_git_worktree(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[list[str]] = []
-    removed: list[str] = []
-    monkeypatch.setattr(ctlptl_custom_registry_image.shutil, "which", lambda name: f"/bin/{name}")
-    monkeypatch.setattr(ctlptl_custom_registry_image.tempfile, "mkdtemp", lambda prefix: "/tmp/worktree")
-    monkeypatch.setattr(
-        ctlptl_custom_registry_image.shutil,
-        "rmtree",
-        lambda path, ignore_errors=False: removed.append(path),
-    )
 
-    def fake_run(
-        cmd: list[str],
+    @contextmanager
+    def fake_worktree(
+        repository_path: str,
+        source_commit: str,
         *,
-        input: str | None = None,
-        check: bool = True,
-        capture_output: bool = True,
-        text: bool = True,
-    ) -> subprocess.CompletedProcess:
-        calls.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+        prefix: str,
+    ) -> Iterator[str]:
+        assert repository_path == "/src/capz"
+        assert source_commit == _SOURCE_COMMIT
+        assert prefix == "ca4s-image-"
+        yield "/tmp/worktree"
 
-    monkeypatch.setattr(ctlptl_custom_registry_image.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        ctlptl_custom_registry_image.oci_object,
+        "require_binary",
+        lambda name: f"/bin/{name}",
+    )
+    monkeypatch.setattr(
+        ctlptl_custom_registry_image.oci_object,
+        "detached_worktree",
+        fake_worktree,
+    )
+    monkeypatch.setattr(
+        ctlptl_custom_registry_image.oci_object,
+        "run",
+        lambda cmd, **kwargs: calls.append(cmd),
+    )
 
     ctlptl_custom_registry_image._build_and_push_image(
         source_path="/src/capz",
@@ -167,16 +172,6 @@ def test_build_and_push_uses_detached_git_worktree(
     )
 
     assert calls == [
-        [
-            "git",
-            "-C",
-            "/src/capz",
-            "worktree",
-            "add",
-            "--detach",
-            "/tmp/worktree",
-            _SOURCE_COMMIT,
-        ],
         [
             "docker",
             "build",
@@ -189,6 +184,4 @@ def test_build_and_push_uses_detached_git_worktree(
             "/tmp/worktree",
         ],
         ["docker", "push", "localhost:5002/capz/controller:source-1234567890ab"],
-        ["git", "-C", "/src/capz", "worktree", "remove", "--force", "/tmp/worktree"],
     ]
-    assert removed == ["/tmp/worktree"]

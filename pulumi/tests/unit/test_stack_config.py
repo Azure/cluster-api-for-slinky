@@ -18,7 +18,7 @@ from stack import (
     _merge_local_slinky_overrides,
     _slinky_image_config,
     _validate_slinky_build_config,
-    _with_local_registry_config,
+    _with_local_registry_configs,
     _with_owner_tag_config,
 )
 from stacks.control_plane.control_plane_config import (
@@ -29,7 +29,11 @@ from stacks.control_plane.control_plane_config import (
     UserAssignedMSIClusterIdentityConfig,
 )
 from stacks.init.init_stack import InitStackConfig
-from stacks.workload_cluster.registry_setting import LocalPortRegistrySetting
+from stacks.workload_cluster.registry_setting import (
+    ContainerdHostConfig,
+    ContainerdRegistryConfig,
+    LocalRegistryConfig,
+)
 from stacks.workload_cluster.tenants import TenantsConfig
 from stacks.workload_cluster.workload_cluster_class_aks import (
     AKSWorkloadClusterConfig,
@@ -47,6 +51,20 @@ _TENANT_ID = "33333333-3333-3333-3333-333333333333"
 _SUBSCRIPTION_ID = "44444444-4444-4444-4444-444444444444"
 _LOCATION = "westus2"
 _RESOURCE_GROUP = "host-rg"
+
+
+def _registry_config(
+    registry: str,
+    server: str,
+    port: object,
+) -> LocalRegistryConfig:
+    return LocalRegistryConfig(
+        registry=registry,
+        config=ContainerdRegistryConfig(
+            server=server,
+            hosts=(ContainerdHostConfig(gateway_port=port),),
+        ),
+    )
 
 
 def test_empty_config_does_not_enable_azure() -> None:
@@ -186,7 +204,15 @@ def test_local_slinky_overrides_update_only_local_workload_clusters() -> None:
     config = InitStackConfig(
         tenants=TenantsConfig(
             workload_clusters={
-                "local": LocalWorkloadClusterConfig(),
+                "local": LocalWorkloadClusterConfig(
+                    registries=(
+                        _registry_config(
+                            "registry.example:5000",
+                            "https://registry.example:5000",
+                            5443,
+                        ),
+                    )
+                ),
                 "caps-aks": AKSWorkloadClusterConfig(
                     parameters=AzureWorkloadSpec(
                         subscription_id=_SUBSCRIPTION_ID,
@@ -217,9 +243,18 @@ def test_local_slinky_overrides_update_only_local_workload_clusters() -> None:
 
     local = updated.tenants.workload_clusters["local"]
     assert isinstance(local, LocalWorkloadClusterConfig)
-    assert local.custom_registry is not None
-    assert local.custom_registry.registry_name == "custom-registry"
-    assert local.custom_registry.port == 5003
+    assert local.registries == (
+        _registry_config(
+            "registry.example:5000",
+            "https://registry.example:5000",
+            5443,
+        ),
+        _registry_config(
+            "custom-registry:5000",
+            "http://custom-registry:5000",
+            5003,
+        ),
+    )
     assert local.slinky.chart_plain_http is True
     assert local.slinky.operator_chart_version == "0.0.0-source1234567890ab"
     assert local.slinky.operator_image is not None
@@ -465,7 +500,15 @@ def test_local_registry_config_is_applied_to_local_workload_clusters_only() -> N
     config = InitStackConfig(
         tenants=TenantsConfig(
             workload_clusters={
-                "local": LocalWorkloadClusterConfig(),
+                "local": LocalWorkloadClusterConfig(
+                    registries=(
+                        _registry_config(
+                            "registry.example:5000",
+                            "https://registry.example:5000",
+                            5443,
+                        ),
+                    )
+                ),
                 "caps-aks": AKSWorkloadClusterConfig(
                     parameters=AzureWorkloadSpec(
                         subscription_id=_SUBSCRIPTION_ID,
@@ -478,16 +521,37 @@ def test_local_registry_config_is_applied_to_local_workload_clusters_only() -> N
         )
     )
 
-    updated = _with_local_registry_config(
+    updated = _with_local_registry_configs(
         config,
-        LocalPortRegistrySetting(port=5002),
+        (
+            _registry_config(
+                "docker.io",
+                "https://registry-1.docker.io",
+                5002,
+            ),
+        ),
     )
 
     assert updated.tenants.to_config() == {
         "workloadClusters": {
             "local": {
                 "className": "local",
-                "registry": {"kind": "local-port", "port": 5002},
+                "registries": [
+                    {
+                        "registry": "registry.example:5000",
+                        "config": {
+                            "server": "https://registry.example:5000",
+                            "hosts": [{"gatewayPort": 5443}],
+                        },
+                    },
+                    {
+                        "registry": "docker.io",
+                        "config": {
+                            "server": "https://registry-1.docker.io",
+                            "hosts": [{"gatewayPort": 5002}],
+                        },
+                    }
+                ],
             },
             "caps-aks": {
                 "className": "aks",

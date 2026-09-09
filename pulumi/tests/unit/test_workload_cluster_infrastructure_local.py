@@ -25,12 +25,16 @@ from stacks.workload_cluster.workload_cluster_infrastructure_local import (
     _NODE_UNHEALTHY_TIMEOUT_SECONDS,
     _SERVICE_ACCOUNT_TOKEN_PATH,
     _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
-    _containerd_custom_registry_commands,
+    _containerd_registry_commands,
     _health_check,
     _management_kubeconfig,
     _node_registration,
 )
-from stacks.workload_cluster.registry_setting import LocalCustomRegistrySetting
+from stacks.workload_cluster.registry_setting import (
+    ContainerdHostConfig,
+    ContainerdRegistryConfig,
+    LocalRegistryConfig,
+)
 
 
 def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
@@ -125,17 +129,43 @@ def test_local_controller_worker_registration_adds_critical_addons_taint() -> No
     }
 
 
-def test_custom_registry_redirects_logical_name_to_host_port() -> None:
-    commands = _containerd_custom_registry_commands(
-        LocalCustomRegistrySetting(
-            registry_name="custom-registry",
-            port=5003,
+def test_registries_redirect_logical_names_to_host_ports() -> None:
+    commands = _containerd_registry_commands(
+        (
+            LocalRegistryConfig(
+                registry="docker.io",
+                config=ContainerdRegistryConfig(
+                    server="https://registry-1.docker.io",
+                    hosts=(ContainerdHostConfig(gateway_port=5002),),
+                ),
+            ),
+            LocalRegistryConfig(
+                registry="custom-registry:5000",
+                config=ContainerdRegistryConfig(
+                    server="http://custom-registry:5000",
+                    hosts=(
+                        ContainerdHostConfig(
+                            gateway_port=5003,
+                            capabilities=("pull", "resolve", "push"),
+                        ),
+                    ),
+                ),
+            ),
         )
     )
 
     assert commands[0] == (
-        "mkdir -p /etc/containerd/certs.d/custom-registry:5000"
+        "mkdir -p /etc/containerd/certs.d/docker.io "
+        "/etc/containerd/certs.d/custom-registry:5000"
     )
+    assert commands[1].count("_CA4S_REGISTRY_HOST=host.docker.internal") == 1
+    assert 'server = "https://registry-1.docker.io"' in commands[1]
+    assert '[host."http://${_CA4S_REGISTRY_HOST}:5002"]' in commands[1]
     assert 'server = "http://custom-registry:5000"' in commands[1]
     assert '[host."http://${_CA4S_REGISTRY_HOST}:5003"]' in commands[1]
+    assert 'capabilities = ["pull", "resolve", "push"]' in commands[1]
     assert commands[-1] == "systemctl restart containerd"
+
+
+def test_empty_registry_list_writes_no_containerd_overrides() -> None:
+    assert _containerd_registry_commands(()) == []

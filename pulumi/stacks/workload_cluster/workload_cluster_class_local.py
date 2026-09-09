@@ -8,13 +8,10 @@ from __future__ import annotations
 from typing import Any, Literal
 
 import pulumi
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
 
 from lib.config import PulumiConfigModel
-from stacks.workload_cluster.registry_setting import (
-    LocalCustomRegistrySetting,
-    RegistryConfig,
-)
+from stacks.workload_cluster.registry_setting import LocalRegistryConfig
 
 from stacks.workload_cluster.workload_cluster_deployments import (
     KEDAOutputs,
@@ -60,13 +57,19 @@ _LOCAL_KEDA_SCALED_NODE_SETS = (
 
 class LocalWorkloadClusterConfig(PulumiConfigModel):
     class_name: Literal["local"] = _CLUSTER_CLASS
-    registry: RegistryConfig | None = None
-    custom_registry: LocalCustomRegistrySetting | None = None
+    registries: tuple[LocalRegistryConfig, ...] = ()
     slinky: SlinkyDeploymentConfig = SlinkyDeploymentConfig()
 
     @field_serializer("class_name")
     def serialize_class_name(self, class_name: str) -> str:
         return class_name
+
+    @model_validator(mode="after")
+    def validate_unique_registries(self) -> LocalWorkloadClusterConfig:
+        names = [registry.registry for registry in self.registries]
+        if len(names) != len(set(names)):
+            raise ValueError("registries must have unique registry names")
+        return self
 
 
 class LocalWorkloadClusterOutputs(BaseModel):
@@ -135,8 +138,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             "infrastructure",
             instance=instance,
             worker_machine_deployments=machine_deployments,
-            registry=config.registry,
-            custom_registry=config.custom_registry,
+            registries=config.registries,
             opts=child_options(),
         )
         deployments = WorkloadClusterDeployments(

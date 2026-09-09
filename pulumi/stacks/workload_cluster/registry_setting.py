@@ -1,70 +1,70 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Registry config contract for local workload-cluster components.
-
-The outer stack forwards this shape through the init Stack CR's typed tenants
-config. The local workload class consumes it directly before rendering node
-bootstrap config.
-
-The explicit ``kind`` tag is intentionally a little more structure than the
-single variant needs today. It keeps the config wire format ready for future
-variants such as an in-cluster Service, cloud registry, or no-mirror mode
-without having to infer semantics from which keys happen to be present.
-"""
+"""Registry config contract for local workload-cluster components."""
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypeAlias
+import re
+from typing import Any, Literal
 
-from pydantic import field_serializer, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from lib.config import NonEmptyStr, PulumiConfigModel
 
 
-class LocalPortRegistrySetting(PulumiConfigModel):
-    """Reach the host-published local registry through a Docker gateway."""
+_REGISTRY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 
-    kind: Literal["local-port"] = "local-port"
-    port: Any
 
-    @field_serializer("kind")
-    def serialize_kind(self, kind: str) -> str:
-        return kind
+class ContainerdHostConfig(PulumiConfigModel):
+    """A containerd registry host reached through the Docker gateway."""
 
-    @field_validator("port")
+    gateway_port: Any
+    scheme: Literal["http", "https"] = "http"
+    capabilities: tuple[Literal["pull", "resolve", "push"], ...] = (
+        "pull",
+        "resolve",
+    )
+
+    @field_validator("gateway_port")
     @classmethod
-    def _validate_literal_port(cls, value: Any) -> Any:
+    def validate_gateway_port(cls, value: Any) -> Any:
         if isinstance(value, bool):
-            raise ValueError("port must be a positive integer")
+            raise ValueError("gatewayPort must be a positive integer")
         if isinstance(value, int):
             if value < 1:
-                raise ValueError("port must be a positive integer")
+                raise ValueError("gatewayPort must be a positive integer")
             return value
         if isinstance(value, str | float):
-            raise ValueError("port must be a positive integer")
+            raise ValueError("gatewayPort must be a positive integer")
         return value
 
+    @model_validator(mode="after")
+    def validate_capabilities(self) -> ContainerdHostConfig:
+        if not self.capabilities:
+            raise ValueError("capabilities must not be empty")
+        if len(self.capabilities) != len(set(self.capabilities)):
+            raise ValueError("capabilities must be unique")
+        return self
 
-RegistryConfig: TypeAlias = LocalPortRegistrySetting
+
+class ContainerdRegistryConfig(PulumiConfigModel):
+    """Typed representation of one containerd registry ``hosts.toml`` file."""
+
+    server: NonEmptyStr
+    hosts: tuple[ContainerdHostConfig, ...] = Field(min_length=1)
 
 
-class LocalCustomRegistrySetting(PulumiConfigModel):
-    """Reach a named ctlptl registry through its host-published port."""
+class LocalRegistryConfig(PulumiConfigModel):
+    """Containerd configuration for one registry namespace."""
 
-    registry_name: NonEmptyStr
-    port: Any
+    registry: NonEmptyStr
+    config: ContainerdRegistryConfig
 
-    @field_validator("port")
+    @field_validator("registry")
     @classmethod
-    def _validate_literal_port(cls, value: Any) -> Any:
-        if isinstance(value, bool):
-            raise ValueError("port must be a positive integer")
-        if isinstance(value, int):
-            if value < 1:
-                raise ValueError("port must be a positive integer")
-            return value
-        if isinstance(value, str | float):
-            raise ValueError("port must be a positive integer")
+    def validate_registry(cls, value: str) -> str:
+        if not _REGISTRY_PATTERN.fullmatch(value):
+            raise ValueError("registry must be a host name with an optional port")
         return value
 
