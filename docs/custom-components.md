@@ -28,7 +28,8 @@ sourceRef: 69ec3a40a818ccbc32b8ce88c84609404d8cb7a2
 The automated source-build path uses a ctlptl registry attached to the local
 management cluster. It requires Docker and Git. CAPZ artifact generation also
 requires Make and ORAS. Pulumi-managed Slinky chart builds require Make and
-Helm.
+Helm. Registry topology and runtime configuration are documented in
+[Container Registry Setup](container-registries.md).
 
 ## CAPI
 
@@ -154,43 +155,13 @@ Pulumi performs the remaining wiring automatically for local workload clusters:
 1. The registry is exposed through a Service in the PKO namespace. The inner
    Pulumi stack pulls charts through that Service using plain-HTTP OCI.
 1. CAPD nodes receive one containerd `hosts.toml` entry per configured local
-  registry. Pulls are redirected to each registry's host-published port through
-  `host.docker.internal`, or through the Docker gateway on Linux.
+   registry.
 1. The resolved image references, chart source, and chart version are injected
    into each local workload cluster's Slinky configuration.
 
-The outer stack forwards registry routes to each local workload cluster as one
-`registries` list. Each entry identifies the containerd registry namespace and
-carries a typed representation of its `hosts.toml` configuration:
-
-```yaml
-registries:
-  - registry: docker.io
-    config:
-      server: https://registry-1.docker.io
-      hosts:
-        - gatewayPort: 5002
-  - registry: custom-registry:5000
-    config:
-      server: http://custom-registry:5000
-      hosts:
-        - gatewayPort: 5003
-          capabilities: [pull, resolve]
-```
-
-The outer stack decides what each route means: the `docker.io` entry points at
-the pull-through cache, while the named custom entry points at the writable
-artifact registry. The workload stack only renders the supplied containerd
-configuration. Each host supports `http` or `https` and any non-empty,
-non-duplicated combination of `pull`, `resolve`, and `push` capabilities;
-defaults are `http` and `[pull, resolve]`.
-
-Bootstrap discovers the Docker gateway once, writes all registry host
-configurations, and restarts containerd once. An empty `registries` list writes
-no containerd registry override.
-
-The local ctlptl registry intentionally uses unauthenticated plain HTTP and is
-for development environments only.
+See [Local Registries](container-registries.md#local-registries) for the
+pull-through cache, writable artifact registry, typed `registries`
+configuration, CAPD containerd routing, and verification commands.
 
 No `slinky` block is required under the local workload cluster when using this
 automated path. Explicit values there remain useful for external registries or
@@ -200,7 +171,9 @@ The local plain-HTTP path uses Pulumi's Helm v4 `Chart` resource because the
 Helm v3 `Release` resource does not expose a plain-HTTP OCI option. Resources
 are still awaited and dependency ordered, but they are managed directly by
 Pulumi rather than recorded as native Helm releases. Consequently, `helm list`
-does not show these three local chart deployments.
+does not show these three local chart deployments. See
+[Container Registry Setup](container-registries.md) for details about which
+clients use each local registry route.
 
 Every workload cluster also installs `slurm-bridge` chart `1.2.2`. CA4S creates
 a `Token` backed by the Slurm chart's `slurm-auth-jwt` key, uses the generated
@@ -225,8 +198,11 @@ pulumi stack output slinky_chart_version -s <stack>
 
 AKS and Azure BYO nodes cannot access the developer machine's ctlptl registry.
 Build and publish images and charts to a registry reachable from both PKO and
-the workload nodes, then add an explicit `slinky` block under the selected
-workload-cluster entry:
+the workload nodes. First-class ACR provisioning is not implemented; its
+remaining design work is tracked in
+[Azure Container Registry](container-registries.md#azure-container-registry).
+For an existing external registry, add an explicit `slinky` block under the
+selected workload-cluster entry:
 
 ```bash
 docker build --target manager -t registry.example/slurm-operator:feature .
