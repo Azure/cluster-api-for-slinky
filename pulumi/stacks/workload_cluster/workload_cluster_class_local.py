@@ -8,17 +8,17 @@ from __future__ import annotations
 from typing import Any, Literal
 
 import pulumi
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
 
 from lib.config import PulumiConfigModel
-from stacks.workload_cluster.registry_setting import RegistryConfig
+from stacks.workload_cluster.registry_setting import LocalRegistryConfig
 
 from stacks.workload_cluster.workload_cluster_deployments import (
     KEDAOutputs,
     KEDANodeSetScalerSpec,
+    SlinkyDeploymentConfig,
     SlurmNodeSetSpec,
     _PROMETHEUS_CHART_VERSION,
-    _SLINKY_CHART_VERSION,
     WorkloadClusterDeployments,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
@@ -57,11 +57,19 @@ _LOCAL_KEDA_SCALED_NODE_SETS = (
 
 class LocalWorkloadClusterConfig(PulumiConfigModel):
     class_name: Literal["local"] = _CLUSTER_CLASS
-    registry: RegistryConfig | None = None
+    registries: tuple[LocalRegistryConfig, ...] = ()
+    slinky: SlinkyDeploymentConfig = SlinkyDeploymentConfig()
 
     @field_serializer("class_name")
     def serialize_class_name(self, class_name: str) -> str:
         return class_name
+
+    @model_validator(mode="after")
+    def validate_unique_registries(self) -> LocalWorkloadClusterConfig:
+        names = [registry.registry for registry in self.registries]
+        if len(names) != len(set(names)):
+            raise ValueError("registries must have unique registry names")
+        return self
 
 
 class LocalWorkloadClusterOutputs(BaseModel):
@@ -85,6 +93,8 @@ class LocalWorkloadClusterOutputs(BaseModel):
     slurm_operator_status: Any
     slurm_chart_version: str
     slurm_status: Any
+    slurm_bridge_chart_version: str
+    slurm_bridge_status: Any
     todo: str
 
 
@@ -130,7 +140,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             "infrastructure",
             instance=instance,
             worker_machine_deployments=machine_deployments,
-            registry=config.registry,
+            registries=config.registries,
             opts=child_options(),
         )
         deployments = WorkloadClusterDeployments(
@@ -138,6 +148,7 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             instance=instance,
             slurm_node_sets=slurm_node_sets,
             keda_scaled_node_sets=keda_scaled_node_sets,
+            slinky=config.slinky,
             workload_provider=infrastructure.workload_provider,
             pin_coredns_to_controller=True,
             opts=child_options(depends_on=[infrastructure]),
@@ -168,10 +179,12 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             "calico_operator_chart_version": infrastructure.calico_operator_chart_version,
             "calico_operator_status": infrastructure.calico_operator_status,
             "workload_cluster_ready": deployments.workload_cluster_ready,
-            "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_operator_chart_version": config.slinky.operator_chart_version,
             "slurm_operator_status": deployments.slurm_operator_status,
-            "slurm_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_chart_version": config.slinky.slurm_chart_version,
             "slurm_status": deployments.slurm_status,
+            "slurm_bridge_chart_version": deployments.slurm_bridge_chart_version,
+            "slurm_bridge_status": deployments.slurm_bridge_status,
             "todo": pulumi.Output.from_input(
                 "Wire workload-driven autoscaling and tenant-facing Slurm operations."
             ),

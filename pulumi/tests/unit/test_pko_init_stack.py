@@ -25,7 +25,11 @@ from pko.pko_bootstrap import (
     _init_stack_config_to_config,
     _init_stack_config_with_flux_source,
 )
-from stacks.workload_cluster.registry_setting import LocalPortRegistrySetting
+from stacks.workload_cluster.registry_setting import (
+    ContainerdHostConfig,
+    ContainerdRegistryConfig,
+    LocalRegistryConfig,
+)
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
 from stacks.workload_cluster.tenants import TenantsConfig
 from stacks.stack_cr import StackCRConfig, build_stack_spec
@@ -34,6 +38,16 @@ from stacks.stack_cr import StackCRConfig, build_stack_spec
 _BASE_EVENT_LOOP = asyncio.new_event_loop()
 asyncio.set_event_loop(_BASE_EVENT_LOOP)
 atexit.register(_BASE_EVENT_LOOP.close)
+
+
+def _docker_registry(port: object) -> LocalRegistryConfig:
+    return LocalRegistryConfig(
+        registry="docker.io",
+        config=ContainerdRegistryConfig(
+            server="https://registry-1.docker.io",
+            hosts=(ContainerdHostConfig(gateway_port=port),),
+        ),
+    )
 
 
 def _stack_spec() -> StackCRConfig:
@@ -53,7 +67,9 @@ def test_init_stack_config_serializes_tenants() -> None:
         tenants=TenantsConfig(
             workload_clusters={
                 "local": LocalWorkloadClusterConfig(
-                    registry=LocalPortRegistrySetting(port=5002),
+                    registries=(
+                        _docker_registry(5002),
+                    ),
                 )
             }
         ),
@@ -64,7 +80,15 @@ def test_init_stack_config_serializes_tenants() -> None:
             "workloadClusters": {
                 "local": {
                     "className": "local",
-                    "registry": {"kind": "local-port", "port": 5002},
+                    "registries": [
+                        {
+                            "registry": "docker.io",
+                            "config": {
+                                "server": "https://registry-1.docker.io",
+                                "hosts": [{"gatewayPort": 5002}],
+                            },
+                        }
+                    ],
                 }
             }
         },
@@ -191,8 +215,8 @@ def test_init_stack_config_serializes_nested_output_values() -> None:
             tenants=TenantsConfig(
                 workload_clusters={
                     "local": LocalWorkloadClusterConfig(
-                        registry=LocalPortRegistrySetting(
-                            port=pulumi.Output.from_input(5002)
+                        registries=(
+                            _docker_registry(pulumi.Output.from_input(5002)),
                         ),
                     )
                 }
@@ -205,7 +229,15 @@ def test_init_stack_config_serializes_nested_output_values() -> None:
                 "workloadClusters": {
                     "local": {
                         "className": "local",
-                        "registry": {"kind": "local-port", "port": 5002},
+                        "registries": [
+                            {
+                                "registry": "docker.io",
+                                "config": {
+                                    "server": "https://registry-1.docker.io",
+                                    "hosts": [{"gatewayPort": 5002}],
+                                },
+                            }
+                        ],
                     }
                 }
             }

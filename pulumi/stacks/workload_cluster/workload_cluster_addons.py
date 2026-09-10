@@ -12,6 +12,7 @@ import pulumi
 import pulumi_kubernetes as k8s
 
 from stacks.workload_cluster.workload_cluster_infrastructure import (
+    calico_typha_deployment,
     controller_bootstrap_tolerations,
     controller_node_affinity,
     controller_node_selector,
@@ -81,6 +82,7 @@ def _calico_vxlan_values(*, pod_cidr: str) -> dict[str, object]:
         "installation": {
             "controlPlaneNodeSelector": controller_node_selector(),
             "controlPlaneTolerations": controller_tolerations(),
+            "typhaDeployment": calico_typha_deployment(),
             "calicoNetwork": {
                 "ipPools": [
                     {

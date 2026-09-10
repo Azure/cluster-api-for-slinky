@@ -5,11 +5,8 @@
 
 from __future__ import annotations
 
-import shutil
-import subprocess
 import sys
-import tempfile
-from typing import List, Optional
+from typing import Optional
 
 from pulumi import Input, Output, ResourceOptions
 from pulumi.dynamic import (
@@ -28,44 +25,6 @@ _DEFAULT_IMAGE_NAME = "capz/cluster-api-azure-controller"
 _DEFAULT_BUILD_ARGS = {"ARCH": "amd64"}
 
 
-def _require_binary(name: str) -> str:
-    path = shutil.which(name)
-    if path is None:
-        raise RuntimeError(
-            f"required binary '{name}' not found in PATH; install it before running pulumi"
-        )
-    return path
-
-
-def _run(
-    cmd: List[str],
-    *,
-    stdin: Optional[str] = None,
-    check: bool = True,
-) -> subprocess.CompletedProcess:
-    result = subprocess.run(
-        cmd,
-        input=stdin,
-        capture_output=True,
-        text=True,
-    )
-    if check and result.returncode != 0:
-        raise RuntimeError(
-            f"command {cmd!r} failed with exit code {result.returncode}\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}"
-        )
-    return result
-
-
-def _required_str(props: dict, name: str) -> str:
-    return oci_object.required_str(props, name)
-
-
-def _required_int(props: dict, name: str) -> int:
-    return oci_object.required_int(props, name)
-
-
 def _image_name_prop(props: dict) -> str:
     value = props.get("image_name") or _DEFAULT_IMAGE_NAME
     if not isinstance(value, str) or not value:
@@ -82,20 +41,21 @@ def _build_args_prop(props: dict) -> dict[str, str]:
     return {str(key): str(item) for key, item in value.items()}
 
 
+def _target_prop(props: dict) -> str | None:
+    value = props.get("target")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise RuntimeError("target must be a non-empty string")
+    return value
+
+
 def _resolve_source_commit(source_path: str, source_ref: str) -> str:
     return oci_object.resolve_source_commit(source_path, source_ref)
 
 
 def _image_tag(source_commit: str) -> str:
     return oci_object.source_tag(source_commit)
-
-
-def _host_image_ref(registry_port: int, image_name: str, image_tag: str) -> str:
-    return oci_object.host_ref(registry_port, image_name, image_tag)
-
-
-def _cluster_image_ref(registry_name: str, image_name: str, image_tag: str) -> str:
-    return oci_object.cluster_ref(registry_name, image_name, image_tag)
 
 
 def _manifest_exists(registry_port: int, image_name: str, image_tag: str) -> bool:
@@ -108,31 +68,31 @@ def _build_and_push_image(
     source_commit: str,
     host_image_ref: str,
     build_args: dict[str, str],
+    target: str | None,
 ) -> None:
-    _require_binary("docker")
-    _require_binary("git")
-    worktree = tempfile.mkdtemp(prefix="ca4s-image-")
-    try:
-        _run(
-            ["git", "-C", source_path, "worktree", "add", "--detach", worktree, source_commit]
-        )
+    oci_object.require_binary("docker")
+    with oci_object.detached_worktree(
+        source_path,
+        source_commit,
+        prefix="ca4s-image-",
+    ) as worktree:
         build_cmd = [
             "docker",
             "build",
         ]
         for key, value in sorted(build_args.items()):
             build_cmd.extend(["--build-arg", f"{key}={value}"])
+        if target is not None:
+            build_cmd.extend(["--target", target])
         build_cmd.extend(["-t", host_image_ref, worktree])
-        _run(build_cmd)
-        _run(["docker", "push", host_image_ref])
-    finally:
-        _run(["git", "-C", source_path, "worktree", "remove", "--force", worktree], check=False)
-        shutil.rmtree(worktree, ignore_errors=True)
+        oci_object.run(build_cmd)
+        oci_object.run(["docker", "push", host_image_ref])
 
 
 def _ensure_image(props: dict) -> dict[str, object]:
     image_name = _image_name_prop(props)
     build_args = _build_args_prop(props)
+    target = _target_prop(props)
 
     def build(source_path: str, source_commit: str, host_image_ref: str) -> None:
         _build_and_push_image(
@@ -140,6 +100,7 @@ def _ensure_image(props: dict) -> dict[str, object]:
             source_commit=source_commit,
             host_image_ref=host_image_ref,
             build_args=build_args,
+            target=target,
         )
 
     return oci_object.ensure_source_ref_object(
@@ -149,7 +110,7 @@ def _ensure_image(props: dict) -> dict[str, object]:
         object_tag_key="image_tag",
         host_ref_key="host_image_ref",
         cluster_ref_key="image_ref",
-        extra_outputs={"build_args": build_args},
+        extra_outputs={"build_args": build_args, "target": target},
         build=build,
         resolve_commit=_resolve_source_commit,
         probe_manifest=_manifest_exists,
@@ -182,6 +143,7 @@ class _CtlptlCustomRegistryImageProvider(ResourceProvider):
             "registry_name",
             "registry_port",
             "image_name",
+            "target",
             "build_args",
         )
         return DiffResult(changes=oci_object.has_diff(olds, news, keys))
@@ -191,7 +153,7 @@ class _CtlptlCustomRegistryImageProvider(ResourceProvider):
 
     def read(self, id_: str, props: dict) -> ReadResult:
         try:
-            registry_port = _required_int(props, "registry_port")
+            registry_port = oci_object.required_int(props, "registry_port")
             image_name = _image_name_prop(props)
             source_commit = oci_object.source_commit_for_read(
                 props,
@@ -218,6 +180,7 @@ class CtlptlCustomRegistryImage(Resource):
     source_commit: Output[str]
     image_name: Output[str]
     image_tag: Output[str]
+    target: Output[str | None]
     host_image_ref: Output[str]
     image_ref: Output[str]
     built: Output[bool]
@@ -232,6 +195,7 @@ class CtlptlCustomRegistryImage(Resource):
         source_path: Optional[Input[str]] = None,
         repository_url: Optional[Input[str]] = None,
         image_name: Optional[Input[str]] = None,
+        target: Optional[Input[str]] = None,
         build_args: Optional[Input[dict[str, Input[str]]]] = None,
         opts: Optional[ResourceOptions] = None,
     ):
@@ -245,6 +209,7 @@ class CtlptlCustomRegistryImage(Resource):
                 "registry_name": registry_name,
                 "registry_port": registry_port,
                 "image_name": image_name,
+                "target": target,
                 "build_args": build_args,
                 "source_commit": None,
                 "image_tag": None,

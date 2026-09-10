@@ -31,6 +31,8 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     ClusterAPIAutoscaler,
     ClusterAPIAutoscalerOutputs,
     CONTROLLER_NODE_TYPE,
+    NATIVE_WORKLOAD_FEATURE_GATES,
+    NATIVE_WORKLOAD_RUNTIME_CONFIG,
     controller_taint,
     machine_deployment_labels,
     worker_labels,
@@ -360,13 +362,25 @@ def _kubeadm_control_plane_spec(
 ) -> dict[str, object]:
     kubeadm_config_spec: dict[str, object] = {
         "clusterConfiguration": {
+            "apiServer": {
+                "extraArgs": {
+                    "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
+                    "runtime-config": NATIVE_WORKLOAD_RUNTIME_CONFIG,
+                }
+            },
             "controllerManager": {
                 "extraArgs": {
                     "allocate-node-cidrs": "false",
                     "cloud-provider": "external",
                     "cluster-name": cluster_name,
+                    "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
                 }
-            }
+            },
+            "scheduler": {
+                "extraArgs": {
+                    "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
+                }
+            },
         },
         "files": [
             _cloud_config_file(

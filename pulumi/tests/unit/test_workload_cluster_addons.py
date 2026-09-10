@@ -10,6 +10,7 @@ from stacks.workload_cluster.workload_cluster_addons import (
     _calico_vxlan_values,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
+    calico_typha_deployment,
     controller_bootstrap_tolerations,
     controller_node_affinity,
     controller_node_selector,
@@ -58,3 +59,6 @@ def test_calico_uses_always_on_vxlan() -> None:
     assert values["installation"][
         "controlPlaneTolerations"
     ] == controller_tolerations()
+    assert values["installation"][
+        "typhaDeployment"
+    ] == calico_typha_deployment()

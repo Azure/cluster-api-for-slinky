@@ -17,9 +17,9 @@ from localenv import discover_azure_resource_placement
 from stacks.workload_cluster.workload_cluster_deployments import (
     KEDAOutputs,
     KEDANodeSetScalerSpec,
+    SlinkyDeploymentConfig,
     SlurmNodeSetSpec,
     _PROMETHEUS_CHART_VERSION,
-    _SLINKY_CHART_VERSION,
     WorkloadClusterDeployments,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
@@ -102,6 +102,7 @@ def _resolve_resource_group(parameters: AzureWorkloadSpec) -> str:
 class AKSWorkloadClusterConfig(PulumiConfigModel):
     class_name: Literal["aks"] = _CLUSTER_CLASS
     parameters: AzureWorkloadSpec
+    slinky: SlinkyDeploymentConfig = SlinkyDeploymentConfig()
 
     @field_serializer("class_name")
     def serialize_class_name(self, class_name: str) -> str:
@@ -127,6 +128,8 @@ class AKSWorkloadClusterOutputs(BaseModel):
     slurm_operator_status: Any
     slurm_chart_version: str
     slurm_status: Any
+    slurm_bridge_chart_version: str
+    slurm_bridge_status: Any
     todo: str
 
 
@@ -217,6 +220,7 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             instance=instance,
             slurm_node_sets=slurm_node_sets,
             keda_scaled_node_sets=keda_scaled_node_sets,
+            slinky=config.slinky,
             workload_provider=infrastructure.workload_provider,
             opts=child_options(depends_on=[infrastructure]),
         )
@@ -238,10 +242,12 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             "prometheus_namespace": deployments.prometheus_namespace,
             "prometheus_status": deployments.prometheus_status,
             "workload_cluster_ready": deployments.workload_cluster_ready,
-            "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_operator_chart_version": config.slinky.operator_chart_version,
             "slurm_operator_status": deployments.slurm_operator_status,
-            "slurm_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_chart_version": config.slinky.slurm_chart_version,
             "slurm_status": deployments.slurm_status,
+            "slurm_bridge_chart_version": deployments.slurm_bridge_chart_version,
+            "slurm_bridge_status": deployments.slurm_bridge_status,
             "todo": pulumi.Output.from_input(
                 "Validate AKS workload-driven autoscaling end-to-end."
             ),

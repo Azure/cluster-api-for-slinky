@@ -17,8 +17,9 @@ from ctlptl import (
     CloudProviderKind,
     CloudProviderKindConfig,
     CtlptlCluster,
-    CtlptlCustomRegistryImage,
     CtlptlCustomRegistryOCIArtifact,
+    CtlptlCustomRegistryHelmCharts,
+    CtlptlCustomRegistryImage,
     CtlptlRegistry,
     CtlptlRegistryService,
 )
@@ -27,7 +28,9 @@ from fluxcd import FluxInfrastructure
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from pko import PKOBootstrap, PKO_NAMESPACE
 from stacks.workload_cluster.registry_setting import (
-    LocalPortRegistrySetting,
+    ContainerdHostConfig,
+    ContainerdRegistryConfig,
+    LocalRegistryConfig,
 )
 from stacks.workload_cluster.tenants import (
     WorkloadClusterConfig,
@@ -38,17 +41,28 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     AzureBYOWorkloadClusterConfig,
 )
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
+from stacks.workload_cluster.workload_cluster_deployments import (
+    SlinkyDeploymentConfig,
+    SlinkyImageConfig,
+)
 
 
 _OWNER_TAG = "Owner"
 _CUSTOM_IMAGES_CONFIG_KEY = "customImages"
 _CAPZ_ARTIFACT_CONFIG_KEY = "capzArtifact"
+_SLINKY_CHARTS_CONFIG_KEY = "slinkyCharts"
 _CUSTOM_REGISTRY_NAME = "custom-registry"
 _CUSTOM_REGISTRY_ENV: list[pulumi.Input[str]] = [
     "CA4S_REGISTRY_MODE=custom-registry",
 ]
 _CAPZ_ARTIFACT_NAME = "capz/cluster-api-provider-azure"
 _CAPZ_CONTROLLER_IMAGE_KEY = "capz-controller"
+_SLINKY_OPERATOR_IMAGE_KEY = "slurm-operator"
+_SLINKY_WEBHOOK_IMAGE_KEY = "slurm-operator-webhook"
+_SLINKY_IMAGE_TARGETS = {
+    _SLINKY_OPERATOR_IMAGE_KEY: "manager",
+    _SLINKY_WEBHOOK_IMAGE_KEY: "webhook",
+}
 
 
 class GitSourceConfig(PulumiConfigModel):
@@ -65,6 +79,7 @@ class GitSourceConfig(PulumiConfigModel):
 
 class CustomImageConfig(GitSourceConfig):
     image_name: NonEmptyStr
+    target: NonEmptyStr | None = None
     build_args: Mapping[NonEmptyStr, NonEmptyStr] | None = None
 
 
@@ -73,9 +88,41 @@ class CustomImagesConfig(PulumiConfigModel):
     registry_port: StrictPositiveInt | None = None
     images: Mapping[NonEmptyStr, CustomImageConfig] = {}
 
+    @model_validator(mode="after")
+    def validate_slinky_targets(self) -> CustomImagesConfig:
+        for image_key, expected_target in _SLINKY_IMAGE_TARGETS.items():
+            image = self.images.get(image_key)
+            if image is not None and image.target != expected_target:
+                raise ValueError(
+                    f"custom image {image_key!r} requires target {expected_target!r}"
+                )
+        return self
+
 
 class CAPZArtifactConfig(GitSourceConfig):
     artifact_name: NonEmptyStr = _CAPZ_ARTIFACT_NAME
+
+
+class SlinkyChartsConfig(GitSourceConfig):
+    pass
+
+
+def _validate_slinky_build_config(
+    custom_images_config: CustomImagesConfig | None,
+    slinky_charts_config: SlinkyChartsConfig | None,
+) -> None:
+    if slinky_charts_config is None:
+        return
+    image_keys = (
+        set(custom_images_config.images)
+        if custom_images_config is not None
+        else set()
+    )
+    missing = set(_SLINKY_IMAGE_TARGETS).difference(image_keys)
+    if missing:
+        raise ValueError(
+            "slinkyCharts requires custom images: " + ", ".join(sorted(missing))
+        )
 
 
 def run_stack() -> None:
@@ -97,12 +144,19 @@ def run_stack() -> None:
         if capz_artifact_config_value is not None
         else None
     )
+    slinky_charts_config_value = config.get_object(_SLINKY_CHARTS_CONFIG_KEY)
+    slinky_charts_config = (
+        SlinkyChartsConfig.model_validate(slinky_charts_config_value)
+        if slinky_charts_config_value is not None
+        else None
+    )
+    _validate_slinky_build_config(custom_images_config, slinky_charts_config)
 
     cache_registry = CtlptlRegistry("cache-registry")
     custom_registry: CtlptlRegistry | None = None
     if (
         custom_images_config is not None and custom_images_config.images
-    ) or capz_artifact_config is not None:
+    ) or capz_artifact_config is not None or slinky_charts_config is not None:
         custom_registry = CtlptlRegistry(
             "custom-registry",
             registry_name=(
@@ -131,6 +185,7 @@ def run_stack() -> None:
                 registry_name=custom_registry.registry_name,
                 registry_port=custom_registry.port,
                 image_name=image_config.image_name,
+                target=image_config.target,
                 build_args=build_args,
                 opts=pulumi.ResourceOptions(depends_on=[custom_registry]),
             )
@@ -144,6 +199,17 @@ def run_stack() -> None:
             registry_name=custom_registry.registry_name,
             registry_port=custom_registry.port,
             artifact_name=capz_artifact_config.artifact_name,
+            opts=pulumi.ResourceOptions(depends_on=[custom_registry]),
+        )
+    slinky_charts: CtlptlCustomRegistryHelmCharts | None = None
+    if slinky_charts_config is not None and custom_registry is not None:
+        slinky_charts = CtlptlCustomRegistryHelmCharts(
+            "slinky-charts",
+            source_path=slinky_charts_config.source_path,
+            repository_url=slinky_charts_config.repository_url,
+            source_ref=slinky_charts_config.source_ref,
+            registry_name=custom_registry.registry_name,
+            registry_port=custom_registry.port,
             opts=pulumi.ResourceOptions(depends_on=[custom_registry]),
         )
 
@@ -205,9 +271,21 @@ def run_stack() -> None:
     )
 
     base_init_stack_config = _with_owner_tag_config(
-        _with_local_registry_config(
+        _with_local_registry_configs(
             InitStackConfig.model_validate(config.get_object("initStack") or {}),
-            LocalPortRegistrySetting(port=cache_registry.port),
+            (
+                LocalRegistryConfig(
+                    registry="docker.io",
+                    config=ContainerdRegistryConfig(
+                        server="https://registry-1.docker.io",
+                        hosts=(
+                            ContainerdHostConfig(
+                                gateway_port=cache_registry.port,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
         )
     )
     capz_controller_image_ref: pulumi.Output[str] | None = None
@@ -217,6 +295,36 @@ def run_stack() -> None:
         base_init_stack_config,
         provider_oci=capz_artifact_oci_url,
         controller_image=capz_controller_image_ref,
+    )
+    slinky_operator_image_ref: pulumi.Output[str] | None = None
+    if _SLINKY_OPERATOR_IMAGE_KEY in custom_images:
+        slinky_operator_image_ref = custom_images[_SLINKY_OPERATOR_IMAGE_KEY].image_ref
+    slinky_webhook_image_ref: pulumi.Output[str] | None = None
+    if _SLINKY_WEBHOOK_IMAGE_KEY in custom_images:
+        slinky_webhook_image_ref = custom_images[_SLINKY_WEBHOOK_IMAGE_KEY].image_ref
+    slinky_chart_oci_prefix: pulumi.Output[str] | None = None
+    if slinky_charts is not None and custom_registry_service is not None:
+        slinky_chart_oci_prefix = _slinky_chart_oci_prefix(custom_registry_service)
+    has_local_slinky_overrides = any(
+        item is not None
+        for item in (
+            slinky_charts,
+            slinky_operator_image_ref,
+            slinky_webhook_image_ref,
+        )
+    )
+    init_stack_config = _with_local_slinky_overrides(
+        init_stack_config,
+        chart_oci_prefix=slinky_chart_oci_prefix,
+        chart_version=(slinky_charts.chart_version if slinky_charts is not None else None),
+        operator_image=slinky_operator_image_ref,
+        webhook_image=slinky_webhook_image_ref,
+        registry_name=(
+            custom_images_config.registry_name
+            if custom_images_config is not None
+            else _CUSTOM_REGISTRY_NAME
+        ) if has_local_slinky_overrides else None,
+        registry_port=(custom_registry.port if custom_registry is not None and has_local_slinky_overrides else None),
     )
 
     pko = PKOBootstrap(
@@ -246,21 +354,37 @@ def run_stack() -> None:
         custom_images=custom_images,
         capz_artifact=capz_artifact,
         capz_artifact_oci_url=capz_artifact_oci_url,
+        slinky_charts=slinky_charts,
+        slinky_chart_oci_prefix=slinky_chart_oci_prefix,
         custom_registry_service=custom_registry_service,
     )
     if _azure_infrastructure_enabled(base_init_stack_config):
         _export_azure_config_outputs(base_init_stack_config)
 
 
-def _with_local_registry_config(
+def _merge_registry_configs(
+    current: tuple[LocalRegistryConfig, ...],
+    updates: tuple[LocalRegistryConfig, ...],
+) -> tuple[LocalRegistryConfig, ...]:
+    merged = {config.registry: config for config in current}
+    merged.update((config.registry, config) for config in updates)
+    return tuple(merged.values())
+
+
+def _with_local_registry_configs(
     init_stack_config: InitStackConfig,
-    registry: LocalPortRegistrySetting,
+    registries: tuple[LocalRegistryConfig, ...],
 ) -> InitStackConfig:
     workload_clusters: dict[str, WorkloadClusterConfig] = {}
     for name, workload_cluster in init_stack_config.tenants.workload_clusters.items():
         if isinstance(workload_cluster, LocalWorkloadClusterConfig):
             workload_cluster = workload_cluster.model_copy(
-                update={"registry": registry}
+                update={
+                    "registries": _merge_registry_configs(
+                        workload_cluster.registries,
+                        registries,
+                    )
+                }
             )
         workload_clusters[name] = workload_cluster
 
@@ -271,6 +395,138 @@ def _with_local_registry_config(
             )
         }
     )
+
+
+def _slinky_image_config(image_ref: str | None) -> SlinkyImageConfig | None:
+    if image_ref is None:
+        return None
+    repository, separator, tag = image_ref.rpartition(":")
+    if not separator or not repository or not tag:
+        raise ValueError(f"invalid tagged Slinky image reference: {image_ref!r}")
+    return SlinkyImageConfig(repository=repository, tag=tag)
+
+
+def _merge_local_slinky_overrides(
+    init_stack_config: InitStackConfig,
+    *,
+    chart_oci_prefix: str | None,
+    chart_version: str | None,
+    operator_image: str | None,
+    webhook_image: str | None,
+    registry_name: str | None,
+    registry_port: int | None,
+) -> InitStackConfig:
+    workload_clusters: dict[str, WorkloadClusterConfig] = {}
+    for name, workload_cluster in init_stack_config.tenants.workload_clusters.items():
+        if isinstance(workload_cluster, LocalWorkloadClusterConfig):
+            slinky_updates: dict[str, object] = {}
+            if chart_oci_prefix is not None:
+                slinky_updates.update(
+                    {
+                        "chart_oci_prefix": chart_oci_prefix,
+                        "chart_plain_http": True,
+                    }
+                )
+            if chart_version is not None:
+                slinky_updates.update(
+                    {
+                        "operator_crds_chart_version": chart_version,
+                        "operator_chart_version": chart_version,
+                        "slurm_chart_version": chart_version,
+                    }
+                )
+            resolved_operator_image = _slinky_image_config(operator_image)
+            if resolved_operator_image is not None:
+                slinky_updates["operator_image"] = resolved_operator_image
+            resolved_webhook_image = _slinky_image_config(webhook_image)
+            if resolved_webhook_image is not None:
+                slinky_updates["webhook_image"] = resolved_webhook_image
+
+            cluster_updates: dict[str, object] = {}
+            if slinky_updates:
+                cluster_updates["slinky"] = workload_cluster.slinky.model_copy(
+                    update=slinky_updates
+                )
+            if registry_name is not None and registry_port is not None:
+                registry = f"{registry_name}:5000"
+                cluster_updates["registries"] = _merge_registry_configs(
+                    workload_cluster.registries,
+                    (
+                        LocalRegistryConfig(
+                            registry=registry,
+                            config=ContainerdRegistryConfig(
+                                server=f"http://{registry}",
+                                hosts=(
+                                    ContainerdHostConfig(
+                                        gateway_port=registry_port,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            if cluster_updates:
+                workload_cluster = workload_cluster.model_copy(update=cluster_updates)
+        workload_clusters[name] = workload_cluster
+
+    return init_stack_config.model_copy(
+        update={
+            "tenants": init_stack_config.tenants.model_copy(
+                update={"workload_clusters": workload_clusters}
+            )
+        }
+    )
+
+
+def _with_local_slinky_overrides(
+    init_stack_config: pulumi.Input[InitStackConfig],
+    *,
+    chart_oci_prefix: pulumi.Input[str] | None,
+    chart_version: pulumi.Input[str] | None,
+    operator_image: pulumi.Input[str] | None,
+    webhook_image: pulumi.Input[str] | None,
+    registry_name: pulumi.Input[str] | None,
+    registry_port: pulumi.Input[int] | None,
+) -> pulumi.Input[InitStackConfig]:
+    if all(
+        item is None
+        for item in (
+            chart_oci_prefix,
+            chart_version,
+            operator_image,
+            webhook_image,
+            registry_name,
+            registry_port,
+        )
+    ):
+        return init_stack_config
+
+    def merge(resolved: dict[str, object]) -> InitStackConfig:
+        config_value = resolved["init_stack_config"]
+        resolved_config = (
+            config_value
+            if isinstance(config_value, InitStackConfig)
+            else InitStackConfig.model_validate(config_value)
+        )
+        return _merge_local_slinky_overrides(
+            resolved_config,
+            chart_oci_prefix=resolved.get("chart_oci_prefix"),
+            chart_version=resolved.get("chart_version"),
+            operator_image=resolved.get("operator_image"),
+            webhook_image=resolved.get("webhook_image"),
+            registry_name=resolved.get("registry_name"),
+            registry_port=resolved.get("registry_port"),
+        )
+
+    return pulumi.Output.all(
+        init_stack_config=init_stack_config,
+        chart_oci_prefix=chart_oci_prefix,
+        chart_version=chart_version,
+        operator_image=operator_image,
+        webhook_image=webhook_image,
+        registry_name=registry_name,
+        registry_port=registry_port,
+    ).apply(merge)
 
 
 def _with_owner_tag_config(
@@ -401,6 +657,18 @@ def _capz_artifact_oci_url(
     )
 
 
+def _slinky_chart_oci_prefix(
+    custom_registry_service: CtlptlRegistryService,
+) -> pulumi.Output[str]:
+    return pulumi.Output.concat(
+        "oci://",
+        custom_registry_service.service_name,
+        ".",
+        custom_registry_service.namespace,
+        ".svc.cluster.local:5000/charts",
+    )
+
+
 def _export_azure_config_outputs(init_stack_config: InitStackConfig) -> None:
     providers = init_stack_config.control_plane.infrastructure_providers
     azure_provider = providers.azure
@@ -446,6 +714,8 @@ def _export_common_outputs(
     custom_images: Mapping[str, CtlptlCustomRegistryImage],
     capz_artifact: CtlptlCustomRegistryOCIArtifact | None,
     capz_artifact_oci_url: pulumi.Output[str] | None,
+    slinky_charts: CtlptlCustomRegistryHelmCharts | None,
+    slinky_chart_oci_prefix: pulumi.Output[str] | None,
     custom_registry_service: CtlptlRegistryService | None,
 ) -> None:
     pulumi.export("cache_registry_name", cache_registry.registry_name)
@@ -459,6 +729,10 @@ def _export_common_outputs(
         pulumi.export("capz_artifact_ref", capz_artifact.artifact_ref)
         if capz_artifact_oci_url is not None:
             pulumi.export("capz_artifact_oci_url", capz_artifact_oci_url)
+    if slinky_charts is not None:
+        pulumi.export("slinky_chart_version", slinky_charts.chart_version)
+        if slinky_chart_oci_prefix is not None:
+            pulumi.export("slinky_chart_oci_prefix", slinky_chart_oci_prefix)
     pulumi.export("cluster_name", cluster.cluster_name)
     pulumi.export("context", cluster.context)
     pulumi.export("kubeconfig", cluster.kubeconfig)

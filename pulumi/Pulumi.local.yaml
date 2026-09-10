@@ -3,6 +3,21 @@
 
 encryptionsalt: v1:rYyJwlvWbf8=:v1:i6q8HBx3zuJMnYPW:W0kFQbNIFTt3r5lGzcSI/jkIeWRZwA==
 config:
+  ca4s-infra:customImages:
+    images:
+      slurm-operator:
+        repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+        sourceRef: c284b9577df89472bf3b91c04ae582d1545da5c7
+        imageName: slurm-operator
+        target: manager
+      slurm-operator-webhook:
+        repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+        sourceRef: c284b9577df89472bf3b91c04ae582d1545da5c7
+        imageName: slurm-operator-webhook
+        target: webhook
+  ca4s-infra:slinkyCharts:
+    repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+    sourceRef: c284b9577df89472bf3b91c04ae582d1545da5c7
   ca4s-infra:initStack:
     controlPlane:
       infrastructureProviders:

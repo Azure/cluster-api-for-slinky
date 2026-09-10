@@ -11,10 +11,14 @@ from pydantic import ValidationError
 from stack import (
     CAPZArtifactConfig,
     CustomImagesConfig,
+    SlinkyChartsConfig,
     _azure_infrastructure_enabled,
     _discover_username,
     _merge_capz_provider_overrides,
-    _with_local_registry_config,
+    _merge_local_slinky_overrides,
+    _slinky_image_config,
+    _validate_slinky_build_config,
+    _with_local_registry_configs,
     _with_owner_tag_config,
 )
 from stacks.control_plane.control_plane_config import (
@@ -25,7 +29,11 @@ from stacks.control_plane.control_plane_config import (
     UserAssignedMSIClusterIdentityConfig,
 )
 from stacks.init.init_stack import InitStackConfig
-from stacks.workload_cluster.registry_setting import LocalPortRegistrySetting
+from stacks.workload_cluster.registry_setting import (
+    ContainerdHostConfig,
+    ContainerdRegistryConfig,
+    LocalRegistryConfig,
+)
 from stacks.workload_cluster.tenants import TenantsConfig
 from stacks.workload_cluster.workload_cluster_class_aks import (
     AKSWorkloadClusterConfig,
@@ -43,6 +51,20 @@ _TENANT_ID = "33333333-3333-3333-3333-333333333333"
 _SUBSCRIPTION_ID = "44444444-4444-4444-4444-444444444444"
 _LOCATION = "westus2"
 _RESOURCE_GROUP = "host-rg"
+
+
+def _registry_config(
+    registry: str,
+    server: str,
+    port: object,
+) -> LocalRegistryConfig:
+    return LocalRegistryConfig(
+        registry=registry,
+        config=ContainerdRegistryConfig(
+            server=server,
+            hosts=(ContainerdHostConfig(gateway_port=port),),
+        ),
+    )
 
 
 def test_empty_config_does_not_enable_azure() -> None:
@@ -86,6 +108,7 @@ def test_custom_images_config_parses_source_and_registry_options() -> None:
                     "sourcePath": "/src/controller",
                     "sourceRef": "feature",
                     "imageName": "custom/controller",
+                    "target": "manager",
                     "buildArgs": {"ARCH": "amd64", "package": "./cmd"},
                 }
             },
@@ -98,7 +121,150 @@ def test_custom_images_config_parses_source_and_registry_options() -> None:
     assert image.source_path == "/src/controller"
     assert image.source_ref == "feature"
     assert image.image_name == "custom/controller"
+    assert image.target == "manager"
     assert image.build_args == {"ARCH": "amd64", "package": "./cmd"}
+
+
+def test_slinky_charts_config_accepts_local_source() -> None:
+    config = SlinkyChartsConfig.model_validate(
+        {
+            "sourcePath": "/src/slurm-operator",
+            "sourceRef": "feature/slinky",
+        }
+    )
+
+    assert config.source_path == "/src/slurm-operator"
+    assert config.source_ref == "feature/slinky"
+
+
+def test_slinky_charts_config_accepts_remote_git_source() -> None:
+    config = SlinkyChartsConfig.model_validate(
+        {
+            "repositoryUrl": "https://github.com/SlinkyProject/slurm-operator.git",
+            "sourceRef": "c284b9577df89472bf3b91c04ae582d1545da5c7",
+        }
+    )
+
+    assert config.source_path is None
+    assert config.repository_url == (
+        "https://github.com/SlinkyProject/slurm-operator.git"
+    )
+    assert config.source_ref == "c284b9577df89472bf3b91c04ae582d1545da5c7"
+
+
+def test_slinky_custom_images_require_expected_targets() -> None:
+    with pytest.raises(ValueError, match="requires target 'manager'"):
+        CustomImagesConfig.model_validate(
+            {
+                "images": {
+                    "slurm-operator": {
+                        "sourcePath": "/src/slurm-operator",
+                        "sourceRef": "HEAD",
+                        "imageName": "slurm-operator",
+                        "target": "webhook",
+                    }
+                }
+            }
+        )
+
+
+def test_slinky_charts_require_both_custom_images() -> None:
+    images = CustomImagesConfig.model_validate(
+        {
+            "images": {
+                "slurm-operator": {
+                    "sourcePath": "/src/slurm-operator",
+                    "sourceRef": "HEAD",
+                    "imageName": "slurm-operator",
+                    "target": "manager",
+                }
+            }
+        }
+    )
+    charts = SlinkyChartsConfig(
+        source_path="/src/slurm-operator",
+        source_ref="HEAD",
+    )
+
+    with pytest.raises(ValueError, match="slurm-operator-webhook"):
+        _validate_slinky_build_config(images, charts)
+
+
+def test_slinky_image_config_parses_registry_port_and_tag() -> None:
+    image = _slinky_image_config(
+        "custom-registry:5000/slurm-operator:source-1234567890ab"
+    )
+
+    assert image is not None
+    assert image.repository == "custom-registry:5000/slurm-operator"
+    assert image.tag == "source-1234567890ab"
+
+
+def test_local_slinky_overrides_update_only_local_workload_clusters() -> None:
+    config = InitStackConfig(
+        tenants=TenantsConfig(
+            workload_clusters={
+                "local": LocalWorkloadClusterConfig(
+                    registries=(
+                        _registry_config(
+                            "registry.example:5000",
+                            "https://registry.example:5000",
+                            5443,
+                        ),
+                    )
+                ),
+                "caps-aks": AKSWorkloadClusterConfig(
+                    parameters=AzureWorkloadSpec(
+                        subscription_id=_SUBSCRIPTION_ID,
+                        location="westus2",
+                        resource_group="rg-capz-mi-dev2",
+                    )
+                ),
+            }
+        )
+    )
+
+    updated = _merge_local_slinky_overrides(
+        config,
+        chart_oci_prefix=(
+            "oci://custom-registry.pulumi-kubernetes-operator."
+            "svc.cluster.local:5000/charts"
+        ),
+        chart_version="0.0.0-source1234567890ab",
+        operator_image=(
+            "custom-registry:5000/slurm-operator:source-1234567890ab"
+        ),
+        webhook_image=(
+            "custom-registry:5000/slurm-operator-webhook:source-1234567890ab"
+        ),
+        registry_name="custom-registry",
+        registry_port=5003,
+    )
+
+    local = updated.tenants.workload_clusters["local"]
+    assert isinstance(local, LocalWorkloadClusterConfig)
+    assert local.registries == (
+        _registry_config(
+            "registry.example:5000",
+            "https://registry.example:5000",
+            5443,
+        ),
+        _registry_config(
+            "custom-registry:5000",
+            "http://custom-registry:5000",
+            5003,
+        ),
+    )
+    assert local.slinky.chart_plain_http is True
+    assert local.slinky.operator_chart_version == "0.0.0-source1234567890ab"
+    assert local.slinky.operator_image is not None
+    assert local.slinky.operator_image.repository == (
+        "custom-registry:5000/slurm-operator"
+    )
+
+    aks = updated.tenants.workload_clusters["caps-aks"]
+    assert isinstance(aks, AKSWorkloadClusterConfig)
+    assert aks.slinky.operator_image is None
 
 
 def test_custom_images_config_defaults_to_dedicated_registry() -> None:
@@ -334,7 +500,15 @@ def test_local_registry_config_is_applied_to_local_workload_clusters_only() -> N
     config = InitStackConfig(
         tenants=TenantsConfig(
             workload_clusters={
-                "local": LocalWorkloadClusterConfig(),
+                "local": LocalWorkloadClusterConfig(
+                    registries=(
+                        _registry_config(
+                            "registry.example:5000",
+                            "https://registry.example:5000",
+                            5443,
+                        ),
+                    )
+                ),
                 "caps-aks": AKSWorkloadClusterConfig(
                     parameters=AzureWorkloadSpec(
                         subscription_id=_SUBSCRIPTION_ID,
@@ -347,16 +521,37 @@ def test_local_registry_config_is_applied_to_local_workload_clusters_only() -> N
         )
     )
 
-    updated = _with_local_registry_config(
+    updated = _with_local_registry_configs(
         config,
-        LocalPortRegistrySetting(port=5002),
+        (
+            _registry_config(
+                "docker.io",
+                "https://registry-1.docker.io",
+                5002,
+            ),
+        ),
     )
 
     assert updated.tenants.to_config() == {
         "workloadClusters": {
             "local": {
                 "className": "local",
-                "registry": {"kind": "local-port", "port": 5002},
+                "registries": [
+                    {
+                        "registry": "registry.example:5000",
+                        "config": {
+                            "server": "https://registry.example:5000",
+                            "hosts": [{"gatewayPort": 5443}],
+                        },
+                    },
+                    {
+                        "registry": "docker.io",
+                        "config": {
+                            "server": "https://registry-1.docker.io",
+                            "hosts": [{"gatewayPort": 5002}],
+                        },
+                    }
+                ],
             },
             "caps-aks": {
                 "className": "aks",

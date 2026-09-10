@@ -5,7 +5,8 @@
 
 from __future__ import annotations
 
-import subprocess
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -18,14 +19,7 @@ _SOURCE_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 
 
 @pytest.fixture
-def provider(
-    monkeypatch: pytest.MonkeyPatch,
-) -> ctlptl_custom_registry_oci_artifact._CtlptlCustomRegistryOCIArtifactProvider:
-    monkeypatch.setattr(
-        ctlptl_custom_registry_oci_artifact.shutil,
-        "which",
-        lambda name: f"/bin/{name}",
-    )
+def provider() -> ctlptl_custom_registry_oci_artifact._CtlptlCustomRegistryOCIArtifactProvider:
     return ctlptl_custom_registry_oci_artifact._CtlptlCustomRegistryOCIArtifactProvider()
 
 
@@ -173,23 +167,29 @@ def test_build_and_push_uses_capz_release_targets_and_oras(
     tmp_path: Path,
 ) -> None:
     calls: list[tuple[list[str], str | None]] = []
-    removed: list[str] = []
     worktree = tmp_path / "worktree"
 
+    @contextmanager
+    def fake_worktree(
+        repository_path: str,
+        source_commit: str,
+        *,
+        prefix: str,
+    ) -> Iterator[str]:
+        assert repository_path == "/src/capz"
+        assert source_commit == _SOURCE_COMMIT
+        assert prefix == "ca4s-capz-artifact-"
+        yield str(worktree)
+
     monkeypatch.setattr(
-        ctlptl_custom_registry_oci_artifact.shutil,
-        "which",
+        ctlptl_custom_registry_oci_artifact.oci_object,
+        "require_binary",
         lambda name: f"/bin/{name}",
     )
     monkeypatch.setattr(
-        ctlptl_custom_registry_oci_artifact.tempfile,
-        "mkdtemp",
-        lambda prefix: str(worktree),
-    )
-    monkeypatch.setattr(
-        ctlptl_custom_registry_oci_artifact.shutil,
-        "rmtree",
-        lambda path, ignore_errors=False: removed.append(path),
+        ctlptl_custom_registry_oci_artifact.oci_object,
+        "detached_worktree",
+        fake_worktree,
     )
 
     def fake_run(
@@ -197,9 +197,7 @@ def test_build_and_push_uses_capz_release_targets_and_oras(
         *,
         cwd: str | None = None,
         check: bool = True,
-        capture_output: bool = True,
-        text: bool = True,
-    ) -> subprocess.CompletedProcess:
+    ) -> None:
         calls.append((cmd, cwd))
         if cmd == ["make", "release-manifests", "release-metadata"]:
             out_dir = worktree / "out"
@@ -209,9 +207,12 @@ def test_build_and_push_uses_capz_release_targets_and_oras(
                 "components",
                 encoding="utf-8",
             )
-        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
-    monkeypatch.setattr(ctlptl_custom_registry_oci_artifact.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        ctlptl_custom_registry_oci_artifact.oci_object,
+        "run",
+        fake_run,
+    )
 
     ctlptl_custom_registry_oci_artifact._build_and_push_artifact(
         source_path="/src/capz",
@@ -221,19 +222,6 @@ def test_build_and_push_uses_capz_release_targets_and_oras(
     )
 
     assert calls == [
-        (
-            [
-                "git",
-                "-C",
-                "/src/capz",
-                "worktree",
-                "add",
-                "--detach",
-                str(worktree),
-                _SOURCE_COMMIT,
-            ],
-            None,
-        ),
         (["make", "release-manifests", "release-metadata"], str(worktree)),
         (
             [
@@ -246,12 +234,7 @@ def test_build_and_push_uses_capz_release_targets_and_oras(
             ],
             str(worktree / "out"),
         ),
-        (
-            ["git", "-C", "/src/capz", "worktree", "remove", "--force", str(worktree)],
-            None,
-        ),
     ]
-    assert removed == [str(worktree)]
 
 
 def test_build_and_push_requires_generated_files(
@@ -259,20 +242,25 @@ def test_build_and_push_requires_generated_files(
     tmp_path: Path,
 ) -> None:
     worktree = tmp_path / "worktree"
+
+    @contextmanager
+    def fake_worktree(
+        repository_path: str,
+        source_commit: str,
+        *,
+        prefix: str,
+    ) -> Iterator[str]:
+        yield str(worktree)
+
     monkeypatch.setattr(
-        ctlptl_custom_registry_oci_artifact.shutil,
-        "which",
+        ctlptl_custom_registry_oci_artifact.oci_object,
+        "require_binary",
         lambda name: f"/bin/{name}",
     )
     monkeypatch.setattr(
-        ctlptl_custom_registry_oci_artifact.tempfile,
-        "mkdtemp",
-        lambda prefix: str(worktree),
-    )
-    monkeypatch.setattr(
-        ctlptl_custom_registry_oci_artifact.shutil,
-        "rmtree",
-        lambda path, ignore_errors=False: None,
+        ctlptl_custom_registry_oci_artifact.oci_object,
+        "detached_worktree",
+        fake_worktree,
     )
 
     def fake_run(
@@ -280,15 +268,16 @@ def test_build_and_push_requires_generated_files(
         *,
         cwd: str | None = None,
         check: bool = True,
-        capture_output: bool = True,
-        text: bool = True,
-    ) -> subprocess.CompletedProcess:
+    ) -> None:
         if cmd == ["make", "release-manifests", "release-metadata"]:
             (worktree / "out").mkdir(parents=True)
             (worktree / "out" / "metadata.yaml").write_text("metadata", encoding="utf-8")
-        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
-    monkeypatch.setattr(ctlptl_custom_registry_oci_artifact.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        ctlptl_custom_registry_oci_artifact.oci_object,
+        "run",
+        fake_run,
+    )
 
     with pytest.raises(RuntimeError, match="infrastructure-components.yaml"):
         ctlptl_custom_registry_oci_artifact._build_and_push_artifact(
