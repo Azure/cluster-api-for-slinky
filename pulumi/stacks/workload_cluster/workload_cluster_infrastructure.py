@@ -30,6 +30,8 @@ POD_SECURITY_PRIVILEGED_LABELS = {
 
 CLUSTER_AUTOSCALER_DISCOVERY_LABEL = "ca4s.azure.com/autoscaler-enabled"
 CLUSTER_AUTOSCALER_DISCOVERY_LABEL_VALUE = "true"
+NATIVE_WORKLOAD_FEATURE_GATES = "GenericWorkload=true,WorkloadWithJob=true"
+NATIVE_WORKLOAD_RUNTIME_CONFIG = "scheduling.k8s.io/v1alpha2=true"
 
 _CLUSTER_AUTOSCALER_CHART_REPO = "https://kubernetes.github.io/autoscaler"
 _CLUSTER_AUTOSCALER_CHART_NAME = "cluster-autoscaler"

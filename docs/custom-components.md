@@ -124,17 +124,17 @@ ca4s-infra:customImages:
   images:
     slurm-operator:
       repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
-      sourceRef: ee37d5aaccacca2a2fddb9bd0581e6f8004d4ece
+      sourceRef: c284b9577df89472bf3b91c04ae582d1545da5c7
       imageName: slurm-operator
       target: manager
     slurm-operator-webhook:
       repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
-      sourceRef: ee37d5aaccacca2a2fddb9bd0581e6f8004d4ece
+      sourceRef: c284b9577df89472bf3b91c04ae582d1545da5c7
       imageName: slurm-operator-webhook
       target: webhook
 ca4s-infra:slinkyCharts:
   repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
-  sourceRef: ee37d5aaccacca2a2fddb9bd0581e6f8004d4ece
+  sourceRef: c284b9577df89472bf3b91c04ae582d1545da5c7
 ```
 
 GitHub pull request refs such as `refs/pull/255/head` also work, but they are
@@ -185,6 +185,13 @@ without evicting `slurmd`.
 
 MCS isolation is not configured yet. Bridge workloads must remain exclusive
 until Slurm MCS configuration is added.
+
+Local and Azure BYO workload clusters use Kubernetes 1.36 or newer and enable
+the `GenericWorkload` and `WorkloadWithJob` feature gates together with the
+`scheduling.k8s.io/v1alpha2` API. This enables native `Workload` and `PodGroup`
+gang scheduling, including the Job controller's `spec.scheduling` integration.
+AKS does not expose these managed control-plane flags. CA4S does not yet install
+the JobSet controller; JobSet workloads require that addon separately.
 
 After `pulumi up`, inspect the generated references:
 

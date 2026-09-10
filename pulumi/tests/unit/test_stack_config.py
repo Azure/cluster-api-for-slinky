@@ -141,7 +141,7 @@ def test_slinky_charts_config_accepts_remote_git_source() -> None:
     config = SlinkyChartsConfig.model_validate(
         {
             "repositoryUrl": "https://github.com/SlinkyProject/slurm-operator.git",
-            "sourceRef": "ee37d5aaccacca2a2fddb9bd0581e6f8004d4ece",
+            "sourceRef": "c284b9577df89472bf3b91c04ae582d1545da5c7",
         }
     )
 
@@ -149,7 +149,7 @@ def test_slinky_charts_config_accepts_remote_git_source() -> None:
     assert config.repository_url == (
         "https://github.com/SlinkyProject/slurm-operator.git"
     )
-    assert config.source_ref == "ee37d5aaccacca2a2fddb9bd0581e6f8004d4ece"
+    assert config.source_ref == "c284b9577df89472bf3b91c04ae582d1545da5c7"
 
 
 def test_slinky_custom_images_require_expected_targets() -> None:

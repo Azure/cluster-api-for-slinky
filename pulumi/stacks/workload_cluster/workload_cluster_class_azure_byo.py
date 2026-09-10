@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any, Literal
 from uuid import UUID
@@ -16,6 +17,7 @@ from pydantic import (
     Field,
     StrictBool,
     field_serializer,
+    field_validator,
 )
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
@@ -43,6 +45,7 @@ _DEFAULT_KUBERNETES_VERSION = "v1.36.1"
 _DEFAULT_CONTROL_PLANE_VM_SIZE = "Standard_D2as_v5"
 _DEFAULT_WORKER_VM_SIZE = "Standard_D2as_v5"
 _DEFAULT_SSH_USERNAME = "capi"
+_KUBERNETES_VERSION_PATTERN = re.compile(r"^v?(\d+)\.(\d+)(?:\.\d+)?(?:[-+].*)?$")
 _CONTROLLER_NODE_TYPE = "controller"
 _COMPUTE_NODE_TYPE = "compute"
 
@@ -96,6 +99,16 @@ class AzureBYOWorkloadSpec(PulumiConfigModel):
     @field_serializer("subscription_id")
     def serialize_subscription_id(self, value: UUID) -> str:
         return str(value)
+
+    @field_validator("kubernetes_version")
+    @classmethod
+    def validate_kubernetes_version(cls, value: str) -> str:
+        match = _KUBERNETES_VERSION_PATTERN.fullmatch(value)
+        if match is None or tuple(map(int, match.groups())) < (1, 36):
+            raise ValueError(
+                "kubernetes_version must be v1.36 or newer for native PodGroup support"
+            )
+        return value
 
     @field_serializer("additional_tags")
     def serialize_additional_tags(

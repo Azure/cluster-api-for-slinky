@@ -22,6 +22,8 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     _resolve_resource_group,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
+    NATIVE_WORKLOAD_FEATURE_GATES,
+    NATIVE_WORKLOAD_RUNTIME_CONFIG,
     controller_taint,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
@@ -140,6 +142,15 @@ def test_azure_byo_config_does_not_expose_resource_group_or_vmss() -> None:
             "additionalTags": {"Owner": "zheyushen"},
         },
     }
+
+
+def test_azure_byo_requires_kubernetes_1_36_for_native_podgroups() -> None:
+    with pytest.raises(ValueError, match="v1.36 or newer"):
+        AzureBYOWorkloadSpec(
+            subscription_id=_SUBSCRIPTION_ID,
+            location="westus2",
+            kubernetes_version="v1.35.9",
+        )
 
 
 def test_azure_byo_config_serializes_auto_discovered_vnet_option() -> None:
@@ -738,6 +749,20 @@ def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
     }
     assert kubeadm["joinConfiguration"]["nodeRegistration"]["kubeletExtraArgs"] == {
         "cloud-provider": "external",
+    }
+    cluster_configuration = kubeadm["clusterConfiguration"]
+    assert cluster_configuration["apiServer"]["extraArgs"] == {
+        "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
+        "runtime-config": NATIVE_WORKLOAD_RUNTIME_CONFIG,
+    }
+    assert cluster_configuration["controllerManager"]["extraArgs"] == {
+        "allocate-node-cidrs": "false",
+        "cloud-provider": "external",
+        "cluster-name": "caps-self",
+        "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
+    }
+    assert cluster_configuration["scheduler"]["extraArgs"] == {
+        "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
     }
     assert "127.0.0.1 apiserver.caps-self.capz.io" in kubeadm[
         "preKubeadmCommands"

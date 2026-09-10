@@ -16,6 +16,8 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
     AUTOSCALER_MIN_ANNOTATION,
     CONTROLLER_NODE_TYPE,
+    NATIVE_WORKLOAD_FEATURE_GATES,
+    NATIVE_WORKLOAD_RUNTIME_CONFIG,
     calico_typha_deployment,
     controller_taint,
 )
@@ -27,6 +29,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_local import (
     _SERVICE_ACCOUNT_TOKEN_PATH,
     _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
     _calico_values,
+    _cluster_configuration,
     _containerd_registry_commands,
     _health_check,
     _management_kubeconfig,
@@ -119,6 +122,20 @@ def test_local_control_plane_registration_has_no_custom_label_or_taint() -> None
             },
         ]
     }
+
+
+def test_local_control_plane_enables_native_podgroups() -> None:
+    cluster_configuration = _cluster_configuration()
+    feature_gates = [
+        {"name": "feature-gates", "value": NATIVE_WORKLOAD_FEATURE_GATES}
+    ]
+
+    assert cluster_configuration["apiServer"]["extraArgs"] == [
+        *feature_gates,
+        {"name": "runtime-config", "value": NATIVE_WORKLOAD_RUNTIME_CONFIG},
+    ]
+    assert cluster_configuration["controllerManager"]["extraArgs"] == feature_gates
+    assert cluster_configuration["scheduler"]["extraArgs"] == feature_gates
 
 
 def test_local_controller_worker_registration_adds_critical_addons_taint() -> None:

@@ -49,6 +49,8 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     ClusterAPIAutoscaler,
     ClusterAPIAutoscalerOutputs,
     CONTROLLER_NODE_TYPE,
+    NATIVE_WORKLOAD_FEATURE_GATES,
+    NATIVE_WORKLOAD_RUNTIME_CONFIG,
     NODE_TYPE_LABEL,
     calico_typha_deployment,
     controller_bootstrap_tolerations,
@@ -269,6 +271,31 @@ def _kubeadm_config_template(
 
 def _api_group(api_version: str) -> str:
     return api_version.split("/", 1)[0]
+
+
+def _cluster_configuration() -> dict[str, object]:
+    feature_gates = [
+        {"name": "feature-gates", "value": NATIVE_WORKLOAD_FEATURE_GATES}
+    ]
+    return {
+        "apiServer": {
+            "certSANs": [
+                "localhost",
+                "127.0.0.1",
+                "0.0.0.0",
+                "host.docker.internal",
+            ],
+            "extraArgs": [
+                *feature_gates,
+                {
+                    "name": "runtime-config",
+                    "value": NATIVE_WORKLOAD_RUNTIME_CONFIG,
+                },
+            ],
+        },
+        "controllerManager": {"extraArgs": feature_gates},
+        "scheduler": {"extraArgs": feature_gates},
+    }
 
 
 def _object_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
@@ -780,16 +807,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     },
                 },
                 "kubeadmConfigSpec": {
-                    "clusterConfiguration": {
-                        "apiServer": {
-                            "certSANs": [
-                                "localhost",
-                                "127.0.0.1",
-                                "0.0.0.0",
-                                "host.docker.internal",
-                            ],
-                        },
-                    },
+                    "clusterConfiguration": _cluster_configuration(),
                     "initConfiguration": {
                         "nodeRegistration": _node_registration(),
                     },
