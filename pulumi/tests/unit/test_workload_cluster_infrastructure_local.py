@@ -57,8 +57,8 @@ def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
     }
 
 
-def test_v1beta1_cluster_wait_uses_legacy_control_plane_condition() -> None:
-    assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneReady"
+def test_v1beta2_cluster_wait_uses_control_plane_available_condition() -> None:
+    assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneAvailable"
 
 
 def test_local_health_check_allows_initial_addon_convergence() -> None:
