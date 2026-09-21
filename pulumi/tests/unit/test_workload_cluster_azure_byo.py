@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
 from typing import Any, cast
 
 import pytest
@@ -22,8 +24,6 @@ from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     _resolve_resource_group,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
-    NATIVE_WORKLOAD_FEATURE_GATES,
-    NATIVE_WORKLOAD_RUNTIME_CONFIG,
     controller_taint,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
@@ -142,15 +142,6 @@ def test_azure_byo_config_does_not_expose_resource_group_or_vmss() -> None:
             "additionalTags": {"Owner": "zheyushen"},
         },
     }
-
-
-def test_azure_byo_requires_kubernetes_1_36_for_native_podgroups() -> None:
-    with pytest.raises(ValueError, match="v1.36 or newer"):
-        AzureBYOWorkloadSpec(
-            subscription_id=_SUBSCRIPTION_ID,
-            location="westus2",
-            kubernetes_version="v1.35.9",
-        )
 
 
 def test_azure_byo_config_serializes_auto_discovered_vnet_option() -> None:
@@ -740,6 +731,27 @@ def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
 
     assert "failureDomain" not in spec["machineTemplate"]
     kubeadm = spec["kubeadmConfigSpec"]
+    assert kubeadm["clusterConfiguration"] == {
+        "apiServer": {
+            "extraArgs": {
+                "feature-gates": "GenericWorkload=true,WorkloadWithJob=true",
+                "runtime-config": "scheduling.k8s.io/v1alpha2=true",
+            }
+        },
+        "controllerManager": {
+            "extraArgs": {
+                "allocate-node-cidrs": "false",
+                "cloud-provider": "external",
+                "cluster-name": "caps-self",
+                "feature-gates": "GenericWorkload=true,WorkloadWithJob=true",
+            }
+        },
+        "scheduler": {
+            "extraArgs": {
+                "feature-gates": "GenericWorkload=true,WorkloadWithJob=true",
+            }
+        },
+    }
     assert kubeadm["files"][0]["contentFrom"]["secret"] == {
         "name": "caps-self-control-plane-azure-json",
         "key": "control-plane-azure.json",
@@ -750,23 +762,43 @@ def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
     assert kubeadm["joinConfiguration"]["nodeRegistration"]["kubeletExtraArgs"] == {
         "cloud-provider": "external",
     }
-    cluster_configuration = kubeadm["clusterConfiguration"]
-    assert cluster_configuration["apiServer"]["extraArgs"] == {
-        "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
-        "runtime-config": NATIVE_WORKLOAD_RUNTIME_CONFIG,
-    }
-    assert cluster_configuration["controllerManager"]["extraArgs"] == {
-        "allocate-node-cidrs": "false",
-        "cloud-provider": "external",
-        "cluster-name": "caps-self",
-        "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
-    }
-    assert cluster_configuration["scheduler"]["extraArgs"] == {
-        "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
-    }
     assert "127.0.0.1 apiserver.caps-self.capz.io" in kubeadm[
         "preKubeadmCommands"
     ][0]
+
+
+@pytest.mark.parametrize("control_plane", [True, False])
+def test_acr_provider_is_installed_before_kubeadm_for_all_nodes(control_plane):
+    server = "ephemeral.azurecr.io"
+    if control_plane:
+        spec = _kubeadm_control_plane_spec(
+            node=_controller_node(), cluster_name="caps-self", control_plane_name="caps-self-control-plane",
+            kubernetes_version="v1.36.1", acr_server=server,
+        )["kubeadmConfigSpec"]
+        registrations = [spec["initConfiguration"], spec["joinConfiguration"]]
+    else:
+        spec = _kubeadm_config_template_spec(
+            node=_compute_node(), worker_name="caps-self-compute", acr_server=server,
+        )["template"]["spec"]
+        registrations = [spec["joinConfiguration"]]
+    provider_file = next(item for item in spec["files"] if "credential-provider-config" in item["path"])
+    config = json.loads(provider_file["content"])
+    assert config["apiVersion"] == "kubelet.config.k8s.io/v1"
+    assert config["providers"] == [{
+        "name": "acr-credential-provider", "matchImages": [server], "defaultCacheDuration": "10m",
+        "apiVersion": "credentialprovider.kubelet.k8s.io/v1", "args": ["/etc/kubernetes/azure.json"],
+    }]
+    for registration in registrations:
+        flags = registration["nodeRegistration"]["kubeletExtraArgs"]
+        assert flags["image-credential-provider-config"] == provider_file["path"]
+        assert flags["image-credential-provider-bin-dir"] == "/var/lib/kubelet/credential-provider"
+        assert flags["cloud-provider"] == "external"
+    installer = spec["preKubeadmCommands"][-1]
+    assert "v1.36.5/azure-acr-credential-provider-linux-$arch" in installer
+    assert "sha256sum -c -" in installer
+    assert installer.index("sha256sum") < installer.index("install -D")
+    assert "arch=amd64" in installer and "arch=arm64" in installer
+    subprocess.run(["sh", "-n"], input=installer, text=True, capture_output=True, check=True)
 
 
 def test_kubeadm_control_plane_adds_ssh_authorized_keys() -> None:

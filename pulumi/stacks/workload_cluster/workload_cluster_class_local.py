@@ -5,13 +5,18 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, Mapping
 
 import pulumi
-from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 from lib.config import PulumiConfigModel
-from stacks.workload_cluster.registry_setting import LocalRegistryConfig
+from stacks.workload_cluster.registry_setting import (
+    ContainerdRegistryConfig,
+    LocalCustomRegistrySetting,
+    RegistryConfig,
+    RegistryName,
+)
 
 from stacks.workload_cluster.workload_cluster_deployments import (
     KEDAOutputs,
@@ -57,19 +62,14 @@ _LOCAL_KEDA_SCALED_NODE_SETS = (
 
 class LocalWorkloadClusterConfig(PulumiConfigModel):
     class_name: Literal["local"] = _CLUSTER_CLASS
-    registries: tuple[LocalRegistryConfig, ...] = ()
+    registry: RegistryConfig | None = None
+    custom_registry: LocalCustomRegistrySetting | None = None
+    registry_routes: Mapping[RegistryName, ContainerdRegistryConfig] = {}
     slinky: SlinkyDeploymentConfig = SlinkyDeploymentConfig()
 
     @field_serializer("class_name")
     def serialize_class_name(self, class_name: str) -> str:
         return class_name
-
-    @model_validator(mode="after")
-    def validate_unique_registries(self) -> LocalWorkloadClusterConfig:
-        names = [registry.registry for registry in self.registries]
-        if len(names) != len(set(names)):
-            raise ValueError("registries must have unique registry names")
-        return self
 
 
 class LocalWorkloadClusterOutputs(BaseModel):
@@ -140,7 +140,9 @@ class LocalWorkloadClusterClass(pulumi.ComponentResource):
             "infrastructure",
             instance=instance,
             worker_machine_deployments=machine_deployments,
-            registries=config.registries,
+            registry=config.registry,
+            custom_registry=config.custom_registry,
+            registry_routes=config.registry_routes,
             opts=child_options(),
         )
         deployments = WorkloadClusterDeployments(

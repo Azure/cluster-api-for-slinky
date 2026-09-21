@@ -172,6 +172,14 @@ class Tenants(pulumi.ComponentResource):
                     if context is not None
                     else None
                 ),
+                azure_client_id=(
+                    pulumi.Output.from_input(context).apply(lambda value: value.azure_client_id)
+                    if context is not None else None
+                ),
+                azure_tenant_id=(
+                    pulumi.Output.from_input(context).apply(lambda value: value.azure_tenant_id)
+                    if context is not None else None
+                ),
                 opts=pulumi.ResourceOptions(parent=self),
             )
 

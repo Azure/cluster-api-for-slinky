@@ -5,17 +5,41 @@
 
 from __future__ import annotations
 
+import pytest
+
 from stacks.workload_cluster.workload_cluster_addons import (
     _azure_cloud_provider_values,
     _calico_vxlan_values,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
-    calico_typha_deployment,
     controller_bootstrap_tolerations,
     controller_node_affinity,
     controller_node_selector,
     controller_tolerations,
 )
+from stacks.workload_cluster.workload_cluster_infrastructure_local import _calico_values
+
+
+@pytest.mark.parametrize("deployment", ["local", "azure-byo"])
+def test_calico_typha_is_schedulable_on_controller_nodes(deployment: str) -> None:
+    values = (
+        _calico_values() if deployment == "local"
+        else _calico_vxlan_values(pod_cidr="192.168.0.0/16")
+    )
+    assert values["installation"]["typhaDeployment"] == {
+        "spec": {
+            "template": {
+                "spec": {
+                    "nodeSelector": {"slinky.slurm.net/node-type": "controller"},
+                    "tolerations": [{
+                        "key": "CriticalAddonsOnly",
+                        "operator": "Exists",
+                        "effect": "NoSchedule",
+                    }],
+                }
+            }
+        }
+    }
 
 
 def test_azure_cloud_provider_values_cover_bootstrap_taints() -> None:
@@ -59,6 +83,3 @@ def test_calico_uses_always_on_vxlan() -> None:
     assert values["installation"][
         "controlPlaneTolerations"
     ] == controller_tolerations()
-    assert values["installation"][
-        "typhaDeployment"
-    ] == calico_typha_deployment()

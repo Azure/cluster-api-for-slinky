@@ -11,6 +11,10 @@ from typing import Any, Literal
 from uuid import UUID
 
 import pulumi
+from azure_container_registry import (
+    AzureContainerRegistryConfig,
+    AzureContainerRegistryPullAccess,
+)
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -122,6 +126,7 @@ class AzureBYOWorkloadClusterConfig(PulumiConfigModel):
     class_name: Literal["azure-byo"] = _CLUSTER_CLASS
     parameters: AzureBYOWorkloadSpec
     slinky: SlinkyDeploymentConfig = SlinkyDeploymentConfig()
+    acr: AzureContainerRegistryConfig | None = None
 
     @field_serializer("class_name")
     def serialize_class_name(self, class_name: str) -> str:
@@ -321,11 +326,22 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             additional_tags=parameters.additional_tags,
             byo_subnet=byo_subnet,
             kubernetes_version=parameters.kubernetes_version,
+            acr_server=config.acr.server if config.acr is not None else None,
             ssh_username=parameters.ssh_username,
             ssh_authorized_keys=parameters.ssh_authorized_keys,
             node_pools=node_pools,
             opts=pulumi.ResourceOptions(parent=self),
         )
+        artifact_registry_access = []
+        if config.acr is not None:
+            artifact_registry_access.append(AzureContainerRegistryPullAccess(
+                "artifact-registry",
+                registry=config.acr,
+                identity_resource_id=azure_identity_resource_id,
+                azure_client_id=azure_client_id,
+                azure_tenant_id=azure_tenant_id,
+                opts=pulumi.ResourceOptions(parent=self),
+            ))
         deployments = WorkloadClusterDeployments(
             "deployments",
             instance=instance,
@@ -336,7 +352,7 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             pin_coredns_to_controller=True,
             opts=pulumi.ResourceOptions(
                 parent=self,
-                depends_on=[infrastructure],
+                depends_on=[infrastructure, *artifact_registry_access],
             ),
         )
 

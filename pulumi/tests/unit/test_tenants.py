@@ -4,6 +4,10 @@
 from __future__ import annotations
 
 import pytest
+import pulumi
+
+from stacks.workload_cluster import tenants as tenants_module
+from stacks.workload_cluster.workload_cluster_class_aks import AKSWorkloadClusterConfig, AzureWorkloadSpec
 
 from stacks.workload_cluster.workload_cluster_deployments import (
     SlinkyDeploymentConfig,
@@ -26,6 +30,46 @@ def test_tenants_config_defaults_to_local_cluster() -> None:
     assert spec.workload_clusters == {
         "local": LocalWorkloadClusterConfig(),
     }
+
+
+def test_aks_dispatch_forwards_runner_identity(monkeypatch) -> None:
+    captured = {}
+
+    class Mocks(pulumi.runtime.Mocks):
+        def new_resource(self, args):
+            return args.name, args.inputs
+
+        def call(self, args):
+            raise AssertionError(args.token)
+
+    def construct(name, **kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(tenants_module, "AKSWorkloadClusterClass", construct)
+    pulumi.runtime.set_mocks(Mocks())
+
+    @pulumi.runtime.test
+    def check():
+        parent = pulumi.ComponentResource("test:Tenants", "tenants")
+        context = WorkloadClusterContext(
+            identity_name="identity", identity_namespace="default",
+            azure_client_id="runner-client", azure_tenant_id="runner-tenant",
+        )
+        config = AKSWorkloadClusterConfig(parameters=AzureWorkloadSpec(
+            subscription_id="44444444-4444-4444-4444-444444444444",
+            location="westus2", resource_group="test-rg",
+        ))
+        Tenants._instantiate_workload_cluster(parent, "aks", config, context=pulumi.Output.from_input(context))
+
+        def verify(values):
+            assert values == ["runner-client", "runner-tenant", "identity", "default"]
+
+        return pulumi.Output.all(
+            captured["azure_client_id"], captured["azure_tenant_id"],
+            captured["identity_name"], captured["identity_namespace"],
+        ).apply(verify)
+
+    check()
 
 
 def test_workload_cluster_context_is_plain_pydantic_model() -> None:

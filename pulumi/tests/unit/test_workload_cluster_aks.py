@@ -1,17 +1,17 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Unit tests for the AKS CR spec helpers + name derivation.
-
-The full Pulumi resource graph (the five ``CustomResource`` objects and the
-``waitFor`` gating annotation) is not rendered here — that needs a Pulumi
-runtime and the asserted bits are constant. The testable surface is the set
-of pure spec-builder functions and the DNS-label name derivation.
-"""
+"""AKS CR spec helpers and mocked workload resource construction."""
 
 from __future__ import annotations
 
 import pytest
+import base64
+import pulumi
+
+from azure_container_registry import AzureContainerRegistryConfig
+from stacks.workload_cluster.tenants import Tenants, WorkloadClusterContext
+from stacks.workload_cluster.workload_cluster_class_aks import AKSWorkloadClusterConfig, AzureWorkloadSpec
 
 from stacks.kubernetes_annotations import (
     DELETE_PROPAGATION_FOREGROUND,
@@ -58,6 +58,71 @@ def test_resource_name_sanitizes_and_suffixes() -> None:
     assert _resource_name("caps-aks", "head") == "caps-aks-head"
     # Uppercase + underscores collapse to a DNS label.
     assert _resource_name("Caps_AKS") == "caps-aks"
+
+
+@pytest.mark.parametrize("with_acr", [False, True])
+def test_aks_construction_through_tenants_with_optional_acr(with_acr):
+    resources = []
+    options = {}
+    calls = []
+    registry_id = "/subscriptions/registry-sub/resourceGroups/rg/providers/Microsoft.ContainerRegistry/registries/images"
+
+    class Mocks(pulumi.runtime.Mocks):
+        def new_resource(self, args):
+            resources.append(args)
+            outputs = dict(args.inputs)
+            if args.typ == "kubernetes:core/v1:Secret":
+                outputs["data"] = {"value": base64.b64encode(b"{}").decode()}
+            if args.typ == "kubernetes:helm.sh/v3:Release":
+                outputs["status"] = {"name": args.name, "namespace": args.inputs["namespace"], "version": args.inputs["version"], "status": "deployed"}
+            return args.name, outputs
+
+        def call(self, args):
+            calls.append(args)
+            assert args.token == "azure-native:containerservice:getManagedCluster"
+            assert any(item.name == "infrastructure-control-plane-ready" for item in resources)
+            return {"name": "aks", "location": "westus2", "identityProfile": {
+                "kubeletidentity": {"objectId": "kubelet-principal"},
+            }}
+
+    def record(args):
+        options[args.name] = args.opts
+
+    pulumi.runtime.set_mocks(Mocks())
+
+    @pulumi.runtime.test
+    def check():
+        parent = pulumi.ComponentResource("test:Tenants", "tenants", opts=pulumi.ResourceOptions(transformations=[record]))
+        config = AKSWorkloadClusterConfig(
+            parameters=AzureWorkloadSpec(
+                subscription_id="44444444-4444-4444-4444-444444444444", location="westus2", resource_group="aks-rg",
+            ),
+            acr=AzureContainerRegistryConfig(server="images.azurecr.io", resource_id=registry_id) if with_acr else None,
+        )
+        cluster = Tenants._instantiate_workload_cluster(
+            parent, "aks", config, context=pulumi.Output.from_input(WorkloadClusterContext(
+                identity_name="identity", identity_namespace="default", azure_client_id="runner-client", azure_tenant_id="runner-tenant",
+            )),
+        )
+        infrastructure = options["deployments"].depends_on[0]
+        readiness = infrastructure.control_plane_ready_resource
+
+        def verify(values):
+            outputs, ready_urn = values
+            assert outputs.control_plane_ready
+            assert outputs.workload_cluster_ready
+            assert ready_urn.endswith("::infrastructure-control-plane-ready")
+            roles = [item for item in resources if item.typ == "azure-native:authorization:RoleAssignment"]
+            assert len(roles) == int(with_acr)
+            assert len(calls) == int(with_acr)
+            if with_acr:
+                assert roles[0].inputs["principalId"] == "kubelet-principal"
+                assert roles[0].inputs["scope"] == registry_id
+                assert len(options["deployments"].depends_on) == 2
+
+        return pulumi.Output.all(cluster.outputs, readiness.urn).apply(verify)
+
+    check()
 
 
 def test_resource_name_rejects_empty() -> None:

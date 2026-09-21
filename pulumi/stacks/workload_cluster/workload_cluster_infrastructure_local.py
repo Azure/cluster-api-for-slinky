@@ -25,7 +25,6 @@ needed.
 from __future__ import annotations
 
 import base64
-import json
 import os
 import re
 import shlex
@@ -36,13 +35,19 @@ import pulumi
 import pulumi_kubernetes as k8s
 import pulumi_local as local
 import yaml
+import tomli_w
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from stacks.kubernetes_annotations import (
     foreground_delete_annotations,
     pulumi_wait_for,
 )
-from stacks.workload_cluster.registry_setting import LocalRegistryConfig
+from stacks.workload_cluster.registry_setting import (
+    ContainerdHostConfig,
+    ContainerdRegistryConfig,
+    LocalCustomRegistrySetting,
+    RegistryConfig,
+)
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
     AUTOSCALER_MIN_ANNOTATION,
@@ -52,9 +57,9 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     NATIVE_WORKLOAD_FEATURE_GATES,
     NATIVE_WORKLOAD_RUNTIME_CONFIG,
     NODE_TYPE_LABEL,
-    calico_typha_deployment,
     controller_bootstrap_tolerations,
     controller_node_affinity,
+    calico_typha_deployment,
     controller_node_selector,
     controller_taint,
     controller_tolerations,
@@ -92,6 +97,8 @@ _WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneReady"
 _SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
+_DOCKER_IO_SERVER = "https://registry-1.docker.io"
+_DOCKER_HUB_PUBLIC_MIRROR = "https://mirror.gcr.io"
 _DOCKER_DESKTOP_HOST = "host.docker.internal"
 _CONTAINERD_CERTS_DIR = "/etc/containerd/certs.d"
 _NODE_UNHEALTHY_TIMEOUT_SECONDS = 900
@@ -116,49 +123,54 @@ def _autoscaler_annotations(
     }
 
 
-def _containerd_registry_commands(
-    registry_configs: tuple[LocalRegistryConfig, ...],
-) -> list[str]:
-    if not registry_configs:
-        return []
-
-    hosts_dirs = [
-        f"{_CONTAINERD_CERTS_DIR}/{config.registry}"
-        for config in registry_configs
-    ]
-    hosts_files = "\n".join(
-        (
-            f"cat >{hosts_dir}/hosts.toml <<EOF\n"
-            f"server = {json.dumps(config.config.server)}\n"
-            + "".join(
-                (
-                    "\n"
-                    f'[host."{host.scheme}://${{_CA4S_REGISTRY_HOST}}:'
-                    f'{host.gateway_port}"]\n'
-                    f"  capabilities = {json.dumps(list(host.capabilities))}\n"
-                )
-                for host in config.config.hosts
-            )
-            + "EOF"
+def _local_registry_routes(
+    registry: RegistryConfig | None,
+    custom_registry: LocalCustomRegistrySetting | None,
+    overrides: Mapping[str, ContainerdRegistryConfig],
+) -> dict[str, ContainerdRegistryConfig]:
+    routes = {"docker.io": ContainerdRegistryConfig(
+        server=_DOCKER_IO_SERVER,
+        hosts=(ContainerdHostConfig(gateway_port=registry.port) if registry is not None
+               else ContainerdHostConfig(url=_DOCKER_HUB_PUBLIC_MIRROR),),
+    )}
+    if custom_registry is not None:
+        endpoint = f"{custom_registry.registry_name}:5000"
+        routes[endpoint] = ContainerdRegistryConfig(
+            server=f"http://{endpoint}",
+            hosts=(ContainerdHostConfig(gateway_port=custom_registry.port),),
         )
-        for config, hosts_dir in zip(registry_configs, hosts_dirs, strict=True)
-    )
-    return [
-        f"mkdir -p {' '.join(shlex.quote(path) for path in hosts_dirs)}",
-        (
+    return {**routes, **overrides}
+
+
+def _containerd_registry_commands(routes: Mapping[str, ContainerdRegistryConfig]) -> list[str]:
+    if not routes:
+        return []
+    commands = []
+    if any(host.gateway_port is not None for route in routes.values() for host in route.hosts):
+        commands.append(
             f"_CA4S_REGISTRY_HOST={_DOCKER_DESKTOP_HOST}\n"
             'if ! getent hosts "${_CA4S_REGISTRY_HOST}" >/dev/null 2>&1; then\n'
-            "  _CA4S_REGISTRY_HOST=$(ip route show default "
-            "| awk '{print $3; exit}')\n"
+            "  _CA4S_REGISTRY_HOST=$(ip route show default | awk '{print $3; exit}')\n"
             "fi\n"
             'if [ -z "${_CA4S_REGISTRY_HOST}" ]; then\n'
             '  echo "could not determine registry gateway" >&2\n'
             "  exit 1\n"
-            "fi\n"
-            f"{hosts_files}"
-        ),
-        "systemctl restart containerd",
-    ]
+            "fi"
+        )
+    for namespace, route in routes.items():
+        hosts = {
+            (host.url if host.url is not None else f"{host.scheme}://__CA4S_REGISTRY_HOST__:{host.gateway_port}"):
+            {"capabilities": list(host.capabilities)}
+            for host in route.hosts
+        }
+        content = tomli_w.dumps({"server": route.server, **({"host": hosts} if hosts else {})})
+        directory = f"{_CONTAINERD_CERTS_DIR}/{namespace}"
+        commands.append(f"mkdir -p {shlex.quote(directory)}")
+        write = f"printf %s {shlex.quote(content)}"
+        if any(host.gateway_port is not None for host in route.hosts):
+            write += ' | sed "s|__CA4S_REGISTRY_HOST__|${_CA4S_REGISTRY_HOST}|g"'
+        commands.append(f"{write} > {shlex.quote(directory + '/hosts.toml')}")
+    return [*commands, "systemctl restart containerd"]
 
 
 def _resource_name(tenant: str, suffix: str) -> str:
@@ -681,7 +693,9 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         *,
         instance: str,
         worker_machine_deployments: tuple[LocalMachineDeploymentSpec, ...],
-        registries: tuple[LocalRegistryConfig, ...] = (),
+        registry: RegistryConfig | None = None,
+        custom_registry: LocalCustomRegistrySetting | None = None,
+        registry_routes: Mapping[str, ContainerdRegistryConfig] | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -693,7 +707,9 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
 
         cluster_name = _resource_name(instance, "workload")
         node_image = f"kindest/node:{_KUBERNETES_VERSION}"
-        pre_kubeadm_commands = _containerd_registry_commands(registries)
+        pre_kubeadm_commands = _containerd_registry_commands(
+            _local_registry_routes(registry, custom_registry, registry_routes or {})
+        )
 
         def child_options(
             *,

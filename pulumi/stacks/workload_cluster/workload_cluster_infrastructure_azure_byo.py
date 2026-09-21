@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import re
 from collections.abc import Mapping
 
@@ -49,6 +50,20 @@ _CONTROL_PLANE_API_VERSION = "controlplane.cluster.x-k8s.io/v1beta1"
 _CONTROL_PLANE_READY_API_VERSION = "controlplane.cluster.x-k8s.io/v1beta2"
 _INFRASTRUCTURE_API_VERSION = "infrastructure.cluster.x-k8s.io/v1beta1"
 _NAMESPACE = "default"
+_ACR_PROVIDER_DIR = "/var/lib/kubelet/credential-provider"
+_ACR_PROVIDER_CONFIG = "/var/lib/kubelet/credential-provider-config.yaml"
+_INSTALL_ACR_PROVIDER = """set -eu
+case "$(uname -m)" in
+    x86_64) arch=amd64; checksum=097fd4f517def87bf0ad6a83fca442ed9eeee69dc132d8a3c93bbc57ecb939ed ;;
+    aarch64|arm64) arch=arm64; checksum=1e7bd205c295352fdb181e7f1591583c82a0c6cf7911a449fefd72c2cfc21b8a ;;
+    *) echo 'Unsupported ACR credential provider architecture' >&2; exit 1 ;;
+esac
+download=$(mktemp)
+trap 'rm -f "$download"' EXIT
+curl -fsSL --retry 5 "https://github.com/kubernetes-sigs/cloud-provider-azure/releases/download/v1.36.5/azure-acr-credential-provider-linux-$arch" -o "$download"
+printf '%s  %s\\n' "$checksum" "$download" | sha256sum -c -
+install -D -m 0755 "$download" /var/lib/kubelet/credential-provider/acr-credential-provider
+"""
 _POD_CIDR = "192.168.0.0/16"
 _SERVICE_CIDR = "10.96.0.0/12"
 _SERVICE_DOMAIN = "cluster.local"
@@ -323,8 +338,34 @@ def _cloud_config_file(*, secret_name: str, key: str) -> dict[str, object]:
     }
 
 
-def _node_registration(*, node_type: str | None = None) -> dict[str, object]:
+def _acr_provider_files(server: str | None) -> list[dict[str, object]]:
+    if server is None:
+        return []
+    return [{
+        "path": _ACR_PROVIDER_CONFIG,
+        "owner": "root:root",
+        "permissions": "0644",
+        "content": json.dumps({
+            "apiVersion": "kubelet.config.k8s.io/v1",
+            "kind": "CredentialProviderConfig",
+            "providers": [{
+                "name": "acr-credential-provider",
+                "matchImages": [server],
+                "defaultCacheDuration": "10m",
+                "apiVersion": "credentialprovider.kubelet.k8s.io/v1",
+                "args": ["/etc/kubernetes/azure.json"],
+            }],
+        }),
+    }]
+
+
+def _node_registration(*, node_type: str | None = None, acr_server: str | None = None) -> dict[str, object]:
     extra_args: dict[str, str] = {"cloud-provider": "external"}
+    if acr_server is not None:
+        extra_args.update({
+            "image-credential-provider-bin-dir": _ACR_PROVIDER_DIR,
+            "image-credential-provider-config": _ACR_PROVIDER_CONFIG,
+        })
     if node_type is not None:
         extra_args["node-labels"] = f"slinky.slurm.net/node-type={node_type}"
     registration: dict[str, object] = {
@@ -357,6 +398,7 @@ def _kubeadm_control_plane_spec(
     cluster_name: str,
     control_plane_name: str,
     kubernetes_version: str,
+    acr_server: str | None = None,
     ssh_username: str = "capi",
     ssh_authorized_keys: tuple[str, ...] = (),
 ) -> dict[str, object]:
@@ -386,13 +428,14 @@ def _kubeadm_control_plane_spec(
             _cloud_config_file(
                 secret_name=f"{control_plane_name}-azure-json",
                 key="control-plane-azure.json",
-            )
+            ),
+            *_acr_provider_files(acr_server),
         ],
         "initConfiguration": {
-            "nodeRegistration": _node_registration()
+            "nodeRegistration": _node_registration(acr_server=acr_server)
         },
         "joinConfiguration": {
-            "nodeRegistration": _node_registration()
+            "nodeRegistration": _node_registration(acr_server=acr_server)
         },
         "preKubeadmCommands": [
             (
@@ -400,7 +443,8 @@ def _kubeadm_control_plane_spec(
                 "[ -f /run/kubeadm/kubeadm.yaml ]; then "
                 f"echo '127.0.0.1 apiserver.{cluster_name}.capz.io apiserver' "
                 ">> /etc/hosts; fi"
-            )
+            ),
+            *([_INSTALL_ACR_PROVIDER] if acr_server is not None else []),
         ],
         "postKubeadmCommands": [
             (
@@ -482,6 +526,7 @@ def _kubeadm_config_template_spec(
     *,
     node: AzureBYONodePoolSpec,
     worker_name: str,
+    acr_server: str | None = None,
     ssh_username: str = "capi",
     ssh_authorized_keys: tuple[str, ...] = (),
 ) -> dict[str, object]:
@@ -490,12 +535,15 @@ def _kubeadm_config_template_spec(
             _cloud_config_file(
                 secret_name=f"{worker_name}-azure-json",
                 key="worker-node-azure.json",
-            )
+            ),
+            *_acr_provider_files(acr_server),
         ],
         "joinConfiguration": {
-            "nodeRegistration": _node_registration(node_type=node.node_type)
+            "nodeRegistration": _node_registration(node_type=node.node_type, acr_server=acr_server)
         },
     }
+    if acr_server is not None:
+        template_spec["preKubeadmCommands"] = [_INSTALL_ACR_PROVIDER]
     ssh_users = _ssh_users(
         ssh_username=ssh_username,
         ssh_authorized_keys=ssh_authorized_keys,
@@ -592,6 +640,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         additional_tags: Mapping[str, str],
         byo_subnet: AzureBYOSubnet | None = None,
         kubernetes_version: str,
+        acr_server: str | None = None,
         ssh_username: str = "capi",
         ssh_authorized_keys: tuple[str, ...] = (),
         node_pools: tuple[AzureBYONodePoolSpec, ...],
@@ -783,6 +832,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 cluster_name=cluster_name,
                 control_plane_name=control_plane_name,
                 kubernetes_version=kubernetes_version,
+                acr_server=acr_server,
                 ssh_username=ssh_username,
                 ssh_authorized_keys=ssh_authorized_keys,
             ),
@@ -848,6 +898,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 spec=_kubeadm_config_template_spec(
                     node=worker_node,
                     worker_name=worker_name,
+                    acr_server=acr_server,
                     ssh_username=ssh_username,
                     ssh_authorized_keys=ssh_authorized_keys,
                 ),

@@ -239,6 +239,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
     machine_pool_name: Output[str]
     machine_pool_names: list[Output[str]]
     control_plane_ready: Output[bool]
+    control_plane_ready_resource: k8s.apiextensions.CustomResourcePatch
     workload_kubeconfig: Output[str]
     workload_provider: k8s.Provider
     workload_kubeconfig_secret: k8s.core.v1.Secret
@@ -470,6 +471,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.control_plane_name = Output.from_input(cluster_name)
         self.machine_pool_names = machine_pool_names
         self.machine_pool_name = machine_pool_names[0]
+        self.control_plane_ready_resource = azure_managed_control_plane_ready
         self.control_plane_ready = azure_managed_control_plane_ready.id.apply(
             lambda _: True
         )

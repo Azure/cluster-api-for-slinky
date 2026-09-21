@@ -9,8 +9,13 @@ from typing import Any, Literal, Mapping
 from uuid import UUID
 
 import pulumi
+import pulumi_azure_native as azure_native
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_serializer
 
+from azure_container_registry import (
+    AzureContainerRegistryConfig,
+    AzureContainerRegistryPullAccess,
+)
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from localenv import discover_azure_resource_placement
 
@@ -103,6 +108,7 @@ class AKSWorkloadClusterConfig(PulumiConfigModel):
     class_name: Literal["aks"] = _CLUSTER_CLASS
     parameters: AzureWorkloadSpec
     slinky: SlinkyDeploymentConfig = SlinkyDeploymentConfig()
+    acr: AzureContainerRegistryConfig | None = None
 
     @field_serializer("class_name")
     def serialize_class_name(self, class_name: str) -> str:
@@ -150,6 +156,19 @@ def _default_aks_node_pools(node_count: int) -> tuple[AKSNodePoolSpec, ...]:
     )
 
 
+def _kubelet_principal_id(identity_profile: Mapping[str, object] | None) -> str:
+    if not identity_profile or "kubeletidentity" not in identity_profile:
+        raise ValueError("AKS managed cluster has no kubelet identity")
+    identity = identity_profile["kubeletidentity"]
+    if isinstance(identity, Mapping):
+        object_id = identity.get("objectId") or identity.get("object_id")
+    else:
+        object_id = getattr(identity, "object_id", None)
+    if not isinstance(object_id, str) or not object_id:
+        raise ValueError("AKS kubelet identity has no object ID")
+    return object_id
+
+
 _AKS_SLURM_NODE_SETS = (
     SlurmNodeSetSpec(name="compute", node_type=COMPUTE_NODE_TYPE, replicas=1),
 )
@@ -171,6 +190,8 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
         config: AKSWorkloadClusterConfig,
         identity_name: pulumi.Input[str] | None = None,
         identity_namespace: pulumi.Input[str] | None = None,
+        azure_client_id: pulumi.Input[str] | None = None,
+        azure_tenant_id: pulumi.Input[str] | None = None,
         node_pools: tuple[AKSNodePoolSpec, ...] | None = None,
         slurm_node_sets: tuple[SlurmNodeSetSpec, ...] = _AKS_SLURM_NODE_SETS,
         keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = _AKS_KEDA_SCALED_NODE_SETS,
@@ -187,6 +208,10 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             raise ValueError("aks workload cluster class requires identity_name")
         if identity_namespace is None:
             raise ValueError("aks workload cluster class requires identity_namespace")
+        if azure_client_id is None:
+            raise ValueError("aks workload cluster class requires azure_client_id")
+        if azure_tenant_id is None:
+            raise ValueError("aks workload cluster class requires azure_tenant_id")
         location = workload_spec.location
         resource_group = _resolve_resource_group(workload_spec)
 
@@ -215,6 +240,33 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             additional_tags=workload_spec.additional_tags,
             opts=child_options(),
         )
+        artifact_registry_access: list[AzureContainerRegistryPullAccess] = []
+        if config.acr is not None:
+            workload_azure_provider = azure_native.Provider(
+                "workload-azure",
+                subscription_id=str(workload_spec.subscription_id),
+                tenant_id=azure_tenant_id,
+                client_id=azure_client_id,
+                use_msi=True,
+                opts=child_options(),
+            )
+            managed_cluster = azure_native.containerservice.get_managed_cluster_output(
+                resource_group_name=resource_group,
+                resource_name=infrastructure.cluster_name,
+                opts=pulumi.InvokeOutputOptions(
+                    parent=self,
+                    provider=workload_azure_provider,
+                    depends_on=[infrastructure.control_plane_ready_resource],
+                ),
+            )
+            artifact_registry_access.append(AzureContainerRegistryPullAccess(
+                "artifact-registry",
+                registry=config.acr,
+                principal_id=managed_cluster.identity_profile.apply(_kubelet_principal_id),
+                azure_client_id=azure_client_id,
+                azure_tenant_id=azure_tenant_id,
+                opts=child_options(),
+            ))
         deployments = WorkloadClusterDeployments(
             "deployments",
             instance=instance,
@@ -222,7 +274,9 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             keda_scaled_node_sets=keda_scaled_node_sets,
             slinky=config.slinky,
             workload_provider=infrastructure.workload_provider,
-            opts=child_options(depends_on=[infrastructure]),
+            opts=child_options(
+                depends_on=[infrastructure, *artifact_registry_access]
+            ),
         )
 
         outputs = {

@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import base64
+import subprocess
+import tomllib
 
 import yaml
 
@@ -16,9 +18,6 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
     AUTOSCALER_MIN_ANNOTATION,
     CONTROLLER_NODE_TYPE,
-    NATIVE_WORKLOAD_FEATURE_GATES,
-    NATIVE_WORKLOAD_RUNTIME_CONFIG,
-    calico_typha_deployment,
     controller_taint,
 )
 from stacks.workload_cluster.workload_cluster_class_local import (
@@ -28,18 +27,17 @@ from stacks.workload_cluster.workload_cluster_infrastructure_local import (
     _NODE_UNHEALTHY_TIMEOUT_SECONDS,
     _SERVICE_ACCOUNT_TOKEN_PATH,
     _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
-    _calico_values,
     _cluster_configuration,
     _containerd_registry_commands,
+    _local_registry_routes,
     _health_check,
     _management_kubeconfig,
     _node_registration,
 )
 from stacks.workload_cluster.registry_setting import (
-    ContainerdHostConfig,
-    ContainerdRegistryConfig,
-    LocalRegistryConfig,
+    ContainerdHostConfig, ContainerdRegistryConfig, LocalCustomRegistrySetting, LocalPortRegistrySetting,
 )
+from stacks.workload_cluster import workload_cluster_infrastructure_local as local_infra
 
 
 def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
@@ -125,17 +123,22 @@ def test_local_control_plane_registration_has_no_custom_label_or_taint() -> None
 
 
 def test_local_control_plane_enables_native_podgroups() -> None:
-    cluster_configuration = _cluster_configuration()
-    feature_gates = [
-        {"name": "feature-gates", "value": NATIVE_WORKLOAD_FEATURE_GATES}
-    ]
-
-    assert cluster_configuration["apiServer"]["extraArgs"] == [
-        *feature_gates,
-        {"name": "runtime-config", "value": NATIVE_WORKLOAD_RUNTIME_CONFIG},
-    ]
-    assert cluster_configuration["controllerManager"]["extraArgs"] == feature_gates
-    assert cluster_configuration["scheduler"]["extraArgs"] == feature_gates
+    configuration = _cluster_configuration()
+    feature_gates = [{
+        "name": "feature-gates",
+        "value": "GenericWorkload=true,WorkloadWithJob=true",
+    }]
+    assert configuration == {
+        "apiServer": {
+            "certSANs": ["localhost", "127.0.0.1", "0.0.0.0", "host.docker.internal"],
+            "extraArgs": [
+                *feature_gates,
+                {"name": "runtime-config", "value": "scheduling.k8s.io/v1alpha2=true"},
+            ],
+        },
+        "controllerManager": {"extraArgs": feature_gates},
+        "scheduler": {"extraArgs": feature_gates},
+    }
 
 
 def test_local_controller_worker_registration_adds_critical_addons_taint() -> None:
@@ -148,51 +151,44 @@ def test_local_controller_worker_registration_adds_critical_addons_taint() -> No
     }
 
 
-def test_local_calico_pins_typha_to_controller_nodes() -> None:
-    values = _calico_values()
-
-    assert values["installation"][
-        "typhaDeployment"
-    ] == calico_typha_deployment()
-
-
-def test_registries_redirect_logical_names_to_host_ports() -> None:
-    commands = _containerd_registry_commands(
-        (
-            LocalRegistryConfig(
-                registry="docker.io",
-                config=ContainerdRegistryConfig(
-                    server="https://registry-1.docker.io",
-                    hosts=(ContainerdHostConfig(gateway_port=5002),),
-                ),
-            ),
-            LocalRegistryConfig(
-                registry="custom-registry:5000",
-                config=ContainerdRegistryConfig(
-                    server="http://custom-registry:5000",
-                    hosts=(
-                        ContainerdHostConfig(
-                            gateway_port=5003,
-                            capabilities=("pull", "resolve", "push"),
-                        ),
-                    ),
-                ),
-            ),
-        )
+def test_containerd_routes_render_multiple_hosts_and_restart_once(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(local_infra, "_CONTAINERD_CERTS_DIR", str(tmp_path))
+    routes = _local_registry_routes(
+        LocalPortRegistrySetting(port=5002), LocalCustomRegistrySetting(registry_name="custom-registry", port=5003),
+        {"private.example": ContainerdRegistryConfig(server="https://private.example", hosts=(
+            ContainerdHostConfig(url="https://mirror.example", capabilities=("pull",)),
+            ContainerdHostConfig(gateway_port=5443, scheme="https", capabilities=("pull", "resolve", "push")),
+        ))},
     )
+    commands = _containerd_registry_commands(routes)
+    assert sum("getent hosts" in command for command in commands) == 1
+    assert commands.count("systemctl restart containerd") == 1
+    script = "\n".join(commands)
+    subprocess.run(["sh", "-n"], input=script, text=True, check=True)
+    for _ in range(2):
+        subprocess.run(["sh", "-eu"], input=(
+            "getent() { return 1; }\nip() { echo 'default via 172.17.0.1'; }\n"
+            "systemctl() { :; }\n" + script
+        ), text=True, check=True)
+    docker = tomllib.loads((tmp_path / "docker.io/hosts.toml").read_text())
+    assert docker["host"] == {"http://172.17.0.1:5002": {"capabilities": ["pull", "resolve"]}}
+    custom = tomllib.loads((tmp_path / "custom-registry:5000/hosts.toml").read_text())
+    assert custom["server"] == "http://custom-registry:5000"
+    assert "http://172.17.0.1:5003" in custom["host"]
+    private = tomllib.loads((tmp_path / "private.example/hosts.toml").read_text())
+    assert private["host"] == {
+        "https://mirror.example": {"capabilities": ["pull"]},
+        "https://172.17.0.1:5443": {"capabilities": ["pull", "resolve", "push"]},
+    }
 
-    assert commands[0] == (
-        "mkdir -p /etc/containerd/certs.d/docker.io "
-        "/etc/containerd/certs.d/custom-registry:5000"
-    )
-    assert commands[1].count("_CA4S_REGISTRY_HOST=host.docker.internal") == 1
-    assert 'server = "https://registry-1.docker.io"' in commands[1]
-    assert '[host."http://${_CA4S_REGISTRY_HOST}:5002"]' in commands[1]
-    assert 'server = "http://custom-registry:5000"' in commands[1]
-    assert '[host."http://${_CA4S_REGISTRY_HOST}:5003"]' in commands[1]
-    assert 'capabilities = ["pull", "resolve", "push"]' in commands[1]
-    assert commands[-1] == "systemctl restart containerd"
 
-
-def test_empty_registry_list_writes_no_containerd_overrides() -> None:
-    assert _containerd_registry_commands(()) == []
+def test_explicit_routes_override_automatic_mirror(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(local_infra, "_CONTAINERD_CERTS_DIR", str(tmp_path))
+    direct = ContainerdRegistryConfig(server="https://registry-1.docker.io")
+    routes = _local_registry_routes(LocalPortRegistrySetting(port=5002), None, {"docker.io": direct})
+    assert routes == {"docker.io": direct}
+    commands = _containerd_registry_commands(routes)
+    assert not any("getent" in command for command in commands)
+    subprocess.run(["sh", "-eu"], input="systemctl() { :; }\n" + "\n".join(commands), text=True, check=True)
+    assert tomllib.loads((tmp_path / "docker.io/hosts.toml").read_text()) == {"server": direct.server}
+    assert _containerd_registry_commands({}) == []

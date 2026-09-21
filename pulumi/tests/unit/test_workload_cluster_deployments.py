@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import pytest
+import pulumi
+import pulumi_kubernetes as k8s
 
 from stacks.workload_cluster.workload_cluster_deployments import (
     _cert_manager_values,
@@ -26,6 +28,7 @@ from stacks.workload_cluster.workload_cluster_deployments import (
     SlinkyDeploymentConfig,
     SlinkyImageConfig,
     SlurmNodeSetSpec,
+    WorkloadClusterDeployments,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     controller_node_affinity,
@@ -223,10 +226,8 @@ def test_slurm_nodeset_values_pin_pods_to_initial_node() -> None:
 
 
 def test_slurm_bridge_uses_compute_partition_and_controller_placement() -> None:
-    values = _slurm_bridge_values()
     placement = controller_pod_spec()
-
-    assert values == {
+    assert _slurm_bridge_values() == {
         "schedulerConfig": {"partition": "compute"},
         "sharedConfig": {"slurmJwtSecret": "slurm-bridge-token"},
         "admission": placement,
@@ -243,6 +244,98 @@ def test_slurm_bridge_token_uses_slurm_chart_jwt_key() -> None:
         "refresh": True,
         "lifetime": "8760h",
     }
+
+
+@pytest.mark.parametrize("plain_http", [False, True])
+def test_bridge_resources_and_readiness_in_both_chart_paths(plain_http: bool) -> None:
+    resources = {}
+    options = {}
+
+    class DeploymentMocks(pulumi.runtime.Mocks):
+        def new_resource(self, args):
+            resources[args.name] = args
+            outputs = dict(args.inputs)
+            if args.typ == "kubernetes:helm.sh/v3:Release":
+                outputs["status"] = {
+                    "name": args.name,
+                    "namespace": args.inputs["namespace"],
+                    "version": args.inputs["version"],
+                    "status": "deployed",
+                }
+            elif args.typ == "kubernetes:helm.sh/v4:Chart":
+                outputs["resources"] = []
+            return args.name, outputs
+
+        def call(self, args):
+            raise AssertionError(f"unexpected provider invoke: {args.token}")
+
+    def record_options(args):
+        options[args.name] = args.opts
+        return None
+
+    pulumi.runtime.set_mocks(DeploymentMocks())
+
+    @pulumi.runtime.test
+    def check():
+        provider = k8s.Provider("workload", kubeconfig="{}")
+        deployments = WorkloadClusterDeployments(
+            "deployments",
+            instance="test",
+            slurm_node_sets=(SlurmNodeSetSpec(name="compute", node_type="compute", replicas=1),),
+            slinky=SlinkyDeploymentConfig(
+                chart_plain_http=plain_http,
+                operator_image=SlinkyImageConfig(repository="registry.example/operator", tag="custom"),
+            ),
+            workload_provider=provider,
+            opts=pulumi.ResourceOptions(transformations=[record_options]),
+        )
+
+        def verify(values):
+            version, status, ready, ready_dependencies, token_dependencies, bridge_dependencies = values
+            assert version == "1.2.2"
+            assert status["name"] == "slurm-bridge"
+            assert ready is True
+            bridge = resources["slurm-bridge"]
+            token = resources["slurm-bridge-token"]
+            assert bridge.typ == "kubernetes:helm.sh/v3:Release"
+            assert bridge.inputs["chart"] == "oci://ghcr.io/slinkyproject/charts/slurm-bridge"
+            assert bridge.inputs["version"] == version
+            assert bridge.inputs["namespace"] == token.inputs["metadata"]["namespace"] == "slurm"
+            assert bridge.inputs["values"] == _slurm_bridge_values()
+            assert token.typ == "kubernetes:slinky.slurm.net/v1beta1:Token"
+            assert token.inputs["spec"] == _slurm_bridge_token_spec()
+            assert token.inputs["metadata"]["annotations"]["pulumi.com/waitFor"] == "jsonpath={.status.issuedAt}"
+            assert {urn.rsplit("::", 1)[-1] for urn in token_dependencies} == {"slurm", "slurm-operator"}
+            assert {urn.rsplit("::", 1)[-1] for urn in bridge_dependencies} == {
+                "slurm-bridge-namespace", "slurm-bridge-token", "slurm", "workload-cert-manager",
+            }
+            assert any(urn.endswith("::slurm-bridge") for urn in ready_dependencies)
+            assert options["slurm-bridge"].provider is provider
+            assert options["slurm-bridge-token"].provider is provider
+            expected_type = "kubernetes:helm.sh/v4:Chart" if plain_http else "kubernetes:helm.sh/v3:Release"
+            assert resources["slurm"].typ == expected_type
+            assert resources["slurm"].inputs["values"]["nodesets"]["compute"]["podSpec"]["tolerations"] == [{
+                "key": "slinky.slurm.net/managed-node",
+                "operator": "Equal",
+                "value": "slurm-bridge-scheduler",
+                "effect": "NoExecute",
+            }]
+            assert resources["slurm-operator"].inputs["values"]["operator"]["image"] == {
+                "repository": "registry.example/operator", "tag": "custom",
+            }
+
+        return pulumi.Output.all(
+            deployments.slurm_bridge_chart_version,
+            deployments.slurm_bridge_status,
+            deployments.workload_cluster_ready,
+            pulumi.Output.from_input(deployments.workload_cluster_ready.resources()).apply(
+                lambda dependencies: pulumi.Output.all(*[resource.urn for resource in dependencies])
+            ),
+            pulumi.Output.all(*[resource.urn for resource in options["slurm-bridge-token"].depends_on]),
+            pulumi.Output.all(*[resource.urn for resource in options["slurm-bridge"].depends_on]),
+        ).apply(verify)
+
+    check()
 
 
 def test_slurm_values_use_container_compatible_cgroups() -> None:
