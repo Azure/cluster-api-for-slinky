@@ -13,7 +13,6 @@ from uuid import UUID
 import pulumi
 from azure_container_registry import (
     AzureContainerRegistryConfig,
-    AzureContainerRegistryPullAccess,
 )
 from pydantic import (
     BaseModel,
@@ -332,16 +331,6 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             node_pools=node_pools,
             opts=pulumi.ResourceOptions(parent=self),
         )
-        artifact_registry_access = []
-        if config.acr is not None:
-            artifact_registry_access.append(AzureContainerRegistryPullAccess(
-                "artifact-registry",
-                registry=config.acr,
-                identity_resource_id=azure_identity_resource_id,
-                azure_client_id=azure_client_id,
-                azure_tenant_id=azure_tenant_id,
-                opts=pulumi.ResourceOptions(parent=self),
-            ))
         deployments = WorkloadClusterDeployments(
             "deployments",
             instance=instance,
@@ -352,7 +341,7 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             pin_coredns_to_controller=True,
             opts=pulumi.ResourceOptions(
                 parent=self,
-                depends_on=[infrastructure, *artifact_registry_access],
+                depends_on=[infrastructure],
             ),
         )
 

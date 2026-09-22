@@ -16,7 +16,8 @@ from pydantic import Field, TypeAdapter, model_validator
 
 from artifacts import PublishedArtifacts, RegistryDestination
 from artifacts import capz, image, slinky
-from azure_container_registry import AzureContainerRegistryConfig, EphemeralAzureContainerRegistry
+from azure_container_registry import AzureContainerRegistryConfig, AzureContainerRegistryPullAccess, EphemeralAzureContainerRegistry
+from azure_aks_identity import AKSClusterIdentities, AKSIdentityConfig
 from ctlptl import (
     CloudProviderKind,
     CloudProviderKindConfig,
@@ -36,7 +37,7 @@ from stacks.workload_cluster.tenants import (
     WorkloadClusterConfig,
 )
 from stacks.init.init_stack import InitStackConfig
-from stacks.workload_cluster.workload_cluster_class_aks import AKSWorkloadClusterConfig
+from stacks.workload_cluster.workload_cluster_class_aks import AKSWorkloadClusterConfig, _resolve_resource_group as _aks_resource_group
 from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     AzureBYOWorkloadClusterConfig,
 )
@@ -142,22 +143,43 @@ def run_stack() -> None:
     )]
     has_local_workloads = any(isinstance(workload, LocalWorkloadClusterConfig) for workload in workloads)
     azure_registry = None
+    aks_identities = {}
+    pull_grants = []
     destinations: dict[str, RegistryDestination] = {}
     registry_dependencies: dict[str, pulumi.Resource] = {}
     if azure_workloads:
         placement = azure_workloads[0].parameters
-        azure_provider_config = configured_init_stack.control_plane.infrastructure_providers.azure
-        runner_identity = azure_provider_config.identity if azure_provider_config is not None else None
         azure_registry = EphemeralAzureContainerRegistry(
             "workload-registry", subscription_id=str(placement.subscription_id),
             location=placement.location, tags=dict(placement.additional_tags),
-            runner_identity_resource_id=runner_identity.resource_id if runner_identity is not None else None,
         )
         destinations["acr"] = {
             "server": azure_registry.server, "consumer_server": azure_registry.server,
             "plain_http": False, "acr_resource_id": azure_registry.resource_id,
         }
         registry_dependencies["acr"] = azure_registry
+        for instance, workload in configured_init_stack.tenants.workload_clusters.items():
+            if isinstance(workload, AKSWorkloadClusterConfig):
+                parameters = workload.parameters
+                identities = AKSClusterIdentities(
+                    f"{instance}-identities", subscription_id=str(parameters.subscription_id),
+                    location=parameters.location, workload_resource_group=_aks_resource_group(parameters),
+                    tags=dict(parameters.additional_tags),
+                )
+                aks_identities[instance] = identities.config
+                pull_grants.append(AzureContainerRegistryPullAccess(
+                    f"{instance}-registry", registry=azure_registry.config,
+                    principal_id=identities.kubelet_principal_id,
+                ))
+        if any(isinstance(workload, AzureBYOWorkloadClusterConfig) for workload in azure_workloads):
+            azure_provider_config = configured_init_stack.control_plane.infrastructure_providers.azure
+            runner_identity = azure_provider_config.identity if azure_provider_config is not None else None
+            if runner_identity is None or runner_identity.resource_id is None:
+                raise ValueError("Azure BYO ACR access requires the node UAMI resource ID")
+            pull_grants.append(AzureContainerRegistryPullAccess(
+                "byo-registry", registry=azure_registry.config,
+                identity_resource_id=runner_identity.resource_id,
+            ))
     slinky_image_keys = {_SLINKY_OPERATOR_IMAGE_KEY, _SLINKY_WEBHOOK_IMAGE_KEY}
     build_destinations = {
         name: (
@@ -324,7 +346,11 @@ def run_stack() -> None:
             image_refs={name: build.artifact_refs for name, build in azure_builds.items()},
             chart_oci_prefix=slinky_chart_oci_prefix,
             chart_version=slinky_charts.artifact_tags["charts/slurm"] if slinky_charts is not None else None,
+            aks_identities=aks_identities,
         ).apply(lambda values: _merge_azure_build_overrides(**values))
+        init_stack_config = pulumi.Output.all(
+            init_stack_config, *[grant.role_assignment_id for grant in pull_grants],
+        ).apply(lambda values: values[0])
 
     pko = PKOBootstrap(
         "pko",
@@ -358,6 +384,7 @@ def run_stack() -> None:
 def _merge_azure_build_overrides(
     *, config: InitStackConfig, acr: AzureContainerRegistryConfig,
     image_refs: dict[str, dict[str, str]], chart_oci_prefix: str | None, chart_version: str | None,
+    aks_identities: dict[str, AKSIdentityConfig],
 ) -> InitStackConfig:
     workloads = {}
     for name, workload in config.tenants.workload_clusters.items():
@@ -377,6 +404,8 @@ def _merge_azure_build_overrides(
                     operator_chart_version=chart_version, slurm_chart_version=chart_version,
                 )
             workload = workload.model_copy(update={"acr": acr, "slinky": workload.slinky.model_copy(update=updates)})
+            if isinstance(workload, AKSWorkloadClusterConfig):
+                workload = workload.model_copy(update={"identities": aks_identities[name]})
         workloads[name] = workload
     return config.model_copy(update={"tenants": config.tenants.model_copy(update={"workload_clusters": workloads})})
 

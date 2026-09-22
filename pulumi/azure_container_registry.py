@@ -16,7 +16,6 @@ from lib.config import NonEmptyStr, PulumiConfigModel
 
 
 _ACR_PULL_ROLE_ID = "7f951dda-4ed3-4680-a7ca-43fe172d538d"
-_RBAC_ADMIN_ROLE_ID = "f58310d9-a9f6-439a-9e8d-f62e7b41a168"
 
 
 class AzureContainerRegistryConfig(PulumiConfigModel):
@@ -42,7 +41,6 @@ class EphemeralAzureContainerRegistry(pulumi.ComponentResource):
         subscription_id: str,
         location: str,
         tags: dict[str, str] | None = None,
-        runner_identity_resource_id: str | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:registry:EphemeralAzureRegistry", name, props={}, opts=opts)
@@ -70,49 +68,9 @@ class EphemeralAzureContainerRegistry(pulumi.ComponentResource):
         )
         self.server = registry.login_server
         self.resource_id = registry.id
-        delegation = None
-        if runner_identity_resource_id is not None:
-            identity_parts = parse_resource_id(runner_identity_resource_id)
-            identity_provider = azure_native.Provider(
-                f"{name}-runner-provider",
-                subscription_id=identity_parts["subscription"],
-                opts=pulumi.ResourceOptions(parent=self),
-            )
-            identity = azure_native.managedidentity.get_user_assigned_identity_output(
-                resource_group_name=identity_parts["resource_group"],
-                resource_name=identity_parts["name"],
-                opts=pulumi.InvokeOutputOptions(provider=identity_provider, parent=self),
-            )
-            delegation = azure_native.authorization.RoleAssignment(
-                f"{name}-pull-delegation",
-                scope=registry.id,
-                principal_id=identity.principal_id,
-                principal_type="ServicePrincipal",
-                role_assignment_name=registry.id.apply(lambda resource_id: str(uuid5(
-                    NAMESPACE_URL,
-                    f"{resource_id.casefold()}:{runner_identity_resource_id.casefold()}:acr-pull-delegation",
-                ))),
-                role_definition_id=(
-                    f"/subscriptions/{subscription_id}/providers/Microsoft.Authorization/"
-                    f"roleDefinitions/{_RBAC_ADMIN_ROLE_ID}"
-                ),
-                condition_version="2.0",
-                condition=(
-                    "((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR "
-                    "(@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] "
-                    f"ForAnyOfAnyValues:GuidEquals {{{_ACR_PULL_ROLE_ID}}})) AND "
-                    "((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR "
-                    "(@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] "
-                    f"ForAnyOfAnyValues:GuidEquals {{{_ACR_PULL_ROLE_ID}}}))"
-                ),
-                opts=resource_options,
-            )
         self.config = pulumi.Output.all(
             server=self.server, resource_id=self.resource_id,
-            delegation=delegation.id if delegation is not None else None,
-        ).apply(lambda values: AzureContainerRegistryConfig(
-            server=values["server"], resource_id=values["resource_id"],
-        ))
+        ).apply(lambda values: AzureContainerRegistryConfig(**values))
         self.register_outputs({"server": self.server, "resource_id": self.resource_id})
 
 
@@ -125,37 +83,22 @@ class AzureContainerRegistryPullAccess(pulumi.ComponentResource):
         self,
         name: str,
         *,
-        registry: AzureContainerRegistryConfig,
+        registry: pulumi.Input[AzureContainerRegistryConfig],
         identity_resource_id: pulumi.Input[str] | None = None,
         principal_id: pulumi.Input[str] | None = None,
-        azure_client_id: pulumi.Input[str] | None = None,
-        azure_tenant_id: pulumi.Input[str] | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         if (identity_resource_id is None) == (principal_id is None):
             raise ValueError(
                 "exactly one of identity_resource_id or principal_id is required"
             )
-        if (azure_client_id is None) != (azure_tenant_id is None):
-            raise ValueError(
-                "azure_client_id and azure_tenant_id must be provided together"
-            )
         super().__init__("ca4s:registry:AzurePullAccess", name, props={}, opts=opts)
 
-        registry_parts = parse_resource_id(registry.resource_id)
-        provider_credentials = (
-            {
-                "client_id": azure_client_id,
-                "tenant_id": azure_tenant_id,
-                "use_msi": True,
-            }
-            if azure_client_id is not None
-            else {}
-        )
+        registry_id = pulumi.Output.from_input(registry).apply(lambda value: value.resource_id)
+        registry_subscription = registry_id.apply(lambda value: parse_resource_id(value)["subscription"])
         registry_provider = azure_native.Provider(
             f"{name}-registry-provider",
-            subscription_id=registry_parts["subscription"],
-            **provider_credentials,
+            subscription_id=registry_subscription,
             opts=pulumi.ResourceOptions(parent=self),
         )
         principal_key: pulumi.Input[str]
@@ -168,7 +111,6 @@ class AzureContainerRegistryPullAccess(pulumi.ComponentResource):
                 subscription_id=identity_parts.apply(
                     lambda parts: parts["subscription"]
                 ),
-                **provider_credentials,
                 opts=pulumi.ResourceOptions(parent=self),
             )
             identity = azure_native.managedidentity.get_user_assigned_identity_output(
@@ -186,11 +128,11 @@ class AzureContainerRegistryPullAccess(pulumi.ComponentResource):
         else:
             principal_key = principal_id
 
-        assignment_name = pulumi.Output.from_input(principal_key).apply(
-            lambda value: str(
+        assignment_name = pulumi.Output.all(registry_id, principal_key).apply(
+            lambda values: str(
                 uuid5(
                     NAMESPACE_URL,
-                    f"{registry.resource_id.casefold()}:{value.casefold()}:acr-pull",
+                    f"{values[0].casefold()}:{values[1].casefold()}:acr-pull",
                 )
             )
         )
@@ -199,11 +141,11 @@ class AzureContainerRegistryPullAccess(pulumi.ComponentResource):
             principal_id=principal_id,
             principal_type="ServicePrincipal",
             role_assignment_name=assignment_name,
-            role_definition_id=(
-                f"/subscriptions/{registry_parts['subscription']}"
+            role_definition_id=pulumi.Output.concat(
+                "/subscriptions/", registry_subscription,
                 f"/providers/Microsoft.Authorization/roleDefinitions/{_ACR_PULL_ROLE_ID}"
             ),
-            scope=registry.resource_id,
+            scope=registry_id,
             opts=pulumi.ResourceOptions(parent=self, provider=registry_provider),
         )
         self.role_assignment_id = assignment.id

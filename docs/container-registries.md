@@ -197,13 +197,16 @@ Python dependency, and the ORAS executable is not required.
 
 ### Workload-Node Authorization
 
-Each workload stack grants `AcrPull` on the generated registry to the identity
-used by its nodes. Azure BYO grants access to the
-user-assigned identity already attached to every VM. AKS keeps its
-provider-created kubelet identity; after the control plane is ready, CA4S reads
-that identity's principal ID from the managed cluster and grants it access.
+The outer stack grants `AcrPull` on the generated registry to the identity
+used by each workload's nodes. Azure BYO uses the user-assigned identity already
+attached to every VM. For AKS, the outer stack creates dedicated control-plane
+and kubelet UAMIs in a disposable resource group. It grants the control-plane
+UAMI Managed Identity Operator on the kubelet UAMI and Network Contributor
+on the configured AKS resource group. CAPZ receives both identity resource IDs
+before cluster creation. The kubelet UAMI receives only registry-scoped `AcrPull`.
 Both paths let kubelet pull images without image pull secrets or access to the
-publisher's identity. Deployments depend on the pull role assignments.
+publisher's identity. The PKO init-stack configuration depends on the completed
+outer grants, and teardown keeps them until the inner cluster is deleted.
 
 Azure BYO also installs the cloud-provider-azure `acr-credential-provider` on
 every control-plane and worker node before kubeadm runs. The binary is pinned
@@ -219,24 +222,13 @@ bootstrap to download the pinned provider binary. Environments without that
 egress must adapt the bootstrap download to a mirror or a preinstalled binary
 before enabling ACR-hosted workload images.
 
-The identity applying workload stacks must be able to read the relevant managed
-identity or AKS cluster and create role assignments at the ACR scope, including
-across subscriptions if configured. CA4S does not grant push access to workload
-nodes. Azure RBAC propagation may cause initial pulls to retry.
-
-When the configured runner identity has a user-assigned identity resource ID,
-the outer stack grants it Role Based Access Control Administrator on this ACR
-only. An Azure RBAC condition restricts role-assignment writes and deletes to
-the `AcrPull` role. The init-stack configuration depends on this delegation;
-the runner receives no subscription-wide RBAC administration permission.
-
-The identity running the outer stack must be authorized to create this
-conditional delegation. Contributor alone is insufficient, and an inherited
-ABAC condition can forbid granting the administrator role even with the
-`AcrPull` restriction. Such a denial requires an authorized administrator or
-an approved policy change; retrying the deployment does not resolve it. If
-the runner has no user-assigned identity resource ID, no delegation is created
-and its required registry-scoped permissions must already exist.
+The identity running the outer stack must be allowed to create and delete these
+ordinary role assignments and create UAMIs. The CAPZ provisioning identity must
+be able to assign the UAMIs to AKS. PKO does not create role assignments and
+receives no RBAC-administrator delegation. An account whose ABAC condition
+excludes administrative roles can still work if it permits `AcrPull`, Managed
+Identity Operator, and Network Contributor assignments at the required scopes.
+Azure RBAC propagation may cause initial pulls to retry.
 
 ### Lifecycle and verification
 
@@ -246,7 +238,8 @@ according to resource dependencies. This is a development registry, not durable 
 storage. No private endpoint, firewall policy, geo-replication, or production
 retention policy is configured. Publisher and workload nodes need outbound
 HTTPS access to ACR; PKO and CAPI Operator continue using the local registry.
-The conditional runner delegation is also stack-owned and removed on teardown.
+The pull grants, AKS identities, and identity permissions are also outer-stack
+owned and removed on teardown after the workload cluster.
 
 Inspect published references:
 

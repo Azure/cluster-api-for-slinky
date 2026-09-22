@@ -418,6 +418,7 @@ def test_outer_stack_routes_named_builds(monkeypatch, scenario, topology):
                 "identity": {
                     "type": "UserAssignedMSI", "clientId": "11111111-1111-1111-1111-111111111111",
                     "tenantId": "33333333-3333-3333-3333-333333333333",
+                    "resourceId": "/subscriptions/44444444-4444-4444-4444-444444444444/resourceGroups/host-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/runner",
                 },
             }}},
             "tenants": {"workloadClusters": {"local": {"className": "local"}}},
@@ -451,6 +452,8 @@ def test_outer_stack_routes_named_builds(monkeypatch, scenario, topology):
             outputs.setdefault("name", args.name)
             if args.typ == "azure-native:containerregistry:Registry":
                 outputs.update(name=args.inputs["registryName"], loginServer="generated.azurecr.io")
+            if args.typ == "azure-native:managedidentity:UserAssignedIdentity":
+                outputs["principalId"] = f"{args.name}-principal"
             if "destination" in args.inputs:
                 provider = dill.loads(base64.b64decode(unwrap_rpc_secret(args.inputs["__provider"])))
                 tags = provider.plan(args.inputs.get("build_options") or {}, _COMMIT)
@@ -463,7 +466,9 @@ def test_outer_stack_routes_named_builds(monkeypatch, scenario, topology):
             return resource_id, outputs
 
         def call(self, args):
-            raise AssertionError(args.token)
+            assert args.token == "azure-native:managedidentity:getUserAssignedIdentity"
+            assert args.args["resourceName"] == "runner"
+            return {"principalId": "byo-principal"}
 
     class StubComponent(pulumi.ComponentResource):
         def __init__(self, name, **kwargs):
@@ -567,6 +572,12 @@ def test_outer_stack_routes_named_builds(monkeypatch, scenario, topology):
                 assert azure.controller_image == baseline.control_plane.infrastructure_providers.azure.controller_image
                 assert azure.provider_oci == baseline.control_plane.infrastructure_providers.azure.provider_oci
             if topology != "local":
+                roles = [item for item in resources if item.typ == "azure-native:authorization:RoleAssignment"]
+                pulls = [item for item in roles if item.inputs["roleDefinitionId"].endswith("/7f951dda-4ed3-4680-a7ca-43fe172d538d")]
+                assert len(roles) == 4
+                assert {item.inputs["principalId"] for item in pulls} == {"aks-identities-kubelet-principal", "byo-principal"}
+                assert all(item.inputs["scope"].endswith("/registries/generated") for item in pulls)
+                assert resolved.tenants.workload_clusters["aks"].identities.kubelet_resource_id == "aks-identities-kubelet"
                 for name in ("aks", "byo"):
                     workload = resolved.tenants.workload_clusters[name]
                     assert workload.acr.server == "generated.azurecr.io"

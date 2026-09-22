@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from azure_aks_identity import AKSIdentityConfig
+
 import base64
 import re
 from typing import Mapping, Sequence
@@ -17,7 +19,7 @@ from pydantic import StrictBool
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from stacks.kubernetes_annotations import (
     PULUMI_SKIP_AWAIT_ANNOTATION,
-    foreground_delete_annotations,
+    background_delete_annotations,
     pulumi_wait_for,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
@@ -119,6 +121,7 @@ def _azure_managed_control_plane_spec(
     subscription_id: str,
     version: str,
     additional_tags: Mapping[str, str],
+    identities: AKSIdentityConfig | None = None,
 ) -> dict[str, object]:
     """``AzureManagedControlPlane.spec`` — the AKS control plane definition.
 
@@ -151,6 +154,12 @@ def _azure_managed_control_plane_spec(
     }
     if additional_tags:
         spec["additionalTags"] = dict(additional_tags)
+    if identities is not None:
+        spec["identity"] = {
+            "type": "UserAssigned",
+            "userAssignedIdentityResourceID": identities.control_plane_resource_id,
+        }
+        spec["kubeletUserAssignedIdentity"] = identities.kubelet_resource_id
     return spec
 
 
@@ -258,6 +267,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
         node_sku: str,
         node_pools: tuple[AKSNodePoolSpec, ...],
         additional_tags: Mapping[str, str] | None = None,
+        identities: AKSIdentityConfig | None = None,
         provider: k8s.Provider | None = None,
         opts: ResourceOptions | None = None,
     ) -> None:
@@ -272,11 +282,27 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
 
         def child_opts(
             depends_on: Sequence[pulumi.Input[pulumi.Resource]] | None = None,
+            deleted_with: pulumi.Resource | None = None,
         ) -> ResourceOptions:
             return ResourceOptions(
-                parent=self, provider=provider, depends_on=depends_on
+                parent=self, provider=provider, depends_on=depends_on, deleted_with=deleted_with,
             )
 
+        cluster = k8s.apiextensions.CustomResource(
+            f"{name}-cluster",
+            api_version=_CAPI_API_VERSION,
+            kind=_CLUSTER_KIND,
+            metadata={
+                "name": cluster_name,
+                "namespace": _NAMESPACE,
+                "annotations": background_delete_annotations(),
+            },
+            spec=_cluster_spec(control_plane_name=cluster_name, infrastructure_name=cluster_name),
+            opts=pulumi.ResourceOptions.merge(
+                child_opts(),
+                pulumi.ResourceOptions(custom_timeouts=pulumi.CustomTimeouts(delete=_AKS_DELETE_TIMEOUT)),
+            ),
+        )
         azure_managed_cluster = k8s.apiextensions.CustomResource(
             f"{name}-managed-cluster",
             api_version=_INFRASTRUCTURE_API_VERSION,
@@ -284,10 +310,10 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(),
+                "annotations": background_delete_annotations(),
             },
             spec={},
-            opts=child_opts(),
+            opts=child_opts(depends_on=[cluster], deleted_with=cluster),
         )
 
         azure_managed_control_plane = k8s.apiextensions.CustomResource(
@@ -299,7 +325,7 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "namespace": _NAMESPACE,
                 # CAPZ cannot make AMCP ready until at least one System AMMP exists.
                 # The explicit ready patch below waits after machine pools are created.
-                "annotations": foreground_delete_annotations(
+                "annotations": background_delete_annotations(
                     {PULUMI_SKIP_AWAIT_ANNOTATION: "true"}
                 ),
             },
@@ -311,9 +337,10 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 subscription_id=subscription_id,
                 version=kubernetes_version,
                 additional_tags=dict(additional_tags or {}),
+                identities=identities,
             ),
             opts=pulumi.ResourceOptions.merge(
-                child_opts(depends_on=[azure_managed_cluster]),
+                child_opts(depends_on=[azure_managed_cluster], deleted_with=cluster),
                 pulumi.ResourceOptions(
                     ignore_changes=_AMCP_IMMUTABLE_DEFAULTED_FIELDS,
                     custom_timeouts=pulumi.CustomTimeouts(
@@ -321,27 +348,6 @@ class AKSWorkloadClusterInfrastructure(pulumi.ComponentResource):
                         update=_AKS_CONTROL_PLANE_TIMEOUT,
                         delete=_AKS_CONTROL_PLANE_TIMEOUT,
                     )
-                ),
-            ),
-        )
-
-        cluster = k8s.apiextensions.CustomResource(
-            f"{name}-cluster",
-            api_version=_CAPI_API_VERSION,
-            kind=_CLUSTER_KIND,
-            metadata={
-                "name": cluster_name,
-                "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(),
-            },
-            spec=_cluster_spec(
-                control_plane_name=cluster_name,
-                infrastructure_name=cluster_name,
-            ),
-            opts=pulumi.ResourceOptions.merge(
-                child_opts(depends_on=[azure_managed_control_plane]),
-                pulumi.ResourceOptions(
-                    custom_timeouts=pulumi.CustomTimeouts(delete=_AKS_DELETE_TIMEOUT)
                 ),
             ),
         )

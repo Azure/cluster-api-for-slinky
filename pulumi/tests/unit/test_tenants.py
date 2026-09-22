@@ -32,7 +32,7 @@ def test_tenants_config_defaults_to_local_cluster() -> None:
     }
 
 
-def test_aks_dispatch_forwards_runner_identity(monkeypatch) -> None:
+def test_aks_dispatch_forwards_capz_identity_without_runner_credentials(monkeypatch) -> None:
     captured = {}
 
     class Mocks(pulumi.runtime.Mocks):
@@ -62,10 +62,11 @@ def test_aks_dispatch_forwards_runner_identity(monkeypatch) -> None:
         Tenants._instantiate_workload_cluster(parent, "aks", config, context=pulumi.Output.from_input(context))
 
         def verify(values):
-            assert values == ["runner-client", "runner-tenant", "identity", "default"]
+            assert values == ["identity", "default"]
+            assert "azure_client_id" not in captured
+            assert "azure_tenant_id" not in captured
 
         return pulumi.Output.all(
-            captured["azure_client_id"], captured["azure_tenant_id"],
             captured["identity_name"], captured["identity_namespace"],
         ).apply(verify)
 

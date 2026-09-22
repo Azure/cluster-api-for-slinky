@@ -4,6 +4,22 @@
 encryptionsalt: v1:VjgtcOTgSeI=:v1:Qk+1kfEEW+5Qj98l:26uVqeGXBdx4OW/LvLPHhaX3sPPb7Q==
 config:
   ca4s-infra:builds:
+    slurm-operator:
+      builder: docker-image
+      repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+      sourceRef: refs/pull/264/head
+      imageName: slurm-operator
+      target: manager
+    slurm-operator-webhook:
+      builder: docker-image
+      repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+      sourceRef: refs/pull/264/head
+      imageName: slurm-operator-webhook
+      target: webhook
+    slinky-charts:
+      builder: slinky-charts
+      repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+      sourceRef: refs/pull/264/head
     capz-controller:
       builder: docker-image
       repositoryUrl: https://github.com/kubernetes-sigs/cluster-api-provider-azure.git

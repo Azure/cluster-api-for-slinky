@@ -10,6 +10,7 @@ import base64
 import pulumi
 
 from azure_container_registry import AzureContainerRegistryConfig
+from azure_aks_identity import AKSIdentityConfig
 from stacks.workload_cluster.tenants import Tenants, WorkloadClusterContext
 from stacks.workload_cluster.workload_cluster_class_aks import AKSWorkloadClusterConfig, AzureWorkloadSpec
 
@@ -64,7 +65,6 @@ def test_resource_name_sanitizes_and_suffixes() -> None:
 def test_aks_construction_through_tenants_with_optional_acr(with_acr):
     resources = []
     options = {}
-    calls = []
     registry_id = "/subscriptions/registry-sub/resourceGroups/rg/providers/Microsoft.ContainerRegistry/registries/images"
 
     class Mocks(pulumi.runtime.Mocks):
@@ -78,12 +78,7 @@ def test_aks_construction_through_tenants_with_optional_acr(with_acr):
             return args.name, outputs
 
         def call(self, args):
-            calls.append(args)
-            assert args.token == "azure-native:containerservice:getManagedCluster"
-            assert any(item.name == "infrastructure-control-plane-ready" for item in resources)
-            return {"name": "aks", "location": "westus2", "identityProfile": {
-                "kubeletidentity": {"objectId": "kubelet-principal"},
-            }}
+            raise AssertionError(f"unexpected inner invoke: {args.token}")
 
     def record(args):
         options[args.name] = args.opts
@@ -98,6 +93,7 @@ def test_aks_construction_through_tenants_with_optional_acr(with_acr):
                 subscription_id="44444444-4444-4444-4444-444444444444", location="westus2", resource_group="aks-rg",
             ),
             acr=AzureContainerRegistryConfig(server="images.azurecr.io", resource_id=registry_id) if with_acr else None,
+            identities=AKSIdentityConfig(control_plane_resource_id="/identities/control", kubelet_resource_id="/identities/kubelet") if with_acr else None,
         )
         cluster = Tenants._instantiate_workload_cluster(
             parent, "aks", config, context=pulumi.Output.from_input(WorkloadClusterContext(
@@ -113,12 +109,24 @@ def test_aks_construction_through_tenants_with_optional_acr(with_acr):
             assert outputs.workload_cluster_ready
             assert ready_urn.endswith("::infrastructure-control-plane-ready")
             roles = [item for item in resources if item.typ == "azure-native:authorization:RoleAssignment"]
-            assert len(roles) == int(with_acr)
-            assert len(calls) == int(with_acr)
+            assert roles == []
+            assert len(options["deployments"].depends_on) == 1
+            owner = options["infrastructure-control-plane"].deleted_with
+            assert owner is not None
+            assert options["infrastructure-managed-cluster"].deleted_with is owner
+            for pool in ("head", "compute"):
+                assert options[f"infrastructure-{pool}-managed-machine-pool"].deleted_with is owner
+                assert options[f"infrastructure-{pool}-machine-pool"].deleted_with is owner
+            assert options["infrastructure-cluster"].deleted_with is None
+            cluster_resource = next(item for item in resources if item.name == "infrastructure-cluster")
+            assert cluster_resource.inputs["metadata"]["annotations"][PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION] == "Background"
+            control_plane = next(item for item in resources if item.name == "infrastructure-control-plane").inputs["spec"]
             if with_acr:
-                assert roles[0].inputs["principalId"] == "kubelet-principal"
-                assert roles[0].inputs["scope"] == registry_id
-                assert len(options["deployments"].depends_on) == 2
+                assert control_plane["identity"] == {"type": "UserAssigned", "userAssignedIdentityResourceID": "/identities/control"}
+                assert control_plane["kubeletUserAssignedIdentity"] == "/identities/kubelet"
+            else:
+                assert "identity" not in control_plane
+                assert "kubeletUserAssignedIdentity" not in control_plane
 
         return pulumi.Output.all(cluster.outputs, readiness.urn).apply(verify)
 

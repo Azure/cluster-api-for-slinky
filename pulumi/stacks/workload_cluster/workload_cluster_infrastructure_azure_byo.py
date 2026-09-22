@@ -19,7 +19,7 @@ from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from localenv import AzureHostNetwork
 from stacks.kubernetes_annotations import (
     PULUMI_SKIP_AWAIT_ANNOTATION,
-    foreground_delete_annotations,
+    background_delete_annotations,
     pulumi_wait_for,
 )
 from stacks.workload_cluster.workload_cluster_addons import (
@@ -77,13 +77,13 @@ _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 
 
 def _cluster_annotations() -> dict[str, str]:
-    return foreground_delete_annotations(
+    return background_delete_annotations(
         {PULUMI_SKIP_AWAIT_ANNOTATION: "true"}
     )
 
 
 def _control_plane_annotations() -> dict[str, str]:
-    return foreground_delete_annotations(
+    return background_delete_annotations(
         {PULUMI_SKIP_AWAIT_ANNOTATION: "true"}
     )
 
@@ -735,12 +735,14 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
             capi_lifecycle: bool = False,
             ignore_changes: list[str] | None = None,
+            deleted_with: pulumi.Resource | None = None,
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
                 ignore_changes=ignore_changes,
+                deleted_with=deleted_with,
                 custom_timeouts=(
                     pulumi.CustomTimeouts(
                         create=_CAPI_LIFECYCLE_TIMEOUT,
@@ -752,6 +754,19 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 ),
             )
 
+        cluster = k8s.apiextensions.CustomResource(
+            "cluster",
+            api_version=_CAPI_API_VERSION,
+            kind="Cluster",
+            metadata={
+                "name": cluster_name,
+                "namespace": _NAMESPACE,
+                "annotations": _cluster_annotations(),
+                "labels": {"cloud-provider": "azure"},
+            },
+            spec=_cluster_spec(cluster_name=cluster_name, control_plane_name=control_plane_name),
+            opts=child_options(depends_on=[*resource_group_dependencies, flex], capi_lifecycle=True),
+        )
         azure_cluster = k8s.apiextensions.CustomResource(
             "azure-cluster",
             api_version=_INFRASTRUCTURE_API_VERSION,
@@ -759,7 +774,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(),
+                "annotations": background_delete_annotations(),
             },
             spec=_azure_cluster_spec(
                 cluster_name=cluster_name,
@@ -772,25 +787,10 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 additional_tags=additional_tags,
             ),
             opts=child_options(
-                depends_on=resource_group_dependencies,
+                depends_on=[cluster],
+                deleted_with=cluster,
                 capi_lifecycle=True,
             ),
-        )
-        cluster = k8s.apiextensions.CustomResource(
-            "cluster",
-            api_version=_CAPI_API_VERSION,
-            kind="Cluster",
-            metadata={
-                "name": cluster_name,
-                "namespace": _NAMESPACE,
-                "annotations": _cluster_annotations(),
-                "labels": {"cloud-provider": "azure"},
-            },
-            spec=_cluster_spec(
-                cluster_name=cluster_name,
-                control_plane_name=control_plane_name,
-            ),
-            opts=child_options(depends_on=[azure_cluster], capi_lifecycle=True),
         )
         azure_cluster_ready = k8s.apiextensions.CustomResourcePatch(
             "azure-cluster-ready",
@@ -801,7 +801,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "namespace": _NAMESPACE,
                 "annotations": pulumi_wait_for("condition=Ready"),
             },
-            opts=child_options(depends_on=[cluster], capi_lifecycle=True),
+            opts=child_options(depends_on=[azure_cluster], capi_lifecycle=True),
         )
         control_plane_machine_template = k8s.apiextensions.CustomResource(
             "control-plane-machine-template",
@@ -842,6 +842,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     azure_cluster_ready,
                     control_plane_machine_template,
                 ],
+                deleted_with=cluster,
                 capi_lifecycle=True,
             ),
         )
@@ -921,7 +922,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                             worker_node.autoscaler_bounds is not None
                         ),
                     ),
-                    "annotations": foreground_delete_annotations(
+                    "annotations": background_delete_annotations(
                         autoscaler_annotations
                     ),
                 },
@@ -938,6 +939,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                         worker_machine_template,
                         worker_bootstrap_template,
                     ],
+                    deleted_with=cluster if worker_node.node_type == CONTROLLER_NODE_TYPE else None,
                     capi_lifecycle=True,
                     ignore_changes=(
                         ["spec.replicas"]

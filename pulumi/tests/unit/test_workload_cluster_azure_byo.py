@@ -6,13 +6,16 @@
 from __future__ import annotations
 
 import json
+import base64
 import subprocess
 from typing import Any, cast
 
 import pytest
+import pulumi
 
 from localenv import AzureHostNetwork, AzureResourcePlacement
 import stacks.workload_cluster.workload_cluster_class_azure_byo as azure_byo_module
+import stacks.workload_cluster.workload_cluster_infrastructure_azure_byo as infrastructure_module
 from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     AzureBYOSubnetConfig,
     AzureBYOVNetConfig,
@@ -50,7 +53,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _vmss_flex_name,
 )
 from stacks.kubernetes_annotations import (
-    DELETE_PROPAGATION_FOREGROUND,
+    DELETE_PROPAGATION_BACKGROUND,
     PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION,
     PULUMI_SKIP_AWAIT_ANNOTATION,
     PULUMI_WAIT_FOR_ANNOTATION,
@@ -91,9 +94,64 @@ def _head_node() -> AzureBYONodePoolSpec:
     )
 
 
+def test_byo_cluster_owns_controller_deletion_before_flex_cleanup(monkeypatch) -> None:
+    resources = {}
+    options = {}
+
+    class Mocks(pulumi.runtime.Mocks):
+        def new_resource(self, args):
+            resources[args.name] = args
+            outputs = dict(args.inputs)
+            outputs.setdefault("name", args.name)
+            if args.typ == "kubernetes:core/v1:Secret":
+                outputs["data"] = {"value": base64.b64encode(b"{}").decode()}
+            return args.name, outputs
+
+        def call(self, args):
+            raise AssertionError(f"unexpected invoke: {args.token}")
+
+    def record(args):
+        options[args.name] = args.opts
+
+    class Addon(pulumi.ComponentResource):
+        def __init__(self, name, **kwargs):
+            super().__init__("test:Addon", name, opts=kwargs.get("opts"))
+            self.chart_version = pulumi.Output.from_input("test")
+            self.status = pulumi.Output.from_input("ready")
+            self.storage_class_name = pulumi.Output.from_input("local-path")
+
+    for component in ("AzureCloudProvider", "CalicoVXLAN", "LocalPathStorage"):
+        monkeypatch.setattr(infrastructure_module, component, Addon)
+    pulumi.runtime.set_mocks(Mocks())
+
+    @pulumi.runtime.test
+    def check():
+        infrastructure = infrastructure_module.AzureBYOWorkloadClusterInfrastructure(
+            "infrastructure", instance="test", subscription_id=_SUBSCRIPTION_ID,
+            tenant_id="tenant", client_id="client", node_identity_resource_id="/identities/nodes",
+            identity_name="identity", identity_namespace="default", location="westus2",
+            additional_tags={}, byo_subnet=AzureBYOSubnet.from_host_network(_host_network()),
+            kubernetes_version="v1.36.1",
+            node_pools=(_controller_node(), _head_node(), _compute_node().model_copy(update={"autoscaler_bounds": None})),
+            opts=pulumi.ResourceOptions(transformations=[record]),
+        )
+        return infrastructure.workload_provider.urn
+
+    check()
+    cluster = options["head-machine-deployment"].deleted_with
+    assert cluster is not None
+    assert options["control-plane"].deleted_with is cluster
+    assert options["azure-cluster"].deleted_with is cluster
+    assert options["compute-machine-deployment"].deleted_with is None
+    assert options["cluster"].deleted_with is None
+    assert len(options["cluster"].depends_on) == 2
+    assert resources["cluster"].inputs["metadata"]["annotations"][PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION] == "Background"
+    assert not any(resource.typ == "azure-native:authorization:RoleAssignment" for resource in resources.values())
+
+
 def test_cluster_lifecycle_annotations_defer_readiness_to_late_patch() -> None:
     assert _cluster_annotations() == {
-        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_FOREGROUND,
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_BACKGROUND,
         PULUMI_SKIP_AWAIT_ANNOTATION: "true",
     }
     assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneReady"
@@ -104,7 +162,7 @@ def test_control_plane_creation_defers_readiness_to_v1beta2_patch() -> None:
         "controlplane.cluster.x-k8s.io/v1beta2"
     )
     assert _control_plane_annotations() == {
-        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_FOREGROUND,
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_BACKGROUND,
         PULUMI_SKIP_AWAIT_ANNOTATION: "true",
     }
     assert _control_plane_ready_annotations() == {
