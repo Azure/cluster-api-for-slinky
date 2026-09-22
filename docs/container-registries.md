@@ -204,7 +204,10 @@ used by each workload's nodes. Azure BYO uses the user-assigned identity already
 attached to every VM. For AKS, the outer stack creates dedicated control-plane
 and kubelet UAMIs in a disposable resource group. It grants the control-plane
 UAMI Managed Identity Operator on the kubelet UAMI and Network Contributor
-on the configured AKS resource group. CAPZ receives both identity resource IDs
+on the AKS resource group. By default AKS also lives in the outer-owned group,
+so deleting it removes policy-created resources such as NSGs. An explicit
+`parameters.resourceGroup` or `useDiscoveredResourceGroup: true` preserves that
+existing group instead. CAPZ receives both identity resource IDs
 before cluster creation. The kubelet UAMI receives only registry-scoped `AcrPull`.
 Both paths let kubelet pull images without image pull secrets or access to the
 publisher's identity. The PKO init-stack configuration depends on the completed

@@ -243,6 +243,12 @@ workload cluster deletes its cluster resources individually but preserves the
 host resource group and Kind host VM. Do not apply CAPZ's cluster ownership tag
 to the shared group.
 
+Without an explicit AKS `resourceGroup` or `useDiscoveredResourceGroup: true`,
+the outer stack creates and owns the AKS workload group alongside its UAMIs.
+Destroy removes that group after the cluster, including resources created by
+Azure Policy. Shared groups are preserved, so policy-created resources outside
+CAPZ ownership may require separate cleanup.
+
 ### Autoscaling
 
 See [docs/autoscaling.md](docs/autoscaling.md) for the autoscaling design,

@@ -144,6 +144,7 @@ def run_stack() -> None:
     has_local_workloads = any(isinstance(workload, LocalWorkloadClusterConfig) for workload in workloads)
     azure_registry = None
     aks_identities = {}
+    aks_resource_groups = {}
     pull_grants = []
     destinations: dict[str, RegistryDestination] = {}
     registry_dependencies: dict[str, pulumi.Resource] = {}
@@ -167,6 +168,7 @@ def run_stack() -> None:
                     tags=dict(parameters.additional_tags),
                 )
                 aks_identities[instance] = identities.config
+                aks_resource_groups[instance] = identities.workload_resource_group
                 pull_grants.append(AzureContainerRegistryPullAccess(
                     f"{instance}-registry", registry=azure_registry.config,
                     principal_id=identities.kubelet_principal_id,
@@ -347,6 +349,7 @@ def run_stack() -> None:
             chart_oci_prefix=slinky_chart_oci_prefix,
             chart_version=slinky_charts.artifact_tags["charts/slurm"] if slinky_charts is not None else None,
             aks_identities=aks_identities,
+            aks_resource_groups=aks_resource_groups,
         ).apply(lambda values: _merge_azure_build_overrides(**values))
         init_stack_config = pulumi.Output.all(
             init_stack_config, *[grant.role_assignment_id for grant in pull_grants],
@@ -385,6 +388,7 @@ def _merge_azure_build_overrides(
     *, config: InitStackConfig, acr: AzureContainerRegistryConfig,
     image_refs: dict[str, dict[str, str]], chart_oci_prefix: str | None, chart_version: str | None,
     aks_identities: dict[str, AKSIdentityConfig],
+    aks_resource_groups: dict[str, str],
 ) -> InitStackConfig:
     workloads = {}
     for name, workload in config.tenants.workload_clusters.items():
@@ -405,7 +409,13 @@ def _merge_azure_build_overrides(
                 )
             workload = workload.model_copy(update={"acr": acr, "slinky": workload.slinky.model_copy(update=updates)})
             if isinstance(workload, AKSWorkloadClusterConfig):
-                workload = workload.model_copy(update={"identities": aks_identities[name]})
+                workload = workload.model_copy(update={
+                    "identities": aks_identities[name],
+                    "parameters": workload.parameters.model_copy(update={
+                        "resource_group": aks_resource_groups[name],
+                        "use_discovered_resource_group": False,
+                    }),
+                })
         workloads[name] = workload
     return config.model_copy(update={"tenants": config.tenants.model_copy(update={"workload_clusters": workloads})})
 

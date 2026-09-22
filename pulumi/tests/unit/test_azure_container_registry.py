@@ -15,7 +15,8 @@ from azure_container_registry import (
 from azure_aks_identity import AKSClusterIdentities
 
 
-def test_aks_identities_have_only_scoped_network_and_identity_grants() -> None:
+@pytest.mark.parametrize("workload_group", [None, "workload"])
+def test_aks_identities_have_only_scoped_network_and_identity_grants(workload_group) -> None:
     resources = []
 
     class Mocks(pulumi.runtime.Mocks):
@@ -35,7 +36,7 @@ def test_aks_identities_have_only_scoped_network_and_identity_grants() -> None:
     def check():
         identities = AKSClusterIdentities(
             "aks", subscription_id="sub", location="westus2",
-            workload_resource_group="workload", tags={"Owner": "test"},
+            workload_resource_group=workload_group, tags={"Owner": "test"},
         )
 
         def verify(config):
@@ -44,7 +45,7 @@ def test_aks_identities_have_only_scoped_network_and_identity_grants() -> None:
             assert set(grants) == {"aks-kubelet-operator", "aks-network"}
             assert grants["aks-kubelet-operator"]["scope"] == config.kubelet_resource_id
             assert grants["aks-kubelet-operator"]["roleDefinitionId"].endswith("/f1a07417-d97a-45cb-824c-7a7467783830")
-            assert grants["aks-network"]["scope"] == "/subscriptions/sub/resourceGroups/workload"
+            assert grants["aks-network"]["scope"] == f"/subscriptions/sub/resourceGroups/{workload_group or 'aks-rg'}"
             assert grants["aks-network"]["roleDefinitionId"].endswith("/4d97b98b-1d4f-4787-a291-c67834d212e7")
             assert all(grant["principalId"] == "aks-control-plane-principal" for grant in grants.values())
             assert config.control_plane_resource_id != config.kubelet_resource_id

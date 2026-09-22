@@ -20,7 +20,7 @@ class AKSClusterIdentities(pulumi.ComponentResource):
         *,
         subscription_id: str,
         location: str,
-        workload_resource_group: str,
+        workload_resource_group: str | None,
         tags: dict[str, str],
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
@@ -33,6 +33,7 @@ class AKSClusterIdentities(pulumi.ComponentResource):
         group = azure_native.resources.ResourceGroup(
             f"{name}-rg", location=location, tags=tags, opts=resource_options,
         )
+        self.workload_resource_group = pulumi.Output.from_input(workload_resource_group or group.name)
         control_plane = azure_native.managedidentity.UserAssignedIdentity(
             f"{name}-control-plane", resource_group_name=group.name,
             location=location, tags=tags, opts=resource_options,
@@ -45,7 +46,7 @@ class AKSClusterIdentities(pulumi.ComponentResource):
         for suffix, role_id, scope in (
             ("kubelet-operator", "f1a07417-d97a-45cb-824c-7a7467783830", kubelet.id),
             ("network", "4d97b98b-1d4f-4787-a291-c67834d212e7",
-             f"/subscriptions/{subscription_id}/resourceGroups/{workload_resource_group}"),
+             pulumi.Output.concat(f"/subscriptions/{subscription_id}/resourceGroups/", self.workload_resource_group)),
         ):
             assignment_name = pulumi.Output.all(scope, control_plane.principal_id).apply(
                 lambda values, role_id=role_id: str(uuid5(
@@ -70,4 +71,5 @@ class AKSClusterIdentities(pulumi.ComponentResource):
         self.register_outputs({
             "config": self.config.apply(lambda config: config.to_config()),
             "kubelet_principal_id": self.kubelet_principal_id,
+            "workload_resource_group": self.workload_resource_group,
         })

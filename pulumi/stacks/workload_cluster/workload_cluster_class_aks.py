@@ -53,8 +53,8 @@ class AKSWorkloadSizingConfig(PulumiConfigModel):
 class AzureWorkloadSpec(PulumiConfigModel):
     """AKS placement and sizing parameters for one workload-cluster entry.
 
-    ``subscription_id``, ``location``, and ``resource_group`` may be omitted
-    from config because they default from local Azure resource placement discovery.
+    Subscription and location default from local discovery. Omitting the resource
+    group lets the outer stack own it and clean up policy-created resources.
     """
 
     subscription_id: UUID = Field(
@@ -67,18 +67,14 @@ class AzureWorkloadSpec(PulumiConfigModel):
             discover_azure_resource_placement(raise_on_missing=True).location
         )
     )
-    resource_group: NonEmptyStr = Field(
-        default_factory=lambda: (
-            discover_azure_resource_placement(raise_on_missing=True).resource_group
-        )
-    )
+    resource_group: NonEmptyStr | None = None
     use_discovered_resource_group: StrictBool = False
     additional_tags: Mapping[NonEmptyStr, str] = Field(default_factory=dict)
     aks: AKSWorkloadSizingConfig = AKSWorkloadSizingConfig()
 
     @field_serializer("subscription_id", "location", "resource_group", check_fields=False)
-    def serialize_placement(self, value: UUID | str) -> str:
-        return str(value)
+    def serialize_placement(self, value: UUID | str | None) -> str | None:
+        return str(value) if value is not None else None
 
     @field_serializer("additional_tags", check_fields=False)
     def serialize_additional_tags(
@@ -88,7 +84,7 @@ class AzureWorkloadSpec(PulumiConfigModel):
         return dict(additional_tags)
 
 
-def _resolve_resource_group(parameters: AzureWorkloadSpec) -> str:
+def _resolve_resource_group(parameters: AzureWorkloadSpec) -> str | None:
     if not parameters.use_discovered_resource_group:
         return parameters.resource_group
 
@@ -193,6 +189,8 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             raise ValueError("aks workload cluster class requires identity_namespace")
         location = workload_spec.location
         resource_group = _resolve_resource_group(workload_spec)
+        if resource_group is None:
+            raise ValueError("AKS resource group must be resolved by the outer stack")
 
         def child_options(
             *,

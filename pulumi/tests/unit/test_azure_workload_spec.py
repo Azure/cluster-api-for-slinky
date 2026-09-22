@@ -99,6 +99,10 @@ def test_build_serializes_discovered_resource_group_option() -> None:
     assert _parameters(built)["useDiscoveredResourceGroup"] is True  # type: ignore[index]
 
 
+def test_default_resource_group_is_outer_owned() -> None:
+    assert _resolve_resource_group(AzureWorkloadSpec()) is None
+
+
 def test_resolve_resource_group_uses_explicit_group_by_default() -> None:
     parameters = AzureWorkloadSpec(
         location=_LOCATION,
@@ -274,9 +278,7 @@ def test_parse_rejects_non_mapping_payload() -> None:
 
 
 @pytest.mark.parametrize("omitted_key", ["subscriptionId", "location", "resourceGroup"])
-def test_parse_allows_omitting_discovery_injected_placement(omitted_key: str) -> None:
-    # Placement fields default from local Azure placement discovery, so any one
-    # may be omitted from config.
+def test_parse_allows_omitting_placement_fields(omitted_key: str) -> None:
     payload: dict[str, str] = {
         "subscriptionId": _SUBSCRIPTION_ID,
         "location": _LOCATION,
@@ -294,16 +296,16 @@ def test_parse_allows_omitting_discovery_injected_placement(omitted_key: str) ->
         assert parsed.location == _LOCATION
         assert parsed.resource_group == _RESOURCE_GROUP
     else:
-        assert parsed.resource_group == _RESOURCE_GROUP
+        assert parsed.resource_group is None
         assert parsed.location == _LOCATION
 
 
-def test_parse_allows_omitting_both_placement_fields() -> None:
+def test_parse_allows_omitting_all_placement_fields() -> None:
     parsed = AzureWorkloadSpec.model_validate({})
 
     assert str(parsed.subscription_id) == _SUBSCRIPTION_ID
     assert parsed.location == _LOCATION
-    assert parsed.resource_group == _RESOURCE_GROUP
+    assert parsed.resource_group is None
     assert parsed.additional_tags == {}
 
 
