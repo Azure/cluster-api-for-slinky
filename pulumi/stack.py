@@ -146,9 +146,12 @@ def run_stack() -> None:
     registry_dependencies: dict[str, pulumi.Resource] = {}
     if azure_workloads:
         placement = azure_workloads[0].parameters
+        azure_provider_config = configured_init_stack.control_plane.infrastructure_providers.azure
+        runner_identity = azure_provider_config.identity if azure_provider_config is not None else None
         azure_registry = EphemeralAzureContainerRegistry(
             "workload-registry", subscription_id=str(placement.subscription_id),
             location=placement.location, tags=dict(placement.additional_tags),
+            runner_identity_resource_id=runner_identity.resource_id if runner_identity is not None else None,
         )
         destinations["acr"] = {
             "server": azure_registry.server, "consumer_server": azure_registry.server,

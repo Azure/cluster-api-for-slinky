@@ -15,7 +15,8 @@ from azure_container_registry import (
 )
 
 
-def test_ephemeral_acr_provisions_registry_with_admin_disabled() -> None:
+@pytest.mark.parametrize("with_runner", [False, True])
+def test_ephemeral_acr_provisions_registry_with_admin_disabled(with_runner) -> None:
     resources: list[pulumi.runtime.MockResourceArgs] = []
 
     class RegistryMocks(pulumi.runtime.Mocks):
@@ -29,7 +30,10 @@ def test_ephemeral_acr_provisions_registry_with_admin_disabled() -> None:
             return f"/subscriptions/sub/resourceGroups/{args.name}", outputs
 
         def call(self, args):
-            raise AssertionError(f"unexpected provider invoke: {args.token}")
+            assert args.token == "azure-native:managedidentity:getUserAssignedIdentity"
+            assert args.args["resourceGroupName"] == "identities"
+            assert args.args["resourceName"] == "runner"
+            return {"principalId": "runner-principal"}
 
     pulumi.runtime.set_mocks(RegistryMocks())
 
@@ -37,6 +41,10 @@ def test_ephemeral_acr_provisions_registry_with_admin_disabled() -> None:
     def check():
         registry = EphemeralAzureContainerRegistry(
             "workload-registry", subscription_id="sub", location="westus2",
+            runner_identity_resource_id=(
+                "/subscriptions/identity-sub/resourceGroups/identities/providers/Microsoft.ManagedIdentity/userAssignedIdentities/runner"
+                if with_runner else None
+            ),
         )
 
         def verify(config):
@@ -47,6 +55,17 @@ def test_ephemeral_acr_provisions_registry_with_admin_disabled() -> None:
             assert resource.inputs["adminUserEnabled"] is False
             assert resource.inputs["registryName"].isalnum()
             assert any(item.typ == "azure-native:resources:ResourceGroup" for item in resources)
+            assignments = [item for item in resources if item.typ == "azure-native:authorization:RoleAssignment"]
+            assert len(assignments) == int(with_runner)
+            if with_runner:
+                assignment = assignments[0].inputs
+                assert assignment["scope"] == config.resource_id
+                assert assignment["principalId"] == "runner-principal"
+                assert assignment["roleDefinitionId"].endswith("/f58310d9-a9f6-439a-9e8d-f62e7b41a168")
+                assert assignment["conditionVersion"] == "2.0"
+                assert "@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId]" in assignment["condition"]
+                assert "@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId]" in assignment["condition"]
+                assert assignment["condition"].count("7f951dda-4ed3-4680-a7ca-43fe172d538d") == 2
 
         return registry.config.apply(verify)
 

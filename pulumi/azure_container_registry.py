@@ -16,6 +16,7 @@ from lib.config import NonEmptyStr, PulumiConfigModel
 
 
 _ACR_PULL_ROLE_ID = "7f951dda-4ed3-4680-a7ca-43fe172d538d"
+_RBAC_ADMIN_ROLE_ID = "f58310d9-a9f6-439a-9e8d-f62e7b41a168"
 
 
 class AzureContainerRegistryConfig(PulumiConfigModel):
@@ -41,6 +42,7 @@ class EphemeralAzureContainerRegistry(pulumi.ComponentResource):
         subscription_id: str,
         location: str,
         tags: dict[str, str] | None = None,
+        runner_identity_resource_id: str | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__("ca4s:registry:EphemeralAzureRegistry", name, props={}, opts=opts)
@@ -68,9 +70,49 @@ class EphemeralAzureContainerRegistry(pulumi.ComponentResource):
         )
         self.server = registry.login_server
         self.resource_id = registry.id
+        delegation = None
+        if runner_identity_resource_id is not None:
+            identity_parts = parse_resource_id(runner_identity_resource_id)
+            identity_provider = azure_native.Provider(
+                f"{name}-runner-provider",
+                subscription_id=identity_parts["subscription"],
+                opts=pulumi.ResourceOptions(parent=self),
+            )
+            identity = azure_native.managedidentity.get_user_assigned_identity_output(
+                resource_group_name=identity_parts["resource_group"],
+                resource_name=identity_parts["name"],
+                opts=pulumi.InvokeOutputOptions(provider=identity_provider, parent=self),
+            )
+            delegation = azure_native.authorization.RoleAssignment(
+                f"{name}-pull-delegation",
+                scope=registry.id,
+                principal_id=identity.principal_id,
+                principal_type="ServicePrincipal",
+                role_assignment_name=registry.id.apply(lambda resource_id: str(uuid5(
+                    NAMESPACE_URL,
+                    f"{resource_id.casefold()}:{runner_identity_resource_id.casefold()}:acr-pull-delegation",
+                ))),
+                role_definition_id=(
+                    f"/subscriptions/{subscription_id}/providers/Microsoft.Authorization/"
+                    f"roleDefinitions/{_RBAC_ADMIN_ROLE_ID}"
+                ),
+                condition_version="2.0",
+                condition=(
+                    "((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR "
+                    "(@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] "
+                    f"ForAnyOfAnyValues:GuidEquals {{{_ACR_PULL_ROLE_ID}}})) AND "
+                    "((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR "
+                    "(@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] "
+                    f"ForAnyOfAnyValues:GuidEquals {{{_ACR_PULL_ROLE_ID}}}))"
+                ),
+                opts=resource_options,
+            )
         self.config = pulumi.Output.all(
             server=self.server, resource_id=self.resource_id,
-        ).apply(lambda values: AzureContainerRegistryConfig(**values))
+            delegation=delegation.id if delegation is not None else None,
+        ).apply(lambda values: AzureContainerRegistryConfig(
+            server=values["server"], resource_id=values["resource_id"],
+        ))
         self.register_outputs({"server": self.server, "resource_id": self.resource_id})
 
 
