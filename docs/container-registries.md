@@ -224,6 +224,20 @@ identity or AKS cluster and create role assignments at the ACR scope, including
 across subscriptions if configured. CA4S does not grant push access to workload
 nodes. Azure RBAC propagation may cause initial pulls to retry.
 
+When the configured runner identity has a user-assigned identity resource ID,
+the outer stack grants it Role Based Access Control Administrator on this ACR
+only. An Azure RBAC condition restricts role-assignment writes and deletes to
+the `AcrPull` role. The init-stack configuration depends on this delegation;
+the runner receives no subscription-wide RBAC administration permission.
+
+The identity running the outer stack must be authorized to create this
+conditional delegation. Contributor alone is insufficient, and an inherited
+ABAC condition can forbid granting the administrator role even with the
+`AcrPull` restriction. Such a denial requires an authorized administrator or
+an approved policy change; retrying the deployment does not resolve it. If
+the runner has no user-assigned identity resource ID, no delegation is created
+and its required registry-scoped permissions must already exist.
+
 ### Lifecycle and verification
 
 When used, the ACR and its dedicated resource group belong to the stack that
@@ -232,6 +246,7 @@ according to resource dependencies. This is a development registry, not durable 
 storage. No private endpoint, firewall policy, geo-replication, or production
 retention policy is configured. Publisher and workload nodes need outbound
 HTTPS access to ACR; PKO and CAPI Operator continue using the local registry.
+The conditional runner delegation is also stack-owned and removed on teardown.
 
 Inspect published references:
 
