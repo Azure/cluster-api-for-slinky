@@ -16,6 +16,7 @@ PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION = (
 )
 
 DELETE_PROPAGATION_FOREGROUND = "Foreground"
+DELETE_PROPAGATION_BACKGROUND = "Background"
 DELETE_PROPAGATION_ORPHAN = "Orphan"
 
 
@@ -37,4 +38,13 @@ def foreground_delete_annotations(
     return {
         **(dict(annotations) if annotations else {}),
         PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_FOREGROUND,
+    }
+
+
+def background_delete_annotations(
+    annotations: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    return {
+        **(dict(annotations) if annotations else {}),
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_BACKGROUND,
     }

@@ -39,7 +39,7 @@ import tomli_w
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from stacks.kubernetes_annotations import (
-    foreground_delete_annotations,
+    background_delete_annotations,
     pulumi_wait_for,
 )
 from stacks.workload_cluster.registry_setting import (
@@ -507,7 +507,11 @@ class WorkerClass(pulumi.ComponentResource):
                 "spec": {
                     "clusterName": cluster_name,
                     "version": _KUBERNETES_VERSION,
-                    "deletion": {"nodeDeletionTimeoutSeconds": 10},
+                    "deletion": {
+                        "nodeDrainTimeoutSeconds": 60,
+                        "nodeVolumeDetachTimeoutSeconds": 60,
+                        "nodeDeletionTimeoutSeconds": 10,
+                    },
                     "bootstrap": {
                         "configRef": _object_ref(
                             _BOOTSTRAP_API_VERSION,
@@ -533,7 +537,7 @@ class WorkerClass(pulumi.ComponentResource):
                 "name": machine_deployment_name,
                 "namespace": _NAMESPACE,
                 "labels": machine_deployment_label_set,
-                "annotations": foreground_delete_annotations(autoscaler_annotations),
+                "annotations": background_delete_annotations(autoscaler_annotations),
             },
             spec=machine_deployment_spec,
             opts=child_options(
@@ -749,7 +753,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(),
+                "annotations": background_delete_annotations(),
             },
             spec={
                 "clusterNetwork": {
@@ -778,7 +782,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(
+                "annotations": background_delete_annotations(
                     pulumi_wait_for("condition=Ready")
                 ),
             },
@@ -805,7 +809,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": control_plane_template_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(
+                "annotations": background_delete_annotations(
                     pulumi_wait_for("condition=Initialized")
                 ),
             },

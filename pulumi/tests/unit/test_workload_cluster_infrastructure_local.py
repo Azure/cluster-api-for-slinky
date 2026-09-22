@@ -7,12 +7,13 @@ import base64
 import subprocess
 import tomllib
 
+import pulumi
 import yaml
 
 from stacks.kubernetes_annotations import (
-    DELETE_PROPAGATION_FOREGROUND,
+    DELETE_PROPAGATION_BACKGROUND,
     PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION,
-    foreground_delete_annotations,
+    background_delete_annotations,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
@@ -40,8 +41,8 @@ from stacks.workload_cluster.registry_setting import (
 from stacks.workload_cluster import workload_cluster_infrastructure_local as local_infra
 
 
-def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
-    annotations = foreground_delete_annotations(
+def test_background_delete_annotations_preserve_existing_annotations() -> None:
+    annotations = background_delete_annotations(
         {
             AUTOSCALER_MIN_ANNOTATION: "1",
             AUTOSCALER_MAX_ANNOTATION: "10",
@@ -52,13 +53,58 @@ def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
         AUTOSCALER_MIN_ANNOTATION: "1",
         AUTOSCALER_MAX_ANNOTATION: "10",
         PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: (
-            DELETE_PROPAGATION_FOREGROUND
+            DELETE_PROPAGATION_BACKGROUND
         ),
     }
 
 
 def test_v1beta2_cluster_wait_uses_control_plane_available_condition() -> None:
     assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneAvailable"
+
+
+def test_local_worker_deletion_preserves_controller_order_and_bounds_drain() -> None:
+    resources = []
+
+    class Mocks(pulumi.runtime.Mocks):
+        def new_resource(self, args):
+            resources.append(args)
+            return args.name, args.inputs
+
+        def call(self, args):
+            return {}
+
+    pulumi.runtime.set_mocks(Mocks())
+
+    @pulumi.runtime.test
+    def check():
+        cluster = pulumi.ComponentResource("test:Cluster", "cluster")
+        worker = local_infra.WorkerClass(
+            "worker",
+            instance="local",
+            cluster_name="local-workload",
+            node_image="kindest/node:v1.36.1",
+            pre_kubeadm_commands=[],
+            worker=_LOCAL_MACHINE_DEPLOYMENTS[0],
+            provider=local_infra.k8s.Provider("management", kubeconfig="{}"),
+            cluster=cluster,
+            control_plane=cluster,
+        )
+
+        return worker.urn
+
+    check()
+    deployment = next(
+        resource for resource in resources
+        if resource.typ.endswith(":MachineDeployment")
+    )
+    assert deployment.inputs["metadata"]["annotations"][
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION
+    ] == "Background"
+    assert deployment.inputs["spec"]["template"]["spec"]["deletion"] == {
+        "nodeDrainTimeoutSeconds": 60,
+        "nodeVolumeDetachTimeoutSeconds": 60,
+        "nodeDeletionTimeoutSeconds": 10,
+    }
 
 
 def test_local_health_check_allows_initial_addon_convergence() -> None:
