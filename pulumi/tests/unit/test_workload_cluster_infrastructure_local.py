@@ -6,8 +6,10 @@ from __future__ import annotations
 import base64
 import subprocess
 import tomllib
+from types import SimpleNamespace
 
 import pulumi
+import pytest
 import yaml
 
 from stacks.kubernetes_annotations import (
@@ -62,8 +64,13 @@ def test_v1beta2_cluster_wait_uses_control_plane_available_condition() -> None:
     assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneAvailable"
 
 
-def test_local_worker_deletion_preserves_controller_order_and_bounds_drain() -> None:
+@pytest.mark.parametrize("worker_spec", _LOCAL_MACHINE_DEPLOYMENTS, ids=lambda worker: worker.name)
+def test_local_worker_deletion_options(worker_spec) -> None:
     resources = []
+    options = {}
+
+    def record_options(args):
+        options[args.name] = args.opts
 
     class Mocks(pulumi.runtime.Mocks):
         def new_resource(self, args):
@@ -77,19 +84,35 @@ def test_local_worker_deletion_preserves_controller_order_and_bounds_drain() -> 
 
     @pulumi.runtime.test
     def check():
-        cluster = pulumi.ComponentResource("test:Cluster", "cluster")
+        cluster = local_infra.k8s.apiextensions.CustomResource(
+            "cluster",
+            api_version="cluster.x-k8s.io/v1beta2",
+            kind="Cluster",
+            metadata={"name": "local-workload"},
+            spec={},
+        )
         worker = local_infra.WorkerClass(
             "worker",
             instance="local",
             cluster_name="local-workload",
             node_image="kindest/node:v1.36.1",
             pre_kubeadm_commands=[],
-            worker=_LOCAL_MACHINE_DEPLOYMENTS[0],
+            worker=worker_spec,
             provider=local_infra.k8s.Provider("management", kubeconfig="{}"),
             cluster=cluster,
             control_plane=cluster,
+            opts=pulumi.ResourceOptions(transformations=[record_options]),
         )
 
+        deployment_name = f"cluster-{worker_spec.name}-machine-deployment"
+        assert options[deployment_name].deleted_with is (
+            cluster if worker_spec.node_type == CONTROLLER_NODE_TYPE else None
+        )
+        assert all(
+            resource_options.deleted_with is None
+            for name, resource_options in options.items()
+            if name != deployment_name
+        )
         return worker.urn
 
     check()
@@ -101,10 +124,69 @@ def test_local_worker_deletion_preserves_controller_order_and_bounds_drain() -> 
         PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION
     ] == "Background"
     assert deployment.inputs["spec"]["template"]["spec"]["deletion"] == {
-        "nodeDrainTimeoutSeconds": 60,
-        "nodeVolumeDetachTimeoutSeconds": 60,
         "nodeDeletionTimeoutSeconds": 10,
     }
+
+
+def test_local_cluster_owns_controller_and_control_plane_deletion(monkeypatch) -> None:
+    resources = {}
+    options = {}
+
+    class Mocks(pulumi.runtime.Mocks):
+        def new_resource(self, args):
+            resources[args.name] = args
+            outputs = dict(args.inputs)
+            if args.typ == "kubernetes:core/v1:Secret":
+                outputs["data"] = {"value": base64.b64encode(b"{}").decode()}
+            return args.name, outputs
+
+        def call(self, args):
+            raise AssertionError(f"unexpected invoke: {args.token}")
+
+    def record_options(args):
+        options[args.name] = args.opts
+
+    monkeypatch.setattr(
+        local_infra.ManagementKubeconfig, "_from_service_account",
+        lambda self: pulumi.Output.from_input("{}"),
+    )
+    monkeypatch.setattr(
+        local_infra, "CalicoCNI",
+        lambda *args, **kwargs: SimpleNamespace(chart_version="test", status="deployed"),
+    )
+    monkeypatch.setattr(
+        local_infra, "LocalPathStorage",
+        lambda *args, **kwargs: SimpleNamespace(storage_class_name="local-path"),
+    )
+    pulumi.runtime.set_mocks(Mocks())
+
+    @pulumi.runtime.test
+    def check():
+        infrastructure = local_infra.LocalWorkloadClusterInfrastructure(
+            "infrastructure",
+            instance="local",
+            worker_machine_deployments=(_LOCAL_MACHINE_DEPLOYMENTS[0],),
+            opts=pulumi.ResourceOptions(transformations=[record_options]),
+        )
+        return infrastructure.workload_provider.urn
+
+    check()
+    cluster = options["cluster-head-machine-deployment"].deleted_with
+    assert cluster is not None
+    assert {
+        name for name, resource_options in options.items()
+        if resource_options.deleted_with is not None
+    } == {
+        "cluster-head-machine-deployment", "cluster-control-plane", "cluster-docker-cluster",
+    }
+    for name in ("cluster-control-plane", "cluster-docker-cluster"):
+        assert options[name].deleted_with is cluster
+        assert cluster in options[name].depends_on
+    assert options["cluster"].deleted_with is None
+    assert not options["cluster"].retain_on_delete
+    assert resources["cluster"].inputs["metadata"]["annotations"][
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION
+    ] == "Background"
 
 
 def test_local_health_check_allows_initial_addon_convergence() -> None:

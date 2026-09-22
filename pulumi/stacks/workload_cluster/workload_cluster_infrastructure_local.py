@@ -470,12 +470,14 @@ class WorkerClass(pulumi.ComponentResource):
             *,
             depends_on: list[pulumi.Resource] | None = None,
             ignore_changes: list[str] | None = None,
+            deleted_with: pulumi.Resource | None = None,
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
                 ignore_changes=ignore_changes,
+                deleted_with=deleted_with,
             )
 
         machine_template = _docker_machine_template(
@@ -507,11 +509,7 @@ class WorkerClass(pulumi.ComponentResource):
                 "spec": {
                     "clusterName": cluster_name,
                     "version": _KUBERNETES_VERSION,
-                    "deletion": {
-                        "nodeDrainTimeoutSeconds": 60,
-                        "nodeVolumeDetachTimeoutSeconds": 60,
-                        "nodeDeletionTimeoutSeconds": 10,
-                    },
+                    "deletion": {"nodeDeletionTimeoutSeconds": 10},
                     "bootstrap": {
                         "configRef": _object_ref(
                             _BOOTSTRAP_API_VERSION,
@@ -550,6 +548,7 @@ class WorkerClass(pulumi.ComponentResource):
                 ignore_changes=(
                     ["spec.replicas"] if worker.autoscaler_bounds is not None else None
                 ),
+                deleted_with=cluster if worker.node_type == CONTROLLER_NODE_TYPE else None,
             ),
         )
 
@@ -719,11 +718,13 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             *,
             provider: pulumi.ProviderResource | None = None,
             depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+            deleted_with: pulumi.Resource | None = None,
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
+                deleted_with=deleted_with,
             )
 
         management_kubeconfig = ManagementKubeconfig(
@@ -790,18 +791,10 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             opts=child_options(
                 provider=management_provider,
                 depends_on=[cluster],
+                deleted_with=cluster,
             ),
         )
 
-        # We intentionally do not use ClusterClass/topology here. Topology hides
-        # the concrete DockerCluster/KubeadmControlPlane/MachineDeployment
-        # resources from Pulumi, so Kubernetes starts deleting the DockerCluster
-        # sibling while the final control-plane DockerMachine may still need the
-        # CAPD load balancer. In CAPD v1.11.1 that can strand the DockerMachine
-        # finalizer after the load balancer is gone. ClusterClass mostly removes
-        # boilerplate that Pulumi is already good at generating, while costing
-        # us the ordering surface we need for this local provider's brittle
-        # finalization path.
         kubeadm_control_plane = k8s.apiextensions.CustomResource(
             "cluster-control-plane",
             api_version=_CONTROL_PLANE_API_VERSION,
@@ -840,6 +833,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             opts=child_options(
                 provider=management_provider,
                 depends_on=[cluster, docker_cluster, control_plane_machine_template],
+                deleted_with=cluster,
             ),
         )
 
