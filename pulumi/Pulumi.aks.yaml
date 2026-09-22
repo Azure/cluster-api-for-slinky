@@ -40,4 +40,6 @@ config:
       workloadClusters:
         caps-aks:
           className: aks
-          parameters: {}
+          parameters:
+            aks:
+              nodeCount: 2
