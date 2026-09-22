@@ -223,6 +223,8 @@ def _azure_managed_machine_pool_spec(
         "sku": sku,
         "nodeLabels": dict(node_labels),
     }
+    if mode == _SYSTEM_NODE_POOL_MODE:
+        spec["maxPods"] = 64
     if taints:
         spec["taints"] = [dict(taint) for taint in taints]
     if additional_tags:

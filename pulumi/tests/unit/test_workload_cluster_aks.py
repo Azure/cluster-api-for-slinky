@@ -301,6 +301,7 @@ def test_ammp_spec_is_system_pool() -> None:
         "name": "syshead",
         "sku": "Standard_D2s_v3",
         "nodeLabels": _AKS_CONTROLLER_NODE_LABELS,
+        "maxPods": 64,
         "taints": [controller_taint()],
     }
 

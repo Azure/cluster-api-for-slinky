@@ -24,7 +24,7 @@ from stacks.kubernetes_annotations import (
 )
 from stacks.workload_cluster.workload_cluster_addons import (
     AzureCloudProvider,
-    CalicoVXLAN,
+    CalicoCNI,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
@@ -980,7 +980,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             depends_on=[workload_kubeconfig_secret],
             opts=pulumi.ResourceOptions(parent=self),
         )
-        calico = CalicoVXLAN(
+        calico = CalicoCNI(
             "calico-vxlan",
             pod_cidr=_POD_CIDR,
             provider=workload_provider,
@@ -1069,7 +1069,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.workload_provider = workload_provider
         self.azure_cloud_provider_chart_version = azure_cloud_provider.chart_version
         self.azure_cloud_provider_status = azure_cloud_provider.status
-        self.calico_chart_version = calico.chart_version
+        self.calico_chart_version = calico.version
         self.calico_status = calico.status
         self.local_path_storage_class_name = local_path_storage.storage_class_name
         self.cluster_autoscaler = (

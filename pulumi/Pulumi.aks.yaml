@@ -42,4 +42,4 @@ config:
           className: aks
           parameters:
             aks:
-              nodeCount: 2
+              nodeCount: 1

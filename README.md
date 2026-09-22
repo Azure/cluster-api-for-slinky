@@ -166,6 +166,19 @@ documented in [Custom CAPI, CAPZ, and Slinky Builds](docs/custom-components.md).
 
 The outer `pulumi up` waits for the PKO init stack to finish reconciliation.
 
+Local and Azure BYO use the pinned Calico manifest installation without Typha
+or Tigera Operator. Calico node agents watch the Kubernetes datastore directly;
+one `calico-kube-controllers` replica runs on the controller worker. Local keeps
+cross-subnet VXLAN and BYO uses always-on VXLAN. The operator's API server,
+Goldmane, and Whisker are not installed by this minimal networking setup.
+Recreate existing operator-managed clusters rather than applying this change
+as an in-place CNI migration. Retained CNI resources disappear with the cluster.
+
+All three sample stacks use one controller worker. AKS keeps Azure CNI and sets
+the system pool's `maxPods` to 64 so platform and policy-required pods fit on
+that node; it does not install Calico or Typha. Its subnet must have enough
+addresses for this per-node pod allocation and node-pool surge capacity.
+
 Optional troubleshooting snippets:
 
 ```bash

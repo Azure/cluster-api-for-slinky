@@ -117,10 +117,11 @@ def test_byo_cluster_owns_controller_deletion_before_flex_cleanup(monkeypatch) -
         def __init__(self, name, **kwargs):
             super().__init__("test:Addon", name, opts=kwargs.get("opts"))
             self.chart_version = pulumi.Output.from_input("test")
+            self.version = pulumi.Output.from_input("test")
             self.status = pulumi.Output.from_input("ready")
             self.storage_class_name = pulumi.Output.from_input("local-path")
 
-    for component in ("AzureCloudProvider", "CalicoVXLAN", "LocalPathStorage"):
+    for component in ("AzureCloudProvider", "CalicoCNI", "LocalPathStorage"):
         monkeypatch.setattr(infrastructure_module, component, Addon)
     pulumi.runtime.set_mocks(Mocks())
 

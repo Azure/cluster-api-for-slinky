@@ -28,7 +28,6 @@ import base64
 import os
 import re
 import shlex
-import urllib.request
 from typing import Any, Mapping
 
 import pulumi
@@ -57,16 +56,12 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     NATIVE_WORKLOAD_FEATURE_GATES,
     NATIVE_WORKLOAD_RUNTIME_CONFIG,
     NODE_TYPE_LABEL,
-    controller_bootstrap_tolerations,
-    controller_node_affinity,
-    calico_typha_deployment,
-    controller_node_selector,
     controller_taint,
-    controller_tolerations,
     machine_deployment_labels,
     worker_labels,
 )
 from stacks.workload_cluster.workload_cluster_storage import LocalPathStorage
+from stacks.workload_cluster.workload_cluster_addons import CalicoCNI
 
 
 _CAPI_API_VERSION = "cluster.x-k8s.io/v1beta2"
@@ -81,15 +76,6 @@ _SERVICE_CIDR = "10.128.0.0/12"
 _SERVICE_DOMAIN = "cluster.local"
 
 _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
-
-_CALICO_CHART_REPO = "https://docs.tigera.io/calico/charts"
-_CALICO_CHART_NAME = "tigera-operator"
-_CALICO_CHART_VERSION = "v3.32.0"
-_CALICO_OPERATOR_CRDS_URL = (
-    "https://raw.githubusercontent.com/projectcalico/calico/"
-    f"{_CALICO_CHART_VERSION}/manifests/operator-crds.yaml"
-)
-_CALICO_OPERATOR_NAMESPACE = "tigera-operator"
 
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
@@ -312,128 +298,6 @@ def _cluster_configuration() -> dict[str, object]:
 
 def _object_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
     return {"apiGroup": _api_group(api_version), "kind": kind, "name": name}
-
-
-def _calico_values() -> dict[str, object]:
-    return {
-        "nodeSelector": controller_node_selector(),
-        "affinity": controller_node_affinity(),
-        "tolerations": controller_bootstrap_tolerations(),
-        "installation": {
-            "controlPlaneNodeSelector": controller_node_selector(),
-            "controlPlaneTolerations": controller_tolerations(),
-            "typhaDeployment": calico_typha_deployment(),
-            "calicoNetwork": {
-                "ipPools": [
-                    {
-                        "name": "default-ipv4-ippool",
-                        "blockSize": 26,
-                        "cidr": _POD_CIDR,
-                        "encapsulation": "VXLANCrossSubnet",
-                        "natOutgoing": "Enabled",
-                        "nodeSelector": "all()",
-                    }
-                ],
-            },
-        },
-    }
-
-
-def _read_url(url: str) -> str:
-    with urllib.request.urlopen(url, timeout=60) as response:
-        return response.read().decode("utf-8")
-
-
-def _calico_operator_crd_dependencies(
-    calico_operator_crds: k8s.yaml.ConfigGroup,
-) -> list[pulumi.Input[pulumi.Resource]]:
-    return [
-        calico_operator_crds.get_resource(
-            "apiextensions.k8s.io/v1/CustomResourceDefinition",
-            name,
-        )
-        for name in (
-            "apiservers.operator.tigera.io",
-            "goldmanes.operator.tigera.io",
-            "installations.operator.tigera.io",
-            "whiskers.operator.tigera.io",
-        )
-    ]
-
-
-class CalicoCNI(pulumi.ComponentResource):
-    """Calico CNI for local CAPD workload clusters."""
-
-    chart_version: pulumi.Output[str]
-    status: pulumi.Output[Any]
-
-    def __init__(
-        self,
-        name: str,
-        *,
-        provider: k8s.Provider,
-        depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
-        opts: pulumi.ResourceOptions | None = None,
-    ) -> None:
-        super().__init__(
-            "ca4s:workload:CalicoCNI",
-            name,
-            props={},
-            opts=opts,
-        )
-
-        def child_options(
-            *,
-            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
-        ) -> pulumi.ResourceOptions:
-            return pulumi.ResourceOptions(
-                parent=self,
-                provider=provider,
-                depends_on=depends_on,
-                retain_on_delete=True,
-            )
-
-        namespace = k8s.core.v1.Namespace(
-            "namespace",
-            metadata={
-                "name": _CALICO_OPERATOR_NAMESPACE,
-                "labels": {"pod-security.kubernetes.io/enforce": "privileged"},
-            },
-            opts=child_options(depends_on=depends_on),
-        )
-        operator_crds = k8s.yaml.ConfigGroup(
-            "operator-crds",
-            yaml=[_read_url(_CALICO_OPERATOR_CRDS_URL)],
-            opts=child_options(depends_on=[namespace]),
-        )
-        operator = k8s.helm.v3.Release(
-            "operator",
-            chart=_CALICO_CHART_NAME,
-            version=_CALICO_CHART_VERSION,
-            repository_opts={"repo": _CALICO_CHART_REPO},
-            namespace=_CALICO_OPERATOR_NAMESPACE,
-            cleanup_on_fail=True,
-            atomic=True,
-            wait_for_jobs=True,
-            skip_crds=True,
-            timeout=600,
-            values=_calico_values(),
-            opts=child_options(
-                depends_on=[
-                    namespace,
-                    *_calico_operator_crd_dependencies(operator_crds),
-                ],
-            ),
-        )
-
-        self.chart_version = pulumi.Output.from_input(_CALICO_CHART_VERSION)
-        self.status = operator.status
-        self.register_outputs(
-            {
-                "chart_version": self.chart_version,
-                "status": self.status,
-            }
-        )
 
 
 class WorkerClass(pulumi.ComponentResource):
@@ -917,6 +781,8 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
 
         calico_cni = CalicoCNI(
             "calico-cni",
+            pod_cidr=_POD_CIDR,
+            vxlan_mode="CrossSubnet",
             provider=workload_provider,
             depends_on=[workload_kubeconfig_secret],
             opts=child_options(provider=workload_provider),
@@ -952,7 +818,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.workload_provider = workload_provider
         self.workload_kubeconfig_secret = workload_kubeconfig_secret
         self.cluster_control_plane_available = cluster_control_plane_available
-        self.calico_operator_chart_version = calico_cni.chart_version
+        self.calico_operator_chart_version = calico_cni.version
         self.calico_operator_status = calico_cni.status
         self.cluster_autoscaler = (
             cluster_autoscaler.outputs if cluster_autoscaler is not None else None

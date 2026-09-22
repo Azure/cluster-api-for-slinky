@@ -152,7 +152,7 @@ def test_local_cluster_owns_controller_and_control_plane_deletion(monkeypatch) -
     )
     monkeypatch.setattr(
         local_infra, "CalicoCNI",
-        lambda *args, **kwargs: SimpleNamespace(chart_version="test", status="deployed"),
+        lambda *args, **kwargs: SimpleNamespace(version="test", status="deployed"),
     )
     monkeypatch.setattr(
         local_infra, "LocalPathStorage",
