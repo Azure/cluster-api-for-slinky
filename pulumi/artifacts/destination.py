@@ -11,6 +11,9 @@ from pathlib import Path
 from typing import NotRequired, TypedDict
 
 from azure.mgmt.core.tools import parse_resource_id
+from azure.containerregistry import ContainerRegistryClient
+from azure.core.exceptions import AzureError, ResourceNotFoundError
+from azure.identity import AzureCliCredential
 from oras.client import OrasClient
 from oras.defaults import default_manifest_accepted_media_types
 from pulumi import Input
@@ -49,6 +52,7 @@ class RegistrySession:
     consumer_server: str
     plain_http: bool
     config_directory: str | None = None
+    acr_subscription_id: str | None = None
 
     @contextmanager
     def client(self) -> Iterator[OrasClient]:
@@ -83,6 +87,16 @@ class RegistrySession:
     def manifest_exists(self, repository: str, tag: str) -> bool:
         """Return false only for HTTP 404; auth and transport failures are errors."""
         reference = self.host_ref(repository, tag)
+        if self.acr_subscription_id is not None:
+            try:
+                with AzureCliCredential(subscription=self.acr_subscription_id) as credential:
+                    with ContainerRegistryClient(f"https://{self.server}", credential) as client:
+                        client.get_manifest_properties(repository, tag)
+                return True
+            except ResourceNotFoundError:
+                return False
+            except AzureError:
+                raise RuntimeError(f"registry manifest probe failed for {reference}") from None
         try:
             with self.client() as client:
                 container = client.get_container(reference)
@@ -164,4 +178,4 @@ def registry_session(destination: dict) -> Iterator[RegistrySession]:
         )
         if result.returncode != 0:
             raise RuntimeError(f"publisher login failed for ACR {server}")
-        yield RegistrySession(server, consumer_server, plain_http, directory)
+        yield RegistrySession(server, consumer_server, plain_http, directory, registry["subscription"])

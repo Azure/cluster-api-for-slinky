@@ -186,10 +186,12 @@ automatically sign the Azure CLI in.
 Each publishing or refresh operation runs `az acr login --expose-token` for the
 generated registry and its subscription. The short-lived Entra token is passed
 to `docker login --password-stdin` with a temporary Docker config directory.
-Docker builds/pushes, ORAS Python SDK manifest probes and bundle uploads, and
-Helm chart pushes use that directory, which is deleted after the operation;
+Docker builds/pushes and Helm chart pushes use that directory, which is deleted after the operation;
 normal host Docker login stores are not modified. SDK clients use only the
 temporary credentials and close their HTTP sessions after each operation.
+Authenticated ACR manifest probes use the Azure Container Registry SDK with
+Azure CLI credentials so the SDK performs ACR's Entra token exchange. Generic
+registry probes and local OCI bundle uploads continue using the ORAS SDK.
 Tokens are not passed through Pulumi resource inputs, outputs, or PKO config.
 Azure CLI, Docker, and Git must be installed on the outer-stack host; Make and
 Helm are required by the corresponding build recipes. ORAS is installed as a

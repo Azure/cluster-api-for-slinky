@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 import responses
 from requests.exceptions import ConnectionError
+from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
 
 from artifacts.destination import RegistrySession, registry_session
 from artifacts import destination
@@ -81,6 +82,7 @@ def test_acr_session_uses_ephemeral_entra_auth(monkeypatch, failure):
             assert Path(session.config_directory).is_dir()
             assert session.registry_flags() == ["--registry-config", f"{session.config_directory}/config.json"]
             assert "--config" in session.docker_command()
+            assert session.acr_subscription_id == "sub"
             assert session.host_ref("image", "tag") == session.consumer_ref("image", "tag")
 
     if failure:
@@ -92,6 +94,48 @@ def test_acr_session_uses_ephemeral_entra_auth(monkeypatch, failure):
         login()
         assert sum(command[0] == "az" for command in calls) == 2
     assert all(not directory.exists() for directory in directories)
+
+
+@pytest.mark.parametrize("error", [None, ResourceNotFoundError, HttpResponseError])
+def test_acr_probe_uses_azure_sdk_token_exchange(monkeypatch, error):
+    calls = []
+
+    class Credential:
+        def __init__(self, **kwargs):
+            assert kwargs == {"subscription": "sub"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            calls.append("credential-closed")
+
+    class Client:
+        def __init__(self, endpoint, credential):
+            assert endpoint == "https://images.azurecr.io"
+            assert isinstance(credential, Credential)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            calls.append("client-closed")
+
+        def get_manifest_properties(self, repository, tag):
+            calls.append((repository, tag))
+            if error is not None:
+                raise error("sensitive details")
+
+    monkeypatch.setattr(destination, "AzureCliCredential", Credential)
+    monkeypatch.setattr(destination, "ContainerRegistryClient", Client)
+    session = RegistrySession("images.azurecr.io", "images.azurecr.io", False, acr_subscription_id="sub")
+    if error is HttpResponseError:
+        with pytest.raises(RuntimeError, match="manifest probe failed") as failure:
+            session.manifest_exists("image", "tag")
+        assert "sensitive" not in str(failure.value)
+    else:
+        assert session.manifest_exists("image", "tag") is (error is None)
+    assert calls == [("image", "tag"), "client-closed", "credential-closed"]
 
 
 @pytest.mark.parametrize("plain_http", [False, True])
