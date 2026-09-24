@@ -5,12 +5,17 @@
 
 from __future__ import annotations
 
+import json
+import base64
+import subprocess
 from typing import Any, cast
 
 import pytest
+import pulumi
 
 from localenv import AzureHostNetwork, AzureResourcePlacement
 import stacks.workload_cluster.workload_cluster_class_azure_byo as azure_byo_module
+import stacks.workload_cluster.workload_cluster_infrastructure_azure_byo as infrastructure_module
 from stacks.workload_cluster.workload_cluster_class_azure_byo import (
     AzureBYOSubnetConfig,
     AzureBYOVNetConfig,
@@ -48,7 +53,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
     _vmss_flex_name,
 )
 from stacks.kubernetes_annotations import (
-    DELETE_PROPAGATION_FOREGROUND,
+    DELETE_PROPAGATION_BACKGROUND,
     PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION,
     PULUMI_SKIP_AWAIT_ANNOTATION,
     PULUMI_WAIT_FOR_ANNOTATION,
@@ -89,9 +94,65 @@ def _head_node() -> AzureBYONodePoolSpec:
     )
 
 
+def test_byo_cluster_owns_controller_deletion_before_flex_cleanup(monkeypatch) -> None:
+    resources = {}
+    options = {}
+
+    class Mocks(pulumi.runtime.Mocks):
+        def new_resource(self, args):
+            resources[args.name] = args
+            outputs = dict(args.inputs)
+            outputs.setdefault("name", args.name)
+            if args.typ == "kubernetes:core/v1:Secret":
+                outputs["data"] = {"value": base64.b64encode(b"{}").decode()}
+            return args.name, outputs
+
+        def call(self, args):
+            raise AssertionError(f"unexpected invoke: {args.token}")
+
+    def record(args):
+        options[args.name] = args.opts
+
+    class Addon(pulumi.ComponentResource):
+        def __init__(self, name, **kwargs):
+            super().__init__("test:Addon", name, opts=kwargs.get("opts"))
+            self.chart_version = pulumi.Output.from_input("test")
+            self.version = pulumi.Output.from_input("test")
+            self.status = pulumi.Output.from_input("ready")
+            self.storage_class_name = pulumi.Output.from_input("local-path")
+
+    for component in ("AzureCloudProvider", "CalicoCNI", "LocalPathStorage"):
+        monkeypatch.setattr(infrastructure_module, component, Addon)
+    pulumi.runtime.set_mocks(Mocks())
+
+    @pulumi.runtime.test
+    def check():
+        infrastructure = infrastructure_module.AzureBYOWorkloadClusterInfrastructure(
+            "infrastructure", instance="test", subscription_id=_SUBSCRIPTION_ID,
+            tenant_id="tenant", client_id="client", node_identity_resource_id="/identities/nodes",
+            identity_name="identity", identity_namespace="default", location="westus2",
+            additional_tags={}, byo_subnet=AzureBYOSubnet.from_host_network(_host_network()),
+            kubernetes_version="v1.36.1",
+            node_pools=(_controller_node(), _head_node(), _compute_node().model_copy(update={"autoscaler_bounds": None})),
+            opts=pulumi.ResourceOptions(transformations=[record]),
+        )
+        return infrastructure.workload_provider.urn
+
+    check()
+    cluster = options["head-machine-deployment"].deleted_with
+    assert cluster is not None
+    assert options["control-plane"].deleted_with is cluster
+    assert options["azure-cluster"].deleted_with is cluster
+    assert options["compute-machine-deployment"].deleted_with is None
+    assert options["cluster"].deleted_with is None
+    assert len(options["cluster"].depends_on) == 2
+    assert resources["cluster"].inputs["metadata"]["annotations"][PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION] == "Background"
+    assert not any(resource.typ == "azure-native:authorization:RoleAssignment" for resource in resources.values())
+
+
 def test_cluster_lifecycle_annotations_defer_readiness_to_late_patch() -> None:
     assert _cluster_annotations() == {
-        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_FOREGROUND,
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_BACKGROUND,
         PULUMI_SKIP_AWAIT_ANNOTATION: "true",
     }
     assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneReady"
@@ -102,7 +163,7 @@ def test_control_plane_creation_defers_readiness_to_v1beta2_patch() -> None:
         "controlplane.cluster.x-k8s.io/v1beta2"
     )
     assert _control_plane_annotations() == {
-        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_FOREGROUND,
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: DELETE_PROPAGATION_BACKGROUND,
         PULUMI_SKIP_AWAIT_ANNOTATION: "true",
     }
     assert _control_plane_ready_annotations() == {
@@ -729,6 +790,27 @@ def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
 
     assert "failureDomain" not in spec["machineTemplate"]
     kubeadm = spec["kubeadmConfigSpec"]
+    assert kubeadm["clusterConfiguration"] == {
+        "apiServer": {
+            "extraArgs": {
+                "feature-gates": "GenericWorkload=true,WorkloadWithJob=true",
+                "runtime-config": "scheduling.k8s.io/v1alpha2=true",
+            }
+        },
+        "controllerManager": {
+            "extraArgs": {
+                "allocate-node-cidrs": "false",
+                "cloud-provider": "external",
+                "cluster-name": "caps-self",
+                "feature-gates": "GenericWorkload=true,WorkloadWithJob=true",
+            }
+        },
+        "scheduler": {
+            "extraArgs": {
+                "feature-gates": "GenericWorkload=true,WorkloadWithJob=true",
+            }
+        },
+    }
     assert kubeadm["files"][0]["contentFrom"]["secret"] == {
         "name": "caps-self-control-plane-azure-json",
         "key": "control-plane-azure.json",
@@ -742,6 +824,40 @@ def test_kubeadm_control_plane_uses_external_cloud_provider() -> None:
     assert "127.0.0.1 apiserver.caps-self.capz.io" in kubeadm[
         "preKubeadmCommands"
     ][0]
+
+
+@pytest.mark.parametrize("control_plane", [True, False])
+def test_acr_provider_is_installed_before_kubeadm_for_all_nodes(control_plane):
+    server = "ephemeral.azurecr.io"
+    if control_plane:
+        spec = _kubeadm_control_plane_spec(
+            node=_controller_node(), cluster_name="caps-self", control_plane_name="caps-self-control-plane",
+            kubernetes_version="v1.36.1", acr_server=server,
+        )["kubeadmConfigSpec"]
+        registrations = [spec["initConfiguration"], spec["joinConfiguration"]]
+    else:
+        spec = _kubeadm_config_template_spec(
+            node=_compute_node(), worker_name="caps-self-compute", acr_server=server,
+        )["template"]["spec"]
+        registrations = [spec["joinConfiguration"]]
+    provider_file = next(item for item in spec["files"] if "credential-provider-config" in item["path"])
+    config = json.loads(provider_file["content"])
+    assert config["apiVersion"] == "kubelet.config.k8s.io/v1"
+    assert config["providers"] == [{
+        "name": "acr-credential-provider", "matchImages": [server], "defaultCacheDuration": "10m",
+        "apiVersion": "credentialprovider.kubelet.k8s.io/v1", "args": ["/etc/kubernetes/azure.json"],
+    }]
+    for registration in registrations:
+        flags = registration["nodeRegistration"]["kubeletExtraArgs"]
+        assert flags["image-credential-provider-config"] == provider_file["path"]
+        assert flags["image-credential-provider-bin-dir"] == "/var/lib/kubelet/credential-provider"
+        assert flags["cloud-provider"] == "external"
+    installer = spec["preKubeadmCommands"][-1]
+    assert "v1.36.5/azure-acr-credential-provider-linux-$arch" in installer
+    assert "sha256sum -c -" in installer
+    assert installer.index("sha256sum") < installer.index("install -D")
+    assert "arch=amd64" in installer and "arch=arm64" in installer
+    subprocess.run(["sh", "-n"], input=installer, text=True, capture_output=True, check=True)
 
 
 def test_kubeadm_control_plane_adds_ssh_authorized_keys() -> None:

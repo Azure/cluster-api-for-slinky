@@ -27,36 +27,41 @@ from __future__ import annotations
 import base64
 import os
 import re
-import urllib.request
+import shlex
 from typing import Any, Mapping
 
 import pulumi
 import pulumi_kubernetes as k8s
 import pulumi_local as local
 import yaml
+import tomli_w
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from stacks.kubernetes_annotations import (
-    foreground_delete_annotations,
+    background_delete_annotations,
     pulumi_wait_for,
 )
-from stacks.workload_cluster.registry_setting import RegistryConfig
+from stacks.workload_cluster.registry_setting import (
+    ContainerdHostConfig,
+    ContainerdRegistryConfig,
+    LocalCustomRegistrySetting,
+    RegistryConfig,
+)
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
     AUTOSCALER_MIN_ANNOTATION,
     ClusterAPIAutoscaler,
     ClusterAPIAutoscalerOutputs,
     CONTROLLER_NODE_TYPE,
+    NATIVE_WORKLOAD_FEATURE_GATES,
+    NATIVE_WORKLOAD_RUNTIME_CONFIG,
     NODE_TYPE_LABEL,
-    controller_bootstrap_tolerations,
-    controller_node_affinity,
-    controller_node_selector,
     controller_taint,
-    controller_tolerations,
     machine_deployment_labels,
     worker_labels,
 )
 from stacks.workload_cluster.workload_cluster_storage import LocalPathStorage
+from stacks.workload_cluster.workload_cluster_addons import CalicoCNI
 
 
 _CAPI_API_VERSION = "cluster.x-k8s.io/v1beta2"
@@ -72,25 +77,17 @@ _SERVICE_DOMAIN = "cluster.local"
 
 _WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
 
-_CALICO_CHART_REPO = "https://docs.tigera.io/calico/charts"
-_CALICO_CHART_NAME = "tigera-operator"
-_CALICO_CHART_VERSION = "v3.32.0"
-_CALICO_OPERATOR_CRDS_URL = (
-    "https://raw.githubusercontent.com/projectcalico/calico/"
-    f"{_CALICO_CHART_VERSION}/manifests/operator-crds.yaml"
-)
-_CALICO_OPERATOR_NAMESPACE = "tigera-operator"
-
 _DNS_LABEL_MAX_LENGTH = 63
 _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
-_WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneReady"
+_WAIT_FOR_CONTROL_PLANE_AVAILABLE = "condition=ControlPlaneAvailable"
 _SERVICE_ACCOUNT_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _SERVICE_ACCOUNT_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
-_DOCKER_IO_HOSTS_DIR = "/etc/containerd/certs.d/docker.io"
 _DOCKER_IO_SERVER = "https://registry-1.docker.io"
 _DOCKER_HUB_PUBLIC_MIRROR = "https://mirror.gcr.io"
 _DOCKER_DESKTOP_HOST = "host.docker.internal"
+_CONTAINERD_CERTS_DIR = "/etc/containerd/certs.d"
+_NODE_UNHEALTHY_TIMEOUT_SECONDS = 900
 
 
 class LocalMachineDeploymentSpec(PulumiConfigModel):
@@ -112,41 +109,54 @@ def _autoscaler_annotations(
     }
 
 
-def _containerd_docker_io_mirror_commands(
-    registry_setting: RegistryConfig | None,
-) -> list[str]:
-    if registry_setting is None:
-        hosts_toml = (
-            f'server = "{_DOCKER_IO_SERVER}"\n\n'
-            f'[host."{_DOCKER_HUB_PUBLIC_MIRROR}"]\n'
-            '  capabilities = ["pull", "resolve"]\n'
+def _local_registry_routes(
+    registry: RegistryConfig | None,
+    custom_registry: LocalCustomRegistrySetting | None,
+    overrides: Mapping[str, ContainerdRegistryConfig],
+) -> dict[str, ContainerdRegistryConfig]:
+    routes = {"docker.io": ContainerdRegistryConfig(
+        server=_DOCKER_IO_SERVER,
+        hosts=(ContainerdHostConfig(gateway_port=registry.port) if registry is not None
+               else ContainerdHostConfig(url=_DOCKER_HUB_PUBLIC_MIRROR),),
+    )}
+    if custom_registry is not None:
+        endpoint = f"{custom_registry.registry_name}:5000"
+        routes[endpoint] = ContainerdRegistryConfig(
+            server=f"http://{endpoint}",
+            hosts=(ContainerdHostConfig(gateway_port=custom_registry.port),),
         )
-        return [
-            f"mkdir -p {_DOCKER_IO_HOSTS_DIR}",
-            f"cat >{_DOCKER_IO_HOSTS_DIR}/hosts.toml <<'EOF'\n{hosts_toml}EOF",
-            "systemctl restart containerd",
-        ]
+    return {**routes, **overrides}
 
-    return [
-        f"mkdir -p {_DOCKER_IO_HOSTS_DIR}",
-        (
+
+def _containerd_registry_commands(routes: Mapping[str, ContainerdRegistryConfig]) -> list[str]:
+    if not routes:
+        return []
+    commands = []
+    if any(host.gateway_port is not None for route in routes.values() for host in route.hosts):
+        commands.append(
             f"_CA4S_REGISTRY_HOST={_DOCKER_DESKTOP_HOST}\n"
             'if ! getent hosts "${_CA4S_REGISTRY_HOST}" >/dev/null 2>&1; then\n'
-            "  _CA4S_REGISTRY_HOST=$(ip route show default "
-            "| awk '{print $3; exit}')\n"
+            "  _CA4S_REGISTRY_HOST=$(ip route show default | awk '{print $3; exit}')\n"
             "fi\n"
             'if [ -z "${_CA4S_REGISTRY_HOST}" ]; then\n'
-            '  echo "could not determine local registry host" >&2\n'
+            '  echo "could not determine registry gateway" >&2\n'
             "  exit 1\n"
-            "fi\n"
-            f"cat >{_DOCKER_IO_HOSTS_DIR}/hosts.toml <<EOF\n"
-            f'server = "{_DOCKER_IO_SERVER}"\n\n'
-            f'[host."http://${{_CA4S_REGISTRY_HOST}}:{registry_setting.port}"]\n'
-            '  capabilities = ["pull", "resolve"]\n'
-            "EOF"
-        ),
-        "systemctl restart containerd",
-    ]
+            "fi"
+        )
+    for namespace, route in routes.items():
+        hosts = {
+            (host.url if host.url is not None else f"{host.scheme}://__CA4S_REGISTRY_HOST__:{host.gateway_port}"):
+            {"capabilities": list(host.capabilities)}
+            for host in route.hosts
+        }
+        content = tomli_w.dumps({"server": route.server, **({"host": hosts} if hosts else {})})
+        directory = f"{_CONTAINERD_CERTS_DIR}/{namespace}"
+        commands.append(f"mkdir -p {shlex.quote(directory)}")
+        write = f"printf %s {shlex.quote(content)}"
+        if any(host.gateway_port is not None for host in route.hosts):
+            write += ' | sed "s|__CA4S_REGISTRY_HOST__|${_CA4S_REGISTRY_HOST}|g"'
+        commands.append(f"{write} > {shlex.quote(directory + '/hosts.toml')}")
+    return [*commands, "systemctl restart containerd"]
 
 
 def _resource_name(tenant: str, suffix: str) -> str:
@@ -161,8 +171,16 @@ def _health_check() -> dict[str, object]:
     return {
         "checks": {
             "unhealthyNodeConditions": [
-                {"type": "Ready", "status": "Unknown", "timeoutSeconds": 300},
-                {"type": "Ready", "status": "False", "timeoutSeconds": 300},
+                {
+                    "type": "Ready",
+                    "status": "Unknown",
+                    "timeoutSeconds": _NODE_UNHEALTHY_TIMEOUT_SECONDS,
+                },
+                {
+                    "type": "Ready",
+                    "status": "False",
+                    "timeoutSeconds": _NODE_UNHEALTHY_TIMEOUT_SECONDS,
+                },
             ],
         },
     }
@@ -253,129 +271,33 @@ def _api_group(api_version: str) -> str:
     return api_version.split("/", 1)[0]
 
 
-def _object_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
-    return {"apiGroup": _api_group(api_version), "kind": kind, "name": name}
-
-
-def _calico_values() -> dict[str, object]:
+def _cluster_configuration() -> dict[str, object]:
+    feature_gates = [
+        {"name": "feature-gates", "value": NATIVE_WORKLOAD_FEATURE_GATES}
+    ]
     return {
-        "nodeSelector": controller_node_selector(),
-        "affinity": controller_node_affinity(),
-        "tolerations": controller_bootstrap_tolerations(),
-        "installation": {
-            "controlPlaneNodeSelector": controller_node_selector(),
-            "controlPlaneTolerations": controller_tolerations(),
-            "calicoNetwork": {
-                "ipPools": [
-                    {
-                        "name": "default-ipv4-ippool",
-                        "blockSize": 26,
-                        "cidr": _POD_CIDR,
-                        "encapsulation": "VXLANCrossSubnet",
-                        "natOutgoing": "Enabled",
-                        "nodeSelector": "all()",
-                    }
-                ],
-            },
+        "apiServer": {
+            "certSANs": [
+                "localhost",
+                "127.0.0.1",
+                "0.0.0.0",
+                "host.docker.internal",
+            ],
+            "extraArgs": [
+                *feature_gates,
+                {
+                    "name": "runtime-config",
+                    "value": NATIVE_WORKLOAD_RUNTIME_CONFIG,
+                },
+            ],
         },
+        "controllerManager": {"extraArgs": feature_gates},
+        "scheduler": {"extraArgs": feature_gates},
     }
 
 
-def _read_url(url: str) -> str:
-    with urllib.request.urlopen(url, timeout=60) as response:
-        return response.read().decode("utf-8")
-
-
-def _calico_operator_crd_dependencies(
-    calico_operator_crds: k8s.yaml.ConfigGroup,
-) -> list[pulumi.Input[pulumi.Resource]]:
-    return [
-        calico_operator_crds.get_resource(
-            "apiextensions.k8s.io/v1/CustomResourceDefinition",
-            name,
-        )
-        for name in (
-            "apiservers.operator.tigera.io",
-            "goldmanes.operator.tigera.io",
-            "installations.operator.tigera.io",
-            "whiskers.operator.tigera.io",
-        )
-    ]
-
-
-class CalicoCNI(pulumi.ComponentResource):
-    """Calico CNI for local CAPD workload clusters."""
-
-    chart_version: pulumi.Output[str]
-    status: pulumi.Output[Any]
-
-    def __init__(
-        self,
-        name: str,
-        *,
-        provider: k8s.Provider,
-        depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
-        opts: pulumi.ResourceOptions | None = None,
-    ) -> None:
-        super().__init__(
-            "ca4s:workload:CalicoCNI",
-            name,
-            props={},
-            opts=opts,
-        )
-
-        def child_options(
-            *,
-            depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
-        ) -> pulumi.ResourceOptions:
-            return pulumi.ResourceOptions(
-                parent=self,
-                provider=provider,
-                depends_on=depends_on,
-                retain_on_delete=True,
-            )
-
-        namespace = k8s.core.v1.Namespace(
-            "namespace",
-            metadata={
-                "name": _CALICO_OPERATOR_NAMESPACE,
-                "labels": {"pod-security.kubernetes.io/enforce": "privileged"},
-            },
-            opts=child_options(depends_on=depends_on),
-        )
-        operator_crds = k8s.yaml.ConfigGroup(
-            "operator-crds",
-            yaml=[_read_url(_CALICO_OPERATOR_CRDS_URL)],
-            opts=child_options(depends_on=[namespace]),
-        )
-        operator = k8s.helm.v3.Release(
-            "operator",
-            chart=_CALICO_CHART_NAME,
-            version=_CALICO_CHART_VERSION,
-            repository_opts={"repo": _CALICO_CHART_REPO},
-            namespace=_CALICO_OPERATOR_NAMESPACE,
-            cleanup_on_fail=True,
-            atomic=True,
-            wait_for_jobs=True,
-            skip_crds=True,
-            timeout=600,
-            values=_calico_values(),
-            opts=child_options(
-                depends_on=[
-                    namespace,
-                    *_calico_operator_crd_dependencies(operator_crds),
-                ],
-            ),
-        )
-
-        self.chart_version = pulumi.Output.from_input(_CALICO_CHART_VERSION)
-        self.status = operator.status
-        self.register_outputs(
-            {
-                "chart_version": self.chart_version,
-                "status": self.status,
-            }
-        )
+def _object_ref(api_version: str, kind: str, name: str) -> dict[str, str]:
+    return {"apiGroup": _api_group(api_version), "kind": kind, "name": name}
 
 
 class WorkerClass(pulumi.ComponentResource):
@@ -412,12 +334,14 @@ class WorkerClass(pulumi.ComponentResource):
             *,
             depends_on: list[pulumi.Resource] | None = None,
             ignore_changes: list[str] | None = None,
+            deleted_with: pulumi.Resource | None = None,
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
                 ignore_changes=ignore_changes,
+                deleted_with=deleted_with,
             )
 
         machine_template = _docker_machine_template(
@@ -475,7 +399,7 @@ class WorkerClass(pulumi.ComponentResource):
                 "name": machine_deployment_name,
                 "namespace": _NAMESPACE,
                 "labels": machine_deployment_label_set,
-                "annotations": foreground_delete_annotations(autoscaler_annotations),
+                "annotations": background_delete_annotations(autoscaler_annotations),
             },
             spec=machine_deployment_spec,
             opts=child_options(
@@ -488,6 +412,7 @@ class WorkerClass(pulumi.ComponentResource):
                 ignore_changes=(
                     ["spec.replicas"] if worker.autoscaler_bounds is not None else None
                 ),
+                deleted_with=cluster if worker.node_type == CONTROLLER_NODE_TYPE else None,
             ),
         )
 
@@ -543,54 +468,64 @@ class ManagementKubeconfig(pulumi.ComponentResource):
         host = os.environ["KUBERNETES_SERVICE_HOST"]
         port = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
         server = f"https://{host}:{port}"
-        token_file = local.get_sensitive_file_output(
-            filename=_SERVICE_ACCOUNT_TOKEN_PATH,
-            opts=pulumi.InvokeOutputOptions(parent=self),
-        )
         ca_file = local.get_file_output(
             filename=_SERVICE_ACCOUNT_CA_PATH,
             opts=pulumi.InvokeOutputOptions(parent=self),
         )
 
-        def build(args: list[str]) -> str:
-            token, ca = args
-            ca_data = base64.b64encode(ca.encode("utf-8")).decode("ascii")
-            return yaml.safe_dump(
-                {
-                    "apiVersion": "v1",
-                    "kind": "Config",
-                    "clusters": [
-                        {
-                            "name": "management",
-                            "cluster": {
-                                "server": server,
-                                "certificate-authority-data": ca_data,
-                            },
-                        }
-                    ],
-                    "contexts": [
-                        {
-                            "name": "management",
-                            "context": {
-                                "cluster": "management",
-                                "user": "pulumi-runner",
-                            },
-                        }
-                    ],
-                    "current-context": "management",
-                    "users": [
-                        {
-                            "name": "pulumi-runner",
-                            "user": {"token": token.strip()},
-                        }
-                    ],
-                },
-                sort_keys=False,
-            )
-
         return pulumi.Output.secret(
-            pulumi.Output.all(token_file.content, ca_file.content).apply(build)
+            ca_file.content.apply(lambda ca: _management_kubeconfig(server, ca))
         )
+
+
+def _management_kubeconfig(server: str, ca: str) -> str:
+    ca_data = base64.b64encode(ca.encode("utf-8")).decode("ascii")
+    return yaml.safe_dump(
+        {
+            "apiVersion": "v1",
+            "kind": "Config",
+            "clusters": [
+                {
+                    "name": "management",
+                    "cluster": {
+                        "server": server,
+                        "certificate-authority-data": ca_data,
+                    },
+                }
+            ],
+            "contexts": [
+                {
+                    "name": "management",
+                    "context": {
+                        "cluster": "management",
+                        "user": "pulumi-runner",
+                    },
+                }
+            ],
+            "current-context": "management",
+            "users": [
+                {
+                    "name": "pulumi-runner",
+                    "user": {
+                        "exec": {
+                            "apiVersion": "client.authentication.k8s.io/v1",
+                            "command": "/bin/sh",
+                            "args": [
+                                "-c",
+                                (
+                                    "printf '{\"apiVersion\":\"client.authentication.k8s.io/v1\","
+                                    "\"kind\":\"ExecCredential\",\"status\":{\"token\":\"%s\"}}\\n' "
+                                    f'"$(cat {_SERVICE_ACCOUNT_TOKEN_PATH})"'
+                                ),
+                            ],
+                            "interactiveMode": "Never",
+                        }
+                    },
+                }
+            ],
+        },
+        sort_keys=False,
+    )
 
 
 def _decode_secret_data_value(data: Mapping[str, str], key: str) -> str:
@@ -626,6 +561,8 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         instance: str,
         worker_machine_deployments: tuple[LocalMachineDeploymentSpec, ...],
         registry: RegistryConfig | None = None,
+        custom_registry: LocalCustomRegistrySetting | None = None,
+        registry_routes: Mapping[str, ContainerdRegistryConfig] | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__(
@@ -637,17 +574,21 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
 
         cluster_name = _resource_name(instance, "workload")
         node_image = f"kindest/node:{_KUBERNETES_VERSION}"
-        pre_kubeadm_commands = _containerd_docker_io_mirror_commands(registry)
+        pre_kubeadm_commands = _containerd_registry_commands(
+            _local_registry_routes(registry, custom_registry, registry_routes or {})
+        )
 
         def child_options(
             *,
             provider: pulumi.ProviderResource | None = None,
             depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
+            deleted_with: pulumi.Resource | None = None,
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
+                deleted_with=deleted_with,
             )
 
         management_kubeconfig = ManagementKubeconfig(
@@ -677,7 +618,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(),
+                "annotations": background_delete_annotations(),
             },
             spec={
                 "clusterNetwork": {
@@ -706,7 +647,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(
+                "annotations": background_delete_annotations(
                     pulumi_wait_for("condition=Ready")
                 ),
             },
@@ -714,18 +655,10 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             opts=child_options(
                 provider=management_provider,
                 depends_on=[cluster],
+                deleted_with=cluster,
             ),
         )
 
-        # We intentionally do not use ClusterClass/topology here. Topology hides
-        # the concrete DockerCluster/KubeadmControlPlane/MachineDeployment
-        # resources from Pulumi, so Kubernetes starts deleting the DockerCluster
-        # sibling while the final control-plane DockerMachine may still need the
-        # CAPD load balancer. In CAPD v1.11.1 that can strand the DockerMachine
-        # finalizer after the load balancer is gone. ClusterClass mostly removes
-        # boilerplate that Pulumi is already good at generating, while costing
-        # us the ordering surface we need for this local provider's brittle
-        # finalization path.
         kubeadm_control_plane = k8s.apiextensions.CustomResource(
             "cluster-control-plane",
             api_version=_CONTROL_PLANE_API_VERSION,
@@ -733,7 +666,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": control_plane_template_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(
+                "annotations": background_delete_annotations(
                     pulumi_wait_for("condition=Initialized")
                 ),
             },
@@ -751,16 +684,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     },
                 },
                 "kubeadmConfigSpec": {
-                    "clusterConfiguration": {
-                        "apiServer": {
-                            "certSANs": [
-                                "localhost",
-                                "127.0.0.1",
-                                "0.0.0.0",
-                                "host.docker.internal",
-                            ],
-                        },
-                    },
+                    "clusterConfiguration": _cluster_configuration(),
                     "initConfiguration": {
                         "nodeRegistration": _node_registration(),
                     },
@@ -773,6 +697,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
             opts=child_options(
                 provider=management_provider,
                 depends_on=[cluster, docker_cluster, control_plane_machine_template],
+                deleted_with=cluster,
             ),
         )
 
@@ -856,6 +781,8 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
 
         calico_cni = CalicoCNI(
             "calico-cni",
+            pod_cidr=_POD_CIDR,
+            vxlan_mode="CrossSubnet",
             provider=workload_provider,
             depends_on=[workload_kubeconfig_secret],
             opts=child_options(provider=workload_provider),
@@ -891,7 +818,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.workload_provider = workload_provider
         self.workload_kubeconfig_secret = workload_kubeconfig_secret
         self.cluster_control_plane_available = cluster_control_plane_available
-        self.calico_operator_chart_version = calico_cni.chart_version
+        self.calico_operator_chart_version = calico_cni.version
         self.calico_operator_status = calico_cni.status
         self.cluster_autoscaler = (
             cluster_autoscaler.outputs if cluster_autoscaler is not None else None

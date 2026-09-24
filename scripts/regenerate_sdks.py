@@ -173,6 +173,18 @@ def _normalize_terraform_readme(path: Path, sdk: dict[str, Any]) -> None:
     path.write_text(source.replace(old, new), encoding="utf-8")
 
 
+def _normalize_terraform_utilities(path: Path) -> None:
+    source = path.read_text(encoding="utf-8")
+    old = "pulumi.runtime.settings._sync_monitor_supports_parameterization()"
+    new = (
+        "pulumi.runtime.settings.monitor_supports_feature("
+        "resource_pb2.RESOURCE_MONITOR_FEATURE_PARAMETERIZATION)"
+    )
+    if source.count(old) != 1:
+        raise GenerationError(f"expected one parameterization feature probe in {path}")
+    path.write_text(source.replace(old, new).replace("\t", "    "), encoding="utf-8")
+
+
 def _remove_flux_provider_shim(package: Path) -> None:
     (package / "provider.py").unlink()
     (package / "pulumi-plugin.json").unlink()
@@ -335,6 +347,7 @@ def generate_sdk(
         if package is None:
             raise GenerationError(f"generated README not found for {name}")
         _normalize_terraform_readme(package, sdk)
+        _normalize_terraform_utilities(package.parent / "_utilities.py")
 
     if sdk["kind"] == "crd":
         patcher = REPO_ROOT / "scripts/patch_crd_sdk_provider_defaults.py"

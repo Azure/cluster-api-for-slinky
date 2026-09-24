@@ -9,11 +9,17 @@ import pytest
 from pydantic import ValidationError
 
 from stack import (
-    CAPZArtifactConfig,
-    CustomImagesConfig,
+    _BUILDS_CONFIG,
+    CustomRegistryConfig,
+    DockerImageBuildConfig,
+    CAPZBundleBuildConfig,
+    SlinkyChartsBuildConfig,
     _azure_infrastructure_enabled,
     _discover_username,
     _merge_capz_provider_overrides,
+    _merge_local_slinky_overrides,
+    _slinky_image_config,
+    _validate_build_consumers,
     _with_local_registry_config,
     _with_owner_tag_config,
 )
@@ -43,6 +49,44 @@ _TENANT_ID = "33333333-3333-3333-3333-333333333333"
 _SUBSCRIPTION_ID = "44444444-4444-4444-4444-444444444444"
 _LOCATION = "westus2"
 _RESOURCE_GROUP = "host-rg"
+
+
+def test_named_builds_have_typed_builder_options() -> None:
+    config = _BUILDS_CONFIG.validate_python({
+        "slurm-operator": {
+            "builder": "docker-image", "sourcePath": "/src/operator", "sourceRef": "feature",
+            "imageName": "custom/operator", "target": "custom-stage", "buildArgs": {"ARCH": "arm64"},
+        },
+        "capz-provider": {"builder": "capz-bundle", "repositoryUrl": "https://example.invalid/capz.git", "sourceRef": "HEAD"},
+        "slinky-charts": {"builder": "slinky-charts", "sourcePath": "/src/operator", "sourceRef": "HEAD"},
+    })
+    assert isinstance(config["slurm-operator"], DockerImageBuildConfig)
+    assert config["slurm-operator"].target == "custom-stage"
+    assert config["slurm-operator"].build_args == {"ARCH": "arm64"}
+    assert isinstance(config["capz-provider"], CAPZBundleBuildConfig)
+    assert isinstance(config["slinky-charts"], SlinkyChartsBuildConfig)
+    assert _BUILDS_CONFIG.validate_python({name: build.to_config() for name, build in config.items()}) == config
+
+
+@pytest.mark.parametrize("options,error", [
+    ({}, "union_tag_not_found"),
+    ({"builder": "unknown"}, "union_tag_invalid"),
+    ({"builder": "docker-image"}, "imageName"),
+    ({"builder": "capz-bundle", "target": "stage"}, "extra_forbidden"),
+    ({"builder": "docker-image", "imageName": "image", "buildArgs": {"ARCH": 1}}, "string_type"),
+])
+def test_named_builds_reject_invalid_builder_options(options, error) -> None:
+    with pytest.raises(ValidationError, match=error):
+        _BUILDS_CONFIG.validate_python({"build": {"sourcePath": "/src/repo", "sourceRef": "HEAD", **options}})
+
+
+def test_custom_registry_config_is_independent_of_builds() -> None:
+    assert CustomRegistryConfig().name == "custom-registry"
+    assert CustomRegistryConfig().port is None
+    config = CustomRegistryConfig(name="build-registry", port=5002)
+    assert config.to_config() == {"name": "build-registry", "port": 5002}
+    with pytest.raises(ValidationError):
+        CustomRegistryConfig(port=0)
 
 
 def test_empty_config_does_not_enable_azure() -> None:
@@ -76,207 +120,114 @@ def test_empty_stack_config_keeps_azure_disabled() -> None:
     assert not _azure_infrastructure_enabled(config)
 
 
-def test_custom_images_config_parses_source_and_registry_options() -> None:
-    config = CustomImagesConfig.model_validate(
-        {
-            "registryName": "images-registry",
-            "registryPort": 5002,
-            "images": {
-                "controller": {
-                    "sourcePath": "/src/controller",
-                    "sourceRef": "feature",
-                    "imageName": "custom/controller",
-                    "buildArgs": {"ARCH": "amd64", "package": "./cmd"},
-                }
-            },
-        }
+@pytest.mark.parametrize("source", [{"sourcePath": "/src/repo"}, {"repositoryUrl": "https://example.invalid/repo.git"}])
+@pytest.mark.parametrize("builder", ["docker-image", "capz-bundle", "slinky-charts"])
+def test_builds_accept_local_and_remote_sources(source, builder) -> None:
+    options = {"imageName": "custom/image"} if builder == "docker-image" else {}
+    build = _BUILDS_CONFIG.validate_python({
+        "named-build": {"builder": builder, **source, "sourceRef": "feature", **options},
+    })["named-build"]
+    assert build.source_path == source.get("sourcePath")
+    assert build.repository_url == source.get("repositoryUrl")
+    assert build.source_ref == "feature"
+    if isinstance(build, DockerImageBuildConfig):
+        assert build.target is None
+        assert build.build_args is None
+
+
+def test_slinky_deployment_requires_both_image_builds() -> None:
+    source = {"sourcePath": "/src/repo", "sourceRef": "HEAD"}
+    builds = _BUILDS_CONFIG.validate_python({
+        "slurm-operator": {**source, "builder": "docker-image", "imageName": "operator", "target": "custom-stage"},
+        "slinky-charts": {**source, "builder": "slinky-charts"},
+    })
+    with pytest.raises(ValueError, match="slurm-operator-webhook"):
+        _validate_build_consumers(builds)
+    builds.update(_BUILDS_CONFIG.validate_python({
+        "slurm-operator-webhook": {**source, "builder": "docker-image", "imageName": "webhook"},
+    }))
+    _validate_build_consumers(builds)
+
+
+def test_build_names_only_select_known_deployment_roles() -> None:
+    source = {"sourcePath": "/src/repo", "sourceRef": "HEAD"}
+    builds = _BUILDS_CONFIG.validate_python({"standalone-charts": {**source, "builder": "slinky-charts"}})
+    _validate_build_consumers(builds)
+    builds = _BUILDS_CONFIG.validate_python({"capz-provider": {**source, "builder": "slinky-charts"}})
+    with pytest.raises(ValueError, match="requires builder 'capz-bundle'"):
+        _validate_build_consumers(builds)
+
+
+def test_slinky_image_config_parses_registry_port_and_tag() -> None:
+    image = _slinky_image_config(
+        "custom-registry:5000/slurm-operator:source-1234567890ab"
     )
 
-    image = config.images["controller"]
-    assert config.registry_name == "images-registry"
-    assert config.registry_port == 5002
-    assert image.source_path == "/src/controller"
-    assert image.source_ref == "feature"
-    assert image.image_name == "custom/controller"
-    assert image.build_args == {"ARCH": "amd64", "package": "./cmd"}
+    assert image is not None
+    assert image.repository == "custom-registry:5000/slurm-operator"
+    assert image.tag == "source-1234567890ab"
 
 
-def test_custom_images_config_defaults_to_dedicated_registry() -> None:
-    config = CustomImagesConfig.model_validate(
-        {
-            "images": {
-                "controller": {
-                    "sourcePath": "/src/controller",
-                    "sourceRef": "HEAD",
-                    "imageName": "custom/controller",
-                }
-            },
-        }
+def test_local_slinky_overrides_update_only_local_workload_clusters() -> None:
+    config = InitStackConfig(
+        tenants=TenantsConfig(
+            workload_clusters={
+                "local": LocalWorkloadClusterConfig(),
+                "caps-aks": AKSWorkloadClusterConfig(
+                    parameters=AzureWorkloadSpec(
+                        subscription_id=_SUBSCRIPTION_ID,
+                        location="westus2",
+                        resource_group="rg-capz-mi-dev2",
+                    )
+                ),
+            }
+        )
     )
 
-    image = config.images["controller"]
-    assert config.registry_name == "custom-registry"
-    assert config.registry_port is None
-    assert image.build_args is None
-
-
-def test_custom_images_config_accepts_remote_git_source() -> None:
-    config = CustomImagesConfig.model_validate(
-        {
-            "images": {
-                "controller": {
-                    "repositoryUrl": "https://github.com/kubernetes-sigs/cluster-api-provider-azure.git",
-                    "sourceRef": "69ec3a40a818ccbc32b8ce88c84609404d8cb7a2",
-                    "imageName": "custom/controller",
-                }
-            },
-        }
+    updated = _merge_local_slinky_overrides(
+        config,
+        chart_oci_prefix=(
+            "oci://custom-registry.pulumi-kubernetes-operator."
+            "svc.cluster.local:5000/charts"
+        ),
+        chart_version="0.0.0-source1234567890ab",
+        operator_image=(
+            "custom-registry:5000/slurm-operator:source-1234567890ab"
+        ),
+        webhook_image=(
+            "custom-registry:5000/slurm-operator-webhook:source-1234567890ab"
+        ),
+        registry_name="custom-registry",
+        registry_port=5003,
     )
 
-    image = config.images["controller"]
-    assert image.source_path is None
-    assert image.repository_url == (
-        "https://github.com/kubernetes-sigs/cluster-api-provider-azure.git"
+    local = updated.tenants.workload_clusters["local"]
+    assert isinstance(local, LocalWorkloadClusterConfig)
+    assert local.custom_registry is not None
+    assert local.custom_registry.registry_name == "custom-registry"
+    assert local.custom_registry.port == 5003
+    assert local.slinky.chart_plain_http is True
+    assert local.slinky.operator_chart_version == "0.0.0-source1234567890ab"
+    assert local.slinky.operator_image is not None
+    assert local.slinky.operator_image.repository == (
+        "custom-registry:5000/slurm-operator"
     )
 
-
-def test_capz_artifact_config_defaults_to_capz_artifact_name() -> None:
-    config = CAPZArtifactConfig.model_validate(
-        {
-            "sourcePath": "/src/capz",
-            "sourceRef": "origin/arsdragonfly/md-vmss",
-        }
-    )
-
-    assert config.source_path == "/src/capz"
-    assert config.source_ref == "origin/arsdragonfly/md-vmss"
-    assert config.artifact_name == "capz/cluster-api-provider-azure"
+    aks = updated.tenants.workload_clusters["caps-aks"]
+    assert isinstance(aks, AKSWorkloadClusterConfig)
+    assert aks.slinky.operator_image is None
 
 
-def test_capz_artifact_config_accepts_remote_git_source() -> None:
-    config = CAPZArtifactConfig.model_validate(
-        {
-            "repositoryUrl": "https://github.com/kubernetes-sigs/cluster-api-provider-azure.git",
-            "sourceRef": "69ec3a40a818ccbc32b8ce88c84609404d8cb7a2",
-        }
-    )
-
-    assert config.source_path is None
-    assert config.repository_url == (
-        "https://github.com/kubernetes-sigs/cluster-api-provider-azure.git"
-    )
-
-
-@pytest.mark.parametrize(
-    "value, expected_errors",
-    [
-        (
-            {},
-            {(("sourceRef",), "missing")},
-        ),
-        (
-            {"sourceRef": "HEAD"},
-            {((), "value_error")},
-        ),
-        (
-            {
-                "sourcePath": "/src/capz",
-                "repositoryUrl": "https://example.invalid/capz.git",
-                "sourceRef": "HEAD",
-            },
-            {((), "value_error")},
-        ),
-        (
-            {
-                "sourcePath": "/src/capz",
-                "sourceRef": "HEAD",
-                "artifactName": "",
-            },
-            {(("artifactName",), "string_too_short")},
-        ),
-    ],
-)
-def test_capz_artifact_config_rejects_invalid_values(
-    value: object,
-    expected_errors: set[tuple[tuple[str, ...], str]],
-) -> None:
-    with pytest.raises(ValidationError) as exc_info:
-        CAPZArtifactConfig.model_validate(value)
-
-    errors = {
-        (tuple(str(part) for part in error["loc"]), str(error["type"]))
-        for error in exc_info.value.errors()
-    }
-    assert expected_errors <= errors
-
-
-@pytest.mark.parametrize(
-    "value, expected_errors",
-    [
-        (
-            {"registryPort": 0, "images": {}},
-            {(('registryPort',), 'greater_than')},
-        ),
-        (
-            {"images": {"controller": {}}},
-            {
-                (('images', 'controller', 'sourceRef'), 'missing'),
-                (('images', 'controller', 'imageName'), 'missing'),
-            },
-        ),
-        (
-            {
-                "images": {
-                    "controller": {
-                        "sourcePath": "/src/controller",
-                        "repositoryUrl": "https://example.invalid/controller.git",
-                        "sourceRef": "HEAD",
-                        "imageName": "custom/controller",
-                    }
-                }
-            },
-            {(('images', 'controller'), 'value_error')},
-        ),
-        (
-            {
-                "images": {
-                    "controller": {
-                        "sourcePath": "/src/controller",
-                        "sourceRef": "HEAD",
-                        "imageName": "custom/controller",
-                        "buildArgs": [],
-                    }
-                }
-            },
-            {(('images', 'controller', 'buildArgs'), 'dict_type')},
-        ),
-        (
-            {
-                "images": {
-                    "controller": {
-                        "sourcePath": "/src/controller",
-                        "sourceRef": "HEAD",
-                        "imageName": "custom/controller",
-                        "buildArgs": {"ARCH": 1},
-                    }
-                }
-            },
-            {(('images', 'controller', 'buildArgs', 'ARCH'), 'string_type')},
-        ),
-    ],
-)
-def test_custom_images_config_rejects_invalid_values(
-    value: object,
-    expected_errors: set[tuple[tuple[str, ...], str]],
-) -> None:
-    with pytest.raises(ValidationError) as exc_info:
-        CustomImagesConfig.model_validate(value)
-
-    errors = {
-        (tuple(str(part) for part in error["loc"]), str(error["type"]))
-        for error in exc_info.value.errors()
-    }
-    assert expected_errors <= errors
+@pytest.mark.parametrize("source,error", [
+    ({}, "sourceRef"),
+    ({"sourceRef": "HEAD"}, "exactly one"),
+    ({"sourcePath": "/src/repo", "repositoryUrl": "https://example.invalid/repo.git", "sourceRef": "HEAD"}, "exactly one"),
+])
+@pytest.mark.parametrize("builder", ["docker-image", "capz-bundle", "slinky-charts"])
+def test_builds_validate_git_sources(source, error, builder) -> None:
+    options = {"imageName": "image"} if builder == "docker-image" else {}
+    with pytest.raises(ValidationError, match=error):
+        _BUILDS_CONFIG.validate_python({"build": {"builder": builder, **source, **options}})
 
 
 def test_explicit_stack_config_enables_azure() -> None:

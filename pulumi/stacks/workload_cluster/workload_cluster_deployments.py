@@ -9,7 +9,7 @@ from typing import Any
 
 import pulumi
 import pulumi_kubernetes as k8s
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StrictBool, model_validator
 
 from lib.config import (
     NonEmptyStr,
@@ -24,7 +24,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     controller_tolerations,
     node_type_affinity,
 )
-from stacks.kubernetes_annotations import pulumi_patch_force
+from stacks.kubernetes_annotations import pulumi_patch_force, pulumi_wait_for
 
 
 _CERT_MANAGER_CHART_REPO = "https://charts.jetstack.io"
@@ -47,11 +47,57 @@ _PROMETHEUS_PORT = 9090
 
 _SLINKY_CHART_OCI_PREFIX = "oci://ghcr.io/slinkyproject/charts"
 _SLINKY_CHART_VERSION = "1.2.1"
-_SLINKY_OPERATOR_CRDS_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator-crds"
-_SLINKY_OPERATOR_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm-operator"
-_SLURM_CHART = f"{_SLINKY_CHART_OCI_PREFIX}/slurm"
 _SLINKY_OPERATOR_NAMESPACE = "slinky"
 _SLURM_NAMESPACE = "slurm"
+_SLURM_BRIDGE_CHART = "oci://ghcr.io/slinkyproject/charts/slurm-bridge"
+_SLURM_BRIDGE_CHART_VERSION = "1.2.2"
+_SLURM_BRIDGE_NAMESPACE = "slurm-bridge"
+_SLURM_BRIDGE_PARTITION = "compute"
+_SLURM_BRIDGE_SCHEDULER_NAME = "slurm-bridge-scheduler"
+_SLURM_BRIDGE_TOKEN_NAME = "slurm-bridge-token"
+_SLURM_BRIDGE_TOKEN_API_VERSION = "slinky.slurm.net/v1beta1"
+
+
+class SlinkyImageConfig(PulumiConfigModel):
+    repository: NonEmptyStr
+    tag: NonEmptyStr | None = None
+    digest: NonEmptyStr | None = None
+
+    @model_validator(mode="after")
+    def validate_reference(self) -> SlinkyImageConfig:
+        if (self.tag is None) == (self.digest is None):
+            raise ValueError("exactly one of tag or digest is required")
+        return self
+
+    def to_helm_values(self) -> dict[str, str]:
+        values = {"repository": self.repository}
+        if self.tag is not None:
+            values["tag"] = self.tag
+        if self.digest is not None:
+            values["digest"] = self.digest
+        return values
+
+
+class SlinkyDeploymentConfig(PulumiConfigModel):
+    chart_oci_prefix: NonEmptyStr = _SLINKY_CHART_OCI_PREFIX
+    chart_plain_http: StrictBool = False
+    operator_crds_chart_version: NonEmptyStr = _SLINKY_CHART_VERSION
+    operator_chart_version: NonEmptyStr = _SLINKY_CHART_VERSION
+    slurm_chart_version: NonEmptyStr = _SLINKY_CHART_VERSION
+    operator_image: SlinkyImageConfig | None = None
+    webhook_image: SlinkyImageConfig | None = None
+    image_pull_secrets: tuple[NonEmptyStr, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_chart_source(self) -> SlinkyDeploymentConfig:
+        if self.chart_plain_http and not self.chart_oci_prefix.startswith("oci://"):
+            raise ValueError(
+                "chartPlainHttp requires chartOciPrefix to use the oci:// scheme"
+            )
+        return self
+
+    def chart(self, name: str) -> str:
+        return f"{self.chart_oci_prefix.rstrip('/')}/{name}"
 
 
 class SlurmNodeSetSpec(PulumiConfigModel):
@@ -102,6 +148,36 @@ def _resource_name(tenant: str, suffix: str) -> str:
 
 def _slurm_nodeset_name(slurm_release_name: str, worker_name: str) -> str:
     return f"{slurm_release_name}-worker-{worker_name}"
+
+
+def _slurm_bridge_toleration() -> dict[str, str]:
+    return {
+        "key": "slinky.slurm.net/managed-node",
+        "operator": "Equal",
+        "value": _SLURM_BRIDGE_SCHEDULER_NAME,
+        "effect": "NoExecute",
+    }
+
+
+def _slurm_bridge_values() -> dict[str, object]:
+    placement = controller_pod_spec()
+    return {
+        "schedulerConfig": {"partition": _SLURM_BRIDGE_PARTITION},
+        "sharedConfig": {"slurmJwtSecret": _SLURM_BRIDGE_TOKEN_NAME},
+        "admission": placement,
+        "controllers": placement,
+        "scheduler": placement,
+    }
+
+
+def _slurm_bridge_token_spec() -> dict[str, object]:
+    return {
+        "jwtKeyRef": {"name": "slurm-auth-jwt", "key": "jwt.key"},
+        "secretRef": {"name": _SLURM_BRIDGE_TOKEN_NAME, "key": "auth-token"},
+        "username": "slurm",
+        "refresh": True,
+        "lifetime": "8760h",
+    }
 
 
 def _prometheus_service_name(prometheus_release_name: str) -> str:
@@ -157,8 +233,11 @@ def _keda_scaled_object_spec(
     }
 
 
-def _slurm_operator_values() -> dict[str, object]:
-    return {
+def _slurm_operator_values(
+    config: SlinkyDeploymentConfig | None = None,
+) -> dict[str, object]:
+    config = config or SlinkyDeploymentConfig()
+    values: dict[str, object] = {
         "operator": {
             **controller_pod_spec(),
         },
@@ -166,6 +245,15 @@ def _slurm_operator_values() -> dict[str, object]:
             **controller_pod_spec(),
         },
     }
+    if config.operator_image is not None:
+        values["operator"]["image"] = config.operator_image.to_helm_values()
+    if config.webhook_image is not None:
+        values["webhook"]["image"] = config.webhook_image.to_helm_values()
+    if config.image_pull_secrets:
+        values["imagePullSecrets"] = [
+            {"name": name} for name in config.image_pull_secrets
+        ]
+    return values
 
 
 def _cert_manager_values() -> dict[str, object]:
@@ -250,6 +338,7 @@ def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
         "oversubscribeNode": False,
         "podSpec": {
             "affinity": node_type_affinity(node_set.node_type),
+            "tolerations": [_slurm_bridge_toleration()],
         },
     }
 
@@ -259,7 +348,7 @@ def _slurm_values(
 ) -> dict[str, object]:
     return {
         "configFiles": {
-            "cgroup.conf": "CgroupPlugin=disabled\n",
+            "cgroup.conf": "CgroupPlugin=cgroup/v2\nIgnoreSystemd=yes\n",
         },
         "controller": {
             "logfile": {
@@ -426,8 +515,10 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
     keda: pulumi.Output[KEDAOutputs] | None
     prometheus_namespace: pulumi.Output[str]
     prometheus_status: pulumi.Output[Any]
+    slurm_bridge_chart_version: pulumi.Output[str]
     slurm_operator_status: pulumi.Output[Any]
     slurm_status: pulumi.Output[Any]
+    slurm_bridge_status: pulumi.Output[Any]
     workload_cluster_ready: pulumi.Output[bool]
 
     def __init__(
@@ -437,6 +528,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         instance: str,
         slurm_node_sets: tuple[SlurmNodeSetSpec, ...],
         keda_scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = (),
+        slinky: SlinkyDeploymentConfig | None = None,
         workload_provider: k8s.Provider,
         pin_coredns_to_controller: bool = False,
         opts: pulumi.ResourceOptions | None = None,
@@ -447,6 +539,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
             props={},
             opts=opts,
         )
+        slinky = slinky or SlinkyDeploymentConfig()
         def child_options(
             *,
             provider: pulumi.ProviderResource | None = None,
@@ -551,52 +644,166 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 retain_on_delete=True,
             ),
         )
-        slurm_operator_crds = k8s.helm.v3.Release(
-            "slurm-operator-crds",
-            chart=_SLINKY_OPERATOR_CRDS_CHART,
-            version=_SLINKY_CHART_VERSION,
-            namespace=_SLINKY_OPERATOR_NAMESPACE,
-            cleanup_on_fail=True,
-            atomic=True,
-            wait_for_jobs=True,
-            timeout=600,
+        slurm_bridge_namespace = k8s.core.v1.Namespace(
+            "slurm-bridge-namespace",
+            metadata={"name": _SLURM_BRIDGE_NAMESPACE},
             opts=child_options(
                 provider=workload_provider,
-                depends_on=[slinky_namespace, prometheus],
                 retain_on_delete=True,
             ),
         )
-        slurm_operator = k8s.helm.v3.Release(
-            "slurm-operator",
-            chart=_SLINKY_OPERATOR_CHART,
-            version=_SLINKY_CHART_VERSION,
-            namespace=_SLINKY_OPERATOR_NAMESPACE,
-            cleanup_on_fail=True,
-            atomic=True,
-            wait_for_jobs=True,
-            timeout=600,
-            values=_slurm_operator_values(),
+        # TODO: Unify on Helm v4 once Pulumi ships a production Release resource
+        # with plain-HTTP OCI support, atomic cleanup, job waits, timeouts, and
+        # release status. The current v4 Chart only renders and manages manifests.
+        if slinky.chart_plain_http:
+            slurm_operator_crds = k8s.helm.v4.Chart(
+                "slurm-operator-crds",
+                chart=slinky.chart("slurm-operator-crds"),
+                name="slurm-operator-crds",
+                version=slinky.operator_crds_chart_version,
+                namespace=_SLINKY_OPERATOR_NAMESPACE,
+                plain_http=True,
+                opts=child_options(
+                    provider=workload_provider,
+                    depends_on=[slinky_namespace, prometheus],
+                    retain_on_delete=True,
+                ),
+            )
+            slurm_operator = k8s.helm.v4.Chart(
+                "slurm-operator",
+                chart=slinky.chart("slurm-operator"),
+                name="slurm-operator",
+                version=slinky.operator_chart_version,
+                namespace=_SLINKY_OPERATOR_NAMESPACE,
+                plain_http=True,
+                values=_slurm_operator_values(slinky),
+                opts=child_options(
+                    provider=workload_provider,
+                    depends_on=[slinky_namespace, cert_manager, slurm_operator_crds],
+                    retain_on_delete=True,
+                ),
+            )
+            slurm_release_name: pulumi.Input[str] = "slurm"
+            slurm_release = k8s.helm.v4.Chart(
+                "slurm",
+                chart=slinky.chart("slurm"),
+                name=slurm_release_name,
+                version=slinky.slurm_chart_version,
+                namespace=_SLURM_NAMESPACE,
+                plain_http=True,
+                values=_slurm_values(slurm_node_sets),
+                opts=child_options(
+                    provider=workload_provider,
+                    depends_on=[slurm_namespace, slurm_operator],
+                    retain_on_delete=True,
+                ),
+            )
+            slurm_operator_status = slurm_operator.resources.apply(
+                lambda _: {
+                    "chart": "slurm-operator",
+                    "name": "slurm-operator",
+                    "namespace": _SLINKY_OPERATOR_NAMESPACE,
+                    "status": "deployed",
+                    "version": slinky.operator_chart_version,
+                }
+            )
+            slurm_status = slurm_release.resources.apply(
+                lambda _: {
+                    "chart": "slurm",
+                    "name": "slurm",
+                    "namespace": _SLURM_NAMESPACE,
+                    "status": "deployed",
+                    "version": slinky.slurm_chart_version,
+                }
+            )
+            slurm_ready = slurm_release.resources
+        else:
+            slurm_operator_crds = k8s.helm.v3.Release(
+                "slurm-operator-crds",
+                chart=slinky.chart("slurm-operator-crds"),
+                version=slinky.operator_crds_chart_version,
+                namespace=_SLINKY_OPERATOR_NAMESPACE,
+                cleanup_on_fail=True,
+                atomic=True,
+                wait_for_jobs=True,
+                timeout=600,
+                opts=child_options(
+                    provider=workload_provider,
+                    depends_on=[slinky_namespace, prometheus],
+                    retain_on_delete=True,
+                ),
+            )
+            slurm_operator = k8s.helm.v3.Release(
+                "slurm-operator",
+                chart=slinky.chart("slurm-operator"),
+                version=slinky.operator_chart_version,
+                namespace=_SLINKY_OPERATOR_NAMESPACE,
+                cleanup_on_fail=True,
+                atomic=True,
+                wait_for_jobs=True,
+                timeout=600,
+                values=_slurm_operator_values(slinky),
+                opts=child_options(
+                    provider=workload_provider,
+                    depends_on=[slinky_namespace, cert_manager, slurm_operator_crds],
+                    retain_on_delete=True,
+                ),
+            )
+            slurm_release = k8s.helm.v3.Release(
+                "slurm",
+                chart=slinky.chart("slurm"),
+                version=slinky.slurm_chart_version,
+                namespace=_SLURM_NAMESPACE,
+                cleanup_on_fail=True,
+                atomic=True,
+                wait_for_jobs=True,
+                timeout=900,
+                values=_slurm_values(slurm_node_sets),
+                opts=child_options(
+                    provider=workload_provider,
+                    depends_on=[slurm_namespace, slurm_operator],
+                    retain_on_delete=True,
+                ),
+            )
+            slurm_release_name = slurm_release.status.name
+            slurm_operator_status = slurm_operator.status
+            slurm_status = slurm_release.status
+            slurm_ready = slurm_release.status
+
+        slurm_bridge_token = k8s.apiextensions.CustomResource(
+            "slurm-bridge-token",
+            api_version=_SLURM_BRIDGE_TOKEN_API_VERSION,
+            kind="Token",
+            metadata={
+                "name": _SLURM_BRIDGE_TOKEN_NAME,
+                "namespace": _SLURM_NAMESPACE,
+                "annotations": pulumi_wait_for("jsonpath={.status.issuedAt}"),
+            },
+            spec=_slurm_bridge_token_spec(),
             opts=child_options(
                 provider=workload_provider,
-                depends_on=[slinky_namespace, cert_manager, slurm_operator_crds],
+                depends_on=[slurm_release, slurm_operator],
                 retain_on_delete=True,
             ),
         )
-        slurm_release = k8s.helm.v3.Release(
-            "slurm",
-            chart=_SLURM_CHART,
-            version=_SLINKY_CHART_VERSION,
+        slurm_bridge = k8s.helm.v3.Release(
+            "slurm-bridge",
+            chart=_SLURM_BRIDGE_CHART,
+            name="slurm-bridge",
+            version=_SLURM_BRIDGE_CHART_VERSION,
             namespace=_SLURM_NAMESPACE,
             cleanup_on_fail=True,
             atomic=True,
             wait_for_jobs=True,
-            timeout=900,
-            values=_slurm_values(slurm_node_sets),
+            timeout=600,
+            values=_slurm_bridge_values(),
             opts=child_options(
                 provider=workload_provider,
                 depends_on=[
-                    slurm_namespace,
-                    slurm_operator,
+                    slurm_bridge_namespace,
+                    slurm_bridge_token,
+                    slurm_release,
+                    cert_manager,
                 ],
                 retain_on_delete=True,
             ),
@@ -607,7 +814,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 "keda-nodeset-scaler",
                 instance=instance,
                 prometheus_release_name=prometheus.status.name,
-                slurm_release_name=slurm_release.status.name,
+                slurm_release_name=slurm_release_name,
                 scaled_node_sets=keda_scaled_node_sets,
                 provider=workload_provider,
                 depends_on=[prometheus, slurm_release],
@@ -617,12 +824,17 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
         self.keda = keda.outputs if keda is not None else None
         self.prometheus_namespace = pulumi.Output.from_input(_PROMETHEUS_NAMESPACE)
         self.prometheus_status = prometheus.status
-        self.slurm_operator_status = slurm_operator.status
-        self.slurm_status = slurm_release.status
+        self.slurm_operator_status = slurm_operator_status
+        self.slurm_status = slurm_status
+        self.slurm_bridge_chart_version = pulumi.Output.from_input(
+            _SLURM_BRIDGE_CHART_VERSION
+        )
+        self.slurm_bridge_status = slurm_bridge.status
         ready_inputs: list[pulumi.Input[Any]] = [
             prometheus.status,
-            slurm_operator.status,
-            slurm_release.status,
+            slurm_operator_status,
+            slurm_ready,
+            slurm_bridge.status,
         ]
         if keda is not None:
             ready_inputs.append(keda.status)
@@ -639,9 +851,11 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 "prometheus_namespace": self.prometheus_namespace,
                 "prometheus_status": self.prometheus_status,
                 "workload_cluster_ready": self.workload_cluster_ready,
-                "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+                "slurm_operator_chart_version": slinky.operator_chart_version,
                 "slurm_operator_status": self.slurm_operator_status,
-                "slurm_chart_version": _SLINKY_CHART_VERSION,
+                "slurm_chart_version": slinky.slurm_chart_version,
                 "slurm_status": self.slurm_status,
+                "slurm_bridge_chart_version": self.slurm_bridge_chart_version,
+                "slurm_bridge_status": self.slurm_bridge_status,
             }
         )

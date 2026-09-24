@@ -3,6 +3,23 @@
 
 encryptionsalt: v1:rYyJwlvWbf8=:v1:i6q8HBx3zuJMnYPW:W0kFQbNIFTt3r5lGzcSI/jkIeWRZwA==
 config:
+  ca4s-infra:builds:
+    slurm-operator:
+      builder: docker-image
+      repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+      sourceRef: refs/pull/264/head
+      imageName: slurm-operator
+      target: manager
+    slurm-operator-webhook:
+      builder: docker-image
+      repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+      sourceRef: refs/pull/264/head
+      imageName: slurm-operator-webhook
+      target: webhook
+    slinky-charts:
+      builder: slinky-charts
+      repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
+      sourceRef: refs/pull/264/head
   ca4s-infra:initStack:
     controlPlane:
       infrastructureProviders:

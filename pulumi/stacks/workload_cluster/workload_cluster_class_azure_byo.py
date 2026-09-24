@@ -5,17 +5,22 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any, Literal
 from uuid import UUID
 
 import pulumi
+from azure_container_registry import (
+    AzureContainerRegistryConfig,
+)
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     StrictBool,
     field_serializer,
+    field_validator,
 )
 
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
@@ -23,9 +28,9 @@ from localenv import discover_azure_host_network, discover_azure_resource_placem
 from stacks.workload_cluster.workload_cluster_deployments import (
     KEDAOutputs,
     KEDANodeSetScalerSpec,
+    SlinkyDeploymentConfig,
     SlurmNodeSetSpec,
     _PROMETHEUS_CHART_VERSION,
-    _SLINKY_CHART_VERSION,
     WorkloadClusterDeployments,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
@@ -43,6 +48,7 @@ _DEFAULT_KUBERNETES_VERSION = "v1.36.1"
 _DEFAULT_CONTROL_PLANE_VM_SIZE = "Standard_D2as_v5"
 _DEFAULT_WORKER_VM_SIZE = "Standard_D2as_v5"
 _DEFAULT_SSH_USERNAME = "capi"
+_KUBERNETES_VERSION_PATTERN = re.compile(r"^v?(\d+)\.(\d+)(?:\.\d+)?(?:[-+].*)?$")
 _CONTROLLER_NODE_TYPE = "controller"
 _COMPUTE_NODE_TYPE = "compute"
 
@@ -97,6 +103,16 @@ class AzureBYOWorkloadSpec(PulumiConfigModel):
     def serialize_subscription_id(self, value: UUID) -> str:
         return str(value)
 
+    @field_validator("kubernetes_version")
+    @classmethod
+    def validate_kubernetes_version(cls, value: str) -> str:
+        match = _KUBERNETES_VERSION_PATTERN.fullmatch(value)
+        if match is None or tuple(map(int, match.groups())) < (1, 36):
+            raise ValueError(
+                "kubernetes_version must be v1.36 or newer for native PodGroup support"
+            )
+        return value
+
     @field_serializer("additional_tags")
     def serialize_additional_tags(
         self,
@@ -108,6 +124,8 @@ class AzureBYOWorkloadSpec(PulumiConfigModel):
 class AzureBYOWorkloadClusterConfig(PulumiConfigModel):
     class_name: Literal["azure-byo"] = _CLUSTER_CLASS
     parameters: AzureBYOWorkloadSpec
+    slinky: SlinkyDeploymentConfig = SlinkyDeploymentConfig()
+    acr: AzureContainerRegistryConfig | None = None
 
     @field_serializer("class_name")
     def serialize_class_name(self, class_name: str) -> str:
@@ -142,6 +160,8 @@ class AzureBYOWorkloadClusterOutputs(BaseModel):
     slurm_operator_status: Any
     slurm_chart_version: str
     slurm_status: Any
+    slurm_bridge_chart_version: str
+    slurm_bridge_status: Any
     workload_cluster_ready: bool
     todo: str
 
@@ -305,6 +325,7 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             additional_tags=parameters.additional_tags,
             byo_subnet=byo_subnet,
             kubernetes_version=parameters.kubernetes_version,
+            acr_server=config.acr.server if config.acr is not None else None,
             ssh_username=parameters.ssh_username,
             ssh_authorized_keys=parameters.ssh_authorized_keys,
             node_pools=node_pools,
@@ -315,6 +336,7 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             instance=instance,
             slurm_node_sets=slurm_node_sets,
             keda_scaled_node_sets=keda_scaled_node_sets,
+            slinky=config.slinky,
             workload_provider=infrastructure.workload_provider,
             pin_coredns_to_controller=True,
             opts=pulumi.ResourceOptions(
@@ -365,10 +387,12 @@ class AzureBYOWorkloadClusterClass(pulumi.ComponentResource):
             "prometheus_chart_version": _PROMETHEUS_CHART_VERSION,
             "prometheus_namespace": deployments.prometheus_namespace,
             "prometheus_status": deployments.prometheus_status,
-            "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_operator_chart_version": config.slinky.operator_chart_version,
             "slurm_operator_status": deployments.slurm_operator_status,
-            "slurm_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_chart_version": config.slinky.slurm_chart_version,
             "slurm_status": deployments.slurm_status,
+            "slurm_bridge_chart_version": deployments.slurm_bridge_chart_version,
+            "slurm_bridge_status": deployments.slurm_bridge_status,
             "workload_cluster_ready": pulumi.Output.all(
                 infrastructure.workload_cluster_ready,
                 deployments.workload_cluster_ready,

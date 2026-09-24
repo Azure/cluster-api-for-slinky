@@ -161,7 +161,23 @@ pulumi up -s local --yes
 popd
 ```
 
+Custom CAPI infrastructure-provider, CAPZ, and Slinky development workflows are
+documented in [Custom CAPI, CAPZ, and Slinky Builds](docs/custom-components.md).
+
 The outer `pulumi up` waits for the PKO init stack to finish reconciliation.
+
+Local and Azure BYO use the pinned Calico manifest installation without Typha
+or Tigera Operator. Calico node agents watch the Kubernetes datastore directly;
+one `calico-kube-controllers` replica runs on the controller worker. Local keeps
+cross-subnet VXLAN and BYO uses always-on VXLAN. The operator's API server,
+Goldmane, and Whisker are not installed by this minimal networking setup.
+Recreate existing operator-managed clusters rather than applying this change
+as an in-place CNI migration. Retained CNI resources disappear with the cluster.
+
+All three sample stacks use one controller worker. AKS keeps Azure CNI and sets
+the system pool's `maxPods` to 64 so platform and policy-required pods fit on
+that node; it does not install Calico or Typha. Its subnet must have enough
+addresses for this per-node pod allocation and node-pool surge capacity.
 
 Optional troubleshooting snippets:
 
@@ -239,6 +255,12 @@ CAPZ treats an untagged pre-existing resource group as unmanaged: deleting the
 workload cluster deletes its cluster resources individually but preserves the
 host resource group and Kind host VM. Do not apply CAPZ's cluster ownership tag
 to the shared group.
+
+Without an explicit AKS `resourceGroup` or `useDiscoveredResourceGroup: true`,
+the outer stack creates and owns the AKS workload group alongside its UAMIs.
+Destroy removes that group after the cluster, including resources created by
+Azure Policy. Shared groups are preserved, so policy-created resources outside
+CAPZ ownership may require separate cleanup.
 
 ### Autoscaling
 

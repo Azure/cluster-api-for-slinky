@@ -5,16 +5,59 @@
 
 from __future__ import annotations
 
+import pytest
+import yaml
+import pulumi
+import pulumi_kubernetes as k8s
+from stacks.workload_cluster import workload_cluster_addons as addons
+
 from stacks.workload_cluster.workload_cluster_addons import (
     _azure_cloud_provider_values,
-    _calico_vxlan_values,
+    _calico_manifest_objects,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
-    controller_bootstrap_tolerations,
-    controller_node_affinity,
-    controller_node_selector,
     controller_tolerations,
 )
+
+
+@pytest.mark.parametrize("vxlan_mode", ["Always", "CrossSubnet"])
+def test_calico_manifest_uses_direct_datastore_and_one_controller(vxlan_mode) -> None:
+    objects = [
+        {"kind": "ConfigMap", "metadata": {"name": "calico-config"}, "data": {
+            "calico_backend": "bird", "typha_service_name": "none", "cni_network_config": "preserved",
+        }},
+        {"kind": "DaemonSet", "metadata": {"name": "calico-node"}, "spec": {"template": {"spec": {
+            "hostNetwork": True, "tolerations": [{"operator": "Exists"}], "containers": [{
+                "name": "calico-node", "env": [{"name": "DATASTORE_TYPE", "value": "kubernetes"},
+                                             {"name": "CALICO_IPV4POOL_IPIP", "value": "Always"}],
+                "livenessProbe": {"exec": {"command": ["/bin/calico-node", "-bird-live"]}},
+                "readinessProbe": {"exec": {"command": ["/bin/calico-node", "-bird-ready"]}},
+            }],
+        }}}},
+        {"kind": "Deployment", "metadata": {"name": "calico-kube-controllers"}, "spec": {
+            "replicas": 1, "template": {"spec": {"nodeSelector": {"kubernetes.io/os": "linux"}}},
+        }},
+    ]
+    rendered = _calico_manifest_objects(yaml.safe_dump_all(objects), pod_cidr="192.168.0.0/16", vxlan_mode=vxlan_mode)
+    config, daemon, controllers = rendered
+    assert config["data"] == {"calico_backend": "vxlan", "typha_service_name": "none", "cni_network_config": "preserved"}
+    pod = daemon["spec"]["template"]["spec"]
+    assert pod["tolerations"] == [{"operator": "Exists"}]
+    container = pod["containers"][0]
+    env = {item["name"]: item.get("value") for item in container["env"]}
+    assert env["DATASTORE_TYPE"] == "kubernetes"
+    assert env["CALICO_IPV4POOL_CIDR"] == "192.168.0.0/16"
+    assert env["CALICO_IPV4POOL_IPIP"] == "Never"
+    assert env["CALICO_IPV4POOL_VXLAN"] == vxlan_mode
+    assert env["IP_AUTODETECTION_METHOD"] == "kubernetes-internal-ip"
+    assert not any("TYPHA" in key for key in env)
+    assert container["readinessProbe"]["exec"]["command"] == ["/bin/calico-node", "-felix-ready"]
+    assert container["livenessProbe"]["exec"]["command"] == ["/bin/calico-node", "-felix-live"]
+    assert controllers["spec"]["replicas"] == 1
+    assert controllers["spec"]["template"]["spec"]["nodeSelector"] == {
+        "kubernetes.io/os": "linux", "slinky.slurm.net/node-type": "controller",
+    }
+    assert controllers["spec"]["template"]["spec"]["tolerations"] == controller_tolerations()
 
 
 def test_azure_cloud_provider_values_cover_bootstrap_taints() -> None:
@@ -37,24 +80,41 @@ def test_azure_cloud_provider_values_cover_bootstrap_taints() -> None:
     }
 
 
-def test_calico_uses_always_on_vxlan() -> None:
-    values = _calico_vxlan_values(pod_cidr="192.168.0.0/16")
+def test_calico_component_retains_resources_and_waits_for_manifests(monkeypatch) -> None:
+    resources = []
+    options = {}
+    manifest = yaml.safe_dump({
+        "apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "calico-config", "namespace": "kube-system"},
+        "data": {},
+    })
+    monkeypatch.setattr(addons, "_read_url", lambda url: manifest)
 
-    pool = values["installation"]["calicoNetwork"]["ipPools"][0]
-    assert pool == {
-        "name": "default-ipv4-ippool",
-        "blockSize": 26,
-        "cidr": "192.168.0.0/16",
-        "encapsulation": "VXLAN",
-        "natOutgoing": "Enabled",
-        "nodeSelector": "all()",
-    }
-    assert values["nodeSelector"] == controller_node_selector()
-    assert values["affinity"] == controller_node_affinity()
-    assert values["tolerations"] == controller_bootstrap_tolerations()
-    assert values["installation"][
-        "controlPlaneNodeSelector"
-    ] == controller_node_selector()
-    assert values["installation"][
-        "controlPlaneTolerations"
-    ] == controller_tolerations()
+    class Mocks(pulumi.runtime.Mocks):
+        def new_resource(self, args):
+            resources.append(args)
+            return args.name, args.inputs
+
+        def call(self, args):
+            assert args.token == "kubernetes:yaml:decode"
+            return {"result": list(yaml.safe_load_all(args.args["text"]))}
+
+    def record(args):
+        options[args.name] = args.opts
+
+    pulumi.runtime.set_mocks(Mocks())
+
+    @pulumi.runtime.test
+    def check():
+        component = addons.CalicoCNI(
+            "calico", pod_cidr="192.168.0.0/16", provider=k8s.Provider("workload", kubeconfig="{}"),
+            opts=pulumi.ResourceOptions(transformations=[record]),
+        )
+
+        def verify(status):
+            assert status == {"version": "v3.32.0", "status": "deployed", "typha": False}
+            config = next(resource for resource in resources if resource.typ == "kubernetes:core/v1:ConfigMap")
+            assert options[config.name].retain_on_delete
+            assert not any(resource.typ == "kubernetes:helm.sh/v3:Release" for resource in resources)
+        return component.status.apply(verify)
+
+    check()

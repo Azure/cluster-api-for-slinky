@@ -11,15 +11,17 @@ from uuid import UUID
 import pulumi
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_serializer
 
+from azure_container_registry import AzureContainerRegistryConfig
+from azure_aks_identity import AKSIdentityConfig
 from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from localenv import discover_azure_resource_placement
 
 from stacks.workload_cluster.workload_cluster_deployments import (
     KEDAOutputs,
     KEDANodeSetScalerSpec,
+    SlinkyDeploymentConfig,
     SlurmNodeSetSpec,
     _PROMETHEUS_CHART_VERSION,
-    _SLINKY_CHART_VERSION,
     WorkloadClusterDeployments,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
@@ -51,8 +53,8 @@ class AKSWorkloadSizingConfig(PulumiConfigModel):
 class AzureWorkloadSpec(PulumiConfigModel):
     """AKS placement and sizing parameters for one workload-cluster entry.
 
-    ``subscription_id``, ``location``, and ``resource_group`` may be omitted
-    from config because they default from local Azure resource placement discovery.
+    Subscription and location default from local discovery. Omitting the resource
+    group lets the outer stack own it and clean up policy-created resources.
     """
 
     subscription_id: UUID = Field(
@@ -65,18 +67,14 @@ class AzureWorkloadSpec(PulumiConfigModel):
             discover_azure_resource_placement(raise_on_missing=True).location
         )
     )
-    resource_group: NonEmptyStr = Field(
-        default_factory=lambda: (
-            discover_azure_resource_placement(raise_on_missing=True).resource_group
-        )
-    )
+    resource_group: NonEmptyStr | None = None
     use_discovered_resource_group: StrictBool = False
     additional_tags: Mapping[NonEmptyStr, str] = Field(default_factory=dict)
     aks: AKSWorkloadSizingConfig = AKSWorkloadSizingConfig()
 
     @field_serializer("subscription_id", "location", "resource_group", check_fields=False)
-    def serialize_placement(self, value: UUID | str) -> str:
-        return str(value)
+    def serialize_placement(self, value: UUID | str | None) -> str | None:
+        return str(value) if value is not None else None
 
     @field_serializer("additional_tags", check_fields=False)
     def serialize_additional_tags(
@@ -86,7 +84,7 @@ class AzureWorkloadSpec(PulumiConfigModel):
         return dict(additional_tags)
 
 
-def _resolve_resource_group(parameters: AzureWorkloadSpec) -> str:
+def _resolve_resource_group(parameters: AzureWorkloadSpec) -> str | None:
     if not parameters.use_discovered_resource_group:
         return parameters.resource_group
 
@@ -102,6 +100,9 @@ def _resolve_resource_group(parameters: AzureWorkloadSpec) -> str:
 class AKSWorkloadClusterConfig(PulumiConfigModel):
     class_name: Literal["aks"] = _CLUSTER_CLASS
     parameters: AzureWorkloadSpec
+    slinky: SlinkyDeploymentConfig = SlinkyDeploymentConfig()
+    acr: AzureContainerRegistryConfig | None = None
+    identities: AKSIdentityConfig | None = None
 
     @field_serializer("class_name")
     def serialize_class_name(self, class_name: str) -> str:
@@ -127,6 +128,8 @@ class AKSWorkloadClusterOutputs(BaseModel):
     slurm_operator_status: Any
     slurm_chart_version: str
     slurm_status: Any
+    slurm_bridge_chart_version: str
+    slurm_bridge_status: Any
     todo: str
 
 
@@ -186,6 +189,8 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             raise ValueError("aks workload cluster class requires identity_namespace")
         location = workload_spec.location
         resource_group = _resolve_resource_group(workload_spec)
+        if resource_group is None:
+            raise ValueError("AKS resource group must be resolved by the outer stack")
 
         def child_options(
             *,
@@ -210,6 +215,7 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             node_sku=workload_spec.aks.node_sku,
             node_pools=node_pools,
             additional_tags=workload_spec.additional_tags,
+            identities=config.identities,
             opts=child_options(),
         )
         deployments = WorkloadClusterDeployments(
@@ -217,8 +223,11 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             instance=instance,
             slurm_node_sets=slurm_node_sets,
             keda_scaled_node_sets=keda_scaled_node_sets,
+            slinky=config.slinky,
             workload_provider=infrastructure.workload_provider,
-            opts=child_options(depends_on=[infrastructure]),
+            opts=child_options(
+                depends_on=[infrastructure]
+            ),
         )
 
         outputs = {
@@ -238,10 +247,12 @@ class AKSWorkloadClusterClass(pulumi.ComponentResource):
             "prometheus_namespace": deployments.prometheus_namespace,
             "prometheus_status": deployments.prometheus_status,
             "workload_cluster_ready": deployments.workload_cluster_ready,
-            "slurm_operator_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_operator_chart_version": config.slinky.operator_chart_version,
             "slurm_operator_status": deployments.slurm_operator_status,
-            "slurm_chart_version": _SLINKY_CHART_VERSION,
+            "slurm_chart_version": config.slinky.slurm_chart_version,
             "slurm_status": deployments.slurm_status,
+            "slurm_bridge_chart_version": deployments.slurm_bridge_chart_version,
+            "slurm_bridge_status": deployments.slurm_bridge_status,
             "todo": pulumi.Output.from_input(
                 "Validate AKS workload-driven autoscaling end-to-end."
             ),

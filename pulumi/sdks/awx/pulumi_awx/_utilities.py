@@ -330,28 +330,27 @@ def get_version():
 _package_lock = asyncio.Lock()
 _package_ref = ...
 async def get_package():
-	global _package_ref
-	if _package_ref is ...:
-		if pulumi.runtime.settings._sync_monitor_supports_parameterization():
-			async with _package_lock:
-				if _package_ref is ...:
-					monitor = pulumi.runtime.settings.get_monitor()
-					parameterization = resource_pb2.Parameterization(
-						name="awx",
-						version=get_version(),
-						value=base64.b64decode("eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkudGVycmFmb3JtLmlvL2pvc2gtc2lsdmFzL2F3eCIsInZlcnNpb24iOiIxLjguMCJ9fQ=="),
-					)
-					registerPackageResponse = monitor.RegisterPackage(
-						resource_pb2.RegisterPackageRequest(
-							name="terraform-provider",
-							version="1.1.3",
-							download_url=get_plugin_download_url(),
-							parameterization=parameterization,
-						))
-					_package_ref = registerPackageResponse.ref
-	# TODO: This check is only needed for parameterized providers, normal providers can return None for get_package when we start
-	# using package with them.
-	if _package_ref is None or _package_ref is ...:
-		raise Exception("The Pulumi CLI does not support parameterization. Please update the Pulumi CLI.")
-	return _package_ref
-	
+    global _package_ref
+    if _package_ref is ...:
+        if pulumi.runtime.settings.monitor_supports_feature(resource_pb2.RESOURCE_MONITOR_FEATURE_PARAMETERIZATION):
+            async with _package_lock:
+                if _package_ref is ...:
+                    monitor = pulumi.runtime.settings.get_monitor()
+                    parameterization = resource_pb2.Parameterization(
+                        name="awx",
+                        version=get_version(),
+                        value=base64.b64decode("eyJyZW1vdGUiOnsidXJsIjoicmVnaXN0cnkudGVycmFmb3JtLmlvL2pvc2gtc2lsdmFzL2F3eCIsInZlcnNpb24iOiIxLjguMCJ9fQ=="),
+                    )
+                    registerPackageResponse = monitor.RegisterPackage(
+                        resource_pb2.RegisterPackageRequest(
+                            name="terraform-provider",
+                            version="1.1.3",
+                            download_url=get_plugin_download_url(),
+                            parameterization=parameterization,
+                        ))
+                    _package_ref = registerPackageResponse.ref
+    # TODO: This check is only needed for parameterized providers, normal providers can return None for get_package when we start
+    # using package with them.
+    if _package_ref is None or _package_ref is ...:
+        raise Exception("The Pulumi CLI does not support parameterization. Please update the Pulumi CLI.")
+    return _package_ref

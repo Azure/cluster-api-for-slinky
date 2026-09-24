@@ -25,7 +25,7 @@ from pko.pko_bootstrap import (
     _init_stack_config_to_config,
     _init_stack_config_with_flux_source,
 )
-from stacks.workload_cluster.registry_setting import LocalPortRegistrySetting
+from stacks.workload_cluster.registry_setting import ContainerdHostConfig, ContainerdRegistryConfig, LocalPortRegistrySetting
 from stacks.workload_cluster.workload_cluster_class_local import LocalWorkloadClusterConfig
 from stacks.workload_cluster.tenants import TenantsConfig
 from stacks.stack_cr import StackCRConfig, build_stack_spec
@@ -194,6 +194,10 @@ def test_init_stack_config_serializes_nested_output_values() -> None:
                         registry=LocalPortRegistrySetting(
                             port=pulumi.Output.from_input(5002)
                         ),
+                        registry_routes={"private.example": ContainerdRegistryConfig(
+                            server="https://private.example",
+                            hosts=(ContainerdHostConfig(gateway_port=pulumi.Output.from_input(5443), scheme="https"),),
+                        )},
                     )
                 }
             )
@@ -206,6 +210,9 @@ def test_init_stack_config_serializes_nested_output_values() -> None:
                     "local": {
                         "className": "local",
                         "registry": {"kind": "local-port", "port": 5002},
+                        "registryRoutes": {"private.example": {
+                            "server": "https://private.example", "hosts": [{"gatewayPort": 5443, "scheme": "https"}],
+                        }},
                     }
                 }
             }

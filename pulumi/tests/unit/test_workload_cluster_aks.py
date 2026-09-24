@@ -1,17 +1,18 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""Unit tests for the AKS CR spec helpers + name derivation.
-
-The full Pulumi resource graph (the five ``CustomResource`` objects and the
-``waitFor`` gating annotation) is not rendered here — that needs a Pulumi
-runtime and the asserted bits are constant. The testable surface is the set
-of pure spec-builder functions and the DNS-label name derivation.
-"""
+"""AKS CR spec helpers and mocked workload resource construction."""
 
 from __future__ import annotations
 
 import pytest
+import base64
+import pulumi
+
+from azure_container_registry import AzureContainerRegistryConfig
+from azure_aks_identity import AKSIdentityConfig
+from stacks.workload_cluster.tenants import Tenants, WorkloadClusterContext
+from stacks.workload_cluster.workload_cluster_class_aks import AKSWorkloadClusterConfig, AzureWorkloadSpec
 
 from stacks.kubernetes_annotations import (
     DELETE_PROPAGATION_FOREGROUND,
@@ -58,6 +59,78 @@ def test_resource_name_sanitizes_and_suffixes() -> None:
     assert _resource_name("caps-aks", "head") == "caps-aks-head"
     # Uppercase + underscores collapse to a DNS label.
     assert _resource_name("Caps_AKS") == "caps-aks"
+
+
+@pytest.mark.parametrize("with_acr", [False, True])
+def test_aks_construction_through_tenants_with_optional_acr(with_acr):
+    resources = []
+    options = {}
+    registry_id = "/subscriptions/registry-sub/resourceGroups/rg/providers/Microsoft.ContainerRegistry/registries/images"
+
+    class Mocks(pulumi.runtime.Mocks):
+        def new_resource(self, args):
+            resources.append(args)
+            outputs = dict(args.inputs)
+            if args.typ == "kubernetes:core/v1:Secret":
+                outputs["data"] = {"value": base64.b64encode(b"{}").decode()}
+            if args.typ == "kubernetes:helm.sh/v3:Release":
+                outputs["status"] = {"name": args.name, "namespace": args.inputs["namespace"], "version": args.inputs["version"], "status": "deployed"}
+            return args.name, outputs
+
+        def call(self, args):
+            raise AssertionError(f"unexpected inner invoke: {args.token}")
+
+    def record(args):
+        options[args.name] = args.opts
+
+    pulumi.runtime.set_mocks(Mocks())
+
+    @pulumi.runtime.test
+    def check():
+        parent = pulumi.ComponentResource("test:Tenants", "tenants", opts=pulumi.ResourceOptions(transformations=[record]))
+        config = AKSWorkloadClusterConfig(
+            parameters=AzureWorkloadSpec(
+                subscription_id="44444444-4444-4444-4444-444444444444", location="westus2", resource_group="aks-rg",
+            ),
+            acr=AzureContainerRegistryConfig(server="images.azurecr.io", resource_id=registry_id) if with_acr else None,
+            identities=AKSIdentityConfig(control_plane_resource_id="/identities/control", kubelet_resource_id="/identities/kubelet") if with_acr else None,
+        )
+        cluster = Tenants._instantiate_workload_cluster(
+            parent, "aks", config, context=pulumi.Output.from_input(WorkloadClusterContext(
+                identity_name="identity", identity_namespace="default", azure_client_id="runner-client", azure_tenant_id="runner-tenant",
+            )),
+        )
+        infrastructure = options["deployments"].depends_on[0]
+        readiness = infrastructure.control_plane_ready_resource
+
+        def verify(values):
+            outputs, ready_urn = values
+            assert outputs.control_plane_ready
+            assert outputs.workload_cluster_ready
+            assert ready_urn.endswith("::infrastructure-control-plane-ready")
+            roles = [item for item in resources if item.typ == "azure-native:authorization:RoleAssignment"]
+            assert roles == []
+            assert len(options["deployments"].depends_on) == 1
+            owner = options["infrastructure-control-plane"].deleted_with
+            assert owner is not None
+            assert options["infrastructure-managed-cluster"].deleted_with is owner
+            for pool in ("head", "compute"):
+                assert options[f"infrastructure-{pool}-managed-machine-pool"].deleted_with is owner
+                assert options[f"infrastructure-{pool}-machine-pool"].deleted_with is owner
+            assert options["infrastructure-cluster"].deleted_with is None
+            cluster_resource = next(item for item in resources if item.name == "infrastructure-cluster")
+            assert cluster_resource.inputs["metadata"]["annotations"][PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION] == "Background"
+            control_plane = next(item for item in resources if item.name == "infrastructure-control-plane").inputs["spec"]
+            if with_acr:
+                assert control_plane["identity"] == {"type": "UserAssigned", "userAssignedIdentityResourceID": "/identities/control"}
+                assert control_plane["kubeletUserAssignedIdentity"] == "/identities/kubelet"
+            else:
+                assert "identity" not in control_plane
+                assert "kubeletUserAssignedIdentity" not in control_plane
+
+        return pulumi.Output.all(cluster.outputs, readiness.urn).apply(verify)
+
+    check()
 
 
 def test_resource_name_rejects_empty() -> None:
@@ -228,6 +301,7 @@ def test_ammp_spec_is_system_pool() -> None:
         "name": "syshead",
         "sku": "Standard_D2s_v3",
         "nodeLabels": _AKS_CONTROLLER_NODE_LABELS,
+        "maxPods": 64,
         "taints": [controller_taint()],
     }
 

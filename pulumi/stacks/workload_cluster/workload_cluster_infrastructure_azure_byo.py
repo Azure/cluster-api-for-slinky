@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import re
 from collections.abc import Mapping
 
@@ -18,12 +19,12 @@ from lib.config import NonEmptyStr, PulumiConfigModel, StrictPositiveInt
 from localenv import AzureHostNetwork
 from stacks.kubernetes_annotations import (
     PULUMI_SKIP_AWAIT_ANNOTATION,
-    foreground_delete_annotations,
+    background_delete_annotations,
     pulumi_wait_for,
 )
 from stacks.workload_cluster.workload_cluster_addons import (
     AzureCloudProvider,
-    CalicoVXLAN,
+    CalicoCNI,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
@@ -31,6 +32,8 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
     ClusterAPIAutoscaler,
     ClusterAPIAutoscalerOutputs,
     CONTROLLER_NODE_TYPE,
+    NATIVE_WORKLOAD_FEATURE_GATES,
+    NATIVE_WORKLOAD_RUNTIME_CONFIG,
     controller_taint,
     machine_deployment_labels,
     worker_labels,
@@ -47,6 +50,20 @@ _CONTROL_PLANE_API_VERSION = "controlplane.cluster.x-k8s.io/v1beta1"
 _CONTROL_PLANE_READY_API_VERSION = "controlplane.cluster.x-k8s.io/v1beta2"
 _INFRASTRUCTURE_API_VERSION = "infrastructure.cluster.x-k8s.io/v1beta1"
 _NAMESPACE = "default"
+_ACR_PROVIDER_DIR = "/var/lib/kubelet/credential-provider"
+_ACR_PROVIDER_CONFIG = "/var/lib/kubelet/credential-provider-config.yaml"
+_INSTALL_ACR_PROVIDER = """set -eu
+case "$(uname -m)" in
+    x86_64) arch=amd64; checksum=097fd4f517def87bf0ad6a83fca442ed9eeee69dc132d8a3c93bbc57ecb939ed ;;
+    aarch64|arm64) arch=arm64; checksum=1e7bd205c295352fdb181e7f1591583c82a0c6cf7911a449fefd72c2cfc21b8a ;;
+    *) echo 'Unsupported ACR credential provider architecture' >&2; exit 1 ;;
+esac
+download=$(mktemp)
+trap 'rm -f "$download"' EXIT
+curl -fsSL --retry 5 "https://github.com/kubernetes-sigs/cloud-provider-azure/releases/download/v1.36.5/azure-acr-credential-provider-linux-$arch" -o "$download"
+printf '%s  %s\\n' "$checksum" "$download" | sha256sum -c -
+install -D -m 0755 "$download" /var/lib/kubelet/credential-provider/acr-credential-provider
+"""
 _POD_CIDR = "192.168.0.0/16"
 _SERVICE_CIDR = "10.96.0.0/12"
 _SERVICE_DOMAIN = "cluster.local"
@@ -60,13 +77,13 @@ _DNS_LABEL_INVALID_CHARS = re.compile(r"[^a-z0-9]+")
 
 
 def _cluster_annotations() -> dict[str, str]:
-    return foreground_delete_annotations(
+    return background_delete_annotations(
         {PULUMI_SKIP_AWAIT_ANNOTATION: "true"}
     )
 
 
 def _control_plane_annotations() -> dict[str, str]:
-    return foreground_delete_annotations(
+    return background_delete_annotations(
         {PULUMI_SKIP_AWAIT_ANNOTATION: "true"}
     )
 
@@ -321,8 +338,34 @@ def _cloud_config_file(*, secret_name: str, key: str) -> dict[str, object]:
     }
 
 
-def _node_registration(*, node_type: str | None = None) -> dict[str, object]:
+def _acr_provider_files(server: str | None) -> list[dict[str, object]]:
+    if server is None:
+        return []
+    return [{
+        "path": _ACR_PROVIDER_CONFIG,
+        "owner": "root:root",
+        "permissions": "0644",
+        "content": json.dumps({
+            "apiVersion": "kubelet.config.k8s.io/v1",
+            "kind": "CredentialProviderConfig",
+            "providers": [{
+                "name": "acr-credential-provider",
+                "matchImages": [server],
+                "defaultCacheDuration": "10m",
+                "apiVersion": "credentialprovider.kubelet.k8s.io/v1",
+                "args": ["/etc/kubernetes/azure.json"],
+            }],
+        }),
+    }]
+
+
+def _node_registration(*, node_type: str | None = None, acr_server: str | None = None) -> dict[str, object]:
     extra_args: dict[str, str] = {"cloud-provider": "external"}
+    if acr_server is not None:
+        extra_args.update({
+            "image-credential-provider-bin-dir": _ACR_PROVIDER_DIR,
+            "image-credential-provider-config": _ACR_PROVIDER_CONFIG,
+        })
     if node_type is not None:
         extra_args["node-labels"] = f"slinky.slurm.net/node-type={node_type}"
     registration: dict[str, object] = {
@@ -355,30 +398,44 @@ def _kubeadm_control_plane_spec(
     cluster_name: str,
     control_plane_name: str,
     kubernetes_version: str,
+    acr_server: str | None = None,
     ssh_username: str = "capi",
     ssh_authorized_keys: tuple[str, ...] = (),
 ) -> dict[str, object]:
     kubeadm_config_spec: dict[str, object] = {
         "clusterConfiguration": {
+            "apiServer": {
+                "extraArgs": {
+                    "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
+                    "runtime-config": NATIVE_WORKLOAD_RUNTIME_CONFIG,
+                }
+            },
             "controllerManager": {
                 "extraArgs": {
                     "allocate-node-cidrs": "false",
                     "cloud-provider": "external",
                     "cluster-name": cluster_name,
+                    "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
                 }
-            }
+            },
+            "scheduler": {
+                "extraArgs": {
+                    "feature-gates": NATIVE_WORKLOAD_FEATURE_GATES,
+                }
+            },
         },
         "files": [
             _cloud_config_file(
                 secret_name=f"{control_plane_name}-azure-json",
                 key="control-plane-azure.json",
-            )
+            ),
+            *_acr_provider_files(acr_server),
         ],
         "initConfiguration": {
-            "nodeRegistration": _node_registration()
+            "nodeRegistration": _node_registration(acr_server=acr_server)
         },
         "joinConfiguration": {
-            "nodeRegistration": _node_registration()
+            "nodeRegistration": _node_registration(acr_server=acr_server)
         },
         "preKubeadmCommands": [
             (
@@ -386,7 +443,8 @@ def _kubeadm_control_plane_spec(
                 "[ -f /run/kubeadm/kubeadm.yaml ]; then "
                 f"echo '127.0.0.1 apiserver.{cluster_name}.capz.io apiserver' "
                 ">> /etc/hosts; fi"
-            )
+            ),
+            *([_INSTALL_ACR_PROVIDER] if acr_server is not None else []),
         ],
         "postKubeadmCommands": [
             (
@@ -468,6 +526,7 @@ def _kubeadm_config_template_spec(
     *,
     node: AzureBYONodePoolSpec,
     worker_name: str,
+    acr_server: str | None = None,
     ssh_username: str = "capi",
     ssh_authorized_keys: tuple[str, ...] = (),
 ) -> dict[str, object]:
@@ -476,12 +535,15 @@ def _kubeadm_config_template_spec(
             _cloud_config_file(
                 secret_name=f"{worker_name}-azure-json",
                 key="worker-node-azure.json",
-            )
+            ),
+            *_acr_provider_files(acr_server),
         ],
         "joinConfiguration": {
-            "nodeRegistration": _node_registration(node_type=node.node_type)
+            "nodeRegistration": _node_registration(node_type=node.node_type, acr_server=acr_server)
         },
     }
+    if acr_server is not None:
+        template_spec["preKubeadmCommands"] = [_INSTALL_ACR_PROVIDER]
     ssh_users = _ssh_users(
         ssh_username=ssh_username,
         ssh_authorized_keys=ssh_authorized_keys,
@@ -578,6 +640,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         additional_tags: Mapping[str, str],
         byo_subnet: AzureBYOSubnet | None = None,
         kubernetes_version: str,
+        acr_server: str | None = None,
         ssh_username: str = "capi",
         ssh_authorized_keys: tuple[str, ...] = (),
         node_pools: tuple[AzureBYONodePoolSpec, ...],
@@ -672,12 +735,14 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             depends_on: list[pulumi.Input[pulumi.Resource]] | None = None,
             capi_lifecycle: bool = False,
             ignore_changes: list[str] | None = None,
+            deleted_with: pulumi.Resource | None = None,
         ) -> pulumi.ResourceOptions:
             return pulumi.ResourceOptions(
                 parent=self,
                 provider=provider,
                 depends_on=depends_on,
                 ignore_changes=ignore_changes,
+                deleted_with=deleted_with,
                 custom_timeouts=(
                     pulumi.CustomTimeouts(
                         create=_CAPI_LIFECYCLE_TIMEOUT,
@@ -689,6 +754,19 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 ),
             )
 
+        cluster = k8s.apiextensions.CustomResource(
+            "cluster",
+            api_version=_CAPI_API_VERSION,
+            kind="Cluster",
+            metadata={
+                "name": cluster_name,
+                "namespace": _NAMESPACE,
+                "annotations": _cluster_annotations(),
+                "labels": {"cloud-provider": "azure"},
+            },
+            spec=_cluster_spec(cluster_name=cluster_name, control_plane_name=control_plane_name),
+            opts=child_options(depends_on=[*resource_group_dependencies, flex], capi_lifecycle=True),
+        )
         azure_cluster = k8s.apiextensions.CustomResource(
             "azure-cluster",
             api_version=_INFRASTRUCTURE_API_VERSION,
@@ -696,7 +774,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             metadata={
                 "name": cluster_name,
                 "namespace": _NAMESPACE,
-                "annotations": foreground_delete_annotations(),
+                "annotations": background_delete_annotations(),
             },
             spec=_azure_cluster_spec(
                 cluster_name=cluster_name,
@@ -709,25 +787,10 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 additional_tags=additional_tags,
             ),
             opts=child_options(
-                depends_on=resource_group_dependencies,
+                depends_on=[cluster],
+                deleted_with=cluster,
                 capi_lifecycle=True,
             ),
-        )
-        cluster = k8s.apiextensions.CustomResource(
-            "cluster",
-            api_version=_CAPI_API_VERSION,
-            kind="Cluster",
-            metadata={
-                "name": cluster_name,
-                "namespace": _NAMESPACE,
-                "annotations": _cluster_annotations(),
-                "labels": {"cloud-provider": "azure"},
-            },
-            spec=_cluster_spec(
-                cluster_name=cluster_name,
-                control_plane_name=control_plane_name,
-            ),
-            opts=child_options(depends_on=[azure_cluster], capi_lifecycle=True),
         )
         azure_cluster_ready = k8s.apiextensions.CustomResourcePatch(
             "azure-cluster-ready",
@@ -738,7 +801,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 "namespace": _NAMESPACE,
                 "annotations": pulumi_wait_for("condition=Ready"),
             },
-            opts=child_options(depends_on=[cluster], capi_lifecycle=True),
+            opts=child_options(depends_on=[azure_cluster], capi_lifecycle=True),
         )
         control_plane_machine_template = k8s.apiextensions.CustomResource(
             "control-plane-machine-template",
@@ -769,6 +832,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 cluster_name=cluster_name,
                 control_plane_name=control_plane_name,
                 kubernetes_version=kubernetes_version,
+                acr_server=acr_server,
                 ssh_username=ssh_username,
                 ssh_authorized_keys=ssh_authorized_keys,
             ),
@@ -778,6 +842,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                     azure_cluster_ready,
                     control_plane_machine_template,
                 ],
+                deleted_with=cluster,
                 capi_lifecycle=True,
             ),
         )
@@ -834,6 +899,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                 spec=_kubeadm_config_template_spec(
                     node=worker_node,
                     worker_name=worker_name,
+                    acr_server=acr_server,
                     ssh_username=ssh_username,
                     ssh_authorized_keys=ssh_authorized_keys,
                 ),
@@ -856,7 +922,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                             worker_node.autoscaler_bounds is not None
                         ),
                     ),
-                    "annotations": foreground_delete_annotations(
+                    "annotations": background_delete_annotations(
                         autoscaler_annotations
                     ),
                 },
@@ -873,6 +939,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
                         worker_machine_template,
                         worker_bootstrap_template,
                     ],
+                    deleted_with=cluster if worker_node.node_type == CONTROLLER_NODE_TYPE else None,
                     capi_lifecycle=True,
                     ignore_changes=(
                         ["spec.replicas"]
@@ -913,7 +980,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
             depends_on=[workload_kubeconfig_secret],
             opts=pulumi.ResourceOptions(parent=self),
         )
-        calico = CalicoVXLAN(
+        calico = CalicoCNI(
             "calico-vxlan",
             pod_cidr=_POD_CIDR,
             provider=workload_provider,
@@ -1002,7 +1069,7 @@ class AzureBYOWorkloadClusterInfrastructure(pulumi.ComponentResource):
         self.workload_provider = workload_provider
         self.azure_cloud_provider_chart_version = azure_cloud_provider.chart_version
         self.azure_cloud_provider_status = azure_cloud_provider.status
-        self.calico_chart_version = calico.chart_version
+        self.calico_chart_version = calico.version
         self.calico_status = calico.status
         self.local_path_storage_class_name = local_path_storage.storage_class_name
         self.cluster_autoscaler = (

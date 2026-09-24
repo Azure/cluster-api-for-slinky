@@ -3,10 +3,19 @@
 
 from __future__ import annotations
 
+import base64
+import subprocess
+import tomllib
+from types import SimpleNamespace
+
+import pulumi
+import pytest
+import yaml
+
 from stacks.kubernetes_annotations import (
-    DELETE_PROPAGATION_FOREGROUND,
+    DELETE_PROPAGATION_BACKGROUND,
     PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION,
-    foreground_delete_annotations,
+    background_delete_annotations,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure import (
     AUTOSCALER_MAX_ANNOTATION,
@@ -18,13 +27,24 @@ from stacks.workload_cluster.workload_cluster_class_local import (
     _LOCAL_MACHINE_DEPLOYMENTS,
 )
 from stacks.workload_cluster.workload_cluster_infrastructure_local import (
+    _NODE_UNHEALTHY_TIMEOUT_SECONDS,
+    _SERVICE_ACCOUNT_TOKEN_PATH,
     _WAIT_FOR_CONTROL_PLANE_AVAILABLE,
+    _cluster_configuration,
+    _containerd_registry_commands,
+    _local_registry_routes,
+    _health_check,
+    _management_kubeconfig,
     _node_registration,
 )
+from stacks.workload_cluster.registry_setting import (
+    ContainerdHostConfig, ContainerdRegistryConfig, LocalCustomRegistrySetting, LocalPortRegistrySetting,
+)
+from stacks.workload_cluster import workload_cluster_infrastructure_local as local_infra
 
 
-def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
-    annotations = foreground_delete_annotations(
+def test_background_delete_annotations_preserve_existing_annotations() -> None:
+    annotations = background_delete_annotations(
         {
             AUTOSCALER_MIN_ANNOTATION: "1",
             AUTOSCALER_MAX_ANNOTATION: "10",
@@ -35,13 +55,176 @@ def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
         AUTOSCALER_MIN_ANNOTATION: "1",
         AUTOSCALER_MAX_ANNOTATION: "10",
         PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION: (
-            DELETE_PROPAGATION_FOREGROUND
+            DELETE_PROPAGATION_BACKGROUND
         ),
     }
 
 
-def test_v1beta1_cluster_wait_uses_legacy_control_plane_condition() -> None:
-    assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneReady"
+def test_v1beta2_cluster_wait_uses_control_plane_available_condition() -> None:
+    assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneAvailable"
+
+
+@pytest.mark.parametrize("worker_spec", _LOCAL_MACHINE_DEPLOYMENTS, ids=lambda worker: worker.name)
+def test_local_worker_deletion_options(worker_spec) -> None:
+    resources = []
+    options = {}
+
+    def record_options(args):
+        options[args.name] = args.opts
+
+    class Mocks(pulumi.runtime.Mocks):
+        def new_resource(self, args):
+            resources.append(args)
+            return args.name, args.inputs
+
+        def call(self, args):
+            return {}
+
+    pulumi.runtime.set_mocks(Mocks())
+
+    @pulumi.runtime.test
+    def check():
+        cluster = local_infra.k8s.apiextensions.CustomResource(
+            "cluster",
+            api_version="cluster.x-k8s.io/v1beta2",
+            kind="Cluster",
+            metadata={"name": "local-workload"},
+            spec={},
+        )
+        worker = local_infra.WorkerClass(
+            "worker",
+            instance="local",
+            cluster_name="local-workload",
+            node_image="kindest/node:v1.36.1",
+            pre_kubeadm_commands=[],
+            worker=worker_spec,
+            provider=local_infra.k8s.Provider("management", kubeconfig="{}"),
+            cluster=cluster,
+            control_plane=cluster,
+            opts=pulumi.ResourceOptions(transformations=[record_options]),
+        )
+
+        deployment_name = f"cluster-{worker_spec.name}-machine-deployment"
+        assert options[deployment_name].deleted_with is (
+            cluster if worker_spec.node_type == CONTROLLER_NODE_TYPE else None
+        )
+        assert all(
+            resource_options.deleted_with is None
+            for name, resource_options in options.items()
+            if name != deployment_name
+        )
+        return worker.urn
+
+    check()
+    deployment = next(
+        resource for resource in resources
+        if resource.typ.endswith(":MachineDeployment")
+    )
+    assert deployment.inputs["metadata"]["annotations"][
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION
+    ] == "Background"
+    assert deployment.inputs["spec"]["template"]["spec"]["deletion"] == {
+        "nodeDeletionTimeoutSeconds": 10,
+    }
+
+
+def test_local_cluster_owns_controller_and_control_plane_deletion(monkeypatch) -> None:
+    resources = {}
+    options = {}
+
+    class Mocks(pulumi.runtime.Mocks):
+        def new_resource(self, args):
+            resources[args.name] = args
+            outputs = dict(args.inputs)
+            if args.typ == "kubernetes:core/v1:Secret":
+                outputs["data"] = {"value": base64.b64encode(b"{}").decode()}
+            return args.name, outputs
+
+        def call(self, args):
+            raise AssertionError(f"unexpected invoke: {args.token}")
+
+    def record_options(args):
+        options[args.name] = args.opts
+
+    monkeypatch.setattr(
+        local_infra.ManagementKubeconfig, "_from_service_account",
+        lambda self: pulumi.Output.from_input("{}"),
+    )
+    monkeypatch.setattr(
+        local_infra, "CalicoCNI",
+        lambda *args, **kwargs: SimpleNamespace(version="test", status="deployed"),
+    )
+    monkeypatch.setattr(
+        local_infra, "LocalPathStorage",
+        lambda *args, **kwargs: SimpleNamespace(storage_class_name="local-path"),
+    )
+    pulumi.runtime.set_mocks(Mocks())
+
+    @pulumi.runtime.test
+    def check():
+        infrastructure = local_infra.LocalWorkloadClusterInfrastructure(
+            "infrastructure",
+            instance="local",
+            worker_machine_deployments=(_LOCAL_MACHINE_DEPLOYMENTS[0],),
+            opts=pulumi.ResourceOptions(transformations=[record_options]),
+        )
+        return infrastructure.workload_provider.urn
+
+    check()
+    cluster = options["cluster-head-machine-deployment"].deleted_with
+    assert cluster is not None
+    assert {
+        name for name, resource_options in options.items()
+        if resource_options.deleted_with is not None
+    } == {
+        "cluster-head-machine-deployment", "cluster-control-plane", "cluster-docker-cluster",
+    }
+    for name in ("cluster-control-plane", "cluster-docker-cluster"):
+        assert options[name].deleted_with is cluster
+        assert cluster in options[name].depends_on
+    assert options["cluster"].deleted_with is None
+    assert not options["cluster"].retain_on_delete
+    assert resources["cluster"].inputs["metadata"]["annotations"][
+        PULUMI_DELETION_PROPAGATION_POLICY_ANNOTATION
+    ] == "Background"
+
+
+def test_local_health_check_allows_initial_addon_convergence() -> None:
+    assert _NODE_UNHEALTHY_TIMEOUT_SECONDS == 900
+    assert _health_check() == {
+        "checks": {
+            "unhealthyNodeConditions": [
+                {"type": "Ready", "status": "Unknown", "timeoutSeconds": 900},
+                {"type": "Ready", "status": "False", "timeoutSeconds": 900},
+            ]
+        }
+    }
+
+
+def test_management_kubeconfig_reads_current_service_account_token() -> None:
+    kubeconfig = yaml.safe_load(
+        _management_kubeconfig("https://10.96.0.1:443", "test-ca")
+    )
+
+    assert kubeconfig["clusters"][0]["cluster"] == {
+        "server": "https://10.96.0.1:443",
+        "certificate-authority-data": base64.b64encode(b"test-ca").decode(),
+    }
+    assert kubeconfig["users"][0]["user"] == {
+        "exec": {
+            "apiVersion": "client.authentication.k8s.io/v1",
+            "command": "/bin/sh",
+            "args": [
+                "-c",
+                (
+                    "printf '{\"apiVersion\":\"client.authentication.k8s.io/v1\","
+                    "\"kind\":\"ExecCredential\",\"status\":{\"token\":\"%s\"}}\\n' "
+                    f'"$(cat {_SERVICE_ACCOUNT_TOKEN_PATH})"'
+                ),
+            ],
+            "interactiveMode": "Never",
+        }
+    }
 
 
 def test_local_topology_has_fixed_head_and_autoscaled_compute_deployments() -> None:
@@ -67,6 +250,25 @@ def test_local_control_plane_registration_has_no_custom_label_or_taint() -> None
     }
 
 
+def test_local_control_plane_enables_native_podgroups() -> None:
+    configuration = _cluster_configuration()
+    feature_gates = [{
+        "name": "feature-gates",
+        "value": "GenericWorkload=true,WorkloadWithJob=true",
+    }]
+    assert configuration == {
+        "apiServer": {
+            "certSANs": ["localhost", "127.0.0.1", "0.0.0.0", "host.docker.internal"],
+            "extraArgs": [
+                *feature_gates,
+                {"name": "runtime-config", "value": "scheduling.k8s.io/v1alpha2=true"},
+            ],
+        },
+        "controllerManager": {"extraArgs": feature_gates},
+        "scheduler": {"extraArgs": feature_gates},
+    }
+
+
 def test_local_controller_worker_registration_adds_critical_addons_taint() -> None:
     registration = _node_registration(CONTROLLER_NODE_TYPE)
 
@@ -75,3 +277,46 @@ def test_local_controller_worker_registration_adds_critical_addons_taint() -> No
         "name": "node-labels",
         "value": "slinky.slurm.net/node-type=controller",
     }
+
+
+def test_containerd_routes_render_multiple_hosts_and_restart_once(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(local_infra, "_CONTAINERD_CERTS_DIR", str(tmp_path))
+    routes = _local_registry_routes(
+        LocalPortRegistrySetting(port=5002), LocalCustomRegistrySetting(registry_name="custom-registry", port=5003),
+        {"private.example": ContainerdRegistryConfig(server="https://private.example", hosts=(
+            ContainerdHostConfig(url="https://mirror.example", capabilities=("pull",)),
+            ContainerdHostConfig(gateway_port=5443, scheme="https", capabilities=("pull", "resolve", "push")),
+        ))},
+    )
+    commands = _containerd_registry_commands(routes)
+    assert sum("getent hosts" in command for command in commands) == 1
+    assert commands.count("systemctl restart containerd") == 1
+    script = "\n".join(commands)
+    subprocess.run(["sh", "-n"], input=script, text=True, check=True)
+    for _ in range(2):
+        subprocess.run(["sh", "-eu"], input=(
+            "getent() { return 1; }\nip() { echo 'default via 172.17.0.1'; }\n"
+            "systemctl() { :; }\n" + script
+        ), text=True, check=True)
+    docker = tomllib.loads((tmp_path / "docker.io/hosts.toml").read_text())
+    assert docker["host"] == {"http://172.17.0.1:5002": {"capabilities": ["pull", "resolve"]}}
+    custom = tomllib.loads((tmp_path / "custom-registry:5000/hosts.toml").read_text())
+    assert custom["server"] == "http://custom-registry:5000"
+    assert "http://172.17.0.1:5003" in custom["host"]
+    private = tomllib.loads((tmp_path / "private.example/hosts.toml").read_text())
+    assert private["host"] == {
+        "https://mirror.example": {"capabilities": ["pull"]},
+        "https://172.17.0.1:5443": {"capabilities": ["pull", "resolve", "push"]},
+    }
+
+
+def test_explicit_routes_override_automatic_mirror(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(local_infra, "_CONTAINERD_CERTS_DIR", str(tmp_path))
+    direct = ContainerdRegistryConfig(server="https://registry-1.docker.io")
+    routes = _local_registry_routes(LocalPortRegistrySetting(port=5002), None, {"docker.io": direct})
+    assert routes == {"docker.io": direct}
+    commands = _containerd_registry_commands(routes)
+    assert not any("getent" in command for command in commands)
+    subprocess.run(["sh", "-eu"], input="systemctl() { :; }\n" + "\n".join(commands), text=True, check=True)
+    assert tomllib.loads((tmp_path / "docker.io/hosts.toml").read_text()) == {"server": direct.server}
+    assert _containerd_registry_commands({}) == []
