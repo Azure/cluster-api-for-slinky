@@ -323,6 +323,10 @@ obsolete identities after replacement. The legacy `pinToNode` chart value is
 retained for compatibility with the published 1.2.x charts; source-built 1.3.x
 charts translate it into `scaleStrategy.statefulset.pinToNode`.
 
+The Slurm controller uses `ReturnToService=2` so a valid worker registration
+after Pod recreation can clear the operator's termination `DOWN` state.
+`DRAIN` continues to protect terminating workers and running workloads.
+
 Local and Azure BYO workload clusters use Kubernetes 1.36 or newer and enable
 the `GenericWorkload` and `WorkloadWithJob` feature gates together with the
 `scheduling.k8s.io/v1alpha2` API. This enables native `Workload` and `PodGroup`

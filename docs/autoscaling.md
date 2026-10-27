@@ -29,10 +29,12 @@ values and installs kube-prometheus-stack before Slinky so the Slurm chart's
 `ServiceMonitor` resources can be created. The key metric is:
 
 ```
-slurm_partition_jobs_pending{partition="all"}
+slurm_partition_jobs_pending{partition="compute"}
 ```
 
-This is the number of Slurm jobs waiting for compute resources.
+This is the number of Slurm jobs waiting in the NodeSet's partition. The scaler
+uses `max` to avoid counting the same controller twice when both its public and
+internal Services are scraped.
 
 ### 2. KEDA ScaledObject → NodeSet Replicas
 
@@ -51,13 +53,13 @@ spec:
   triggers:
   - type: prometheus
     metadata:
-      query: sum(slurm_partition_jobs_pending{partition="all"})
+      query: max(slurm_partition_jobs_pending{partition="compute"})
       threshold: '1'
       activationThreshold: '1'
 ```
 
-When at least one job is pending, KEDA increases the NodeSet replica
-count. Each replica becomes one `slurmd` pod, essentially one Slurm compute
+With the configured activation threshold of 1, more than one pending job
+activates the scaler. Each replica becomes one `slurmd` pod, essentially one Slurm compute
 node. When pending jobs drop to zero, KEDA reduces replicas back to its
 configured minimum.
 

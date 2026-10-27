@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pulumi
@@ -42,7 +43,6 @@ _KEDA_CHART_NAME = "keda"
 _KEDA_CHART_VERSION = "2.20.1"
 _KEDA_SCALED_OBJECT_API_VERSION = "keda.sh/v1alpha1"
 _SLURM_NODESET_API_VERSION = "slinky.slurm.net/v1beta1"
-_SLURM_PENDING_JOBS_QUERY = 'sum(slurm_partition_jobs_pending{partition="all"})'
 _PROMETHEUS_PORT = 9090
 
 _SLINKY_CHART_OCI_PREFIX = "oci://ghcr.io/slinkyproject/charts"
@@ -206,6 +206,7 @@ def _keda_values() -> dict[str, object]:
 def _keda_scaled_object_spec(
     *,
     node_set_name: pulumi.Input[str],
+    partition_name: str,
     min_replicas: int,
     max_replicas: int,
     prometheus_server_address: pulumi.Input[str],
@@ -223,7 +224,10 @@ def _keda_scaled_object_spec(
                 "type": "prometheus",
                 "metadata": {
                     "serverAddress": prometheus_server_address,
-                    "query": _SLURM_PENDING_JOBS_QUERY,
+                    "query": (
+                        "max(slurm_partition_jobs_pending"
+                        f"{{partition={json.dumps(partition_name)}}})"
+                    ),
                     "threshold": "1",
                     "activationThreshold": "1",
                     "unsafeSsl": "true",
@@ -355,6 +359,7 @@ def _slurm_values(
             "cgroup.conf": "CgroupPlugin=cgroup/v2\nIgnoreSystemd=yes\n",
         },
         "controller": {
+            "extraConfMap": {"ReturnToService": "2"},
             "logfile": {
                 "image": {
                     "repository": "public.ecr.aws/docker/library/alpine",
@@ -494,6 +499,7 @@ class KEDANodeSetScaler(pulumi.ComponentResource):
                 },
                 spec=_keda_scaled_object_spec(
                     node_set_name=node_set_name,
+                    partition_name=scaled_node_set.node_set_name,
                     min_replicas=scaled_node_set.min_replicas,
                     max_replicas=scaled_node_set.max_replicas,
                     prometheus_server_address=prometheus_server_address,

@@ -345,6 +345,7 @@ def test_bridge_resources_and_readiness_in_both_chart_paths(plain_http: bool) ->
 def test_slurm_values_use_container_compatible_cgroups() -> None:
     values = _slurm_values(())
 
+    assert values["controller"]["extraConfMap"]["ReturnToService"] == "2"
     assert values["configFiles"]["cgroup.conf"] == (
         "CgroupPlugin=cgroup/v2\nIgnoreSystemd=yes\n"
     )
@@ -365,13 +366,15 @@ def test_prometheus_server_address_uses_helm_release_name() -> None:
     )
 
 
-def test_keda_scaled_object_targets_slurm_nodeset() -> None:
-    assert _slurm_nodeset_name("slurm-87aab368", "compute") == (
-        "slurm-87aab368-worker-compute"
+@pytest.mark.parametrize("partition_name", ["compute", "gpu"])
+def test_keda_scaled_object_targets_slurm_nodeset(partition_name: str) -> None:
+    assert _slurm_nodeset_name("slurm-87aab368", partition_name) == (
+        f"slurm-87aab368-worker-{partition_name}"
     )
 
     spec = _keda_scaled_object_spec(
-        node_set_name="slurm-87aab368-worker-compute",
+        node_set_name=f"slurm-87aab368-worker-{partition_name}",
+        partition_name=partition_name,
         min_replicas=1,
         max_replicas=10,
         prometheus_server_address=(
@@ -384,7 +387,7 @@ def test_keda_scaled_object_targets_slurm_nodeset() -> None:
         "scaleTargetRef": {
             "apiVersion": "slinky.slurm.net/v1beta1",
             "kind": "NodeSet",
-            "name": "slurm-87aab368-worker-compute",
+            "name": f"slurm-87aab368-worker-{partition_name}",
         },
         "minReplicaCount": 1,
         "maxReplicaCount": 10,
@@ -396,7 +399,7 @@ def test_keda_scaled_object_targets_slurm_nodeset() -> None:
                         "http://prometheus-a9b5a75d-kube-p-prometheus."
                         "prometheus.svc.cluster.local:9090"
                     ),
-                    "query": 'sum(slurm_partition_jobs_pending{partition="all"})',
+                    "query": f'max(slurm_partition_jobs_pending{{partition="{partition_name}"}})',
                     "threshold": "1",
                     "activationThreshold": "1",
                     "unsafeSsl": "true",
