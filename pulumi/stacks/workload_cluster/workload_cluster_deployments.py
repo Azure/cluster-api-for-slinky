@@ -243,6 +243,8 @@ def _slurm_operator_values(
         },
         "webhook": {
             **controller_pod_spec(),
+            "podsBinding": True,
+            "mutating": {"failurePolicy": "Fail"},
         },
     }
     if config.operator_image is not None:
@@ -335,6 +337,8 @@ def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
             "rollingUpdate": {"maxUnavailable": "25%"},
         },
         "pinToNode": True,
+        "preferKubernetesNodeName": True,
+        "pruneSlurmNodeRecords": "Auto",
         "oversubscribeNode": False,
         "podSpec": {
             "affinity": node_type_affinity(node_set.node_type),

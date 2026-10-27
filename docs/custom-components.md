@@ -316,6 +316,13 @@ without evicting `slurmd`.
 MCS isolation is not configured yet. Bridge workloads must remain exclusive
 until Slurm MCS configuration is added.
 
+CA4S enables the operator's Pod-binding webhook with a fail-closed policy so
+Node-derived Slurm names are resolved before workers start. Pinned workers
+prefer Kubernetes-derived names, and `pruneSlurmNodeRecords: Auto` removes
+obsolete identities after replacement. The legacy `pinToNode` chart value is
+retained for compatibility with the published 1.2.x charts; source-built 1.3.x
+charts translate it into `scaleStrategy.statefulset.pinToNode`.
+
 Local and Azure BYO workload clusters use Kubernetes 1.36 or newer and enable
 the `GenericWorkload` and `WorkloadWithJob` feature gates together with the
 `scheduling.k8s.io/v1alpha2` API. This enables native `Workload` and `PodGroup`

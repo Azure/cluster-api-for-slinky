@@ -157,6 +157,8 @@ def test_slurm_operator_values_apply_custom_images_and_pull_secrets() -> None:
         },
         "webhook": {
             **controller_pod_spec(),
+            "podsBinding": True,
+            "mutating": {"failurePolicy": "Fail"},
             "image": {
                 "repository": "registry.example/slurm-operator-webhook",
                 "digest": "sha256:abc123",
@@ -209,6 +211,8 @@ def test_slurm_nodeset_values_pin_pods_to_initial_node() -> None:
     )
 
     assert values["pinToNode"] is True
+    assert values["preferKubernetesNodeName"] is True
+    assert values["pruneSlurmNodeRecords"] == "Auto"
     assert values["oversubscribeNode"] is False
     assert values["slurmd"]["image"] == {
         "repository": "ghcr.io/slinkyproject/slurmd",
