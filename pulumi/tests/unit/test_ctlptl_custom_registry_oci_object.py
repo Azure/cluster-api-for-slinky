@@ -47,7 +47,7 @@ def test_remote_source_repository_fetches_requested_ref(
         assert source == (repository_path, _SOURCE_REF)
 
     assert calls == [
-        ["git", "init", "--bare", repository_path],
+        ["git", "init", repository_path],
         [
             "git",
             "-C",

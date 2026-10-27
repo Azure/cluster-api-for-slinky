@@ -60,7 +60,8 @@ def remote_source_repository(repository_url: str, source_ref: str) -> Iterator[t
     require_binary("git")
     repository_path = tempfile.mkdtemp(prefix="ca4s-source-")
     try:
-        run(["git", "init", "--bare", repository_path])
+        # A normal repository also supports worktrees under safe.bareRepository=explicit.
+        run(["git", "init", repository_path])
         run(["git", "-C", repository_path, "fetch", "--depth=1", repository_url, source_ref])
         result = run(["git", "-C", repository_path, "rev-parse", "FETCH_HEAD^{commit}"])
         source_commit = result.stdout.strip()

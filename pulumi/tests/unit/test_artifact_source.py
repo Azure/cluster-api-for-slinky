@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import subprocess
 from contextlib import nullcontext
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +16,30 @@ from artifacts import source as oci_object
 
 _REPOSITORY_URL = "https://github.com/kubernetes-sigs/cluster-api-provider-azure.git"
 _SOURCE_REF = "69ec3a40a818ccbc32b8ce88c84609404d8cb7a2"
+
+
+def test_remote_source_supports_explicit_bare_repository_policy(monkeypatch, tmp_path):
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "safe.bareRepository")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "explicit")
+    origin = tmp_path / "origin"
+    oci_object.run(["git", "init", str(origin)])
+    (origin / "source.txt").write_text("source snapshot\n")
+    oci_object.run(["git", "-C", str(origin), "add", "source.txt"])
+    oci_object.run([
+        "git", "-C", str(origin),
+        "-c", "user.name=CA4S test",
+        "-c", "user.email=test@example.invalid",
+        "commit", "-m",
+        "test snapshot\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",
+    ])
+    commit = oci_object.resolve_source_commit(str(origin), "HEAD")
+    with oci_object.remote_source_repository(origin.as_uri(), commit) as (repository, resolved):
+        assert resolved == commit
+        with oci_object.detached_worktree(repository, resolved, prefix="ca4s-test-") as worktree:
+            assert (Path(worktree) / "source.txt").read_text() == "source snapshot\n"
+        assert not Path(worktree).exists()
+    assert not Path(repository).exists()
 
 
 def test_remote_source_repository_fetches_requested_ref(
@@ -47,7 +72,7 @@ def test_remote_source_repository_fetches_requested_ref(
         assert source == (repository_path, _SOURCE_REF)
 
     assert calls == [
-        ["git", "init", "--bare", repository_path],
+        ["git", "init", repository_path],
         [
             "git",
             "-C",
