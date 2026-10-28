@@ -16,7 +16,7 @@ The refreshed defaults use the following compatible component versions:
 | External Secrets / cert-manager | `2.14.0` / `1.21.3` |
 | CAPI Operator / core, kubeadm providers and CAPD | `0.30.0` / `1.14.3` |
 | CAPZ | `1.27.0`, including its bundled ASO |
-| Self-managed Kubernetes / Calico | `1.36.4` / `3.32.2` |
+| Local Kubernetes / Azure BYO Kubernetes / Calico | `1.36.4` / `1.36.6` / `3.32.2` |
 | Cluster Autoscaler chart / image | `9.59.0` / `1.36.1` |
 | Azure CCM chart / CCM and cloud-node-manager images | `1.36.0` / `1.36.8` |
 | KEDA / kube-prometheus-stack | `2.21.0` / `92.14.1` |
@@ -28,6 +28,11 @@ chart defaults otherwise select older Kubernetes minors. CAPZ source builds
 pin the `1.27.0` release commit for both controller and provider bundle.
 Slinky source builds pin the aligned naming branch revision
 `c6837713bceb4b0c488f01cf56023e27453f05ad` for operator, webhook and all charts.
+
+Azure BYO uses the CAPZ community-gallery image matching its Kubernetes patch.
+Its `1.36.6` default is published in `westus2`; the local Kind `1.36.4` image is
+not available there as a CAPZ gallery image. Check regional gallery replication
+before choosing a different BYO patch or region.
 
 Gitea uses the application shipped by its chart; the separate v28 migration is
 not part of this refresh. AKS Kubernetes versions remain region-dependent and

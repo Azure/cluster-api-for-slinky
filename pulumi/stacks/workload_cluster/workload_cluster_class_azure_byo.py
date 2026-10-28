@@ -44,7 +44,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure_azure_byo import (
 
 
 _CLUSTER_CLASS = "azure-byo"
-_DEFAULT_KUBERNETES_VERSION = "v1.36.4"
+_DEFAULT_KUBERNETES_VERSION = "v1.36.6"
 _DEFAULT_CONTROL_PLANE_VM_SIZE = "Standard_D2as_v5"
 _DEFAULT_WORKER_VM_SIZE = "Standard_D2as_v5"
 _DEFAULT_SSH_USERNAME = "capi"

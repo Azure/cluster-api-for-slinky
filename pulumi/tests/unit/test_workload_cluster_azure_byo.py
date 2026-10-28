@@ -64,6 +64,14 @@ _SUBSCRIPTION_ID = "44444444-4444-4444-4444-444444444444"
 _OTHER_SUBSCRIPTION_ID = "55555555-5555-5555-5555-555555555555"
 
 
+def test_default_kubernetes_patch_matches_published_capz_gallery() -> None:
+    parameters = AzureBYOWorkloadSpec(
+        subscription_id=_SUBSCRIPTION_ID,
+        location="westus2",
+    )
+    assert parameters.kubernetes_version == "v1.36.6"
+
+
 def _controller_node() -> AzureBYONodePoolSpec:
     return AzureBYONodePoolSpec(
         name="control-plane",
