@@ -30,7 +30,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
 )
 
 
-# Core CAPI types (Cluster, MachinePool) on v1beta1 to match the CAPZ v1.24.1
+# Core CAPI types (Cluster, MachinePool) on v1beta1 to match the CAPZ v1.27.0
 # AKS template; CAPZ managed types on the infrastructure v1beta1 surface.
 _CAPI_API_VERSION = "cluster.x-k8s.io/v1beta1"
 _INFRASTRUCTURE_API_VERSION = "infrastructure.cluster.x-k8s.io/v1beta1"

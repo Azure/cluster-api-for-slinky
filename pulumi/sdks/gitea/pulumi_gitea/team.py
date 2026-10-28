@@ -27,7 +27,8 @@ class TeamArgs:
                  permission: pulumi.Input[Optional[_builtins.str]] = None,
                  repositories: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  team_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 units: pulumi.Input[Optional[_builtins.str]] = None):
+                 units: pulumi.Input[Optional[_builtins.str]] = None,
+                 units_map: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None):
         """
         The set of arguments for constructing a Team resource.
 
@@ -40,7 +41,8 @@ class TeamArgs:
                Can be <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`write`" pulumi-lang-dotnet="`Write`" pulumi-lang-go="`write`" pulumi-lang-python="`write`" pulumi-lang-yaml="`write`" pulumi-lang-java="`write`" pulumi-lang-hcl="`write`">`write`</span>, <span pulumi-lang-nodejs="`admin`" pulumi-lang-dotnet="`Admin`" pulumi-lang-go="`admin`" pulumi-lang-python="`admin`" pulumi-lang-yaml="`admin`" pulumi-lang-java="`admin`" pulumi-lang-hcl="`admin`">`admin`</span> or <span pulumi-lang-nodejs="`owner`" pulumi-lang-dotnet="`Owner`" pulumi-lang-go="`owner`" pulumi-lang-python="`owner`" pulumi-lang-yaml="`owner`" pulumi-lang-java="`owner`" pulumi-lang-hcl="`owner`">`owner`</span>
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] repositories: List of Repositories that should be part of this team
         :param pulumi.Input[_builtins.str] units: List of types of Repositories that should be allowed to be created from Team members.
-               Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects` and/or `repo.ext_wiki`
+               Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects`, `repo.ext_wiki`, `repo.actions` and/or `repo.packages`
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] units_map: Map of repository units to their permissions
         """
         pulumi.set(__self__, "organisation", organisation)
         if can_create_repos is not None:
@@ -59,6 +61,8 @@ class TeamArgs:
             pulumi.set(__self__, "team_id", team_id)
         if units is not None:
             pulumi.set(__self__, "units", units)
+        if units_map is not None:
+            pulumi.set(__self__, "units_map", units_map)
 
     @_builtins.property
     @pulumi.getter
@@ -159,13 +163,25 @@ class TeamArgs:
     def units(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         List of types of Repositories that should be allowed to be created from Team members.
-        Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects` and/or `repo.ext_wiki`
+        Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects`, `repo.ext_wiki`, `repo.actions` and/or `repo.packages`
         """
         return pulumi.get(self, "units")
 
     @units.setter
     def units(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "units", value)
+
+    @_builtins.property
+    @pulumi.getter(name="unitsMap")
+    def units_map(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        Map of repository units to their permissions
+        """
+        return pulumi.get(self, "units_map")
+
+    @units_map.setter
+    def units_map(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "units_map", value)
 
 
 @pulumi.input_type
@@ -179,7 +195,8 @@ class _TeamState:
                  permission: pulumi.Input[Optional[_builtins.str]] = None,
                  repositories: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  team_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 units: pulumi.Input[Optional[_builtins.str]] = None):
+                 units: pulumi.Input[Optional[_builtins.str]] = None,
+                 units_map: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None):
         """
         Input properties used for looking up and filtering Team resources.
 
@@ -192,7 +209,8 @@ class _TeamState:
                Can be <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`write`" pulumi-lang-dotnet="`Write`" pulumi-lang-go="`write`" pulumi-lang-python="`write`" pulumi-lang-yaml="`write`" pulumi-lang-java="`write`" pulumi-lang-hcl="`write`">`write`</span>, <span pulumi-lang-nodejs="`admin`" pulumi-lang-dotnet="`Admin`" pulumi-lang-go="`admin`" pulumi-lang-python="`admin`" pulumi-lang-yaml="`admin`" pulumi-lang-java="`admin`" pulumi-lang-hcl="`admin`">`admin`</span> or <span pulumi-lang-nodejs="`owner`" pulumi-lang-dotnet="`Owner`" pulumi-lang-go="`owner`" pulumi-lang-python="`owner`" pulumi-lang-yaml="`owner`" pulumi-lang-java="`owner`" pulumi-lang-hcl="`owner`">`owner`</span>
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] repositories: List of Repositories that should be part of this team
         :param pulumi.Input[_builtins.str] units: List of types of Repositories that should be allowed to be created from Team members.
-               Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects` and/or `repo.ext_wiki`
+               Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects`, `repo.ext_wiki`, `repo.actions` and/or `repo.packages`
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] units_map: Map of repository units to their permissions
         """
         if can_create_repos is not None:
             pulumi.set(__self__, "can_create_repos", can_create_repos)
@@ -212,6 +230,8 @@ class _TeamState:
             pulumi.set(__self__, "team_id", team_id)
         if units is not None:
             pulumi.set(__self__, "units", units)
+        if units_map is not None:
+            pulumi.set(__self__, "units_map", units_map)
 
     @_builtins.property
     @pulumi.getter(name="canCreateRepos")
@@ -312,13 +332,25 @@ class _TeamState:
     def units(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         List of types of Repositories that should be allowed to be created from Team members.
-        Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects` and/or `repo.ext_wiki`
+        Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects`, `repo.ext_wiki`, `repo.actions` and/or `repo.packages`
         """
         return pulumi.get(self, "units")
 
     @units.setter
     def units(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "units", value)
+
+    @_builtins.property
+    @pulumi.getter(name="unitsMap")
+    def units_map(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        Map of repository units to their permissions
+        """
+        return pulumi.get(self, "units_map")
+
+    @units_map.setter
+    def units_map(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "units_map", value)
 
 
 @pulumi.type_token("gitea:index/team:Team")
@@ -336,6 +368,7 @@ class Team(pulumi.CustomResource):
                  repositories: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  team_id: pulumi.Input[Optional[_builtins.str]] = None,
                  units: pulumi.Input[Optional[_builtins.str]] = None,
+                 units_map: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         """
         Create a Team resource with the given unique name, props, and options.
@@ -351,7 +384,8 @@ class Team(pulumi.CustomResource):
                Can be <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`write`" pulumi-lang-dotnet="`Write`" pulumi-lang-go="`write`" pulumi-lang-python="`write`" pulumi-lang-yaml="`write`" pulumi-lang-java="`write`" pulumi-lang-hcl="`write`">`write`</span>, <span pulumi-lang-nodejs="`admin`" pulumi-lang-dotnet="`Admin`" pulumi-lang-go="`admin`" pulumi-lang-python="`admin`" pulumi-lang-yaml="`admin`" pulumi-lang-java="`admin`" pulumi-lang-hcl="`admin`">`admin`</span> or <span pulumi-lang-nodejs="`owner`" pulumi-lang-dotnet="`Owner`" pulumi-lang-go="`owner`" pulumi-lang-python="`owner`" pulumi-lang-yaml="`owner`" pulumi-lang-java="`owner`" pulumi-lang-hcl="`owner`">`owner`</span>
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] repositories: List of Repositories that should be part of this team
         :param pulumi.Input[_builtins.str] units: List of types of Repositories that should be allowed to be created from Team members.
-               Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects` and/or `repo.ext_wiki`
+               Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects`, `repo.ext_wiki`, `repo.actions` and/or `repo.packages`
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] units_map: Map of repository units to their permissions
         """
         ...
     @overload
@@ -386,6 +420,7 @@ class Team(pulumi.CustomResource):
                  repositories: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  team_id: pulumi.Input[Optional[_builtins.str]] = None,
                  units: pulumi.Input[Optional[_builtins.str]] = None,
+                 units_map: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -406,6 +441,7 @@ class Team(pulumi.CustomResource):
             __props__.__dict__["repositories"] = repositories
             __props__.__dict__["team_id"] = team_id
             __props__.__dict__["units"] = units
+            __props__.__dict__["units_map"] = units_map
         super(Team, __self__).__init__(
             'gitea:index/team:Team',
             resource_name,
@@ -425,7 +461,8 @@ class Team(pulumi.CustomResource):
             permission: pulumi.Input[Optional[_builtins.str]] = None,
             repositories: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
             team_id: pulumi.Input[Optional[_builtins.str]] = None,
-            units: pulumi.Input[Optional[_builtins.str]] = None) -> 'Team':
+            units: pulumi.Input[Optional[_builtins.str]] = None,
+            units_map: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None) -> 'Team':
         """
         Get an existing Team resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -442,7 +479,8 @@ class Team(pulumi.CustomResource):
                Can be <span pulumi-lang-nodejs="`none`" pulumi-lang-dotnet="`None`" pulumi-lang-go="`none`" pulumi-lang-python="`none`" pulumi-lang-yaml="`none`" pulumi-lang-java="`none`" pulumi-lang-hcl="`none`">`none`</span>, <span pulumi-lang-nodejs="`read`" pulumi-lang-dotnet="`Read`" pulumi-lang-go="`read`" pulumi-lang-python="`read`" pulumi-lang-yaml="`read`" pulumi-lang-java="`read`" pulumi-lang-hcl="`read`">`read`</span>, <span pulumi-lang-nodejs="`write`" pulumi-lang-dotnet="`Write`" pulumi-lang-go="`write`" pulumi-lang-python="`write`" pulumi-lang-yaml="`write`" pulumi-lang-java="`write`" pulumi-lang-hcl="`write`">`write`</span>, <span pulumi-lang-nodejs="`admin`" pulumi-lang-dotnet="`Admin`" pulumi-lang-go="`admin`" pulumi-lang-python="`admin`" pulumi-lang-yaml="`admin`" pulumi-lang-java="`admin`" pulumi-lang-hcl="`admin`">`admin`</span> or <span pulumi-lang-nodejs="`owner`" pulumi-lang-dotnet="`Owner`" pulumi-lang-go="`owner`" pulumi-lang-python="`owner`" pulumi-lang-yaml="`owner`" pulumi-lang-java="`owner`" pulumi-lang-hcl="`owner`">`owner`</span>
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] repositories: List of Repositories that should be part of this team
         :param pulumi.Input[_builtins.str] units: List of types of Repositories that should be allowed to be created from Team members.
-               Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects` and/or `repo.ext_wiki`
+               Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects`, `repo.ext_wiki`, `repo.actions` and/or `repo.packages`
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] units_map: Map of repository units to their permissions
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -457,6 +495,7 @@ class Team(pulumi.CustomResource):
         __props__.__dict__["repositories"] = repositories
         __props__.__dict__["team_id"] = team_id
         __props__.__dict__["units"] = units
+        __props__.__dict__["units_map"] = units_map
         return Team(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
@@ -526,7 +565,15 @@ class Team(pulumi.CustomResource):
     def units(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         List of types of Repositories that should be allowed to be created from Team members.
-        Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects` and/or `repo.ext_wiki`
+        Can be `repo.code`, `repo.issues`, `repo.ext_issues`, `repo.wiki`, `repo.pulls`, `repo.releases`, `repo.projects`, `repo.ext_wiki`, `repo.actions` and/or `repo.packages`
         """
         return pulumi.get(self, "units")
+
+    @_builtins.property
+    @pulumi.getter(name="unitsMap")
+    def units_map(self) -> pulumi.Output[Mapping[str, _builtins.str]]:
+        """
+        Map of repository units to their permissions
+        """
+        return pulumi.get(self, "units_map")
 

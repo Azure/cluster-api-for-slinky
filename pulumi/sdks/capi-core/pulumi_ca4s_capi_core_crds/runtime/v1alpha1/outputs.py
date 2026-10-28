@@ -1133,7 +1133,7 @@ class ExtensionConfigStatusHandlers(dict):
                Defaults to Fail if not set.
         :param _builtins.str name: name is the unique name of the ExtensionHandler.
         :param _builtins.int timeout_seconds: timeoutSeconds defines the timeout duration for client calls to the ExtensionHandler.
-               Defaults to 10 is not set.
+               Defaults to 10 seconds if not set.
         """
         if failure_policy is not None:
             pulumi.set(__self__, "failure_policy", failure_policy)
@@ -1171,7 +1171,7 @@ class ExtensionConfigStatusHandlers(dict):
     def timeout_seconds(self) -> Optional[_builtins.int]:
         """
         timeoutSeconds defines the timeout duration for client calls to the ExtensionHandler.
-        Defaults to 10 is not set.
+        Defaults to 10 seconds if not set.
         """
         return pulumi.get(self, "timeout_seconds")
 
@@ -1214,7 +1214,7 @@ class ExtensionConfigStatusHandlersPatch(dict):
                Defaults to Fail if not set.
         :param _builtins.str name: name is the unique name of the ExtensionHandler.
         :param _builtins.int timeout_seconds: timeoutSeconds defines the timeout duration for client calls to the ExtensionHandler.
-               Defaults to 10 is not set.
+               Defaults to 10 seconds if not set.
         """
         if failure_policy is not None:
             pulumi.set(__self__, "failure_policy", failure_policy)
@@ -1252,7 +1252,7 @@ class ExtensionConfigStatusHandlersPatch(dict):
     def timeout_seconds(self) -> Optional[_builtins.int]:
         """
         timeoutSeconds defines the timeout duration for client calls to the ExtensionHandler.
-        Defaults to 10 is not set.
+        Defaults to 10 seconds if not set.
         """
         return pulumi.get(self, "timeout_seconds")
 

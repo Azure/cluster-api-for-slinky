@@ -25,7 +25,7 @@ _AZURE_CCM_CHART_NAME = "cloud-provider-azure"
 _AZURE_CCM_CHART_VERSION = "1.36.0"
 _AZURE_CCM_RELEASE_NAME = "cloud-provider-azure-oot"
 
-_CALICO_VERSION = "v3.32.0"
+_CALICO_VERSION = "v3.32.2"
 _CALICO_MANIFEST_URL = (
     "https://raw.githubusercontent.com/projectcalico/calico/"
     f"{_CALICO_VERSION}/manifests/calico.yaml"
@@ -69,6 +69,7 @@ def _azure_cloud_provider_values(
     return {
         "infra": {"clusterName": cluster_name},
         "cloudControllerManager": {
+            "imageTag": "v1.36.8",
             "clusterCIDR": pod_cidr,
             "configureCloudRoutes": "true",
             "logVerbosity": "4",
@@ -95,6 +96,7 @@ def _azure_cloud_provider_values(
                 },
             ],
         },
+        "cloudNodeManager": {"imageTag": "v1.36.8"},
     }
 
 

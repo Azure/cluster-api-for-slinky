@@ -166,7 +166,7 @@ kindV1Alpha4Cluster:
     ipFamily: dual
   nodes:
   - role: control-plane
-    image: kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
+    image: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
     extraMounts:
     # Docker Hub mirror for in-cluster pod pulls. Host Docker still handles the
     # node image pull before these containers exist.
@@ -177,7 +177,7 @@ kindV1Alpha4Cluster:
     - hostPath: /var/run/docker.sock
       containerPath: /var/run/docker.sock
   - role: worker
-    image: kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
+    image: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
     extraMounts:
     # Docker Hub mirror for in-cluster pod pulls. Host Docker still handles the
     # node image pull before these containers exist.

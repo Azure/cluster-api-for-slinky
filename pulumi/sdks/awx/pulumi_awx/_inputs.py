@@ -19,8 +19,8 @@ __all__ = [
     'JobTemplateLaunchTimeoutsArgsDict',
     'JobTemplateSurveySpecSpecArgs',
     'JobTemplateSurveySpecSpecArgsDict',
-    'NotificationTemplateMessageArgs',
-    'NotificationTemplateMessageArgsDict',
+    'NotificationTemplateMessagesArgs',
+    'NotificationTemplateMessagesArgsDict',
     'NotificationTemplateNotificationConfigurationArgs',
     'NotificationTemplateNotificationConfigurationArgsDict',
     'ProjectTimeoutsArgs',
@@ -271,7 +271,7 @@ class JobTemplateSurveySpecSpecArgs:
         pulumi.set(self, "required", value)
 
 
-class NotificationTemplateMessageArgsDict(TypedDict):
+class NotificationTemplateMessagesArgsDict(TypedDict):
     error: NotRequired[pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]]
     """
     The message to send when the job starts.
@@ -286,7 +286,7 @@ class NotificationTemplateMessageArgsDict(TypedDict):
     """
 
 @pulumi.input_type
-class NotificationTemplateMessageArgs:
+class NotificationTemplateMessagesArgs:
     def __init__(__self__, *,
                  error: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  started: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,

@@ -48,7 +48,7 @@ _WORKSPACE_CONTAINER = "pulumi"
 
 # PKO defaults to the all-language Pulumi image. The init/control-plane/workload
 # stacks in this repo are Python-only, so use the smaller pinned Python runtime.
-_WORKSPACE_IMAGE = "pulumi/pulumi-python:3.202.0"
+_WORKSPACE_IMAGE = "pulumi/pulumi-python:3.272.0"
 
 # PKO runs workspace pods as UID 1000 without HOME/USER entries in the Python
 # image. Point home/cache paths at PKO's writable shared workspace volume, and

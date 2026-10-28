@@ -155,7 +155,7 @@ class Setting(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  setting_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeouts: pulumi.Input[Optional[Union['SettingTimeoutsArgs', 'SettingTimeoutsArgsDict']]] = None,
+                 timeouts: pulumi.Input[Optional[Union['SettingTimeoutsArgs', 'SettingTimeoutsArgsDict', 'outputs.SettingTimeouts']]] = None,
                  value: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -192,7 +192,7 @@ class Setting(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  setting_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeouts: pulumi.Input[Optional[Union['SettingTimeoutsArgs', 'SettingTimeoutsArgsDict']]] = None,
+                 timeouts: pulumi.Input[Optional[Union['SettingTimeoutsArgs', 'SettingTimeoutsArgsDict', 'outputs.SettingTimeouts']]] = None,
                  value: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -222,7 +222,7 @@ class Setting(pulumi.CustomResource):
             opts: Optional[pulumi.ResourceOptions] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
             setting_id: pulumi.Input[Optional[_builtins.str]] = None,
-            timeouts: pulumi.Input[Optional[Union['SettingTimeoutsArgs', 'SettingTimeoutsArgsDict']]] = None,
+            timeouts: pulumi.Input[Optional[Union['SettingTimeoutsArgs', 'SettingTimeoutsArgsDict', 'outputs.SettingTimeouts']]] = None,
             value: pulumi.Input[Optional[_builtins.str]] = None) -> 'Setting':
         """
         Get an existing Setting resource's state with the given name, id, and optional extra

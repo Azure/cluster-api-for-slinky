@@ -187,12 +187,12 @@ class GitRepositorySpec(dict):
         :param _builtins.str interval: Interval at which the GitRepository URL is checked for updates.
                This interval is approximate and may be subject to jitter to ensure
                efficient use of resources.
-        :param _builtins.str provider: Provider used for authentication, can be 'azure', 'github', 'generic'.
+        :param _builtins.str provider: Provider used for authentication, can be 'aws', 'azure', 'github', 'generic'.
                When not specified, defaults to 'generic'.
         :param _builtins.bool recurse_submodules: RecurseSubmodules enables the initialization of all submodules within
                the GitRepository as cloned from the URL, using their default settings.
         :param _builtins.str service_account_name: ServiceAccountName is the name of the Kubernetes ServiceAccount used to
-               authenticate to the GitRepository. This field is only supported for 'azure' provider.
+               authenticate to the GitRepository. This field is only supported for 'azure' and 'aws' providers.
         :param Sequence[_builtins.str] sparse_checkout: SparseCheckout specifies a list of directories to checkout when cloning
                the repository. If specified, only these directories are included in the
                Artifact produced for this GitRepository.
@@ -263,7 +263,7 @@ class GitRepositorySpec(dict):
     @pulumi.getter
     def provider(self) -> Optional[_builtins.str]:
         """
-        Provider used for authentication, can be 'azure', 'github', 'generic'.
+        Provider used for authentication, can be 'aws', 'azure', 'github', 'generic'.
         When not specified, defaults to 'generic'.
         """
         return pulumi.get(self, "provider")
@@ -297,7 +297,7 @@ class GitRepositorySpec(dict):
     def service_account_name(self) -> Optional[_builtins.str]:
         """
         ServiceAccountName is the name of the Kubernetes ServiceAccount used to
-        authenticate to the GitRepository. This field is only supported for 'azure' provider.
+        authenticate to the GitRepository. This field is only supported for 'azure' and 'aws' providers.
         """
         return pulumi.get(self, "service_account_name")
 
@@ -590,12 +590,12 @@ class GitRepositorySpecPatch(dict):
         :param _builtins.str interval: Interval at which the GitRepository URL is checked for updates.
                This interval is approximate and may be subject to jitter to ensure
                efficient use of resources.
-        :param _builtins.str provider: Provider used for authentication, can be 'azure', 'github', 'generic'.
+        :param _builtins.str provider: Provider used for authentication, can be 'aws', 'azure', 'github', 'generic'.
                When not specified, defaults to 'generic'.
         :param _builtins.bool recurse_submodules: RecurseSubmodules enables the initialization of all submodules within
                the GitRepository as cloned from the URL, using their default settings.
         :param _builtins.str service_account_name: ServiceAccountName is the name of the Kubernetes ServiceAccount used to
-               authenticate to the GitRepository. This field is only supported for 'azure' provider.
+               authenticate to the GitRepository. This field is only supported for 'azure' and 'aws' providers.
         :param Sequence[_builtins.str] sparse_checkout: SparseCheckout specifies a list of directories to checkout when cloning
                the repository. If specified, only these directories are included in the
                Artifact produced for this GitRepository.
@@ -666,7 +666,7 @@ class GitRepositorySpecPatch(dict):
     @pulumi.getter
     def provider(self) -> Optional[_builtins.str]:
         """
-        Provider used for authentication, can be 'azure', 'github', 'generic'.
+        Provider used for authentication, can be 'aws', 'azure', 'github', 'generic'.
         When not specified, defaults to 'generic'.
         """
         return pulumi.get(self, "provider")
@@ -700,7 +700,7 @@ class GitRepositorySpecPatch(dict):
     def service_account_name(self) -> Optional[_builtins.str]:
         """
         ServiceAccountName is the name of the Kubernetes ServiceAccount used to
-        authenticate to the GitRepository. This field is only supported for 'azure' provider.
+        authenticate to the GitRepository. This field is only supported for 'azure' and 'aws' providers.
         """
         return pulumi.get(self, "service_account_name")
 
@@ -1159,13 +1159,15 @@ class GitRepositorySpecVerifyPatch(dict):
 class GitRepositorySpecVerifySecretRef(dict):
     """
     SecretRef specifies the Secret containing the public keys of trusted Git
-    authors.
+    authors. PGP public keys must be stored under keys with the .asc suffix,
+    and SSH public keys must be stored under keys with the .sshpub suffix.
     """
     def __init__(__self__, *,
                  name: Optional[_builtins.str] = None):
         """
         SecretRef specifies the Secret containing the public keys of trusted Git
-        authors.
+        authors. PGP public keys must be stored under keys with the .asc suffix,
+        and SSH public keys must be stored under keys with the .sshpub suffix.
 
         :param _builtins.str name: Name of the referent.
         """
@@ -1185,13 +1187,15 @@ class GitRepositorySpecVerifySecretRef(dict):
 class GitRepositorySpecVerifySecretRefPatch(dict):
     """
     SecretRef specifies the Secret containing the public keys of trusted Git
-    authors.
+    authors. PGP public keys must be stored under keys with the .asc suffix,
+    and SSH public keys must be stored under keys with the .sshpub suffix.
     """
     def __init__(__self__, *,
                  name: Optional[_builtins.str] = None):
         """
         SecretRef specifies the Secret containing the public keys of trusted Git
-        authors.
+        authors. PGP public keys must be stored under keys with the .asc suffix,
+        and SSH public keys must be stored under keys with the .sshpub suffix.
 
         :param _builtins.str name: Name of the referent.
         """

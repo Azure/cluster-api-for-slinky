@@ -21,26 +21,30 @@ class CredentialAzureKeyVaultArgs:
     def __init__(__self__, *,
                  client: pulumi.Input[_builtins.str],
                  organization_id: pulumi.Input[_builtins.float],
-                 secret: pulumi.Input[_builtins.str],
                  tenant: pulumi.Input[_builtins.str],
                  url: pulumi.Input[_builtins.str],
                  credential_azure_key_vault_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None):
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_wo_version: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a CredentialAzureKeyVault resource.
 
         :param pulumi.Input[_builtins.str] client: The client ID of the Azure Key Vault.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to.
-        :param pulumi.Input[_builtins.str] secret: The secret of the Azure Key Vault.
         :param pulumi.Input[_builtins.str] tenant: The tenant ID of the Azure Key Vault.
         :param pulumi.Input[_builtins.str] url: The URL of the Azure Key Vault.
         :param pulumi.Input[_builtins.str] description: The description of the credential.
         :param pulumi.Input[_builtins.str] name: The name of the credential.
+        :param pulumi.Input[_builtins.str] secret: The secret of the Azure Key Vault.
+        :param pulumi.Input[_builtins.str] secret_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The secret of the Azure Key Vault. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`secret`" pulumi-lang-dotnet="`Secret`" pulumi-lang-go="`secret`" pulumi-lang-python="`secret`" pulumi-lang-yaml="`secret`" pulumi-lang-java="`secret`" pulumi-lang-hcl="`secret`">`secret`</span> for older versions.
+        :param pulumi.Input[_builtins.float] secret_wo_version: Version of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span> to AWX.
         """
         pulumi.set(__self__, "client", client)
         pulumi.set(__self__, "organization_id", organization_id)
-        pulumi.set(__self__, "secret", secret)
         pulumi.set(__self__, "tenant", tenant)
         pulumi.set(__self__, "url", url)
         if credential_azure_key_vault_id is not None:
@@ -49,6 +53,12 @@ class CredentialAzureKeyVaultArgs:
             pulumi.set(__self__, "description", description)
         if name is not None:
             pulumi.set(__self__, "name", name)
+        if secret is not None:
+            pulumi.set(__self__, "secret", secret)
+        if secret_wo is not None:
+            pulumi.set(__self__, "secret_wo", secret_wo)
+        if secret_wo_version is not None:
+            pulumi.set(__self__, "secret_wo_version", secret_wo_version)
 
     @_builtins.property
     @pulumi.getter
@@ -73,18 +83,6 @@ class CredentialAzureKeyVaultArgs:
     @organization_id.setter
     def organization_id(self, value: pulumi.Input[_builtins.float]):
         pulumi.set(self, "organization_id", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def secret(self) -> pulumi.Input[_builtins.str]:
-        """
-        The secret of the Azure Key Vault.
-        """
-        return pulumi.get(self, "secret")
-
-    @secret.setter
-    def secret(self, value: pulumi.Input[_builtins.str]):
-        pulumi.set(self, "secret", value)
 
     @_builtins.property
     @pulumi.getter
@@ -143,6 +141,43 @@ class CredentialAzureKeyVaultArgs:
     def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
+    @_builtins.property
+    @pulumi.getter
+    def secret(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The secret of the Azure Key Vault.
+        """
+        return pulumi.get(self, "secret")
+
+    @secret.setter
+    def secret(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "secret", value)
+
+    @_builtins.property
+    @pulumi.getter(name="secretWo")
+    def secret_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The secret of the Azure Key Vault. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`secret`" pulumi-lang-dotnet="`Secret`" pulumi-lang-go="`secret`" pulumi-lang-python="`secret`" pulumi-lang-yaml="`secret`" pulumi-lang-java="`secret`" pulumi-lang-hcl="`secret`">`secret`</span> for older versions.
+        """
+        return pulumi.get(self, "secret_wo")
+
+    @secret_wo.setter
+    def secret_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "secret_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="secretWoVersion")
+    def secret_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span> to AWX.
+        """
+        return pulumi.get(self, "secret_wo_version")
+
+    @secret_wo_version.setter
+    def secret_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "secret_wo_version", value)
+
 
 @pulumi.input_type
 class _CredentialAzureKeyVaultState:
@@ -153,6 +188,8 @@ class _CredentialAzureKeyVaultState:
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  tenant: pulumi.Input[Optional[_builtins.str]] = None,
                  url: pulumi.Input[Optional[_builtins.str]] = None):
         """
@@ -163,6 +200,9 @@ class _CredentialAzureKeyVaultState:
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to.
         :param pulumi.Input[_builtins.str] secret: The secret of the Azure Key Vault.
+        :param pulumi.Input[_builtins.str] secret_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The secret of the Azure Key Vault. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`secret`" pulumi-lang-dotnet="`Secret`" pulumi-lang-go="`secret`" pulumi-lang-python="`secret`" pulumi-lang-yaml="`secret`" pulumi-lang-java="`secret`" pulumi-lang-hcl="`secret`">`secret`</span> for older versions.
+        :param pulumi.Input[_builtins.float] secret_wo_version: Version of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] tenant: The tenant ID of the Azure Key Vault.
         :param pulumi.Input[_builtins.str] url: The URL of the Azure Key Vault.
         """
@@ -178,6 +218,10 @@ class _CredentialAzureKeyVaultState:
             pulumi.set(__self__, "organization_id", organization_id)
         if secret is not None:
             pulumi.set(__self__, "secret", secret)
+        if secret_wo is not None:
+            pulumi.set(__self__, "secret_wo", secret_wo)
+        if secret_wo_version is not None:
+            pulumi.set(__self__, "secret_wo_version", secret_wo_version)
         if tenant is not None:
             pulumi.set(__self__, "tenant", tenant)
         if url is not None:
@@ -253,6 +297,31 @@ class _CredentialAzureKeyVaultState:
         pulumi.set(self, "secret", value)
 
     @_builtins.property
+    @pulumi.getter(name="secretWo")
+    def secret_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The secret of the Azure Key Vault. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`secret`" pulumi-lang-dotnet="`Secret`" pulumi-lang-go="`secret`" pulumi-lang-python="`secret`" pulumi-lang-yaml="`secret`" pulumi-lang-java="`secret`" pulumi-lang-hcl="`secret`">`secret`</span> for older versions.
+        """
+        return pulumi.get(self, "secret_wo")
+
+    @secret_wo.setter
+    def secret_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "secret_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="secretWoVersion")
+    def secret_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span> to AWX.
+        """
+        return pulumi.get(self, "secret_wo_version")
+
+    @secret_wo_version.setter
+    def secret_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "secret_wo_version", value)
+
+    @_builtins.property
     @pulumi.getter
     def tenant(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -289,6 +358,8 @@ class CredentialAzureKeyVault(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  tenant: pulumi.Input[Optional[_builtins.str]] = None,
                  url: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
@@ -302,6 +373,9 @@ class CredentialAzureKeyVault(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to.
         :param pulumi.Input[_builtins.str] secret: The secret of the Azure Key Vault.
+        :param pulumi.Input[_builtins.str] secret_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The secret of the Azure Key Vault. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`secret`" pulumi-lang-dotnet="`Secret`" pulumi-lang-go="`secret`" pulumi-lang-python="`secret`" pulumi-lang-yaml="`secret`" pulumi-lang-java="`secret`" pulumi-lang-hcl="`secret`">`secret`</span> for older versions.
+        :param pulumi.Input[_builtins.float] secret_wo_version: Version of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] tenant: The tenant ID of the Azure Key Vault.
         :param pulumi.Input[_builtins.str] url: The URL of the Azure Key Vault.
         """
@@ -335,6 +409,8 @@ class CredentialAzureKeyVault(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  secret: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  tenant: pulumi.Input[Optional[_builtins.str]] = None,
                  url: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
@@ -355,16 +431,16 @@ class CredentialAzureKeyVault(pulumi.CustomResource):
             if organization_id is None and not opts.urn:
                 raise TypeError("Missing required property 'organization_id'")
             __props__.__dict__["organization_id"] = organization_id
-            if secret is None and not opts.urn:
-                raise TypeError("Missing required property 'secret'")
             __props__.__dict__["secret"] = None if secret is None else pulumi.Output.secret(secret)
+            __props__.__dict__["secret_wo"] = None if secret_wo is None else pulumi.Output.secret(secret_wo)
+            __props__.__dict__["secret_wo_version"] = secret_wo_version
             if tenant is None and not opts.urn:
                 raise TypeError("Missing required property 'tenant'")
             __props__.__dict__["tenant"] = tenant
             if url is None and not opts.urn:
                 raise TypeError("Missing required property 'url'")
             __props__.__dict__["url"] = url
-        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["secret"])
+        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["secret", "secretWo"])
         opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(CredentialAzureKeyVault, __self__).__init__(
             'awx:index/credentialAzureKeyVault:CredentialAzureKeyVault',
@@ -383,6 +459,8 @@ class CredentialAzureKeyVault(pulumi.CustomResource):
             name: pulumi.Input[Optional[_builtins.str]] = None,
             organization_id: pulumi.Input[Optional[_builtins.float]] = None,
             secret: pulumi.Input[Optional[_builtins.str]] = None,
+            secret_wo: pulumi.Input[Optional[_builtins.str]] = None,
+            secret_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
             tenant: pulumi.Input[Optional[_builtins.str]] = None,
             url: pulumi.Input[Optional[_builtins.str]] = None) -> 'CredentialAzureKeyVault':
         """
@@ -397,6 +475,9 @@ class CredentialAzureKeyVault(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to.
         :param pulumi.Input[_builtins.str] secret: The secret of the Azure Key Vault.
+        :param pulumi.Input[_builtins.str] secret_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The secret of the Azure Key Vault. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`secret`" pulumi-lang-dotnet="`Secret`" pulumi-lang-go="`secret`" pulumi-lang-python="`secret`" pulumi-lang-yaml="`secret`" pulumi-lang-java="`secret`" pulumi-lang-hcl="`secret`">`secret`</span> for older versions.
+        :param pulumi.Input[_builtins.float] secret_wo_version: Version of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] tenant: The tenant ID of the Azure Key Vault.
         :param pulumi.Input[_builtins.str] url: The URL of the Azure Key Vault.
         """
@@ -410,6 +491,8 @@ class CredentialAzureKeyVault(pulumi.CustomResource):
         __props__.__dict__["name"] = name
         __props__.__dict__["organization_id"] = organization_id
         __props__.__dict__["secret"] = secret
+        __props__.__dict__["secret_wo"] = secret_wo
+        __props__.__dict__["secret_wo_version"] = secret_wo_version
         __props__.__dict__["tenant"] = tenant
         __props__.__dict__["url"] = url
         return CredentialAzureKeyVault(resource_name, opts=opts, __props__=__props__)
@@ -453,11 +536,28 @@ class CredentialAzureKeyVault(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter
-    def secret(self) -> pulumi.Output[_builtins.str]:
+    def secret(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         The secret of the Azure Key Vault.
         """
         return pulumi.get(self, "secret")
+
+    @_builtins.property
+    @pulumi.getter(name="secretWo")
+    def secret_wo(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The secret of the Azure Key Vault. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`secret`" pulumi-lang-dotnet="`Secret`" pulumi-lang-go="`secret`" pulumi-lang-python="`secret`" pulumi-lang-yaml="`secret`" pulumi-lang-java="`secret`" pulumi-lang-hcl="`secret`">`secret`</span> for older versions.
+        """
+        return pulumi.get(self, "secret_wo")
+
+    @_builtins.property
+    @pulumi.getter(name="secretWoVersion")
+    def secret_wo_version(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretWo`" pulumi-lang-dotnet="`SecretWo`" pulumi-lang-go="`secretWo`" pulumi-lang-python="`secret_wo`" pulumi-lang-yaml="`secretWo`" pulumi-lang-java="`secretWo`" pulumi-lang-hcl="`secret_wo`">`secretWo`</span> to AWX.
+        """
+        return pulumi.get(self, "secret_wo_version")
 
     @_builtins.property
     @pulumi.getter

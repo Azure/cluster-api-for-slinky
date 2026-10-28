@@ -12,7 +12,7 @@ from pulumi import Output, ResourceOptions
 
 EXTERNAL_SECRETS_CHART_REPO = "https://charts.external-secrets.io"
 EXTERNAL_SECRETS_CHART_NAME = "external-secrets"
-EXTERNAL_SECRETS_CHART_VERSION = "2.6.0"
+EXTERNAL_SECRETS_CHART_VERSION = "2.14.0"
 EXTERNAL_SECRETS_NAMESPACE = "external-secrets"
 _BOOTSTRAP_HELM_TIMEOUT_SECONDS = 30 * 60
 _BOOTSTRAP_HELM_TIMEOUT = "30m"

@@ -32,17 +32,17 @@ from stacks.kubernetes_annotations import pulumi_patch_force, pulumi_wait_for
 
 _CERT_MANAGER_CHART_REPO = "https://charts.jetstack.io"
 _CERT_MANAGER_CHART_NAME = "cert-manager"
-_CERT_MANAGER_CHART_VERSION = "v1.20.2"
+_CERT_MANAGER_CHART_VERSION = "v1.21.3"
 _CERT_MANAGER_NAMESPACE = "cert-manager"
 
 _PROMETHEUS_CHART_REPO = "https://prometheus-community.github.io/helm-charts"
 _PROMETHEUS_CHART_NAME = "kube-prometheus-stack"
-_PROMETHEUS_CHART_VERSION = "86.2.2"
+_PROMETHEUS_CHART_VERSION = "92.14.1"
 _PROMETHEUS_NAMESPACE = "prometheus"
 
 _KEDA_CHART_REPO = "https://kedacore.github.io/charts"
 _KEDA_CHART_NAME = "keda"
-_KEDA_CHART_VERSION = "2.20.1"
+_KEDA_CHART_VERSION = "2.21.0"
 _KEDA_SCALED_OBJECT_API_VERSION = "keda.sh/v1alpha1"
 _SLURM_NODESET_API_VERSION = "slinky.slurm.net/v1beta1"
 _PROMETHEUS_PORT = 9090
@@ -51,11 +51,11 @@ _SLURM_CAPACITY_PORT = 9091
 _SLURM_CAPACITY_IMAGE = "ghcr.io/slinkyproject/slurmctld:26.05-ubuntu26.04"
 
 _SLINKY_CHART_OCI_PREFIX = "oci://ghcr.io/slinkyproject/charts"
-_SLINKY_CHART_VERSION = "1.2.1"
+_SLINKY_CHART_VERSION = "1.2.3"
 _SLINKY_OPERATOR_NAMESPACE = "slinky"
 _SLURM_NAMESPACE = "slurm"
 _SLURM_BRIDGE_CHART = "oci://ghcr.io/slinkyproject/charts/slurm-bridge"
-_SLURM_BRIDGE_CHART_VERSION = "1.2.2"
+_SLURM_BRIDGE_CHART_VERSION = "1.2.3"
 _SLURM_BRIDGE_NAMESPACE = "slurm-bridge"
 _SLURM_BRIDGE_PARTITION = "compute"
 _SLURM_BRIDGE_SCHEDULER_NAME = "slurm-bridge-scheduler"
@@ -340,7 +340,7 @@ def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
         "logfile": {
             "image": {
                 "repository": "public.ecr.aws/docker/library/alpine",
-                "tag": "3.21",
+                "tag": "3.24.3",
             },
         },
         "partition": {"enabled": True, "configMap": {}},
@@ -373,7 +373,7 @@ def _slurm_values(
             "logfile": {
                 "image": {
                     "repository": "public.ecr.aws/docker/library/alpine",
-                    "tag": "3.21",
+                    "tag": "3.24.3",
                 },
             },
             "metrics": {
@@ -388,7 +388,7 @@ def _slurm_values(
                 "initconf": {
                     "image": {
                         "repository": "public.ecr.aws/docker/library/alpine",
-                        "tag": "3.21",
+                        "tag": "3.24.3",
                     },
                 },
                 "sssdConf": """[sssd]

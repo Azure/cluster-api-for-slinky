@@ -258,7 +258,7 @@ def test_build_stack_spec_uses_flux_source_namespace() -> None:
     assert spec["workspaceTemplate"]["spec"]["podTemplate"]["spec"]["containers"] == [
         {
             "name": "pulumi",
-            "image": "pulumi/pulumi-python:3.202.0",
+            "image": "pulumi/pulumi-python:3.272.0",
             "volumeMounts": [
                 {"name": "state", "mountPath": "/state"},
                 {

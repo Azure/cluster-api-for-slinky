@@ -26,7 +26,7 @@ class GetCommandResult:
     """
     A collection of values returned by getCommand.
     """
-    def __init__(__self__, allow_non_zero_exit_code=None, arguments=None, command=None, exit_code=None, id=None, stderr=None, stdin=None, stdout=None, working_directory=None):
+    def __init__(__self__, allow_non_zero_exit_code=None, arguments=None, command=None, exit_code=None, stderr=None, stdin=None, stdout=None, working_directory=None):
         if allow_non_zero_exit_code and not isinstance(allow_non_zero_exit_code, bool):
             raise TypeError("Expected argument 'allow_non_zero_exit_code' to be a bool")
         pulumi.set(__self__, "allow_non_zero_exit_code", allow_non_zero_exit_code)
@@ -39,9 +39,6 @@ class GetCommandResult:
         if exit_code and not isinstance(exit_code, float):
             raise TypeError("Expected argument 'exit_code' to be a float")
         pulumi.set(__self__, "exit_code", exit_code)
-        if id and not isinstance(id, str):
-            raise TypeError("Expected argument 'id' to be a str")
-        pulumi.set(__self__, "id", id)
         if stderr and not isinstance(stderr, str):
             raise TypeError("Expected argument 'stderr' to be a str")
         pulumi.set(__self__, "stderr", stderr)
@@ -77,14 +74,6 @@ class GetCommandResult:
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.str:
-        """
-        The provider-assigned unique ID for this managed resource.
-        """
-        return pulumi.get(self, "id")
-
-    @_builtins.property
-    @pulumi.getter
     def stderr(self) -> _builtins.str:
         return pulumi.get(self, "stderr")
 
@@ -114,7 +103,6 @@ class AwaitableGetCommandResult(GetCommandResult):
             arguments=self.arguments,
             command=self.command,
             exit_code=self.exit_code,
-            id=self.id,
             stderr=self.stderr,
             stdin=self.stdin,
             stdout=self.stdout,
@@ -144,7 +132,6 @@ def get_command(allow_non_zero_exit_code: Optional[_builtins.bool] = None,
         arguments=pulumi.get(__ret__, 'arguments'),
         command=pulumi.get(__ret__, 'command'),
         exit_code=pulumi.get(__ret__, 'exit_code'),
-        id=pulumi.get(__ret__, 'id'),
         stderr=pulumi.get(__ret__, 'stderr'),
         stdin=pulumi.get(__ret__, 'stdin'),
         stdout=pulumi.get(__ret__, 'stdout'),
@@ -171,7 +158,6 @@ def get_command_output(allow_non_zero_exit_code: pulumi.Input[Optional[Optional[
         arguments=pulumi.get(__response__, 'arguments'),
         command=pulumi.get(__response__, 'command'),
         exit_code=pulumi.get(__response__, 'exit_code'),
-        id=pulumi.get(__response__, 'id'),
         stderr=pulumi.get(__response__, 'stderr'),
         stdin=pulumi.get(__response__, 'stdin'),
         stdout=pulumi.get(__response__, 'stdout'),

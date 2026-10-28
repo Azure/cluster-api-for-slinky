@@ -10,6 +10,7 @@ from pathlib import Path
 import runpy
 
 import pytest
+import yaml
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -20,6 +21,7 @@ clean_artifacts = _GENERATOR["clean_artifacts"]
 compare_trees = _GENERATOR["compare_trees"]
 load_manifest = _GENERATOR["load_manifest"]
 normalize_crd_utilities = _GENERATOR["_normalize_crd_utilities"]
+normalize_terraform_utilities = _GENERATOR["_normalize_terraform_utilities"]
 remove_flux_provider_shim = _GENERATOR["_remove_flux_provider_shim"]
 verify_checksum = _GENERATOR["verify_checksum"]
 
@@ -28,6 +30,26 @@ def test_committed_manifest_is_valid() -> None:
     manifest = load_manifest()
 
     assert set(manifest["sdks"]) == {"awx", "capi-core", "flux", "gitea", "local"}
+
+
+def test_capi_runtime_and_generated_crd_sdk_are_aligned() -> None:
+    from stacks.control_plane.capi._operator import CAPI_PROVIDER_VERSION
+
+    manifest = load_manifest()
+    capi = manifest["sdks"]["capi-core"]
+    assert capi["version"] == CAPI_PROVIDER_VERSION.removeprefix("v")
+    assert f"/{CAPI_PROVIDER_VERSION}/" in capi["sourceUrl"]
+    assert capi["kubernetesVersion"] == manifest["sdks"]["flux"]["kubernetesVersion"]
+
+
+def test_terraform_project_packages_match_generated_sources() -> None:
+    manifest = load_manifest()
+    project = yaml.safe_load((_REPO_ROOT / "pulumi/Pulumi.yaml").read_text())
+    for name, sdk in manifest["sdks"].items():
+        if sdk["kind"] == "terraform":
+            package = project["packages"][name]
+            assert package["version"] == manifest["tools"]["terraformBridge"]["version"]
+            assert package["parameters"] == [sdk["provider"], sdk["version"]]
 
 
 def test_rejects_unknown_manifest_schema(tmp_path: Path) -> None:
@@ -101,6 +123,22 @@ def test_crd_utilities_falls_back_to_distribution_name(tmp_path: Path) -> None:
     source = utilities.read_text(encoding="utf-8")
     assert "except importlib.metadata.PackageNotFoundError:" in source
     assert 'importlib.metadata.version("example")' in source
+
+
+def test_terraform_utilities_use_public_package_registration(tmp_path: Path) -> None:
+    utilities = tmp_path / "_utilities.py"
+    utilities.write_text("async def get_package():\n\treturn await pulumi.runtime.register_package()\n")
+    normalize_terraform_utilities(utilities)
+    assert utilities.read_text() == (
+        "async def get_package():\n    return await pulumi.runtime.register_package()\n"
+    )
+
+
+def test_terraform_utilities_reject_unexpected_generator_shape(tmp_path: Path) -> None:
+    utilities = tmp_path / "_utilities.py"
+    utilities.write_text("unexpected generator output\n")
+    with pytest.raises(GenerationError, match="package registration"):
+        normalize_terraform_utilities(utilities)
 
 
 def test_flux_provider_removal_normalizes_root_initializer(tmp_path: Path) -> None:

@@ -26,7 +26,7 @@ class JobTemplateArgs:
                  ask_diff_mode_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_execution_environment_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_forks_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_instance_group_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_instance_groups_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_slice_count_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_type_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -54,6 +54,7 @@ class JobTemplateArgs:
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  playbook: pulumi.Input[Optional[_builtins.str]] = None,
+                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
                  start_at_task: pulumi.Input[Optional[_builtins.str]] = None,
@@ -77,6 +78,7 @@ class JobTemplateArgs:
         :param pulumi.Input[_builtins.str] limit: The limit to apply to filter hosts that run on this job template.
         :param pulumi.Input[_builtins.str] name: The name of the job template.
         :param pulumi.Input[_builtins.str] playbook: The playbook to associate with the job template.
+        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: Only run the job on instance groups assigned to this job template, without falling back to the inventory or organization instance groups.
         :param pulumi.Input[_builtins.str] skip_tags: The tags to skip on the job template.
         :param pulumi.Input[_builtins.str] start_at_task: The task to start at on the job template.
         :param pulumi.Input[_builtins.float] timeout: The timeout to associate with the job template. Default is 0
@@ -95,8 +97,8 @@ class JobTemplateArgs:
             pulumi.set(__self__, "ask_execution_environment_on_launch", ask_execution_environment_on_launch)
         if ask_forks_on_launch is not None:
             pulumi.set(__self__, "ask_forks_on_launch", ask_forks_on_launch)
-        if ask_instance_group_on_launch is not None:
-            pulumi.set(__self__, "ask_instance_group_on_launch", ask_instance_group_on_launch)
+        if ask_instance_groups_on_launch is not None:
+            pulumi.set(__self__, "ask_instance_groups_on_launch", ask_instance_groups_on_launch)
         if ask_inventory_on_launch is not None:
             pulumi.set(__self__, "ask_inventory_on_launch", ask_inventory_on_launch)
         if ask_job_slice_count_on_launch is not None:
@@ -151,6 +153,8 @@ class JobTemplateArgs:
             pulumi.set(__self__, "name", name)
         if playbook is not None:
             pulumi.set(__self__, "playbook", playbook)
+        if prevent_instance_group_fallback is not None:
+            pulumi.set(__self__, "prevent_instance_group_fallback", prevent_instance_group_fallback)
         if scm_branch is not None:
             pulumi.set(__self__, "scm_branch", scm_branch)
         if skip_tags is not None:
@@ -236,13 +240,13 @@ class JobTemplateArgs:
         pulumi.set(self, "ask_forks_on_launch", value)
 
     @_builtins.property
-    @pulumi.getter(name="askInstanceGroupOnLaunch")
-    def ask_instance_group_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        return pulumi.get(self, "ask_instance_group_on_launch")
+    @pulumi.getter(name="askInstanceGroupsOnLaunch")
+    def ask_instance_groups_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "ask_instance_groups_on_launch")
 
-    @ask_instance_group_on_launch.setter
-    def ask_instance_group_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_instance_group_on_launch", value)
+    @ask_instance_groups_on_launch.setter
+    def ask_instance_groups_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "ask_instance_groups_on_launch", value)
 
     @_builtins.property
     @pulumi.getter(name="askInventoryOnLaunch")
@@ -521,6 +525,18 @@ class JobTemplateArgs:
         pulumi.set(self, "playbook", value)
 
     @_builtins.property
+    @pulumi.getter(name="preventInstanceGroupFallback")
+    def prevent_instance_group_fallback(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Only run the job on instance groups assigned to this job template, without falling back to the inventory or organization instance groups.
+        """
+        return pulumi.get(self, "prevent_instance_group_fallback")
+
+    @prevent_instance_group_fallback.setter
+    def prevent_instance_group_fallback(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "prevent_instance_group_fallback", value)
+
+    @_builtins.property
     @pulumi.getter(name="scmBranch")
     def scm_branch(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "scm_branch")
@@ -607,7 +623,7 @@ class _JobTemplateState:
                  ask_diff_mode_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_execution_environment_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_forks_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_instance_group_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_instance_groups_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_slice_count_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_type_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -636,6 +652,7 @@ class _JobTemplateState:
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  playbook: pulumi.Input[Optional[_builtins.str]] = None,
+                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
                  project_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
@@ -659,6 +676,7 @@ class _JobTemplateState:
         :param pulumi.Input[_builtins.str] limit: The limit to apply to filter hosts that run on this job template.
         :param pulumi.Input[_builtins.str] name: The name of the job template.
         :param pulumi.Input[_builtins.str] playbook: The playbook to associate with the job template.
+        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: Only run the job on instance groups assigned to this job template, without falling back to the inventory or organization instance groups.
         :param pulumi.Input[_builtins.float] project_id: The project ID to associate with the job template.
         :param pulumi.Input[_builtins.str] skip_tags: The tags to skip on the job template.
         :param pulumi.Input[_builtins.str] start_at_task: The task to start at on the job template.
@@ -676,8 +694,8 @@ class _JobTemplateState:
             pulumi.set(__self__, "ask_execution_environment_on_launch", ask_execution_environment_on_launch)
         if ask_forks_on_launch is not None:
             pulumi.set(__self__, "ask_forks_on_launch", ask_forks_on_launch)
-        if ask_instance_group_on_launch is not None:
-            pulumi.set(__self__, "ask_instance_group_on_launch", ask_instance_group_on_launch)
+        if ask_instance_groups_on_launch is not None:
+            pulumi.set(__self__, "ask_instance_groups_on_launch", ask_instance_groups_on_launch)
         if ask_inventory_on_launch is not None:
             pulumi.set(__self__, "ask_inventory_on_launch", ask_inventory_on_launch)
         if ask_job_slice_count_on_launch is not None:
@@ -734,6 +752,8 @@ class _JobTemplateState:
             pulumi.set(__self__, "name", name)
         if playbook is not None:
             pulumi.set(__self__, "playbook", playbook)
+        if prevent_instance_group_fallback is not None:
+            pulumi.set(__self__, "prevent_instance_group_fallback", prevent_instance_group_fallback)
         if project_id is not None:
             pulumi.set(__self__, "project_id", project_id)
         if scm_branch is not None:
@@ -797,13 +817,13 @@ class _JobTemplateState:
         pulumi.set(self, "ask_forks_on_launch", value)
 
     @_builtins.property
-    @pulumi.getter(name="askInstanceGroupOnLaunch")
-    def ask_instance_group_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
-        return pulumi.get(self, "ask_instance_group_on_launch")
+    @pulumi.getter(name="askInstanceGroupsOnLaunch")
+    def ask_instance_groups_on_launch(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        return pulumi.get(self, "ask_instance_groups_on_launch")
 
-    @ask_instance_group_on_launch.setter
-    def ask_instance_group_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
-        pulumi.set(self, "ask_instance_group_on_launch", value)
+    @ask_instance_groups_on_launch.setter
+    def ask_instance_groups_on_launch(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "ask_instance_groups_on_launch", value)
 
     @_builtins.property
     @pulumi.getter(name="askInventoryOnLaunch")
@@ -1094,6 +1114,18 @@ class _JobTemplateState:
         pulumi.set(self, "playbook", value)
 
     @_builtins.property
+    @pulumi.getter(name="preventInstanceGroupFallback")
+    def prevent_instance_group_fallback(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Only run the job on instance groups assigned to this job template, without falling back to the inventory or organization instance groups.
+        """
+        return pulumi.get(self, "prevent_instance_group_fallback")
+
+    @prevent_instance_group_fallback.setter
+    def prevent_instance_group_fallback(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "prevent_instance_group_fallback", value)
+
+    @_builtins.property
     @pulumi.getter(name="projectId")
     def project_id(self) -> pulumi.Input[Optional[_builtins.float]]:
         """
@@ -1195,7 +1227,7 @@ class JobTemplate(pulumi.CustomResource):
                  ask_diff_mode_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_execution_environment_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_forks_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_instance_group_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_instance_groups_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_slice_count_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_type_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -1224,6 +1256,7 @@ class JobTemplate(pulumi.CustomResource):
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  playbook: pulumi.Input[Optional[_builtins.str]] = None,
+                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
                  project_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
@@ -1250,6 +1283,7 @@ class JobTemplate(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] limit: The limit to apply to filter hosts that run on this job template.
         :param pulumi.Input[_builtins.str] name: The name of the job template.
         :param pulumi.Input[_builtins.str] playbook: The playbook to associate with the job template.
+        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: Only run the job on instance groups assigned to this job template, without falling back to the inventory or organization instance groups.
         :param pulumi.Input[_builtins.float] project_id: The project ID to associate with the job template.
         :param pulumi.Input[_builtins.str] skip_tags: The tags to skip on the job template.
         :param pulumi.Input[_builtins.str] start_at_task: The task to start at on the job template.
@@ -1286,7 +1320,7 @@ class JobTemplate(pulumi.CustomResource):
                  ask_diff_mode_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_execution_environment_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_forks_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-                 ask_instance_group_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+                 ask_instance_groups_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_slice_count_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  ask_job_type_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -1315,6 +1349,7 @@ class JobTemplate(pulumi.CustomResource):
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  playbook: pulumi.Input[Optional[_builtins.str]] = None,
+                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
                  project_id: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
                  skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
@@ -1337,7 +1372,7 @@ class JobTemplate(pulumi.CustomResource):
             __props__.__dict__["ask_diff_mode_on_launch"] = ask_diff_mode_on_launch
             __props__.__dict__["ask_execution_environment_on_launch"] = ask_execution_environment_on_launch
             __props__.__dict__["ask_forks_on_launch"] = ask_forks_on_launch
-            __props__.__dict__["ask_instance_group_on_launch"] = ask_instance_group_on_launch
+            __props__.__dict__["ask_instance_groups_on_launch"] = ask_instance_groups_on_launch
             __props__.__dict__["ask_inventory_on_launch"] = ask_inventory_on_launch
             __props__.__dict__["ask_job_slice_count_on_launch"] = ask_job_slice_count_on_launch
             __props__.__dict__["ask_job_type_on_launch"] = ask_job_type_on_launch
@@ -1368,6 +1403,7 @@ class JobTemplate(pulumi.CustomResource):
             __props__.__dict__["limit"] = limit
             __props__.__dict__["name"] = name
             __props__.__dict__["playbook"] = playbook
+            __props__.__dict__["prevent_instance_group_fallback"] = prevent_instance_group_fallback
             if project_id is None and not opts.urn:
                 raise TypeError("Missing required property 'project_id'")
             __props__.__dict__["project_id"] = project_id
@@ -1394,7 +1430,7 @@ class JobTemplate(pulumi.CustomResource):
             ask_diff_mode_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_execution_environment_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_forks_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
-            ask_instance_group_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
+            ask_instance_groups_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_inventory_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_job_slice_count_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             ask_job_type_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -1423,6 +1459,7 @@ class JobTemplate(pulumi.CustomResource):
             limit: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
             playbook: pulumi.Input[Optional[_builtins.str]] = None,
+            prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
             project_id: pulumi.Input[Optional[_builtins.float]] = None,
             scm_branch: pulumi.Input[Optional[_builtins.str]] = None,
             skip_tags: pulumi.Input[Optional[_builtins.str]] = None,
@@ -1450,6 +1487,7 @@ class JobTemplate(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] limit: The limit to apply to filter hosts that run on this job template.
         :param pulumi.Input[_builtins.str] name: The name of the job template.
         :param pulumi.Input[_builtins.str] playbook: The playbook to associate with the job template.
+        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: Only run the job on instance groups assigned to this job template, without falling back to the inventory or organization instance groups.
         :param pulumi.Input[_builtins.float] project_id: The project ID to associate with the job template.
         :param pulumi.Input[_builtins.str] skip_tags: The tags to skip on the job template.
         :param pulumi.Input[_builtins.str] start_at_task: The task to start at on the job template.
@@ -1466,7 +1504,7 @@ class JobTemplate(pulumi.CustomResource):
         __props__.__dict__["ask_diff_mode_on_launch"] = ask_diff_mode_on_launch
         __props__.__dict__["ask_execution_environment_on_launch"] = ask_execution_environment_on_launch
         __props__.__dict__["ask_forks_on_launch"] = ask_forks_on_launch
-        __props__.__dict__["ask_instance_group_on_launch"] = ask_instance_group_on_launch
+        __props__.__dict__["ask_instance_groups_on_launch"] = ask_instance_groups_on_launch
         __props__.__dict__["ask_inventory_on_launch"] = ask_inventory_on_launch
         __props__.__dict__["ask_job_slice_count_on_launch"] = ask_job_slice_count_on_launch
         __props__.__dict__["ask_job_type_on_launch"] = ask_job_type_on_launch
@@ -1495,6 +1533,7 @@ class JobTemplate(pulumi.CustomResource):
         __props__.__dict__["limit"] = limit
         __props__.__dict__["name"] = name
         __props__.__dict__["playbook"] = playbook
+        __props__.__dict__["prevent_instance_group_fallback"] = prevent_instance_group_fallback
         __props__.__dict__["project_id"] = project_id
         __props__.__dict__["scm_branch"] = scm_branch
         __props__.__dict__["skip_tags"] = skip_tags
@@ -1531,9 +1570,9 @@ class JobTemplate(pulumi.CustomResource):
         return pulumi.get(self, "ask_forks_on_launch")
 
     @_builtins.property
-    @pulumi.getter(name="askInstanceGroupOnLaunch")
-    def ask_instance_group_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
-        return pulumi.get(self, "ask_instance_group_on_launch")
+    @pulumi.getter(name="askInstanceGroupsOnLaunch")
+    def ask_instance_groups_on_launch(self) -> pulumi.Output[Optional[_builtins.bool]]:
+        return pulumi.get(self, "ask_instance_groups_on_launch")
 
     @_builtins.property
     @pulumi.getter(name="askInventoryOnLaunch")
@@ -1710,6 +1749,14 @@ class JobTemplate(pulumi.CustomResource):
         The playbook to associate with the job template.
         """
         return pulumi.get(self, "playbook")
+
+    @_builtins.property
+    @pulumi.getter(name="preventInstanceGroupFallback")
+    def prevent_instance_group_fallback(self) -> pulumi.Output[Optional[_builtins.bool]]:
+        """
+        Only run the job on instance groups assigned to this job template, without falling back to the inventory or organization instance groups.
+        """
+        return pulumi.get(self, "prevent_instance_group_fallback")
 
     @_builtins.property
     @pulumi.getter(name="projectId")

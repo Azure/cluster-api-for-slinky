@@ -296,7 +296,7 @@ def test_bridge_resources_and_readiness_in_both_chart_paths(plain_http: bool) ->
 
         def verify(values):
             version, status, ready, ready_dependencies, token_dependencies, bridge_dependencies = values
-            assert version == "1.2.2"
+            assert version == "1.2.3"
             assert status["name"] == "slurm-bridge"
             assert ready is True
             bridge = resources["slurm-bridge"]
@@ -352,7 +352,7 @@ def test_slurm_values_use_container_compatible_cgroups() -> None:
 
 
 def test_slinky_chart_supports_nodeset_oversubscription_control() -> None:
-    assert _SLINKY_CHART_VERSION == "1.2.1"
+    assert _SLINKY_CHART_VERSION == "1.2.3"
 
 
 def test_prometheus_server_address_uses_helm_release_name() -> None:

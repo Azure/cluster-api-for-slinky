@@ -310,7 +310,7 @@ class GitRepositorySpecPatchArgsDict(TypedDict):
     """
     provider: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
-    Provider used for authentication, can be 'azure', 'github', 'generic'.
+    Provider used for authentication, can be 'aws', 'azure', 'github', 'generic'.
     When not specified, defaults to 'generic'.
     """
     proxy_secret_ref: NotRequired[pulumi.Input[Optional['GitRepositorySpecProxySecretRefPatchArgs']]]
@@ -324,7 +324,7 @@ class GitRepositorySpecPatchArgsDict(TypedDict):
     service_account_name: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     ServiceAccountName is the name of the Kubernetes ServiceAccount used to
-    authenticate to the GitRepository. This field is only supported for 'azure' provider.
+    authenticate to the GitRepository. This field is only supported for 'azure' and 'aws' providers.
     """
     sparse_checkout: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]]
     """
@@ -376,12 +376,12 @@ class GitRepositorySpecPatchArgs:
         :param pulumi.Input[_builtins.str] interval: Interval at which the GitRepository URL is checked for updates.
                This interval is approximate and may be subject to jitter to ensure
                efficient use of resources.
-        :param pulumi.Input[_builtins.str] provider: Provider used for authentication, can be 'azure', 'github', 'generic'.
+        :param pulumi.Input[_builtins.str] provider: Provider used for authentication, can be 'aws', 'azure', 'github', 'generic'.
                When not specified, defaults to 'generic'.
         :param pulumi.Input[_builtins.bool] recurse_submodules: RecurseSubmodules enables the initialization of all submodules within
                the GitRepository as cloned from the URL, using their default settings.
         :param pulumi.Input[_builtins.str] service_account_name: ServiceAccountName is the name of the Kubernetes ServiceAccount used to
-               authenticate to the GitRepository. This field is only supported for 'azure' provider.
+               authenticate to the GitRepository. This field is only supported for 'azure' and 'aws' providers.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] sparse_checkout: SparseCheckout specifies a list of directories to checkout when cloning
                the repository. If specified, only these directories are included in the
                Artifact produced for this GitRepository.
@@ -464,7 +464,7 @@ class GitRepositorySpecPatchArgs:
     @pulumi.getter
     def provider(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Provider used for authentication, can be 'azure', 'github', 'generic'.
+        Provider used for authentication, can be 'aws', 'azure', 'github', 'generic'.
         When not specified, defaults to 'generic'.
         """
         return pulumi.get(self, "provider")
@@ -518,7 +518,7 @@ class GitRepositorySpecPatchArgs:
     def service_account_name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ServiceAccountName is the name of the Kubernetes ServiceAccount used to
-        authenticate to the GitRepository. This field is only supported for 'azure' provider.
+        authenticate to the GitRepository. This field is only supported for 'azure' and 'aws' providers.
         """
         return pulumi.get(self, "service_account_name")
 
@@ -1079,7 +1079,8 @@ class GitRepositorySpecVerifyPatchArgs:
 class GitRepositorySpecVerifySecretRefPatchArgsDict(TypedDict):
     """
     SecretRef specifies the Secret containing the public keys of trusted Git
-    authors.
+    authors. PGP public keys must be stored under keys with the .asc suffix,
+    and SSH public keys must be stored under keys with the .sshpub suffix.
     """
     name: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
@@ -1092,7 +1093,8 @@ class GitRepositorySpecVerifySecretRefPatchArgs:
                  name: pulumi.Input[Optional[_builtins.str]] = None):
         """
         SecretRef specifies the Secret containing the public keys of trusted Git
-        authors.
+        authors. PGP public keys must be stored under keys with the .asc suffix,
+        and SSH public keys must be stored under keys with the .sshpub suffix.
 
         :param pulumi.Input[_builtins.str] name: Name of the referent.
         """
@@ -1115,7 +1117,8 @@ class GitRepositorySpecVerifySecretRefPatchArgs:
 class GitRepositorySpecVerifySecretRefArgsDict(TypedDict):
     """
     SecretRef specifies the Secret containing the public keys of trusted Git
-    authors.
+    authors. PGP public keys must be stored under keys with the .asc suffix,
+    and SSH public keys must be stored under keys with the .sshpub suffix.
     """
     name: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
@@ -1128,7 +1131,8 @@ class GitRepositorySpecVerifySecretRefArgs:
                  name: pulumi.Input[Optional[_builtins.str]] = None):
         """
         SecretRef specifies the Secret containing the public keys of trusted Git
-        authors.
+        authors. PGP public keys must be stored under keys with the .asc suffix,
+        and SSH public keys must be stored under keys with the .sshpub suffix.
 
         :param pulumi.Input[_builtins.str] name: Name of the referent.
         """
@@ -1233,7 +1237,7 @@ class GitRepositorySpecArgsDict(TypedDict):
     """
     provider: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
-    Provider used for authentication, can be 'azure', 'github', 'generic'.
+    Provider used for authentication, can be 'aws', 'azure', 'github', 'generic'.
     When not specified, defaults to 'generic'.
     """
     proxy_secret_ref: NotRequired[pulumi.Input[Optional['GitRepositorySpecProxySecretRefArgs']]]
@@ -1247,7 +1251,7 @@ class GitRepositorySpecArgsDict(TypedDict):
     service_account_name: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     ServiceAccountName is the name of the Kubernetes ServiceAccount used to
-    authenticate to the GitRepository. This field is only supported for 'azure' provider.
+    authenticate to the GitRepository. This field is only supported for 'azure' and 'aws' providers.
     """
     sparse_checkout: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]]
     """
@@ -1299,12 +1303,12 @@ class GitRepositorySpecArgs:
         :param pulumi.Input[_builtins.str] interval: Interval at which the GitRepository URL is checked for updates.
                This interval is approximate and may be subject to jitter to ensure
                efficient use of resources.
-        :param pulumi.Input[_builtins.str] provider: Provider used for authentication, can be 'azure', 'github', 'generic'.
+        :param pulumi.Input[_builtins.str] provider: Provider used for authentication, can be 'aws', 'azure', 'github', 'generic'.
                When not specified, defaults to 'generic'.
         :param pulumi.Input[_builtins.bool] recurse_submodules: RecurseSubmodules enables the initialization of all submodules within
                the GitRepository as cloned from the URL, using their default settings.
         :param pulumi.Input[_builtins.str] service_account_name: ServiceAccountName is the name of the Kubernetes ServiceAccount used to
-               authenticate to the GitRepository. This field is only supported for 'azure' provider.
+               authenticate to the GitRepository. This field is only supported for 'azure' and 'aws' providers.
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] sparse_checkout: SparseCheckout specifies a list of directories to checkout when cloning
                the repository. If specified, only these directories are included in the
                Artifact produced for this GitRepository.
@@ -1387,7 +1391,7 @@ class GitRepositorySpecArgs:
     @pulumi.getter
     def provider(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
-        Provider used for authentication, can be 'azure', 'github', 'generic'.
+        Provider used for authentication, can be 'aws', 'azure', 'github', 'generic'.
         When not specified, defaults to 'generic'.
         """
         return pulumi.get(self, "provider")
@@ -1441,7 +1445,7 @@ class GitRepositorySpecArgs:
     def service_account_name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         ServiceAccountName is the name of the Kubernetes ServiceAccount used to
-        authenticate to the GitRepository. This field is only supported for 'azure' provider.
+        authenticate to the GitRepository. This field is only supported for 'azure' and 'aws' providers.
         """
         return pulumi.get(self, "service_account_name")
 

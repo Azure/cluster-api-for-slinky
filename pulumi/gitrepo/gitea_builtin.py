@@ -83,11 +83,11 @@ from stacks.kubernetes_annotations import pulumi_wait_for
 
 # Pinned upstream chart. Bump this together with ``_GITEA_APP_VERSION``
 # (which is informational only — surfaced for log/output use, not passed
-# to the chart) when refreshing. Chart 12.6.0 ships Gitea 1.26.1.
+# to the chart) when refreshing. Chart 12.7.0 ships Gitea 1.27.0.
 _GITEA_CHART_REPO = "https://dl.gitea.com/charts/"
 _GITEA_CHART_NAME = "gitea"
-_GITEA_CHART_VERSION = "12.6.0"
-_GITEA_APP_VERSION = "1.26.1"  # informational
+_GITEA_CHART_VERSION = "12.7.0"
+_GITEA_APP_VERSION = "1.27.0"  # informational
 
 # Namespace this component owns. We don't make it configurable — there's
 # no real use case for renaming it and hard-coding keeps the consumer

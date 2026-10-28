@@ -30,6 +30,7 @@ class RepositoryArgs:
                  auto_init: pulumi.Input[Optional[_builtins.bool]] = None,
                  autodetect_manual_merge: pulumi.Input[Optional[_builtins.bool]] = None,
                  default_branch: pulumi.Input[Optional[_builtins.str]] = None,
+                 default_merge_style: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  gitignores: pulumi.Input[Optional[_builtins.str]] = None,
                  has_issues: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -57,6 +58,8 @@ class RepositoryArgs:
                  readme: pulumi.Input[Optional[_builtins.str]] = None,
                  repo_template: pulumi.Input[Optional[_builtins.bool]] = None,
                  repository_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_template: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_template_items: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  website: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Repository resource.
@@ -65,6 +68,7 @@ class RepositoryArgs:
         :param pulumi.Input[_builtins.bool] archive_on_destroy: Set to 'true' to archive the repository instead of deleting on destroy.
         :param pulumi.Input[_builtins.bool] auto_init: Flag if the repository should be initiated with the configured values
         :param pulumi.Input[_builtins.str] default_branch: The default branch of the repository. Defaults to <span pulumi-lang-nodejs="`main`" pulumi-lang-dotnet="`Main`" pulumi-lang-go="`main`" pulumi-lang-python="`main`" pulumi-lang-yaml="`main`" pulumi-lang-java="`main`" pulumi-lang-hcl="`main`">`main`</span>
+        :param pulumi.Input[_builtins.str] default_merge_style: The default merge style for pull requests in this repository. Possible values are <span pulumi-lang-nodejs="`merge`" pulumi-lang-dotnet="`Merge`" pulumi-lang-go="`merge`" pulumi-lang-python="`merge`" pulumi-lang-yaml="`merge`" pulumi-lang-java="`merge`" pulumi-lang-hcl="`merge`">`merge`</span>, <span pulumi-lang-nodejs="`rebase`" pulumi-lang-dotnet="`Rebase`" pulumi-lang-go="`rebase`" pulumi-lang-python="`rebase`" pulumi-lang-yaml="`rebase`" pulumi-lang-java="`rebase`" pulumi-lang-hcl="`rebase`">`rebase`</span>, `rebase-merge`, <span pulumi-lang-nodejs="`squash`" pulumi-lang-dotnet="`Squash`" pulumi-lang-go="`squash`" pulumi-lang-python="`squash`" pulumi-lang-yaml="`squash`" pulumi-lang-java="`squash`" pulumi-lang-hcl="`squash`">`squash`</span>, `fast-forward-only`, or `manually-merged`.
         :param pulumi.Input[_builtins.str] description: The description of the repository.
         :param pulumi.Input[_builtins.str] gitignores: A specific gitignore that should be commited to the repositoryon creation if <span pulumi-lang-nodejs="`autoInit`" pulumi-lang-dotnet="`AutoInit`" pulumi-lang-go="`autoInit`" pulumi-lang-python="`auto_init`" pulumi-lang-yaml="`autoInit`" pulumi-lang-java="`autoInit`" pulumi-lang-hcl="`auto_init`">`autoInit`</span> is set to <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span>
                Need to exist in the gitea instance
@@ -81,6 +85,8 @@ class RepositoryArgs:
         :param pulumi.Input[_builtins.str] migration_service: git/github/gitlab/gitea/gogs
         :param pulumi.Input[_builtins.str] name: The Name of the repository
         :param pulumi.Input[_builtins.bool] private: Flag if the repository should be private or not.
+        :param pulumi.Input[_builtins.str] source_template: The name of the template repository in format <owner>/<repository_name>
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] source_template_items: List of items that will be used from the template.Possible values are <span pulumi-lang-nodejs="`gitcontent`" pulumi-lang-dotnet="`Gitcontent`" pulumi-lang-go="`gitcontent`" pulumi-lang-python="`gitcontent`" pulumi-lang-yaml="`gitcontent`" pulumi-lang-java="`gitcontent`" pulumi-lang-hcl="`gitcontent`">`gitcontent`</span>, <span pulumi-lang-nodejs="`githooks`" pulumi-lang-dotnet="`Githooks`" pulumi-lang-go="`githooks`" pulumi-lang-python="`githooks`" pulumi-lang-yaml="`githooks`" pulumi-lang-java="`githooks`" pulumi-lang-hcl="`githooks`">`githooks`</span>, <span pulumi-lang-nodejs="`webhooks`" pulumi-lang-dotnet="`Webhooks`" pulumi-lang-go="`webhooks`" pulumi-lang-python="`webhooks`" pulumi-lang-yaml="`webhooks`" pulumi-lang-java="`webhooks`" pulumi-lang-hcl="`webhooks`">`webhooks`</span>, <span pulumi-lang-nodejs="`topics`" pulumi-lang-dotnet="`Topics`" pulumi-lang-go="`topics`" pulumi-lang-python="`topics`" pulumi-lang-yaml="`topics`" pulumi-lang-java="`topics`" pulumi-lang-hcl="`topics`">`topics`</span>, <span pulumi-lang-nodejs="`avatar`" pulumi-lang-dotnet="`Avatar`" pulumi-lang-go="`avatar`" pulumi-lang-python="`avatar`" pulumi-lang-yaml="`avatar`" pulumi-lang-java="`avatar`" pulumi-lang-hcl="`avatar`">`avatar`</span>, <span pulumi-lang-nodejs="`labels`" pulumi-lang-dotnet="`Labels`" pulumi-lang-go="`labels`" pulumi-lang-python="`labels`" pulumi-lang-yaml="`labels`" pulumi-lang-java="`labels`" pulumi-lang-hcl="`labels`">`labels`</span>
         :param pulumi.Input[_builtins.str] website: A link to a website with more information.
         """
         pulumi.set(__self__, "username", username)
@@ -104,6 +110,8 @@ class RepositoryArgs:
             pulumi.set(__self__, "autodetect_manual_merge", autodetect_manual_merge)
         if default_branch is not None:
             pulumi.set(__self__, "default_branch", default_branch)
+        if default_merge_style is not None:
+            pulumi.set(__self__, "default_merge_style", default_merge_style)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if gitignores is not None:
@@ -158,6 +166,10 @@ class RepositoryArgs:
             pulumi.set(__self__, "repo_template", repo_template)
         if repository_id is not None:
             pulumi.set(__self__, "repository_id", repository_id)
+        if source_template is not None:
+            pulumi.set(__self__, "source_template", source_template)
+        if source_template_items is not None:
+            pulumi.set(__self__, "source_template_items", source_template_items)
         if website is not None:
             pulumi.set(__self__, "website", website)
 
@@ -271,6 +283,18 @@ class RepositoryArgs:
     @default_branch.setter
     def default_branch(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "default_branch", value)
+
+    @_builtins.property
+    @pulumi.getter(name="defaultMergeStyle")
+    def default_merge_style(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The default merge style for pull requests in this repository. Possible values are <span pulumi-lang-nodejs="`merge`" pulumi-lang-dotnet="`Merge`" pulumi-lang-go="`merge`" pulumi-lang-python="`merge`" pulumi-lang-yaml="`merge`" pulumi-lang-java="`merge`" pulumi-lang-hcl="`merge`">`merge`</span>, <span pulumi-lang-nodejs="`rebase`" pulumi-lang-dotnet="`Rebase`" pulumi-lang-go="`rebase`" pulumi-lang-python="`rebase`" pulumi-lang-yaml="`rebase`" pulumi-lang-java="`rebase`" pulumi-lang-hcl="`rebase`">`rebase`</span>, `rebase-merge`, <span pulumi-lang-nodejs="`squash`" pulumi-lang-dotnet="`Squash`" pulumi-lang-go="`squash`" pulumi-lang-python="`squash`" pulumi-lang-yaml="`squash`" pulumi-lang-java="`squash`" pulumi-lang-hcl="`squash`">`squash`</span>, `fast-forward-only`, or `manually-merged`.
+        """
+        return pulumi.get(self, "default_merge_style")
+
+    @default_merge_style.setter
+    def default_merge_style(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "default_merge_style", value)
 
     @_builtins.property
     @pulumi.getter
@@ -558,6 +582,30 @@ class RepositoryArgs:
         pulumi.set(self, "repository_id", value)
 
     @_builtins.property
+    @pulumi.getter(name="sourceTemplate")
+    def source_template(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The name of the template repository in format <owner>/<repository_name>
+        """
+        return pulumi.get(self, "source_template")
+
+    @source_template.setter
+    def source_template(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "source_template", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sourceTemplateItems")
+    def source_template_items(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
+        """
+        List of items that will be used from the template.Possible values are <span pulumi-lang-nodejs="`gitcontent`" pulumi-lang-dotnet="`Gitcontent`" pulumi-lang-go="`gitcontent`" pulumi-lang-python="`gitcontent`" pulumi-lang-yaml="`gitcontent`" pulumi-lang-java="`gitcontent`" pulumi-lang-hcl="`gitcontent`">`gitcontent`</span>, <span pulumi-lang-nodejs="`githooks`" pulumi-lang-dotnet="`Githooks`" pulumi-lang-go="`githooks`" pulumi-lang-python="`githooks`" pulumi-lang-yaml="`githooks`" pulumi-lang-java="`githooks`" pulumi-lang-hcl="`githooks`">`githooks`</span>, <span pulumi-lang-nodejs="`webhooks`" pulumi-lang-dotnet="`Webhooks`" pulumi-lang-go="`webhooks`" pulumi-lang-python="`webhooks`" pulumi-lang-yaml="`webhooks`" pulumi-lang-java="`webhooks`" pulumi-lang-hcl="`webhooks`">`webhooks`</span>, <span pulumi-lang-nodejs="`topics`" pulumi-lang-dotnet="`Topics`" pulumi-lang-go="`topics`" pulumi-lang-python="`topics`" pulumi-lang-yaml="`topics`" pulumi-lang-java="`topics`" pulumi-lang-hcl="`topics`">`topics`</span>, <span pulumi-lang-nodejs="`avatar`" pulumi-lang-dotnet="`Avatar`" pulumi-lang-go="`avatar`" pulumi-lang-python="`avatar`" pulumi-lang-yaml="`avatar`" pulumi-lang-java="`avatar`" pulumi-lang-hcl="`avatar`">`avatar`</span>, <span pulumi-lang-nodejs="`labels`" pulumi-lang-dotnet="`Labels`" pulumi-lang-go="`labels`" pulumi-lang-python="`labels`" pulumi-lang-yaml="`labels`" pulumi-lang-java="`labels`" pulumi-lang-hcl="`labels`">`labels`</span>
+        """
+        return pulumi.get(self, "source_template_items")
+
+    @source_template_items.setter
+    def source_template_items(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "source_template_items", value)
+
+    @_builtins.property
     @pulumi.getter
     def website(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -585,6 +633,7 @@ class _RepositoryState:
                  clone_url: pulumi.Input[Optional[_builtins.str]] = None,
                  created: pulumi.Input[Optional[_builtins.str]] = None,
                  default_branch: pulumi.Input[Optional[_builtins.str]] = None,
+                 default_merge_style: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  gitignores: pulumi.Input[Optional[_builtins.str]] = None,
                  has_issues: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -616,6 +665,8 @@ class _RepositoryState:
                  readme: pulumi.Input[Optional[_builtins.str]] = None,
                  repo_template: pulumi.Input[Optional[_builtins.bool]] = None,
                  repository_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_template: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_template_items: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  ssh_url: pulumi.Input[Optional[_builtins.str]] = None,
                  updated: pulumi.Input[Optional[_builtins.str]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
@@ -626,6 +677,7 @@ class _RepositoryState:
         :param pulumi.Input[_builtins.bool] archive_on_destroy: Set to 'true' to archive the repository instead of deleting on destroy.
         :param pulumi.Input[_builtins.bool] auto_init: Flag if the repository should be initiated with the configured values
         :param pulumi.Input[_builtins.str] default_branch: The default branch of the repository. Defaults to <span pulumi-lang-nodejs="`main`" pulumi-lang-dotnet="`Main`" pulumi-lang-go="`main`" pulumi-lang-python="`main`" pulumi-lang-yaml="`main`" pulumi-lang-java="`main`" pulumi-lang-hcl="`main`">`main`</span>
+        :param pulumi.Input[_builtins.str] default_merge_style: The default merge style for pull requests in this repository. Possible values are <span pulumi-lang-nodejs="`merge`" pulumi-lang-dotnet="`Merge`" pulumi-lang-go="`merge`" pulumi-lang-python="`merge`" pulumi-lang-yaml="`merge`" pulumi-lang-java="`merge`" pulumi-lang-hcl="`merge`">`merge`</span>, <span pulumi-lang-nodejs="`rebase`" pulumi-lang-dotnet="`Rebase`" pulumi-lang-go="`rebase`" pulumi-lang-python="`rebase`" pulumi-lang-yaml="`rebase`" pulumi-lang-java="`rebase`" pulumi-lang-hcl="`rebase`">`rebase`</span>, `rebase-merge`, <span pulumi-lang-nodejs="`squash`" pulumi-lang-dotnet="`Squash`" pulumi-lang-go="`squash`" pulumi-lang-python="`squash`" pulumi-lang-yaml="`squash`" pulumi-lang-java="`squash`" pulumi-lang-hcl="`squash`">`squash`</span>, `fast-forward-only`, or `manually-merged`.
         :param pulumi.Input[_builtins.str] description: The description of the repository.
         :param pulumi.Input[_builtins.str] gitignores: A specific gitignore that should be commited to the repositoryon creation if <span pulumi-lang-nodejs="`autoInit`" pulumi-lang-dotnet="`AutoInit`" pulumi-lang-go="`autoInit`" pulumi-lang-python="`auto_init`" pulumi-lang-yaml="`autoInit`" pulumi-lang-java="`autoInit`" pulumi-lang-hcl="`auto_init`">`autoInit`</span> is set to <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span>
                Need to exist in the gitea instance
@@ -642,6 +694,8 @@ class _RepositoryState:
         :param pulumi.Input[_builtins.str] migration_service: git/github/gitlab/gitea/gogs
         :param pulumi.Input[_builtins.str] name: The Name of the repository
         :param pulumi.Input[_builtins.bool] private: Flag if the repository should be private or not.
+        :param pulumi.Input[_builtins.str] source_template: The name of the template repository in format <owner>/<repository_name>
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] source_template_items: List of items that will be used from the template.Possible values are <span pulumi-lang-nodejs="`gitcontent`" pulumi-lang-dotnet="`Gitcontent`" pulumi-lang-go="`gitcontent`" pulumi-lang-python="`gitcontent`" pulumi-lang-yaml="`gitcontent`" pulumi-lang-java="`gitcontent`" pulumi-lang-hcl="`gitcontent`">`gitcontent`</span>, <span pulumi-lang-nodejs="`githooks`" pulumi-lang-dotnet="`Githooks`" pulumi-lang-go="`githooks`" pulumi-lang-python="`githooks`" pulumi-lang-yaml="`githooks`" pulumi-lang-java="`githooks`" pulumi-lang-hcl="`githooks`">`githooks`</span>, <span pulumi-lang-nodejs="`webhooks`" pulumi-lang-dotnet="`Webhooks`" pulumi-lang-go="`webhooks`" pulumi-lang-python="`webhooks`" pulumi-lang-yaml="`webhooks`" pulumi-lang-java="`webhooks`" pulumi-lang-hcl="`webhooks`">`webhooks`</span>, <span pulumi-lang-nodejs="`topics`" pulumi-lang-dotnet="`Topics`" pulumi-lang-go="`topics`" pulumi-lang-python="`topics`" pulumi-lang-yaml="`topics`" pulumi-lang-java="`topics`" pulumi-lang-hcl="`topics`">`topics`</span>, <span pulumi-lang-nodejs="`avatar`" pulumi-lang-dotnet="`Avatar`" pulumi-lang-go="`avatar`" pulumi-lang-python="`avatar`" pulumi-lang-yaml="`avatar`" pulumi-lang-java="`avatar`" pulumi-lang-hcl="`avatar`">`avatar`</span>, <span pulumi-lang-nodejs="`labels`" pulumi-lang-dotnet="`Labels`" pulumi-lang-go="`labels`" pulumi-lang-python="`labels`" pulumi-lang-yaml="`labels`" pulumi-lang-java="`labels`" pulumi-lang-hcl="`labels`">`labels`</span>
         :param pulumi.Input[_builtins.str] username: The Owner of the repository
         :param pulumi.Input[_builtins.str] website: A link to a website with more information.
         """
@@ -669,6 +723,8 @@ class _RepositoryState:
             pulumi.set(__self__, "created", created)
         if default_branch is not None:
             pulumi.set(__self__, "default_branch", default_branch)
+        if default_merge_style is not None:
+            pulumi.set(__self__, "default_merge_style", default_merge_style)
         if description is not None:
             pulumi.set(__self__, "description", description)
         if gitignores is not None:
@@ -731,6 +787,10 @@ class _RepositoryState:
             pulumi.set(__self__, "repo_template", repo_template)
         if repository_id is not None:
             pulumi.set(__self__, "repository_id", repository_id)
+        if source_template is not None:
+            pulumi.set(__self__, "source_template", source_template)
+        if source_template_items is not None:
+            pulumi.set(__self__, "source_template_items", source_template_items)
         if ssh_url is not None:
             pulumi.set(__self__, "ssh_url", ssh_url)
         if updated is not None:
@@ -856,6 +916,18 @@ class _RepositoryState:
     @default_branch.setter
     def default_branch(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "default_branch", value)
+
+    @_builtins.property
+    @pulumi.getter(name="defaultMergeStyle")
+    def default_merge_style(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The default merge style for pull requests in this repository. Possible values are <span pulumi-lang-nodejs="`merge`" pulumi-lang-dotnet="`Merge`" pulumi-lang-go="`merge`" pulumi-lang-python="`merge`" pulumi-lang-yaml="`merge`" pulumi-lang-java="`merge`" pulumi-lang-hcl="`merge`">`merge`</span>, <span pulumi-lang-nodejs="`rebase`" pulumi-lang-dotnet="`Rebase`" pulumi-lang-go="`rebase`" pulumi-lang-python="`rebase`" pulumi-lang-yaml="`rebase`" pulumi-lang-java="`rebase`" pulumi-lang-hcl="`rebase`">`rebase`</span>, `rebase-merge`, <span pulumi-lang-nodejs="`squash`" pulumi-lang-dotnet="`Squash`" pulumi-lang-go="`squash`" pulumi-lang-python="`squash`" pulumi-lang-yaml="`squash`" pulumi-lang-java="`squash`" pulumi-lang-hcl="`squash`">`squash`</span>, `fast-forward-only`, or `manually-merged`.
+        """
+        return pulumi.get(self, "default_merge_style")
+
+    @default_merge_style.setter
+    def default_merge_style(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "default_merge_style", value)
 
     @_builtins.property
     @pulumi.getter
@@ -1179,6 +1251,30 @@ class _RepositoryState:
         pulumi.set(self, "repository_id", value)
 
     @_builtins.property
+    @pulumi.getter(name="sourceTemplate")
+    def source_template(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The name of the template repository in format <owner>/<repository_name>
+        """
+        return pulumi.get(self, "source_template")
+
+    @source_template.setter
+    def source_template(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "source_template", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sourceTemplateItems")
+    def source_template_items(self) -> pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]:
+        """
+        List of items that will be used from the template.Possible values are <span pulumi-lang-nodejs="`gitcontent`" pulumi-lang-dotnet="`Gitcontent`" pulumi-lang-go="`gitcontent`" pulumi-lang-python="`gitcontent`" pulumi-lang-yaml="`gitcontent`" pulumi-lang-java="`gitcontent`" pulumi-lang-hcl="`gitcontent`">`gitcontent`</span>, <span pulumi-lang-nodejs="`githooks`" pulumi-lang-dotnet="`Githooks`" pulumi-lang-go="`githooks`" pulumi-lang-python="`githooks`" pulumi-lang-yaml="`githooks`" pulumi-lang-java="`githooks`" pulumi-lang-hcl="`githooks`">`githooks`</span>, <span pulumi-lang-nodejs="`webhooks`" pulumi-lang-dotnet="`Webhooks`" pulumi-lang-go="`webhooks`" pulumi-lang-python="`webhooks`" pulumi-lang-yaml="`webhooks`" pulumi-lang-java="`webhooks`" pulumi-lang-hcl="`webhooks`">`webhooks`</span>, <span pulumi-lang-nodejs="`topics`" pulumi-lang-dotnet="`Topics`" pulumi-lang-go="`topics`" pulumi-lang-python="`topics`" pulumi-lang-yaml="`topics`" pulumi-lang-java="`topics`" pulumi-lang-hcl="`topics`">`topics`</span>, <span pulumi-lang-nodejs="`avatar`" pulumi-lang-dotnet="`Avatar`" pulumi-lang-go="`avatar`" pulumi-lang-python="`avatar`" pulumi-lang-yaml="`avatar`" pulumi-lang-java="`avatar`" pulumi-lang-hcl="`avatar`">`avatar`</span>, <span pulumi-lang-nodejs="`labels`" pulumi-lang-dotnet="`Labels`" pulumi-lang-go="`labels`" pulumi-lang-python="`labels`" pulumi-lang-yaml="`labels`" pulumi-lang-java="`labels`" pulumi-lang-hcl="`labels`">`labels`</span>
+        """
+        return pulumi.get(self, "source_template_items")
+
+    @source_template_items.setter
+    def source_template_items(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "source_template_items", value)
+
+    @_builtins.property
     @pulumi.getter(name="sshUrl")
     def ssh_url(self) -> pulumi.Input[Optional[_builtins.str]]:
         return pulumi.get(self, "ssh_url")
@@ -1237,6 +1333,7 @@ class Repository(pulumi.CustomResource):
                  auto_init: pulumi.Input[Optional[_builtins.bool]] = None,
                  autodetect_manual_merge: pulumi.Input[Optional[_builtins.bool]] = None,
                  default_branch: pulumi.Input[Optional[_builtins.str]] = None,
+                 default_merge_style: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  gitignores: pulumi.Input[Optional[_builtins.str]] = None,
                  has_issues: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -1264,6 +1361,8 @@ class Repository(pulumi.CustomResource):
                  readme: pulumi.Input[Optional[_builtins.str]] = None,
                  repo_template: pulumi.Input[Optional[_builtins.bool]] = None,
                  repository_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_template: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_template_items: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  website: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
@@ -1275,6 +1374,7 @@ class Repository(pulumi.CustomResource):
         :param pulumi.Input[_builtins.bool] archive_on_destroy: Set to 'true' to archive the repository instead of deleting on destroy.
         :param pulumi.Input[_builtins.bool] auto_init: Flag if the repository should be initiated with the configured values
         :param pulumi.Input[_builtins.str] default_branch: The default branch of the repository. Defaults to <span pulumi-lang-nodejs="`main`" pulumi-lang-dotnet="`Main`" pulumi-lang-go="`main`" pulumi-lang-python="`main`" pulumi-lang-yaml="`main`" pulumi-lang-java="`main`" pulumi-lang-hcl="`main`">`main`</span>
+        :param pulumi.Input[_builtins.str] default_merge_style: The default merge style for pull requests in this repository. Possible values are <span pulumi-lang-nodejs="`merge`" pulumi-lang-dotnet="`Merge`" pulumi-lang-go="`merge`" pulumi-lang-python="`merge`" pulumi-lang-yaml="`merge`" pulumi-lang-java="`merge`" pulumi-lang-hcl="`merge`">`merge`</span>, <span pulumi-lang-nodejs="`rebase`" pulumi-lang-dotnet="`Rebase`" pulumi-lang-go="`rebase`" pulumi-lang-python="`rebase`" pulumi-lang-yaml="`rebase`" pulumi-lang-java="`rebase`" pulumi-lang-hcl="`rebase`">`rebase`</span>, `rebase-merge`, <span pulumi-lang-nodejs="`squash`" pulumi-lang-dotnet="`Squash`" pulumi-lang-go="`squash`" pulumi-lang-python="`squash`" pulumi-lang-yaml="`squash`" pulumi-lang-java="`squash`" pulumi-lang-hcl="`squash`">`squash`</span>, `fast-forward-only`, or `manually-merged`.
         :param pulumi.Input[_builtins.str] description: The description of the repository.
         :param pulumi.Input[_builtins.str] gitignores: A specific gitignore that should be commited to the repositoryon creation if <span pulumi-lang-nodejs="`autoInit`" pulumi-lang-dotnet="`AutoInit`" pulumi-lang-go="`autoInit`" pulumi-lang-python="`auto_init`" pulumi-lang-yaml="`autoInit`" pulumi-lang-java="`autoInit`" pulumi-lang-hcl="`auto_init`">`autoInit`</span> is set to <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span>
                Need to exist in the gitea instance
@@ -1291,6 +1391,8 @@ class Repository(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] migration_service: git/github/gitlab/gitea/gogs
         :param pulumi.Input[_builtins.str] name: The Name of the repository
         :param pulumi.Input[_builtins.bool] private: Flag if the repository should be private or not.
+        :param pulumi.Input[_builtins.str] source_template: The name of the template repository in format <owner>/<repository_name>
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] source_template_items: List of items that will be used from the template.Possible values are <span pulumi-lang-nodejs="`gitcontent`" pulumi-lang-dotnet="`Gitcontent`" pulumi-lang-go="`gitcontent`" pulumi-lang-python="`gitcontent`" pulumi-lang-yaml="`gitcontent`" pulumi-lang-java="`gitcontent`" pulumi-lang-hcl="`gitcontent`">`gitcontent`</span>, <span pulumi-lang-nodejs="`githooks`" pulumi-lang-dotnet="`Githooks`" pulumi-lang-go="`githooks`" pulumi-lang-python="`githooks`" pulumi-lang-yaml="`githooks`" pulumi-lang-java="`githooks`" pulumi-lang-hcl="`githooks`">`githooks`</span>, <span pulumi-lang-nodejs="`webhooks`" pulumi-lang-dotnet="`Webhooks`" pulumi-lang-go="`webhooks`" pulumi-lang-python="`webhooks`" pulumi-lang-yaml="`webhooks`" pulumi-lang-java="`webhooks`" pulumi-lang-hcl="`webhooks`">`webhooks`</span>, <span pulumi-lang-nodejs="`topics`" pulumi-lang-dotnet="`Topics`" pulumi-lang-go="`topics`" pulumi-lang-python="`topics`" pulumi-lang-yaml="`topics`" pulumi-lang-java="`topics`" pulumi-lang-hcl="`topics`">`topics`</span>, <span pulumi-lang-nodejs="`avatar`" pulumi-lang-dotnet="`Avatar`" pulumi-lang-go="`avatar`" pulumi-lang-python="`avatar`" pulumi-lang-yaml="`avatar`" pulumi-lang-java="`avatar`" pulumi-lang-hcl="`avatar`">`avatar`</span>, <span pulumi-lang-nodejs="`labels`" pulumi-lang-dotnet="`Labels`" pulumi-lang-go="`labels`" pulumi-lang-python="`labels`" pulumi-lang-yaml="`labels`" pulumi-lang-java="`labels`" pulumi-lang-hcl="`labels`">`labels`</span>
         :param pulumi.Input[_builtins.str] username: The Owner of the repository
         :param pulumi.Input[_builtins.str] website: A link to a website with more information.
         """
@@ -1328,6 +1430,7 @@ class Repository(pulumi.CustomResource):
                  auto_init: pulumi.Input[Optional[_builtins.bool]] = None,
                  autodetect_manual_merge: pulumi.Input[Optional[_builtins.bool]] = None,
                  default_branch: pulumi.Input[Optional[_builtins.str]] = None,
+                 default_merge_style: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  gitignores: pulumi.Input[Optional[_builtins.str]] = None,
                  has_issues: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -1355,6 +1458,8 @@ class Repository(pulumi.CustomResource):
                  readme: pulumi.Input[Optional[_builtins.str]] = None,
                  repo_template: pulumi.Input[Optional[_builtins.bool]] = None,
                  repository_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_template: pulumi.Input[Optional[_builtins.str]] = None,
+                 source_template_items: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  website: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
@@ -1376,6 +1481,7 @@ class Repository(pulumi.CustomResource):
             __props__.__dict__["auto_init"] = auto_init
             __props__.__dict__["autodetect_manual_merge"] = autodetect_manual_merge
             __props__.__dict__["default_branch"] = default_branch
+            __props__.__dict__["default_merge_style"] = default_merge_style
             __props__.__dict__["description"] = description
             __props__.__dict__["gitignores"] = gitignores
             __props__.__dict__["has_issues"] = has_issues
@@ -1403,6 +1509,8 @@ class Repository(pulumi.CustomResource):
             __props__.__dict__["readme"] = readme
             __props__.__dict__["repo_template"] = repo_template
             __props__.__dict__["repository_id"] = repository_id
+            __props__.__dict__["source_template"] = source_template
+            __props__.__dict__["source_template_items"] = source_template_items
             if username is None and not opts.urn:
                 raise TypeError("Missing required property 'username'")
             __props__.__dict__["username"] = username
@@ -1440,6 +1548,7 @@ class Repository(pulumi.CustomResource):
             clone_url: pulumi.Input[Optional[_builtins.str]] = None,
             created: pulumi.Input[Optional[_builtins.str]] = None,
             default_branch: pulumi.Input[Optional[_builtins.str]] = None,
+            default_merge_style: pulumi.Input[Optional[_builtins.str]] = None,
             description: pulumi.Input[Optional[_builtins.str]] = None,
             gitignores: pulumi.Input[Optional[_builtins.str]] = None,
             has_issues: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -1471,6 +1580,8 @@ class Repository(pulumi.CustomResource):
             readme: pulumi.Input[Optional[_builtins.str]] = None,
             repo_template: pulumi.Input[Optional[_builtins.bool]] = None,
             repository_id: pulumi.Input[Optional[_builtins.str]] = None,
+            source_template: pulumi.Input[Optional[_builtins.str]] = None,
+            source_template_items: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
             ssh_url: pulumi.Input[Optional[_builtins.str]] = None,
             updated: pulumi.Input[Optional[_builtins.str]] = None,
             username: pulumi.Input[Optional[_builtins.str]] = None,
@@ -1485,6 +1596,7 @@ class Repository(pulumi.CustomResource):
         :param pulumi.Input[_builtins.bool] archive_on_destroy: Set to 'true' to archive the repository instead of deleting on destroy.
         :param pulumi.Input[_builtins.bool] auto_init: Flag if the repository should be initiated with the configured values
         :param pulumi.Input[_builtins.str] default_branch: The default branch of the repository. Defaults to <span pulumi-lang-nodejs="`main`" pulumi-lang-dotnet="`Main`" pulumi-lang-go="`main`" pulumi-lang-python="`main`" pulumi-lang-yaml="`main`" pulumi-lang-java="`main`" pulumi-lang-hcl="`main`">`main`</span>
+        :param pulumi.Input[_builtins.str] default_merge_style: The default merge style for pull requests in this repository. Possible values are <span pulumi-lang-nodejs="`merge`" pulumi-lang-dotnet="`Merge`" pulumi-lang-go="`merge`" pulumi-lang-python="`merge`" pulumi-lang-yaml="`merge`" pulumi-lang-java="`merge`" pulumi-lang-hcl="`merge`">`merge`</span>, <span pulumi-lang-nodejs="`rebase`" pulumi-lang-dotnet="`Rebase`" pulumi-lang-go="`rebase`" pulumi-lang-python="`rebase`" pulumi-lang-yaml="`rebase`" pulumi-lang-java="`rebase`" pulumi-lang-hcl="`rebase`">`rebase`</span>, `rebase-merge`, <span pulumi-lang-nodejs="`squash`" pulumi-lang-dotnet="`Squash`" pulumi-lang-go="`squash`" pulumi-lang-python="`squash`" pulumi-lang-yaml="`squash`" pulumi-lang-java="`squash`" pulumi-lang-hcl="`squash`">`squash`</span>, `fast-forward-only`, or `manually-merged`.
         :param pulumi.Input[_builtins.str] description: The description of the repository.
         :param pulumi.Input[_builtins.str] gitignores: A specific gitignore that should be commited to the repositoryon creation if <span pulumi-lang-nodejs="`autoInit`" pulumi-lang-dotnet="`AutoInit`" pulumi-lang-go="`autoInit`" pulumi-lang-python="`auto_init`" pulumi-lang-yaml="`autoInit`" pulumi-lang-java="`autoInit`" pulumi-lang-hcl="`auto_init`">`autoInit`</span> is set to <span pulumi-lang-nodejs="`true`" pulumi-lang-dotnet="`True`" pulumi-lang-go="`true`" pulumi-lang-python="`true`" pulumi-lang-yaml="`true`" pulumi-lang-java="`true`" pulumi-lang-hcl="`true`">`true`</span>
                Need to exist in the gitea instance
@@ -1501,6 +1613,8 @@ class Repository(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] migration_service: git/github/gitlab/gitea/gogs
         :param pulumi.Input[_builtins.str] name: The Name of the repository
         :param pulumi.Input[_builtins.bool] private: Flag if the repository should be private or not.
+        :param pulumi.Input[_builtins.str] source_template: The name of the template repository in format <owner>/<repository_name>
+        :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] source_template_items: List of items that will be used from the template.Possible values are <span pulumi-lang-nodejs="`gitcontent`" pulumi-lang-dotnet="`Gitcontent`" pulumi-lang-go="`gitcontent`" pulumi-lang-python="`gitcontent`" pulumi-lang-yaml="`gitcontent`" pulumi-lang-java="`gitcontent`" pulumi-lang-hcl="`gitcontent`">`gitcontent`</span>, <span pulumi-lang-nodejs="`githooks`" pulumi-lang-dotnet="`Githooks`" pulumi-lang-go="`githooks`" pulumi-lang-python="`githooks`" pulumi-lang-yaml="`githooks`" pulumi-lang-java="`githooks`" pulumi-lang-hcl="`githooks`">`githooks`</span>, <span pulumi-lang-nodejs="`webhooks`" pulumi-lang-dotnet="`Webhooks`" pulumi-lang-go="`webhooks`" pulumi-lang-python="`webhooks`" pulumi-lang-yaml="`webhooks`" pulumi-lang-java="`webhooks`" pulumi-lang-hcl="`webhooks`">`webhooks`</span>, <span pulumi-lang-nodejs="`topics`" pulumi-lang-dotnet="`Topics`" pulumi-lang-go="`topics`" pulumi-lang-python="`topics`" pulumi-lang-yaml="`topics`" pulumi-lang-java="`topics`" pulumi-lang-hcl="`topics`">`topics`</span>, <span pulumi-lang-nodejs="`avatar`" pulumi-lang-dotnet="`Avatar`" pulumi-lang-go="`avatar`" pulumi-lang-python="`avatar`" pulumi-lang-yaml="`avatar`" pulumi-lang-java="`avatar`" pulumi-lang-hcl="`avatar`">`avatar`</span>, <span pulumi-lang-nodejs="`labels`" pulumi-lang-dotnet="`Labels`" pulumi-lang-go="`labels`" pulumi-lang-python="`labels`" pulumi-lang-yaml="`labels`" pulumi-lang-java="`labels`" pulumi-lang-hcl="`labels`">`labels`</span>
         :param pulumi.Input[_builtins.str] username: The Owner of the repository
         :param pulumi.Input[_builtins.str] website: A link to a website with more information.
         """
@@ -1520,6 +1634,7 @@ class Repository(pulumi.CustomResource):
         __props__.__dict__["clone_url"] = clone_url
         __props__.__dict__["created"] = created
         __props__.__dict__["default_branch"] = default_branch
+        __props__.__dict__["default_merge_style"] = default_merge_style
         __props__.__dict__["description"] = description
         __props__.__dict__["gitignores"] = gitignores
         __props__.__dict__["has_issues"] = has_issues
@@ -1551,6 +1666,8 @@ class Repository(pulumi.CustomResource):
         __props__.__dict__["readme"] = readme
         __props__.__dict__["repo_template"] = repo_template
         __props__.__dict__["repository_id"] = repository_id
+        __props__.__dict__["source_template"] = source_template
+        __props__.__dict__["source_template_items"] = source_template_items
         __props__.__dict__["ssh_url"] = ssh_url
         __props__.__dict__["updated"] = updated
         __props__.__dict__["username"] = username
@@ -1625,6 +1742,14 @@ class Repository(pulumi.CustomResource):
         The default branch of the repository. Defaults to <span pulumi-lang-nodejs="`main`" pulumi-lang-dotnet="`Main`" pulumi-lang-go="`main`" pulumi-lang-python="`main`" pulumi-lang-yaml="`main`" pulumi-lang-java="`main`" pulumi-lang-hcl="`main`">`main`</span>
         """
         return pulumi.get(self, "default_branch")
+
+    @_builtins.property
+    @pulumi.getter(name="defaultMergeStyle")
+    def default_merge_style(self) -> pulumi.Output[_builtins.str]:
+        """
+        The default merge style for pull requests in this repository. Possible values are <span pulumi-lang-nodejs="`merge`" pulumi-lang-dotnet="`Merge`" pulumi-lang-go="`merge`" pulumi-lang-python="`merge`" pulumi-lang-yaml="`merge`" pulumi-lang-java="`merge`" pulumi-lang-hcl="`merge`">`merge`</span>, <span pulumi-lang-nodejs="`rebase`" pulumi-lang-dotnet="`Rebase`" pulumi-lang-go="`rebase`" pulumi-lang-python="`rebase`" pulumi-lang-yaml="`rebase`" pulumi-lang-java="`rebase`" pulumi-lang-hcl="`rebase`">`rebase`</span>, `rebase-merge`, <span pulumi-lang-nodejs="`squash`" pulumi-lang-dotnet="`Squash`" pulumi-lang-go="`squash`" pulumi-lang-python="`squash`" pulumi-lang-yaml="`squash`" pulumi-lang-java="`squash`" pulumi-lang-hcl="`squash`">`squash`</span>, `fast-forward-only`, or `manually-merged`.
+        """
+        return pulumi.get(self, "default_merge_style")
 
     @_builtins.property
     @pulumi.getter
@@ -1822,6 +1947,22 @@ class Repository(pulumi.CustomResource):
     @pulumi.getter(name="repositoryId")
     def repository_id(self) -> pulumi.Output[_builtins.str]:
         return pulumi.get(self, "repository_id")
+
+    @_builtins.property
+    @pulumi.getter(name="sourceTemplate")
+    def source_template(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        The name of the template repository in format <owner>/<repository_name>
+        """
+        return pulumi.get(self, "source_template")
+
+    @_builtins.property
+    @pulumi.getter(name="sourceTemplateItems")
+    def source_template_items(self) -> pulumi.Output[Optional[Sequence[_builtins.str]]]:
+        """
+        List of items that will be used from the template.Possible values are <span pulumi-lang-nodejs="`gitcontent`" pulumi-lang-dotnet="`Gitcontent`" pulumi-lang-go="`gitcontent`" pulumi-lang-python="`gitcontent`" pulumi-lang-yaml="`gitcontent`" pulumi-lang-java="`gitcontent`" pulumi-lang-hcl="`gitcontent`">`gitcontent`</span>, <span pulumi-lang-nodejs="`githooks`" pulumi-lang-dotnet="`Githooks`" pulumi-lang-go="`githooks`" pulumi-lang-python="`githooks`" pulumi-lang-yaml="`githooks`" pulumi-lang-java="`githooks`" pulumi-lang-hcl="`githooks`">`githooks`</span>, <span pulumi-lang-nodejs="`webhooks`" pulumi-lang-dotnet="`Webhooks`" pulumi-lang-go="`webhooks`" pulumi-lang-python="`webhooks`" pulumi-lang-yaml="`webhooks`" pulumi-lang-java="`webhooks`" pulumi-lang-hcl="`webhooks`">`webhooks`</span>, <span pulumi-lang-nodejs="`topics`" pulumi-lang-dotnet="`Topics`" pulumi-lang-go="`topics`" pulumi-lang-python="`topics`" pulumi-lang-yaml="`topics`" pulumi-lang-java="`topics`" pulumi-lang-hcl="`topics`">`topics`</span>, <span pulumi-lang-nodejs="`avatar`" pulumi-lang-dotnet="`Avatar`" pulumi-lang-go="`avatar`" pulumi-lang-python="`avatar`" pulumi-lang-yaml="`avatar`" pulumi-lang-java="`avatar`" pulumi-lang-hcl="`avatar`">`avatar`</span>, <span pulumi-lang-nodejs="`labels`" pulumi-lang-dotnet="`Labels`" pulumi-lang-go="`labels`" pulumi-lang-python="`labels`" pulumi-lang-yaml="`labels`" pulumi-lang-java="`labels`" pulumi-lang-hcl="`labels`">`labels`</span>
+        """
+        return pulumi.get(self, "source_template_items")
 
     @_builtins.property
     @pulumi.getter(name="sshUrl")

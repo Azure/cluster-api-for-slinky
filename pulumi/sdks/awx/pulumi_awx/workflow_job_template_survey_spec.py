@@ -194,7 +194,7 @@ class WorkflowJobTemplateSurveySpec(pulumi.CustomResource):
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict']]]]] = None,
+                 specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict', 'outputs.WorkflowJobTemplateSurveySpecSpec']]]]] = None,
                  workflow_job_template_survey_spec_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -205,7 +205,7 @@ class WorkflowJobTemplateSurveySpec(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: The description of the job template survey spec.
         :param pulumi.Input[_builtins.float] job_template_id: The ID of the Job Template to which create the survey spec.
         :param pulumi.Input[_builtins.str] name: The name of the Job Template survey spec.
-        :param pulumi.Input[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict']]]] specs: Spec of the job template survey. One block per question in the survey.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict', 'outputs.WorkflowJobTemplateSurveySpecSpec']]]] specs: Spec of the job template survey. One block per question in the survey.
         """
         ...
     @overload
@@ -234,7 +234,7 @@ class WorkflowJobTemplateSurveySpec(pulumi.CustomResource):
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict']]]]] = None,
+                 specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict', 'outputs.WorkflowJobTemplateSurveySpecSpec']]]]] = None,
                  workflow_job_template_survey_spec_id: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -270,7 +270,7 @@ class WorkflowJobTemplateSurveySpec(pulumi.CustomResource):
             description: pulumi.Input[Optional[_builtins.str]] = None,
             job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict']]]]] = None,
+            specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict', 'outputs.WorkflowJobTemplateSurveySpecSpec']]]]] = None,
             workflow_job_template_survey_spec_id: pulumi.Input[Optional[_builtins.str]] = None) -> 'WorkflowJobTemplateSurveySpec':
         """
         Get an existing WorkflowJobTemplateSurveySpec resource's state with the given name, id, and optional extra
@@ -282,7 +282,7 @@ class WorkflowJobTemplateSurveySpec(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: The description of the job template survey spec.
         :param pulumi.Input[_builtins.float] job_template_id: The ID of the Job Template to which create the survey spec.
         :param pulumi.Input[_builtins.str] name: The name of the Job Template survey spec.
-        :param pulumi.Input[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict']]]] specs: Spec of the job template survey. One block per question in the survey.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['WorkflowJobTemplateSurveySpecSpecArgs', 'WorkflowJobTemplateSurveySpecSpecArgsDict', 'outputs.WorkflowJobTemplateSurveySpecSpec']]]] specs: Spec of the job template survey. One block per question in the survey.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 

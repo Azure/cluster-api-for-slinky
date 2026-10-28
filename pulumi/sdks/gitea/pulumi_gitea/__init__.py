@@ -7,19 +7,50 @@ from . import _utilities
 import typing
 # Export this package's modules as members:
 from .fork import *
+from .get_actions_jobs import *
+from .get_actions_runner_registration_token import *
+from .get_actions_runners import *
+from .get_actions_runs import *
+from .get_issue_attachments import *
+from .get_issue_comment_attachments import *
 from .get_org import *
+from .get_package_versions import *
+from .get_pull_request_by_base_head import *
 from .get_repo import *
+from .get_repositories import *
+from .get_repository_actions_artifact import *
+from .get_repository_actions_artifacts import *
+from .get_repository_actions_workflows import *
+from .get_repository_file import *
+from .get_repository_files import *
+from .get_repository_issue_config import *
+from .get_repository_licenses import *
+from .get_repository_signing_key import *
+from .get_repository_subscribers import *
+from .get_repository_webhook import *
+from .get_team import *
+from .get_team_members import *
+from .get_team_repository import *
+from .get_teams import *
 from .get_user import *
 from .git_hook import *
 from .gpg_key import *
+from .issue_attachment import *
+from .issue_comment_attachment import *
 from .oauth2_app import *
 from .org import *
+from .org_actions_secret import *
+from .org_actions_variable import *
 from .provider import *
 from .public_key import *
 from .repository import *
 from .repository_actions_secret import *
 from .repository_actions_variable import *
+from .repository_actions_workflow_state import *
+from .repository_branch import *
 from .repository_branch_protection import *
+from .repository_collaborator import *
+from .repository_file import *
 from .repository_key import *
 from .repository_webhook import *
 from .team import *
@@ -27,6 +58,9 @@ from .team_members import *
 from .team_membership import *
 from .token import *
 from .user import *
+from .user_actions_secret import *
+from .user_actions_variable import *
+from . import outputs
 
 # Make subpackages available:
 if typing.TYPE_CHECKING:
@@ -64,6 +98,22 @@ _utilities.register(
  },
  {
   "pkg": "gitea",
+  "mod": "index/issueAttachment",
+  "fqn": "pulumi_gitea",
+  "classes": {
+   "gitea:index/issueAttachment:IssueAttachment": "IssueAttachment"
+  }
+ },
+ {
+  "pkg": "gitea",
+  "mod": "index/issueCommentAttachment",
+  "fqn": "pulumi_gitea",
+  "classes": {
+   "gitea:index/issueCommentAttachment:IssueCommentAttachment": "IssueCommentAttachment"
+  }
+ },
+ {
+  "pkg": "gitea",
   "mod": "index/oauth2App",
   "fqn": "pulumi_gitea",
   "classes": {
@@ -76,6 +126,22 @@ _utilities.register(
   "fqn": "pulumi_gitea",
   "classes": {
    "gitea:index/org:Org": "Org"
+  }
+ },
+ {
+  "pkg": "gitea",
+  "mod": "index/orgActionsSecret",
+  "fqn": "pulumi_gitea",
+  "classes": {
+   "gitea:index/orgActionsSecret:OrgActionsSecret": "OrgActionsSecret"
+  }
+ },
+ {
+  "pkg": "gitea",
+  "mod": "index/orgActionsVariable",
+  "fqn": "pulumi_gitea",
+  "classes": {
+   "gitea:index/orgActionsVariable:OrgActionsVariable": "OrgActionsVariable"
   }
  },
  {
@@ -112,10 +178,42 @@ _utilities.register(
  },
  {
   "pkg": "gitea",
+  "mod": "index/repositoryActionsWorkflowState",
+  "fqn": "pulumi_gitea",
+  "classes": {
+   "gitea:index/repositoryActionsWorkflowState:RepositoryActionsWorkflowState": "RepositoryActionsWorkflowState"
+  }
+ },
+ {
+  "pkg": "gitea",
+  "mod": "index/repositoryBranch",
+  "fqn": "pulumi_gitea",
+  "classes": {
+   "gitea:index/repositoryBranch:RepositoryBranch": "RepositoryBranch"
+  }
+ },
+ {
+  "pkg": "gitea",
   "mod": "index/repositoryBranchProtection",
   "fqn": "pulumi_gitea",
   "classes": {
    "gitea:index/repositoryBranchProtection:RepositoryBranchProtection": "RepositoryBranchProtection"
+  }
+ },
+ {
+  "pkg": "gitea",
+  "mod": "index/repositoryCollaborator",
+  "fqn": "pulumi_gitea",
+  "classes": {
+   "gitea:index/repositoryCollaborator:RepositoryCollaborator": "RepositoryCollaborator"
+  }
+ },
+ {
+  "pkg": "gitea",
+  "mod": "index/repositoryFile",
+  "fqn": "pulumi_gitea",
+  "classes": {
+   "gitea:index/repositoryFile:RepositoryFile": "RepositoryFile"
   }
  },
  {
@@ -172,6 +270,22 @@ _utilities.register(
   "fqn": "pulumi_gitea",
   "classes": {
    "gitea:index/user:User": "User"
+  }
+ },
+ {
+  "pkg": "gitea",
+  "mod": "index/userActionsSecret",
+  "fqn": "pulumi_gitea",
+  "classes": {
+   "gitea:index/userActionsSecret:UserActionsSecret": "UserActionsSecret"
+  }
+ },
+ {
+  "pkg": "gitea",
+  "mod": "index/userActionsVariable",
+  "fqn": "pulumi_gitea",
+  "classes": {
+   "gitea:index/userActionsVariable:UserActionsVariable": "UserActionsVariable"
   }
  }
 ]

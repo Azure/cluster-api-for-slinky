@@ -25,6 +25,8 @@ class CredentialContainerRegistryArgs:
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  verify_ssl: pulumi.Input[Optional[_builtins.bool]] = None):
         """
@@ -35,6 +37,9 @@ class CredentialContainerRegistryArgs:
         :param pulumi.Input[_builtins.str] description: The description of the credential.
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.str] password: A password or token used to authenticate with.
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               A password or token used to authenticate with. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] username: The username to use for the credential.
         :param pulumi.Input[_builtins.bool] verify_ssl: Verify SSL
         """
@@ -48,6 +53,10 @@ class CredentialContainerRegistryArgs:
             pulumi.set(__self__, "name", name)
         if password is not None:
             pulumi.set(__self__, "password", password)
+        if password_wo is not None:
+            pulumi.set(__self__, "password_wo", password_wo)
+        if password_wo_version is not None:
+            pulumi.set(__self__, "password_wo_version", password_wo_version)
         if username is not None:
             pulumi.set(__self__, "username", username)
         if verify_ssl is not None:
@@ -123,6 +132,31 @@ class CredentialContainerRegistryArgs:
         pulumi.set(self, "password", value)
 
     @_builtins.property
+    @pulumi.getter(name="passwordWo")
+    def password_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        A password or token used to authenticate with. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        """
+        return pulumi.get(self, "password_wo")
+
+    @password_wo.setter
+    def password_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "password_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWoVersion")
+    def password_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "password_wo_version")
+
+    @password_wo_version.setter
+    def password_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "password_wo_version", value)
+
+    @_builtins.property
     @pulumi.getter
     def username(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -156,6 +190,8 @@ class _CredentialContainerRegistryState:
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  verify_ssl: pulumi.Input[Optional[_builtins.bool]] = None):
         """
@@ -166,6 +202,9 @@ class _CredentialContainerRegistryState:
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
         :param pulumi.Input[_builtins.str] password: A password or token used to authenticate with.
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               A password or token used to authenticate with. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] username: The username to use for the credential.
         :param pulumi.Input[_builtins.bool] verify_ssl: Verify SSL
         """
@@ -181,6 +220,10 @@ class _CredentialContainerRegistryState:
             pulumi.set(__self__, "organization_id", organization_id)
         if password is not None:
             pulumi.set(__self__, "password", password)
+        if password_wo is not None:
+            pulumi.set(__self__, "password_wo", password_wo)
+        if password_wo_version is not None:
+            pulumi.set(__self__, "password_wo_version", password_wo_version)
         if username is not None:
             pulumi.set(__self__, "username", username)
         if verify_ssl is not None:
@@ -256,6 +299,31 @@ class _CredentialContainerRegistryState:
         pulumi.set(self, "password", value)
 
     @_builtins.property
+    @pulumi.getter(name="passwordWo")
+    def password_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        A password or token used to authenticate with. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        """
+        return pulumi.get(self, "password_wo")
+
+    @password_wo.setter
+    def password_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "password_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWoVersion")
+    def password_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "password_wo_version")
+
+    @password_wo_version.setter
+    def password_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "password_wo_version", value)
+
+    @_builtins.property
     @pulumi.getter
     def username(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -292,6 +360,8 @@ class CredentialContainerRegistry(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  verify_ssl: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
@@ -305,6 +375,9 @@ class CredentialContainerRegistry(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
         :param pulumi.Input[_builtins.str] password: A password or token used to authenticate with.
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               A password or token used to authenticate with. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] username: The username to use for the credential.
         :param pulumi.Input[_builtins.bool] verify_ssl: Verify SSL
         """
@@ -338,6 +411,8 @@ class CredentialContainerRegistry(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  verify_ssl: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
@@ -359,9 +434,11 @@ class CredentialContainerRegistry(pulumi.CustomResource):
                 raise TypeError("Missing required property 'organization_id'")
             __props__.__dict__["organization_id"] = organization_id
             __props__.__dict__["password"] = None if password is None else pulumi.Output.secret(password)
+            __props__.__dict__["password_wo"] = None if password_wo is None else pulumi.Output.secret(password_wo)
+            __props__.__dict__["password_wo_version"] = password_wo_version
             __props__.__dict__["username"] = username
             __props__.__dict__["verify_ssl"] = verify_ssl
-        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["password"])
+        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["password", "passwordWo"])
         opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(CredentialContainerRegistry, __self__).__init__(
             'awx:index/credentialContainerRegistry:CredentialContainerRegistry',
@@ -380,6 +457,8 @@ class CredentialContainerRegistry(pulumi.CustomResource):
             name: pulumi.Input[Optional[_builtins.str]] = None,
             organization_id: pulumi.Input[Optional[_builtins.float]] = None,
             password: pulumi.Input[Optional[_builtins.str]] = None,
+            password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+            password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
             username: pulumi.Input[Optional[_builtins.str]] = None,
             verify_ssl: pulumi.Input[Optional[_builtins.bool]] = None) -> 'CredentialContainerRegistry':
         """
@@ -394,6 +473,9 @@ class CredentialContainerRegistry(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
         :param pulumi.Input[_builtins.str] password: A password or token used to authenticate with.
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               A password or token used to authenticate with. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] username: The username to use for the credential.
         :param pulumi.Input[_builtins.bool] verify_ssl: Verify SSL
         """
@@ -407,6 +489,8 @@ class CredentialContainerRegistry(pulumi.CustomResource):
         __props__.__dict__["name"] = name
         __props__.__dict__["organization_id"] = organization_id
         __props__.__dict__["password"] = password
+        __props__.__dict__["password_wo"] = password_wo
+        __props__.__dict__["password_wo_version"] = password_wo_version
         __props__.__dict__["username"] = username
         __props__.__dict__["verify_ssl"] = verify_ssl
         return CredentialContainerRegistry(resource_name, opts=opts, __props__=__props__)
@@ -455,6 +539,23 @@ class CredentialContainerRegistry(pulumi.CustomResource):
         A password or token used to authenticate with.
         """
         return pulumi.get(self, "password")
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWo")
+    def password_wo(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        A password or token used to authenticate with. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        """
+        return pulumi.get(self, "password_wo")
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWoVersion")
+    def password_wo_version(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "password_wo_version")
 
     @_builtins.property
     @pulumi.getter

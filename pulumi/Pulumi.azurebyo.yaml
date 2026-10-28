@@ -7,30 +7,30 @@ config:
     slurm-operator:
       builder: docker-image
       repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
-      sourceRef: refs/pull/264/head
+      sourceRef: c6837713bceb4b0c488f01cf56023e27453f05ad
       imageName: slurm-operator
       target: manager
     slurm-operator-webhook:
       builder: docker-image
       repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
-      sourceRef: refs/pull/264/head
+      sourceRef: c6837713bceb4b0c488f01cf56023e27453f05ad
       imageName: slurm-operator-webhook
       target: webhook
     slinky-charts:
       builder: slinky-charts
       repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
-      sourceRef: refs/pull/264/head
+      sourceRef: c6837713bceb4b0c488f01cf56023e27453f05ad
     capz-controller:
       builder: docker-image
       repositoryUrl: https://github.com/kubernetes-sigs/cluster-api-provider-azure.git
-      sourceRef: 69ec3a40a818ccbc32b8ce88c84609404d8cb7a2
+      sourceRef: 3d9e0c36bebc1432048148f168a9bb7415e756a7
       imageName: capz/cluster-api-azure-controller
       buildArgs:
         ARCH: amd64
     capz-provider:
       builder: capz-bundle
       repositoryUrl: https://github.com/kubernetes-sigs/cluster-api-provider-azure.git
-      sourceRef: 69ec3a40a818ccbc32b8ce88c84609404d8cb7a2
+      sourceRef: 3d9e0c36bebc1432048148f168a9bb7415e756a7
   ca4s-infra:initStack:
     controlPlane:
       infrastructureProviders:

@@ -150,7 +150,7 @@ def test_foreground_delete_annotations_preserve_existing_annotations() -> None:
 
 
 def test_api_versions_match_capz_aks_template() -> None:
-    # The CAPZ v1.24.1 AKS template pairs core CAPI v1beta1 with the infra
+    # The CAPZ v1.27.0 AKS template pairs core CAPI v1beta1 with the infra
     # v1beta1 surface. Pin both so a CAPI/CAPZ bump that drops v1beta1 fails
     # loudly in this test rather than silently at reconcile time.
     assert _CAPI_API_VERSION == "cluster.x-k8s.io/v1beta1"

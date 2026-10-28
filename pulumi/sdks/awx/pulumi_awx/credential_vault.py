@@ -19,120 +19,25 @@ __all__ = ['CredentialVaultArgs', 'CredentialVault']
 @pulumi.input_type
 class CredentialVaultArgs:
     def __init__(__self__, *,
-                 vault_password: pulumi.Input[_builtins.str],
-                 credential_vault_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 description: pulumi.Input[Optional[_builtins.str]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
-                 vault_id: pulumi.Input[Optional[_builtins.str]] = None):
-        """
-        The set of arguments for constructing a CredentialVault resource.
-
-        :param pulumi.Input[_builtins.str] vault_password: Vault Password.
-        :param pulumi.Input[_builtins.str] description: The description of the credential.
-        :param pulumi.Input[_builtins.str] name: The name of the credential.
-        :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
-        :param pulumi.Input[_builtins.str] vault_id: The vault identity to use.
-        """
-        pulumi.set(__self__, "vault_password", vault_password)
-        if credential_vault_id is not None:
-            pulumi.set(__self__, "credential_vault_id", credential_vault_id)
-        if description is not None:
-            pulumi.set(__self__, "description", description)
-        if name is not None:
-            pulumi.set(__self__, "name", name)
-        if organization_id is not None:
-            pulumi.set(__self__, "organization_id", organization_id)
-        if vault_id is not None:
-            pulumi.set(__self__, "vault_id", vault_id)
-
-    @_builtins.property
-    @pulumi.getter(name="vaultPassword")
-    def vault_password(self) -> pulumi.Input[_builtins.str]:
-        """
-        Vault Password.
-        """
-        return pulumi.get(self, "vault_password")
-
-    @vault_password.setter
-    def vault_password(self, value: pulumi.Input[_builtins.str]):
-        pulumi.set(self, "vault_password", value)
-
-    @_builtins.property
-    @pulumi.getter(name="credentialVaultId")
-    def credential_vault_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        return pulumi.get(self, "credential_vault_id")
-
-    @credential_vault_id.setter
-    def credential_vault_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "credential_vault_id", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The description of the credential.
-        """
-        return pulumi.get(self, "description")
-
-    @description.setter
-    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "description", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The name of the credential.
-        """
-        return pulumi.get(self, "name")
-
-    @name.setter
-    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "name", value)
-
-    @_builtins.property
-    @pulumi.getter(name="organizationId")
-    def organization_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The organization ID this credential belongs to.
-        """
-        return pulumi.get(self, "organization_id")
-
-    @organization_id.setter
-    def organization_id(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization_id", value)
-
-    @_builtins.property
-    @pulumi.getter(name="vaultId")
-    def vault_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The vault identity to use.
-        """
-        return pulumi.get(self, "vault_id")
-
-    @vault_id.setter
-    def vault_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "vault_id", value)
-
-
-@pulumi.input_type
-class _CredentialVaultState:
-    def __init__(__self__, *,
                  credential_vault_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  vault_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 vault_password: pulumi.Input[Optional[_builtins.str]] = None):
+                 vault_password: pulumi.Input[Optional[_builtins.str]] = None,
+                 vault_password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 vault_password_wo_version: pulumi.Input[Optional[_builtins.float]] = None):
         """
-        Input properties used for looking up and filtering CredentialVault resources.
+        The set of arguments for constructing a CredentialVault resource.
 
         :param pulumi.Input[_builtins.str] description: The description of the credential.
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
         :param pulumi.Input[_builtins.str] vault_id: The vault identity to use.
         :param pulumi.Input[_builtins.str] vault_password: Vault Password.
+        :param pulumi.Input[_builtins.str] vault_password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               Vault Password. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`vaultPassword`" pulumi-lang-dotnet="`VaultPassword`" pulumi-lang-go="`vaultPassword`" pulumi-lang-python="`vault_password`" pulumi-lang-yaml="`vaultPassword`" pulumi-lang-java="`vaultPassword`" pulumi-lang-hcl="`vault_password`">`vaultPassword`</span> for older versions.
+        :param pulumi.Input[_builtins.float] vault_password_wo_version: Version of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span> to AWX.
         """
         if credential_vault_id is not None:
             pulumi.set(__self__, "credential_vault_id", credential_vault_id)
@@ -146,6 +51,10 @@ class _CredentialVaultState:
             pulumi.set(__self__, "vault_id", vault_id)
         if vault_password is not None:
             pulumi.set(__self__, "vault_password", vault_password)
+        if vault_password_wo is not None:
+            pulumi.set(__self__, "vault_password_wo", vault_password_wo)
+        if vault_password_wo_version is not None:
+            pulumi.set(__self__, "vault_password_wo_version", vault_password_wo_version)
 
     @_builtins.property
     @pulumi.getter(name="credentialVaultId")
@@ -216,6 +125,166 @@ class _CredentialVaultState:
     def vault_password(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "vault_password", value)
 
+    @_builtins.property
+    @pulumi.getter(name="vaultPasswordWo")
+    def vault_password_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        Vault Password. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`vaultPassword`" pulumi-lang-dotnet="`VaultPassword`" pulumi-lang-go="`vaultPassword`" pulumi-lang-python="`vault_password`" pulumi-lang-yaml="`vaultPassword`" pulumi-lang-java="`vaultPassword`" pulumi-lang-hcl="`vault_password`">`vaultPassword`</span> for older versions.
+        """
+        return pulumi.get(self, "vault_password_wo")
+
+    @vault_password_wo.setter
+    def vault_password_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "vault_password_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="vaultPasswordWoVersion")
+    def vault_password_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "vault_password_wo_version")
+
+    @vault_password_wo_version.setter
+    def vault_password_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "vault_password_wo_version", value)
+
+
+@pulumi.input_type
+class _CredentialVaultState:
+    def __init__(__self__, *,
+                 credential_vault_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 vault_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 vault_password: pulumi.Input[Optional[_builtins.str]] = None,
+                 vault_password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 vault_password_wo_version: pulumi.Input[Optional[_builtins.float]] = None):
+        """
+        Input properties used for looking up and filtering CredentialVault resources.
+
+        :param pulumi.Input[_builtins.str] description: The description of the credential.
+        :param pulumi.Input[_builtins.str] name: The name of the credential.
+        :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
+        :param pulumi.Input[_builtins.str] vault_id: The vault identity to use.
+        :param pulumi.Input[_builtins.str] vault_password: Vault Password.
+        :param pulumi.Input[_builtins.str] vault_password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               Vault Password. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`vaultPassword`" pulumi-lang-dotnet="`VaultPassword`" pulumi-lang-go="`vaultPassword`" pulumi-lang-python="`vault_password`" pulumi-lang-yaml="`vaultPassword`" pulumi-lang-java="`vaultPassword`" pulumi-lang-hcl="`vault_password`">`vaultPassword`</span> for older versions.
+        :param pulumi.Input[_builtins.float] vault_password_wo_version: Version of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span> to AWX.
+        """
+        if credential_vault_id is not None:
+            pulumi.set(__self__, "credential_vault_id", credential_vault_id)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if organization_id is not None:
+            pulumi.set(__self__, "organization_id", organization_id)
+        if vault_id is not None:
+            pulumi.set(__self__, "vault_id", vault_id)
+        if vault_password is not None:
+            pulumi.set(__self__, "vault_password", vault_password)
+        if vault_password_wo is not None:
+            pulumi.set(__self__, "vault_password_wo", vault_password_wo)
+        if vault_password_wo_version is not None:
+            pulumi.set(__self__, "vault_password_wo_version", vault_password_wo_version)
+
+    @_builtins.property
+    @pulumi.getter(name="credentialVaultId")
+    def credential_vault_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "credential_vault_id")
+
+    @credential_vault_id.setter
+    def credential_vault_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "credential_vault_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The description of the credential.
+        """
+        return pulumi.get(self, "description")
+
+    @description.setter
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "description", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The name of the credential.
+        """
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "name", value)
+
+    @_builtins.property
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        The organization ID this credential belongs to.
+        """
+        return pulumi.get(self, "organization_id")
+
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "organization_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="vaultId")
+    def vault_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The vault identity to use.
+        """
+        return pulumi.get(self, "vault_id")
+
+    @vault_id.setter
+    def vault_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "vault_id", value)
+
+    @_builtins.property
+    @pulumi.getter(name="vaultPassword")
+    def vault_password(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Vault Password.
+        """
+        return pulumi.get(self, "vault_password")
+
+    @vault_password.setter
+    def vault_password(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "vault_password", value)
+
+    @_builtins.property
+    @pulumi.getter(name="vaultPasswordWo")
+    def vault_password_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        Vault Password. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`vaultPassword`" pulumi-lang-dotnet="`VaultPassword`" pulumi-lang-go="`vaultPassword`" pulumi-lang-python="`vault_password`" pulumi-lang-yaml="`vaultPassword`" pulumi-lang-java="`vaultPassword`" pulumi-lang-hcl="`vault_password`">`vaultPassword`</span> for older versions.
+        """
+        return pulumi.get(self, "vault_password_wo")
+
+    @vault_password_wo.setter
+    def vault_password_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "vault_password_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="vaultPasswordWoVersion")
+    def vault_password_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "vault_password_wo_version")
+
+    @vault_password_wo_version.setter
+    def vault_password_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "vault_password_wo_version", value)
+
 
 @pulumi.type_token("awx:index/credentialVault:CredentialVault")
 class CredentialVault(pulumi.CustomResource):
@@ -229,6 +298,8 @@ class CredentialVault(pulumi.CustomResource):
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  vault_id: pulumi.Input[Optional[_builtins.str]] = None,
                  vault_password: pulumi.Input[Optional[_builtins.str]] = None,
+                 vault_password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 vault_password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a CredentialVault resource with the given unique name, props, and options.
@@ -240,12 +311,15 @@ class CredentialVault(pulumi.CustomResource):
         :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
         :param pulumi.Input[_builtins.str] vault_id: The vault identity to use.
         :param pulumi.Input[_builtins.str] vault_password: Vault Password.
+        :param pulumi.Input[_builtins.str] vault_password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               Vault Password. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`vaultPassword`" pulumi-lang-dotnet="`VaultPassword`" pulumi-lang-go="`vaultPassword`" pulumi-lang-python="`vault_password`" pulumi-lang-yaml="`vaultPassword`" pulumi-lang-java="`vaultPassword`" pulumi-lang-hcl="`vault_password`">`vaultPassword`</span> for older versions.
+        :param pulumi.Input[_builtins.float] vault_password_wo_version: Version of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span> to AWX.
         """
         ...
     @overload
     def __init__(__self__,
                  resource_name: str,
-                 args: CredentialVaultArgs,
+                 args: Optional[CredentialVaultArgs] = None,
                  opts: Optional[pulumi.ResourceOptions] = None):
         """
         Create a CredentialVault resource with the given unique name, props, and options.
@@ -271,6 +345,8 @@ class CredentialVault(pulumi.CustomResource):
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  vault_id: pulumi.Input[Optional[_builtins.str]] = None,
                  vault_password: pulumi.Input[Optional[_builtins.str]] = None,
+                 vault_password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 vault_password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -285,10 +361,10 @@ class CredentialVault(pulumi.CustomResource):
             __props__.__dict__["name"] = name
             __props__.__dict__["organization_id"] = organization_id
             __props__.__dict__["vault_id"] = vault_id
-            if vault_password is None and not opts.urn:
-                raise TypeError("Missing required property 'vault_password'")
             __props__.__dict__["vault_password"] = None if vault_password is None else pulumi.Output.secret(vault_password)
-        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["vaultPassword"])
+            __props__.__dict__["vault_password_wo"] = None if vault_password_wo is None else pulumi.Output.secret(vault_password_wo)
+            __props__.__dict__["vault_password_wo_version"] = vault_password_wo_version
+        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["vaultPassword", "vaultPasswordWo"])
         opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(CredentialVault, __self__).__init__(
             'awx:index/credentialVault:CredentialVault',
@@ -306,7 +382,9 @@ class CredentialVault(pulumi.CustomResource):
             name: pulumi.Input[Optional[_builtins.str]] = None,
             organization_id: pulumi.Input[Optional[_builtins.float]] = None,
             vault_id: pulumi.Input[Optional[_builtins.str]] = None,
-            vault_password: pulumi.Input[Optional[_builtins.str]] = None) -> 'CredentialVault':
+            vault_password: pulumi.Input[Optional[_builtins.str]] = None,
+            vault_password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+            vault_password_wo_version: pulumi.Input[Optional[_builtins.float]] = None) -> 'CredentialVault':
         """
         Get an existing CredentialVault resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -319,6 +397,9 @@ class CredentialVault(pulumi.CustomResource):
         :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
         :param pulumi.Input[_builtins.str] vault_id: The vault identity to use.
         :param pulumi.Input[_builtins.str] vault_password: Vault Password.
+        :param pulumi.Input[_builtins.str] vault_password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               Vault Password. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`vaultPassword`" pulumi-lang-dotnet="`VaultPassword`" pulumi-lang-go="`vaultPassword`" pulumi-lang-python="`vault_password`" pulumi-lang-yaml="`vaultPassword`" pulumi-lang-java="`vaultPassword`" pulumi-lang-hcl="`vault_password`">`vaultPassword`</span> for older versions.
+        :param pulumi.Input[_builtins.float] vault_password_wo_version: Version of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span> to AWX.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -330,6 +411,8 @@ class CredentialVault(pulumi.CustomResource):
         __props__.__dict__["organization_id"] = organization_id
         __props__.__dict__["vault_id"] = vault_id
         __props__.__dict__["vault_password"] = vault_password
+        __props__.__dict__["vault_password_wo"] = vault_password_wo
+        __props__.__dict__["vault_password_wo_version"] = vault_password_wo_version
         return CredentialVault(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
@@ -371,9 +454,26 @@ class CredentialVault(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="vaultPassword")
-    def vault_password(self) -> pulumi.Output[_builtins.str]:
+    def vault_password(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         Vault Password.
         """
         return pulumi.get(self, "vault_password")
+
+    @_builtins.property
+    @pulumi.getter(name="vaultPasswordWo")
+    def vault_password_wo(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        Vault Password. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`vaultPassword`" pulumi-lang-dotnet="`VaultPassword`" pulumi-lang-go="`vaultPassword`" pulumi-lang-python="`vault_password`" pulumi-lang-yaml="`vaultPassword`" pulumi-lang-java="`vaultPassword`" pulumi-lang-hcl="`vault_password`">`vaultPassword`</span> for older versions.
+        """
+        return pulumi.get(self, "vault_password_wo")
+
+    @_builtins.property
+    @pulumi.getter(name="vaultPasswordWoVersion")
+    def vault_password_wo_version(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`vaultPasswordWo`" pulumi-lang-dotnet="`VaultPasswordWo`" pulumi-lang-go="`vaultPasswordWo`" pulumi-lang-python="`vault_password_wo`" pulumi-lang-yaml="`vaultPasswordWo`" pulumi-lang-java="`vaultPasswordWo`" pulumi-lang-hcl="`vault_password_wo`">`vaultPasswordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "vault_password_wo_version")
 

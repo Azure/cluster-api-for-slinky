@@ -6,19 +6,19 @@ config:
   ca4s-infra:builds:
     slurm-operator:
       builder: docker-image
-      sourceRef: b3ba6a462303e28f8b7c4d3988312d11de3b6fec
+      sourceRef: c6837713bceb4b0c488f01cf56023e27453f05ad
       imageName: slurm-operator
       target: manager
       repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
     slurm-operator-webhook:
       builder: docker-image
-      sourceRef: b3ba6a462303e28f8b7c4d3988312d11de3b6fec
+      sourceRef: c6837713bceb4b0c488f01cf56023e27453f05ad
       imageName: slurm-operator-webhook
       target: webhook
       repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
     slinky-charts:
       builder: slinky-charts
-      sourceRef: b3ba6a462303e28f8b7c4d3988312d11de3b6fec
+      sourceRef: c6837713bceb4b0c488f01cf56023e27453f05ad
       repositoryUrl: https://github.com/SlinkyProject/slurm-operator.git
   ca4s-infra:initStack:
     controlPlane:

@@ -23,6 +23,7 @@ class RepositoryBranchProtectionArgs:
                  username: pulumi.Input[_builtins.str],
                  approval_whitelist_teams: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  approval_whitelist_users: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 block_admin_merge_override: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_official_review_requests: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_outdated_branch: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_rejected_reviews: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -51,6 +52,7 @@ class RepositoryBranchProtectionArgs:
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] approval_whitelist_users: Only reviews from allowlisted users will count to the required
                								approvals. Without approval allowlist, reviews from anyone with
                								write access count to the required approvals.
+        :param pulumi.Input[_builtins.bool] block_admin_merge_override: Prevent admins from bypassing branch protection rules when merging.
         :param pulumi.Input[_builtins.bool] block_merge_on_official_review_requests: Merging will not be possible when it has official
                								review requests, even if there are enough approvals.
         :param pulumi.Input[_builtins.bool] block_merge_on_outdated_branch: Merging will not be possible when head branch is behind base branch.
@@ -82,6 +84,8 @@ class RepositoryBranchProtectionArgs:
             pulumi.set(__self__, "approval_whitelist_teams", approval_whitelist_teams)
         if approval_whitelist_users is not None:
             pulumi.set(__self__, "approval_whitelist_users", approval_whitelist_users)
+        if block_admin_merge_override is not None:
+            pulumi.set(__self__, "block_admin_merge_override", block_admin_merge_override)
         if block_merge_on_official_review_requests is not None:
             pulumi.set(__self__, "block_merge_on_official_review_requests", block_merge_on_official_review_requests)
         if block_merge_on_outdated_branch is not None:
@@ -168,6 +172,18 @@ class RepositoryBranchProtectionArgs:
     @approval_whitelist_users.setter
     def approval_whitelist_users(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "approval_whitelist_users", value)
+
+    @_builtins.property
+    @pulumi.getter(name="blockAdminMergeOverride")
+    def block_admin_merge_override(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Prevent admins from bypassing branch protection rules when merging.
+        """
+        return pulumi.get(self, "block_admin_merge_override")
+
+    @block_admin_merge_override.setter
+    def block_admin_merge_override(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "block_admin_merge_override", value)
 
     @_builtins.property
     @pulumi.getter(name="blockMergeOnOfficialReviewRequests")
@@ -384,6 +400,7 @@ class _RepositoryBranchProtectionState:
     def __init__(__self__, *,
                  approval_whitelist_teams: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  approval_whitelist_users: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 block_admin_merge_override: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_official_review_requests: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_outdated_branch: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_rejected_reviews: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -418,6 +435,7 @@ class _RepositoryBranchProtectionState:
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] approval_whitelist_users: Only reviews from allowlisted users will count to the required
                								approvals. Without approval allowlist, reviews from anyone with
                								write access count to the required approvals.
+        :param pulumi.Input[_builtins.bool] block_admin_merge_override: Prevent admins from bypassing branch protection rules when merging.
         :param pulumi.Input[_builtins.bool] block_merge_on_official_review_requests: Merging will not be possible when it has official
                								review requests, even if there are enough approvals.
         :param pulumi.Input[_builtins.bool] block_merge_on_outdated_branch: Merging will not be possible when head branch is behind base branch.
@@ -459,6 +477,8 @@ class _RepositoryBranchProtectionState:
             pulumi.set(__self__, "approval_whitelist_teams", approval_whitelist_teams)
         if approval_whitelist_users is not None:
             pulumi.set(__self__, "approval_whitelist_users", approval_whitelist_users)
+        if block_admin_merge_override is not None:
+            pulumi.set(__self__, "block_admin_merge_override", block_admin_merge_override)
         if block_merge_on_official_review_requests is not None:
             pulumi.set(__self__, "block_merge_on_official_review_requests", block_merge_on_official_review_requests)
         if block_merge_on_outdated_branch is not None:
@@ -537,6 +557,18 @@ class _RepositoryBranchProtectionState:
     @approval_whitelist_users.setter
     def approval_whitelist_users(self, value: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]]):
         pulumi.set(self, "approval_whitelist_users", value)
+
+    @_builtins.property
+    @pulumi.getter(name="blockAdminMergeOverride")
+    def block_admin_merge_override(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Prevent admins from bypassing branch protection rules when merging.
+        """
+        return pulumi.get(self, "block_admin_merge_override")
+
+    @block_admin_merge_override.setter
+    def block_admin_merge_override(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "block_admin_merge_override", value)
 
     @_builtins.property
     @pulumi.getter(name="blockMergeOnOfficialReviewRequests")
@@ -856,6 +888,7 @@ class RepositoryBranchProtection(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  approval_whitelist_teams: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  approval_whitelist_users: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 block_admin_merge_override: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_official_review_requests: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_outdated_branch: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_rejected_reviews: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -887,6 +920,7 @@ class RepositoryBranchProtection(pulumi.CustomResource):
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] approval_whitelist_users: Only reviews from allowlisted users will count to the required
                								approvals. Without approval allowlist, reviews from anyone with
                								write access count to the required approvals.
+        :param pulumi.Input[_builtins.bool] block_admin_merge_override: Prevent admins from bypassing branch protection rules when merging.
         :param pulumi.Input[_builtins.bool] block_merge_on_official_review_requests: Merging will not be possible when it has official
                								review requests, even if there are enough approvals.
         :param pulumi.Input[_builtins.bool] block_merge_on_outdated_branch: Merging will not be possible when head branch is behind base branch.
@@ -940,6 +974,7 @@ class RepositoryBranchProtection(pulumi.CustomResource):
                  opts: Optional[pulumi.ResourceOptions] = None,
                  approval_whitelist_teams: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  approval_whitelist_users: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+                 block_admin_merge_override: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_official_review_requests: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_outdated_branch: pulumi.Input[Optional[_builtins.bool]] = None,
                  block_merge_on_rejected_reviews: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -970,6 +1005,7 @@ class RepositoryBranchProtection(pulumi.CustomResource):
 
             __props__.__dict__["approval_whitelist_teams"] = approval_whitelist_teams
             __props__.__dict__["approval_whitelist_users"] = approval_whitelist_users
+            __props__.__dict__["block_admin_merge_override"] = block_admin_merge_override
             __props__.__dict__["block_merge_on_official_review_requests"] = block_merge_on_official_review_requests
             __props__.__dict__["block_merge_on_outdated_branch"] = block_merge_on_outdated_branch
             __props__.__dict__["block_merge_on_rejected_reviews"] = block_merge_on_rejected_reviews
@@ -1012,6 +1048,7 @@ class RepositoryBranchProtection(pulumi.CustomResource):
             opts: Optional[pulumi.ResourceOptions] = None,
             approval_whitelist_teams: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
             approval_whitelist_users: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
+            block_admin_merge_override: pulumi.Input[Optional[_builtins.bool]] = None,
             block_merge_on_official_review_requests: pulumi.Input[Optional[_builtins.bool]] = None,
             block_merge_on_outdated_branch: pulumi.Input[Optional[_builtins.bool]] = None,
             block_merge_on_rejected_reviews: pulumi.Input[Optional[_builtins.bool]] = None,
@@ -1050,6 +1087,7 @@ class RepositoryBranchProtection(pulumi.CustomResource):
         :param pulumi.Input[Sequence[pulumi.Input[_builtins.str]]] approval_whitelist_users: Only reviews from allowlisted users will count to the required
                								approvals. Without approval allowlist, reviews from anyone with
                								write access count to the required approvals.
+        :param pulumi.Input[_builtins.bool] block_admin_merge_override: Prevent admins from bypassing branch protection rules when merging.
         :param pulumi.Input[_builtins.bool] block_merge_on_official_review_requests: Merging will not be possible when it has official
                								review requests, even if there are enough approvals.
         :param pulumi.Input[_builtins.bool] block_merge_on_outdated_branch: Merging will not be possible when head branch is behind base branch.
@@ -1093,6 +1131,7 @@ class RepositoryBranchProtection(pulumi.CustomResource):
 
         __props__.__dict__["approval_whitelist_teams"] = approval_whitelist_teams
         __props__.__dict__["approval_whitelist_users"] = approval_whitelist_users
+        __props__.__dict__["block_admin_merge_override"] = block_admin_merge_override
         __props__.__dict__["block_merge_on_official_review_requests"] = block_merge_on_official_review_requests
         __props__.__dict__["block_merge_on_outdated_branch"] = block_merge_on_outdated_branch
         __props__.__dict__["block_merge_on_rejected_reviews"] = block_merge_on_rejected_reviews
@@ -1139,6 +1178,14 @@ class RepositoryBranchProtection(pulumi.CustomResource):
         								write access count to the required approvals.
         """
         return pulumi.get(self, "approval_whitelist_users")
+
+    @_builtins.property
+    @pulumi.getter(name="blockAdminMergeOverride")
+    def block_admin_merge_override(self) -> pulumi.Output[Optional[_builtins.bool]]:
+        """
+        Prevent admins from bypassing branch protection rules when merging.
+        """
+        return pulumi.get(self, "block_admin_merge_override")
 
     @_builtins.property
     @pulumi.getter(name="blockMergeOnOfficialReviewRequests")

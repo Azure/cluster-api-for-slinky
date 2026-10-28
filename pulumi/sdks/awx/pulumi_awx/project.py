@@ -478,7 +478,7 @@ class Project(pulumi.CustomResource):
                  scm_update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  scm_url: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeouts: pulumi.Input[Optional[Union['ProjectTimeoutsArgs', 'ProjectTimeoutsArgsDict']]] = None,
+                 timeouts: pulumi.Input[Optional[Union['ProjectTimeoutsArgs', 'ProjectTimeoutsArgsDict', 'outputs.ProjectTimeouts']]] = None,
                  __props__=None):
         """
         Create a Project resource with the given unique name, props, and options.
@@ -532,7 +532,7 @@ class Project(pulumi.CustomResource):
                  scm_update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
                  scm_update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
                  scm_url: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeouts: pulumi.Input[Optional[Union['ProjectTimeoutsArgs', 'ProjectTimeoutsArgsDict']]] = None,
+                 timeouts: pulumi.Input[Optional[Union['ProjectTimeoutsArgs', 'ProjectTimeoutsArgsDict', 'outputs.ProjectTimeouts']]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -586,7 +586,7 @@ class Project(pulumi.CustomResource):
             scm_update_cache_timeout: pulumi.Input[Optional[_builtins.float]] = None,
             scm_update_on_launch: pulumi.Input[Optional[_builtins.bool]] = None,
             scm_url: pulumi.Input[Optional[_builtins.str]] = None,
-            timeouts: pulumi.Input[Optional[Union['ProjectTimeoutsArgs', 'ProjectTimeoutsArgsDict']]] = None) -> 'Project':
+            timeouts: pulumi.Input[Optional[Union['ProjectTimeoutsArgs', 'ProjectTimeoutsArgsDict', 'outputs.ProjectTimeouts']]] = None) -> 'Project':
         """
         Get an existing Project resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.

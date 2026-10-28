@@ -25,7 +25,9 @@ class CredentialGalaxyArgs:
                  credential_galaxy_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 token: pulumi.Input[Optional[_builtins.str]] = None):
+                 token: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo_version: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a CredentialGalaxy resource.
 
@@ -35,6 +37,9 @@ class CredentialGalaxyArgs:
         :param pulumi.Input[_builtins.str] description: The description of the credential.
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.str] token: The API token for the Ansible Galaxy/Automation Hub API.
+        :param pulumi.Input[_builtins.str] token_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The API token for the Ansible Galaxy/Automation Hub API. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        :param pulumi.Input[_builtins.float] token_wo_version: Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
         """
         pulumi.set(__self__, "organization_id", organization_id)
         pulumi.set(__self__, "url", url)
@@ -48,6 +53,10 @@ class CredentialGalaxyArgs:
             pulumi.set(__self__, "name", name)
         if token is not None:
             pulumi.set(__self__, "token", token)
+        if token_wo is not None:
+            pulumi.set(__self__, "token_wo", token_wo)
+        if token_wo_version is not None:
+            pulumi.set(__self__, "token_wo_version", token_wo_version)
 
     @_builtins.property
     @pulumi.getter(name="organizationId")
@@ -130,6 +139,31 @@ class CredentialGalaxyArgs:
     def token(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "token", value)
 
+    @_builtins.property
+    @pulumi.getter(name="tokenWo")
+    def token_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The API token for the Ansible Galaxy/Automation Hub API. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        """
+        return pulumi.get(self, "token_wo")
+
+    @token_wo.setter
+    def token_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "token_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="tokenWoVersion")
+    def token_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
+        """
+        return pulumi.get(self, "token_wo_version")
+
+    @token_wo_version.setter
+    def token_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "token_wo_version", value)
+
 
 @pulumi.input_type
 class _CredentialGalaxyState:
@@ -140,6 +174,8 @@ class _CredentialGalaxyState:
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  token: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  url: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering CredentialGalaxy resources.
@@ -149,6 +185,9 @@ class _CredentialGalaxyState:
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization that the credential belongs to.
         :param pulumi.Input[_builtins.str] token: The API token for the Ansible Galaxy/Automation Hub API.
+        :param pulumi.Input[_builtins.str] token_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The API token for the Ansible Galaxy/Automation Hub API. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        :param pulumi.Input[_builtins.float] token_wo_version: Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] url: The URL of the Ansible Galaxy/Automation Hub API.
         """
         if auth_url is not None:
@@ -163,6 +202,10 @@ class _CredentialGalaxyState:
             pulumi.set(__self__, "organization_id", organization_id)
         if token is not None:
             pulumi.set(__self__, "token", token)
+        if token_wo is not None:
+            pulumi.set(__self__, "token_wo", token_wo)
+        if token_wo_version is not None:
+            pulumi.set(__self__, "token_wo_version", token_wo_version)
         if url is not None:
             pulumi.set(__self__, "url", url)
 
@@ -236,6 +279,31 @@ class _CredentialGalaxyState:
         pulumi.set(self, "token", value)
 
     @_builtins.property
+    @pulumi.getter(name="tokenWo")
+    def token_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The API token for the Ansible Galaxy/Automation Hub API. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        """
+        return pulumi.get(self, "token_wo")
+
+    @token_wo.setter
+    def token_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "token_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="tokenWoVersion")
+    def token_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
+        """
+        return pulumi.get(self, "token_wo_version")
+
+    @token_wo_version.setter
+    def token_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "token_wo_version", value)
+
+    @_builtins.property
     @pulumi.getter
     def url(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -260,6 +328,8 @@ class CredentialGalaxy(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  token: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  url: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -272,6 +342,9 @@ class CredentialGalaxy(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization that the credential belongs to.
         :param pulumi.Input[_builtins.str] token: The API token for the Ansible Galaxy/Automation Hub API.
+        :param pulumi.Input[_builtins.str] token_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The API token for the Ansible Galaxy/Automation Hub API. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        :param pulumi.Input[_builtins.float] token_wo_version: Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] url: The URL of the Ansible Galaxy/Automation Hub API.
         """
         ...
@@ -304,6 +377,8 @@ class CredentialGalaxy(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  token: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  url: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -322,10 +397,12 @@ class CredentialGalaxy(pulumi.CustomResource):
                 raise TypeError("Missing required property 'organization_id'")
             __props__.__dict__["organization_id"] = organization_id
             __props__.__dict__["token"] = None if token is None else pulumi.Output.secret(token)
+            __props__.__dict__["token_wo"] = None if token_wo is None else pulumi.Output.secret(token_wo)
+            __props__.__dict__["token_wo_version"] = token_wo_version
             if url is None and not opts.urn:
                 raise TypeError("Missing required property 'url'")
             __props__.__dict__["url"] = url
-        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["token"])
+        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["token", "tokenWo"])
         opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(CredentialGalaxy, __self__).__init__(
             'awx:index/credentialGalaxy:CredentialGalaxy',
@@ -344,6 +421,8 @@ class CredentialGalaxy(pulumi.CustomResource):
             name: pulumi.Input[Optional[_builtins.str]] = None,
             organization_id: pulumi.Input[Optional[_builtins.float]] = None,
             token: pulumi.Input[Optional[_builtins.str]] = None,
+            token_wo: pulumi.Input[Optional[_builtins.str]] = None,
+            token_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
             url: pulumi.Input[Optional[_builtins.str]] = None) -> 'CredentialGalaxy':
         """
         Get an existing CredentialGalaxy resource's state with the given name, id, and optional extra
@@ -357,6 +436,9 @@ class CredentialGalaxy(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization that the credential belongs to.
         :param pulumi.Input[_builtins.str] token: The API token for the Ansible Galaxy/Automation Hub API.
+        :param pulumi.Input[_builtins.str] token_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The API token for the Ansible Galaxy/Automation Hub API. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        :param pulumi.Input[_builtins.float] token_wo_version: Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] url: The URL of the Ansible Galaxy/Automation Hub API.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -369,6 +451,8 @@ class CredentialGalaxy(pulumi.CustomResource):
         __props__.__dict__["name"] = name
         __props__.__dict__["organization_id"] = organization_id
         __props__.__dict__["token"] = token
+        __props__.__dict__["token_wo"] = token_wo
+        __props__.__dict__["token_wo_version"] = token_wo_version
         __props__.__dict__["url"] = url
         return CredentialGalaxy(resource_name, opts=opts, __props__=__props__)
 
@@ -416,6 +500,23 @@ class CredentialGalaxy(pulumi.CustomResource):
         The API token for the Ansible Galaxy/Automation Hub API.
         """
         return pulumi.get(self, "token")
+
+    @_builtins.property
+    @pulumi.getter(name="tokenWo")
+    def token_wo(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The API token for the Ansible Galaxy/Automation Hub API. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        """
+        return pulumi.get(self, "token_wo")
+
+    @_builtins.property
+    @pulumi.getter(name="tokenWoVersion")
+    def token_wo_version(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
+        """
+        return pulumi.get(self, "token_wo_version")
 
     @_builtins.property
     @pulumi.getter

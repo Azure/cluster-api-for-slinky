@@ -26,7 +26,7 @@ class GetRepoResult:
     """
     A collection of values returned by getRepo.
     """
-    def __init__(__self__, clone_url=None, created=None, default_branch=None, description=None, fork=None, forks=None, full_name=None, html_url=None, id=None, mirror=None, name=None, open_issue_count=None, permission_admin=None, permission_pull=None, permission_push=None, private=None, size=None, ssh_url=None, stars=None, updated=None, username=None, watchers=None, website=None):
+    def __init__(__self__, clone_url=None, created=None, default_branch=None, default_merge_style=None, description=None, fork=None, forks=None, full_name=None, html_url=None, id=None, mirror=None, name=None, open_issue_count=None, permission_admin=None, permission_pull=None, permission_push=None, private=None, size=None, ssh_url=None, stars=None, updated=None, username=None, watchers=None, website=None):
         if clone_url and not isinstance(clone_url, str):
             raise TypeError("Expected argument 'clone_url' to be a str")
         pulumi.set(__self__, "clone_url", clone_url)
@@ -36,6 +36,9 @@ class GetRepoResult:
         if default_branch and not isinstance(default_branch, str):
             raise TypeError("Expected argument 'default_branch' to be a str")
         pulumi.set(__self__, "default_branch", default_branch)
+        if default_merge_style and not isinstance(default_merge_style, str):
+            raise TypeError("Expected argument 'default_merge_style' to be a str")
+        pulumi.set(__self__, "default_merge_style", default_merge_style)
         if description and not isinstance(description, str):
             raise TypeError("Expected argument 'description' to be a str")
         pulumi.set(__self__, "description", description)
@@ -111,6 +114,11 @@ class GetRepoResult:
     @pulumi.getter(name="defaultBranch")
     def default_branch(self) -> _builtins.str:
         return pulumi.get(self, "default_branch")
+
+    @_builtins.property
+    @pulumi.getter(name="defaultMergeStyle")
+    def default_merge_style(self) -> _builtins.str:
+        return pulumi.get(self, "default_merge_style")
 
     @_builtins.property
     @pulumi.getter
@@ -222,6 +230,7 @@ class AwaitableGetRepoResult(GetRepoResult):
             clone_url=self.clone_url,
             created=self.created,
             default_branch=self.default_branch,
+            default_merge_style=self.default_merge_style,
             description=self.description,
             fork=self.fork,
             forks=self.forks,
@@ -262,6 +271,7 @@ def get_repo(id: Optional[_builtins.str] = None,
         clone_url=pulumi.get(__ret__, 'clone_url'),
         created=pulumi.get(__ret__, 'created'),
         default_branch=pulumi.get(__ret__, 'default_branch'),
+        default_merge_style=pulumi.get(__ret__, 'default_merge_style'),
         description=pulumi.get(__ret__, 'description'),
         fork=pulumi.get(__ret__, 'fork'),
         forks=pulumi.get(__ret__, 'forks'),
@@ -299,6 +309,7 @@ def get_repo_output(id: pulumi.Input[Optional[Optional[_builtins.str]]] = None,
         clone_url=pulumi.get(__response__, 'clone_url'),
         created=pulumi.get(__response__, 'created'),
         default_branch=pulumi.get(__response__, 'default_branch'),
+        default_merge_style=pulumi.get(__response__, 'default_merge_style'),
         description=pulumi.get(__response__, 'description'),
         fork=pulumi.get(__response__, 'fork'),
         forks=pulumi.get(__response__, 'forks'),

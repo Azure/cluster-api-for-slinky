@@ -1,6 +1,6 @@
 # CAPI core CRD SDK
 
-Generated Python Pulumi shim for Cluster API core CRDs from CAPI `v1.13.2`.
+Generated Python Pulumi shim for Cluster API core CRDs from CAPI `v1.14.3`.
 
 The source URL, checksum, generator version, package name, dependency version,
 and license are pinned in `pulumi/sdks/sources.json`.

@@ -21,11 +21,18 @@ Install the following:
 | Tool | Purpose | Install |
 |---|---|---|
 | [Docker](https://docs.docker.com/engine/install/) | Container runtime hosting both the kind nodes and the CAPD workload-cluster containers | see *Recommended local setup* below |
-| [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) | Spins up the management Kubernetes cluster | `go install sigs.k8s.io/kind@latest` |
-| [`cloud-provider-kind`](https://github.com/kubernetes-sigs/cloud-provider-kind) | Host-side daemon that makes `type: LoadBalancer` Services on kind reachable from the host (Pulumi spawns/kills it via the `CloudProviderKind` resource) | `go install sigs.k8s.io/cloud-provider-kind@latest` |
-| [`ctlptl`](https://github.com/tilt-dev/ctlptl) | Declarative front-end that wraps `kind` to create the management cluster + local image registry (driven by Pulumi, see below) | `go install github.com/tilt-dev/ctlptl/cmd/ctlptl@latest` |
+| [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) | Spins up the management Kubernetes cluster | `go install sigs.k8s.io/kind@v0.33.0` |
+| [`cloud-provider-kind`](https://github.com/kubernetes-sigs/cloud-provider-kind) | Host-side daemon that makes `type: LoadBalancer` Services on kind reachable from the host (Pulumi spawns/kills it via the `CloudProviderKind` resource) | `go install sigs.k8s.io/cloud-provider-kind@v0.12.0` |
+| [`ctlptl`](https://github.com/tilt-dev/ctlptl) | Declarative front-end that wraps `kind` to create the management cluster + local image registry (driven by Pulumi, see below) | `go install github.com/tilt-dev/ctlptl/cmd/ctlptl@v0.9.6` |
 | [`pulumi`](https://www.pulumi.com/docs/install/) | Drives the local bootstrap stack ([`pulumi/`](pulumi/)), which is the supported way to bring up the management cluster, GitOps source, PKO, AWX, and local workload cluster | `curl -fsSL https://get.pulumi.com \| sh` |
 | `kubectl`, `helm` | Standard inspection and recovery tooling for the managed local stack | upstream binaries |
+
+Use Pulumi CLI `3.272.0`, matching the PKO Python workspace image and Python SDK
+minimum, and Helm `3.22.1`. The tested management and local workload node image
+is Kubernetes `1.36.4`, pinned by digest. `kubectl 1.35.9` supports both these
+clusters and the AKS sample's `1.34` default; choose a different client if your
+managed-cluster version requires it. Changing the Kind node-image pin requires
+recreating existing local clusters.
 
 ### Recommended local setup
 

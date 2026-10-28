@@ -62,6 +62,7 @@ def test_cluster_autoscaler_values_use_secret_backed_workload_kubeconfig() -> No
 
     assert values["fullnameOverride"] == "local-cluster-autoscaler"
     assert values["cloudProvider"] == "clusterapi"
+    assert values["image"] == {"tag": "v1.36.1"}
     assert values["clusterAPIMode"] == "kubeconfig-incluster"
     assert values["clusterAPIKubeconfigSecret"] == "local-autoscaler-kubeconfig"
     assert values["clusterAPIWorkloadKubeconfigPath"] == "/etc/kubernetes/value"

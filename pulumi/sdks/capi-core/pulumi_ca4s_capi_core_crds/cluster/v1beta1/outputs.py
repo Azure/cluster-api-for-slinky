@@ -254,9 +254,17 @@ __all__ = [
     'ClusterStatusV1beta2ConditionsPatch',
     'ClusterStatusV1beta2ControlPlane',
     'ClusterStatusV1beta2ControlPlanePatch',
+    'ClusterStatusV1beta2ControlPlaneUpgradePlan',
+    'ClusterStatusV1beta2ControlPlaneUpgradePlanPatch',
+    'ClusterStatusV1beta2ControlPlaneVersions',
+    'ClusterStatusV1beta2ControlPlaneVersionsPatch',
     'ClusterStatusV1beta2Patch',
     'ClusterStatusV1beta2Workers',
     'ClusterStatusV1beta2WorkersPatch',
+    'ClusterStatusV1beta2WorkersUpgradePlan',
+    'ClusterStatusV1beta2WorkersUpgradePlanPatch',
+    'ClusterStatusV1beta2WorkersVersions',
+    'ClusterStatusV1beta2WorkersVersionsPatch',
     'Machine',
     'MachineDeployment',
     'MachineDeploymentSpec',
@@ -297,6 +305,8 @@ __all__ = [
     'MachineDeploymentStatusV1beta2Conditions',
     'MachineDeploymentStatusV1beta2ConditionsPatch',
     'MachineDeploymentStatusV1beta2Patch',
+    'MachineDeploymentStatusVersions',
+    'MachineDeploymentStatusVersionsPatch',
     'MachineDrainRule',
     'MachineDrainRuleSpec',
     'MachineDrainRuleSpecDrain',
@@ -372,6 +382,8 @@ __all__ = [
     'MachinePoolStatusV1beta2Conditions',
     'MachinePoolStatusV1beta2ConditionsPatch',
     'MachinePoolStatusV1beta2Patch',
+    'MachinePoolStatusVersions',
+    'MachinePoolStatusVersionsPatch',
     'MachineSet',
     'MachineSetSpec',
     'MachineSetSpecMachineNamingStrategy',
@@ -405,6 +417,8 @@ __all__ = [
     'MachineSetStatusV1beta2Conditions',
     'MachineSetStatusV1beta2ConditionsPatch',
     'MachineSetStatusV1beta2Patch',
+    'MachineSetStatusVersions',
+    'MachineSetStatusVersionsPatch',
     'MachineSpec',
     'MachineSpecBootstrap',
     'MachineSpecBootstrapConfigRef',
@@ -8764,7 +8778,7 @@ class ClusterClassSpecWorkersMachineDeploymentsStrategyRollingUpdate(dict):
         MachineDeploymentStrategyType = RollingUpdate.
 
         :param _builtins.str delete_policy: deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-               Valid values are "Random, "Newest", "Oldest"
+               Valid values are "Random", "Newest", "Oldest"
                When no value is supplied, the default DeletePolicy of MachineSet is used
         :param Union[_builtins.int, _builtins.str] max_surge: maxSurge is the maximum number of machines that can be scheduled above the
                desired number of machines.
@@ -8804,7 +8818,7 @@ class ClusterClassSpecWorkersMachineDeploymentsStrategyRollingUpdate(dict):
     def delete_policy(self) -> Optional[_builtins.str]:
         """
         deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-        Valid values are "Random, "Newest", "Oldest"
+        Valid values are "Random", "Newest", "Oldest"
         When no value is supplied, the default DeletePolicy of MachineSet is used
         """
         return pulumi.get(self, "delete_policy")
@@ -8885,7 +8899,7 @@ class ClusterClassSpecWorkersMachineDeploymentsStrategyRollingUpdatePatch(dict):
         MachineDeploymentStrategyType = RollingUpdate.
 
         :param _builtins.str delete_policy: deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-               Valid values are "Random, "Newest", "Oldest"
+               Valid values are "Random", "Newest", "Oldest"
                When no value is supplied, the default DeletePolicy of MachineSet is used
         :param Union[_builtins.int, _builtins.str] max_surge: maxSurge is the maximum number of machines that can be scheduled above the
                desired number of machines.
@@ -8925,7 +8939,7 @@ class ClusterClassSpecWorkersMachineDeploymentsStrategyRollingUpdatePatch(dict):
     def delete_policy(self) -> Optional[_builtins.str]:
         """
         deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-        Valid values are "Random, "Newest", "Oldest"
+        Valid values are "Random", "Newest", "Oldest"
         When no value is supplied, the default DeletePolicy of MachineSet is used
         """
         return pulumi.get(self, "delete_policy")
@@ -19914,7 +19928,7 @@ class ClusterSpecTopologyWorkersMachineDeploymentsStrategyRollingUpdate(dict):
         MachineDeploymentStrategyType = RollingUpdate.
 
         :param _builtins.str delete_policy: deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-               Valid values are "Random, "Newest", "Oldest"
+               Valid values are "Random", "Newest", "Oldest"
                When no value is supplied, the default DeletePolicy of MachineSet is used
         :param Union[_builtins.int, _builtins.str] max_surge: maxSurge is the maximum number of machines that can be scheduled above the
                desired number of machines.
@@ -19954,7 +19968,7 @@ class ClusterSpecTopologyWorkersMachineDeploymentsStrategyRollingUpdate(dict):
     def delete_policy(self) -> Optional[_builtins.str]:
         """
         deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-        Valid values are "Random, "Newest", "Oldest"
+        Valid values are "Random", "Newest", "Oldest"
         When no value is supplied, the default DeletePolicy of MachineSet is used
         """
         return pulumi.get(self, "delete_policy")
@@ -20035,7 +20049,7 @@ class ClusterSpecTopologyWorkersMachineDeploymentsStrategyRollingUpdatePatch(dic
         MachineDeploymentStrategyType = RollingUpdate.
 
         :param _builtins.str delete_policy: deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-               Valid values are "Random, "Newest", "Oldest"
+               Valid values are "Random", "Newest", "Oldest"
                When no value is supplied, the default DeletePolicy of MachineSet is used
         :param Union[_builtins.int, _builtins.str] max_surge: maxSurge is the maximum number of machines that can be scheduled above the
                desired number of machines.
@@ -20075,7 +20089,7 @@ class ClusterSpecTopologyWorkersMachineDeploymentsStrategyRollingUpdatePatch(dic
     def delete_policy(self) -> Optional[_builtins.str]:
         """
         deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-        Valid values are "Random, "Newest", "Oldest"
+        Valid values are "Random", "Newest", "Oldest"
         When no value is supplied, the default DeletePolicy of MachineSet is used
         """
         return pulumi.get(self, "delete_policy")
@@ -22316,6 +22330,8 @@ class ClusterStatusV1beta2ControlPlane(dict):
             suggest = "ready_replicas"
         elif key == "upToDateReplicas":
             suggest = "up_to_date_replicas"
+        elif key == "upgradePlan":
+            suggest = "upgrade_plan"
 
         if suggest:
             pulumi.log.warn(f"Key '{key}' not found in ClusterStatusV1beta2ControlPlane. Access the value via the '{suggest}' property getter instead.")
@@ -22333,7 +22349,9 @@ class ClusterStatusV1beta2ControlPlane(dict):
                  desired_replicas: Optional[_builtins.int] = None,
                  ready_replicas: Optional[_builtins.int] = None,
                  replicas: Optional[_builtins.int] = None,
-                 up_to_date_replicas: Optional[_builtins.int] = None):
+                 up_to_date_replicas: Optional[_builtins.int] = None,
+                 upgrade_plan: Optional[Sequence['outputs.ClusterStatusV1beta2ControlPlaneUpgradePlan']] = None,
+                 versions: Optional[Sequence['outputs.ClusterStatusV1beta2ControlPlaneVersions']] = None):
         """
         controlPlane groups all the observations about Cluster's ControlPlane current state.
 
@@ -22343,6 +22361,14 @@ class ClusterStatusV1beta2ControlPlane(dict):
         :param _builtins.int replicas: replicas is the total number of control plane machines in this cluster.
                NOTE: replicas also includes machines still being provisioned or being deleted.
         :param _builtins.int up_to_date_replicas: upToDateReplicas is the number of up-to-date control plane machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
+        :param Sequence['ClusterStatusV1beta2ControlPlaneUpgradePlanArgs'] upgrade_plan: upgradePlan reports the list of versions that would be applied to the control plane object according to the upgrade plan.
+               Note:
+               - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+               - Once a version is applied to the control plane object, it is removed from the list (after a version
+                 is applied to a control plane object, it might take some time for the actual upgrade to complete)
+               - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+                 report only the last known upgrade plan.
+        :param Sequence['ClusterStatusV1beta2ControlPlaneVersionsArgs'] versions: versions is the aggregated Kubernetes versions in this control plane.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -22354,6 +22380,10 @@ class ClusterStatusV1beta2ControlPlane(dict):
             pulumi.set(__self__, "replicas", replicas)
         if up_to_date_replicas is not None:
             pulumi.set(__self__, "up_to_date_replicas", up_to_date_replicas)
+        if upgrade_plan is not None:
+            pulumi.set(__self__, "upgrade_plan", upgrade_plan)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -22395,6 +22425,28 @@ class ClusterStatusV1beta2ControlPlane(dict):
         upToDateReplicas is the number of up-to-date control plane machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
         """
         return pulumi.get(self, "up_to_date_replicas")
+
+    @_builtins.property
+    @pulumi.getter(name="upgradePlan")
+    def upgrade_plan(self) -> Optional[Sequence['outputs.ClusterStatusV1beta2ControlPlaneUpgradePlan']]:
+        """
+        upgradePlan reports the list of versions that would be applied to the control plane object according to the upgrade plan.
+        Note:
+        - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+        - Once a version is applied to the control plane object, it is removed from the list (after a version
+          is applied to a control plane object, it might take some time for the actual upgrade to complete)
+        - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+          report only the last known upgrade plan.
+        """
+        return pulumi.get(self, "upgrade_plan")
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> Optional[Sequence['outputs.ClusterStatusV1beta2ControlPlaneVersions']]:
+        """
+        versions is the aggregated Kubernetes versions in this control plane.
+        """
+        return pulumi.get(self, "versions")
 
 
 @pulumi.output_type
@@ -22413,6 +22465,8 @@ class ClusterStatusV1beta2ControlPlanePatch(dict):
             suggest = "ready_replicas"
         elif key == "upToDateReplicas":
             suggest = "up_to_date_replicas"
+        elif key == "upgradePlan":
+            suggest = "upgrade_plan"
 
         if suggest:
             pulumi.log.warn(f"Key '{key}' not found in ClusterStatusV1beta2ControlPlanePatch. Access the value via the '{suggest}' property getter instead.")
@@ -22430,7 +22484,9 @@ class ClusterStatusV1beta2ControlPlanePatch(dict):
                  desired_replicas: Optional[_builtins.int] = None,
                  ready_replicas: Optional[_builtins.int] = None,
                  replicas: Optional[_builtins.int] = None,
-                 up_to_date_replicas: Optional[_builtins.int] = None):
+                 up_to_date_replicas: Optional[_builtins.int] = None,
+                 upgrade_plan: Optional[Sequence['outputs.ClusterStatusV1beta2ControlPlaneUpgradePlanPatch']] = None,
+                 versions: Optional[Sequence['outputs.ClusterStatusV1beta2ControlPlaneVersionsPatch']] = None):
         """
         controlPlane groups all the observations about Cluster's ControlPlane current state.
 
@@ -22440,6 +22496,14 @@ class ClusterStatusV1beta2ControlPlanePatch(dict):
         :param _builtins.int replicas: replicas is the total number of control plane machines in this cluster.
                NOTE: replicas also includes machines still being provisioned or being deleted.
         :param _builtins.int up_to_date_replicas: upToDateReplicas is the number of up-to-date control plane machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
+        :param Sequence['ClusterStatusV1beta2ControlPlaneUpgradePlanPatchArgs'] upgrade_plan: upgradePlan reports the list of versions that would be applied to the control plane object according to the upgrade plan.
+               Note:
+               - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+               - Once a version is applied to the control plane object, it is removed from the list (after a version
+                 is applied to a control plane object, it might take some time for the actual upgrade to complete)
+               - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+                 report only the last known upgrade plan.
+        :param Sequence['ClusterStatusV1beta2ControlPlaneVersionsPatchArgs'] versions: versions is the aggregated Kubernetes versions in this control plane.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -22451,6 +22515,10 @@ class ClusterStatusV1beta2ControlPlanePatch(dict):
             pulumi.set(__self__, "replicas", replicas)
         if up_to_date_replicas is not None:
             pulumi.set(__self__, "up_to_date_replicas", up_to_date_replicas)
+        if upgrade_plan is not None:
+            pulumi.set(__self__, "upgrade_plan", upgrade_plan)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -22492,6 +22560,148 @@ class ClusterStatusV1beta2ControlPlanePatch(dict):
         upToDateReplicas is the number of up-to-date control plane machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
         """
         return pulumi.get(self, "up_to_date_replicas")
+
+    @_builtins.property
+    @pulumi.getter(name="upgradePlan")
+    def upgrade_plan(self) -> Optional[Sequence['outputs.ClusterStatusV1beta2ControlPlaneUpgradePlanPatch']]:
+        """
+        upgradePlan reports the list of versions that would be applied to the control plane object according to the upgrade plan.
+        Note:
+        - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+        - Once a version is applied to the control plane object, it is removed from the list (after a version
+          is applied to a control plane object, it might take some time for the actual upgrade to complete)
+        - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+          report only the last known upgrade plan.
+        """
+        return pulumi.get(self, "upgrade_plan")
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> Optional[Sequence['outputs.ClusterStatusV1beta2ControlPlaneVersionsPatch']]:
+        """
+        versions is the aggregated Kubernetes versions in this control plane.
+        """
+        return pulumi.get(self, "versions")
+
+
+@pulumi.output_type
+class ClusterStatusV1beta2ControlPlaneUpgradePlan(dict):
+    """
+    StatusUpgradePlanVersion groups upgrade plan version-related status information.
+    """
+    def __init__(__self__, *,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusUpgradePlanVersion groups upgrade plan version-related status information.
+
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+
+@pulumi.output_type
+class ClusterStatusV1beta2ControlPlaneUpgradePlanPatch(dict):
+    """
+    StatusUpgradePlanVersion groups upgrade plan version-related status information.
+    """
+    def __init__(__self__, *,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusUpgradePlanVersion groups upgrade plan version-related status information.
+
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+
+@pulumi.output_type
+class ClusterStatusV1beta2ControlPlaneVersions(dict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    def __init__(__self__, *,
+                 replicas: Optional[_builtins.int] = None,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param _builtins.int replicas: replicas is the number of replicas at this version.
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> Optional[_builtins.int]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+
+@pulumi.output_type
+class ClusterStatusV1beta2ControlPlaneVersionsPatch(dict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    def __init__(__self__, *,
+                 replicas: Optional[_builtins.int] = None,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param _builtins.int replicas: replicas is the number of replicas at this version.
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> Optional[_builtins.int]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
 
 
 @pulumi.output_type
@@ -22573,6 +22783,8 @@ class ClusterStatusV1beta2Workers(dict):
             suggest = "ready_replicas"
         elif key == "upToDateReplicas":
             suggest = "up_to_date_replicas"
+        elif key == "upgradePlan":
+            suggest = "upgrade_plan"
 
         if suggest:
             pulumi.log.warn(f"Key '{key}' not found in ClusterStatusV1beta2Workers. Access the value via the '{suggest}' property getter instead.")
@@ -22590,7 +22802,9 @@ class ClusterStatusV1beta2Workers(dict):
                  desired_replicas: Optional[_builtins.int] = None,
                  ready_replicas: Optional[_builtins.int] = None,
                  replicas: Optional[_builtins.int] = None,
-                 up_to_date_replicas: Optional[_builtins.int] = None):
+                 up_to_date_replicas: Optional[_builtins.int] = None,
+                 upgrade_plan: Optional[Sequence['outputs.ClusterStatusV1beta2WorkersUpgradePlan']] = None,
+                 versions: Optional[Sequence['outputs.ClusterStatusV1beta2WorkersVersions']] = None):
         """
         workers groups all the observations about Cluster's Workers current state.
 
@@ -22600,6 +22814,14 @@ class ClusterStatusV1beta2Workers(dict):
         :param _builtins.int replicas: replicas is the total number of worker machines in this cluster.
                NOTE: replicas also includes machines still being provisioned or being deleted.
         :param _builtins.int up_to_date_replicas: upToDateReplicas is the number of up-to-date worker machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
+        :param Sequence['ClusterStatusV1beta2WorkersUpgradePlanArgs'] upgrade_plan: upgradePlan reports the list of versions that would be applied to the worker objects (all MachineDeployments and MachinePools).
+               Note:
+               - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+               - Once a version is applied to the worker objects, it is removed from the list (after a version
+                 is applied to a worker object, it might take some time for the actual upgrade to complete)
+               - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+                 report only the last known upgrade plan.
+        :param Sequence['ClusterStatusV1beta2WorkersVersionsArgs'] versions: versions is the aggregated Kubernetes versions in cluster workers.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -22611,6 +22833,10 @@ class ClusterStatusV1beta2Workers(dict):
             pulumi.set(__self__, "replicas", replicas)
         if up_to_date_replicas is not None:
             pulumi.set(__self__, "up_to_date_replicas", up_to_date_replicas)
+        if upgrade_plan is not None:
+            pulumi.set(__self__, "upgrade_plan", upgrade_plan)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -22652,6 +22878,28 @@ class ClusterStatusV1beta2Workers(dict):
         upToDateReplicas is the number of up-to-date worker machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
         """
         return pulumi.get(self, "up_to_date_replicas")
+
+    @_builtins.property
+    @pulumi.getter(name="upgradePlan")
+    def upgrade_plan(self) -> Optional[Sequence['outputs.ClusterStatusV1beta2WorkersUpgradePlan']]:
+        """
+        upgradePlan reports the list of versions that would be applied to the worker objects (all MachineDeployments and MachinePools).
+        Note:
+        - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+        - Once a version is applied to the worker objects, it is removed from the list (after a version
+          is applied to a worker object, it might take some time for the actual upgrade to complete)
+        - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+          report only the last known upgrade plan.
+        """
+        return pulumi.get(self, "upgrade_plan")
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> Optional[Sequence['outputs.ClusterStatusV1beta2WorkersVersions']]:
+        """
+        versions is the aggregated Kubernetes versions in cluster workers.
+        """
+        return pulumi.get(self, "versions")
 
 
 @pulumi.output_type
@@ -22670,6 +22918,8 @@ class ClusterStatusV1beta2WorkersPatch(dict):
             suggest = "ready_replicas"
         elif key == "upToDateReplicas":
             suggest = "up_to_date_replicas"
+        elif key == "upgradePlan":
+            suggest = "upgrade_plan"
 
         if suggest:
             pulumi.log.warn(f"Key '{key}' not found in ClusterStatusV1beta2WorkersPatch. Access the value via the '{suggest}' property getter instead.")
@@ -22687,7 +22937,9 @@ class ClusterStatusV1beta2WorkersPatch(dict):
                  desired_replicas: Optional[_builtins.int] = None,
                  ready_replicas: Optional[_builtins.int] = None,
                  replicas: Optional[_builtins.int] = None,
-                 up_to_date_replicas: Optional[_builtins.int] = None):
+                 up_to_date_replicas: Optional[_builtins.int] = None,
+                 upgrade_plan: Optional[Sequence['outputs.ClusterStatusV1beta2WorkersUpgradePlanPatch']] = None,
+                 versions: Optional[Sequence['outputs.ClusterStatusV1beta2WorkersVersionsPatch']] = None):
         """
         workers groups all the observations about Cluster's Workers current state.
 
@@ -22697,6 +22949,14 @@ class ClusterStatusV1beta2WorkersPatch(dict):
         :param _builtins.int replicas: replicas is the total number of worker machines in this cluster.
                NOTE: replicas also includes machines still being provisioned or being deleted.
         :param _builtins.int up_to_date_replicas: upToDateReplicas is the number of up-to-date worker machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
+        :param Sequence['ClusterStatusV1beta2WorkersUpgradePlanPatchArgs'] upgrade_plan: upgradePlan reports the list of versions that would be applied to the worker objects (all MachineDeployments and MachinePools).
+               Note:
+               - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+               - Once a version is applied to the worker objects, it is removed from the list (after a version
+                 is applied to a worker object, it might take some time for the actual upgrade to complete)
+               - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+                 report only the last known upgrade plan.
+        :param Sequence['ClusterStatusV1beta2WorkersVersionsPatchArgs'] versions: versions is the aggregated Kubernetes versions in cluster workers.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -22708,6 +22968,10 @@ class ClusterStatusV1beta2WorkersPatch(dict):
             pulumi.set(__self__, "replicas", replicas)
         if up_to_date_replicas is not None:
             pulumi.set(__self__, "up_to_date_replicas", up_to_date_replicas)
+        if upgrade_plan is not None:
+            pulumi.set(__self__, "upgrade_plan", upgrade_plan)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -22749,6 +23013,148 @@ class ClusterStatusV1beta2WorkersPatch(dict):
         upToDateReplicas is the number of up-to-date worker machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
         """
         return pulumi.get(self, "up_to_date_replicas")
+
+    @_builtins.property
+    @pulumi.getter(name="upgradePlan")
+    def upgrade_plan(self) -> Optional[Sequence['outputs.ClusterStatusV1beta2WorkersUpgradePlanPatch']]:
+        """
+        upgradePlan reports the list of versions that would be applied to the worker objects (all MachineDeployments and MachinePools).
+        Note:
+        - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+        - Once a version is applied to the worker objects, it is removed from the list (after a version
+          is applied to a worker object, it might take some time for the actual upgrade to complete)
+        - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+          report only the last known upgrade plan.
+        """
+        return pulumi.get(self, "upgrade_plan")
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> Optional[Sequence['outputs.ClusterStatusV1beta2WorkersVersionsPatch']]:
+        """
+        versions is the aggregated Kubernetes versions in cluster workers.
+        """
+        return pulumi.get(self, "versions")
+
+
+@pulumi.output_type
+class ClusterStatusV1beta2WorkersUpgradePlan(dict):
+    """
+    StatusUpgradePlanVersion groups upgrade plan version-related status information.
+    """
+    def __init__(__self__, *,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusUpgradePlanVersion groups upgrade plan version-related status information.
+
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+
+@pulumi.output_type
+class ClusterStatusV1beta2WorkersUpgradePlanPatch(dict):
+    """
+    StatusUpgradePlanVersion groups upgrade plan version-related status information.
+    """
+    def __init__(__self__, *,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusUpgradePlanVersion groups upgrade plan version-related status information.
+
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+
+@pulumi.output_type
+class ClusterStatusV1beta2WorkersVersions(dict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    def __init__(__self__, *,
+                 replicas: Optional[_builtins.int] = None,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param _builtins.int replicas: replicas is the number of replicas at this version.
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> Optional[_builtins.int]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+
+@pulumi.output_type
+class ClusterStatusV1beta2WorkersVersionsPatch(dict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    def __init__(__self__, *,
+                 replicas: Optional[_builtins.int] = None,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param _builtins.int replicas: replicas is the number of replicas at this version.
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> Optional[_builtins.int]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
 
 
 @pulumi.output_type
@@ -24001,7 +24407,7 @@ class MachineDeploymentSpecStrategyRollingUpdate(dict):
         MachineDeploymentStrategyType = RollingUpdate.
 
         :param _builtins.str delete_policy: deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-               Valid values are "Random, "Newest", "Oldest"
+               Valid values are "Random", "Newest", "Oldest"
                When no value is supplied, the default DeletePolicy of MachineSet is used
         :param Union[_builtins.int, _builtins.str] max_surge: maxSurge is the maximum number of machines that can be scheduled above the
                desired number of machines.
@@ -24041,7 +24447,7 @@ class MachineDeploymentSpecStrategyRollingUpdate(dict):
     def delete_policy(self) -> Optional[_builtins.str]:
         """
         deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-        Valid values are "Random, "Newest", "Oldest"
+        Valid values are "Random", "Newest", "Oldest"
         When no value is supplied, the default DeletePolicy of MachineSet is used
         """
         return pulumi.get(self, "delete_policy")
@@ -24122,7 +24528,7 @@ class MachineDeploymentSpecStrategyRollingUpdatePatch(dict):
         MachineDeploymentStrategyType = RollingUpdate.
 
         :param _builtins.str delete_policy: deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-               Valid values are "Random, "Newest", "Oldest"
+               Valid values are "Random", "Newest", "Oldest"
                When no value is supplied, the default DeletePolicy of MachineSet is used
         :param Union[_builtins.int, _builtins.str] max_surge: maxSurge is the maximum number of machines that can be scheduled above the
                desired number of machines.
@@ -24162,7 +24568,7 @@ class MachineDeploymentSpecStrategyRollingUpdatePatch(dict):
     def delete_policy(self) -> Optional[_builtins.str]:
         """
         deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.
-        Valid values are "Random, "Newest", "Oldest"
+        Valid values are "Random", "Newest", "Oldest"
         When no value is supplied, the default DeletePolicy of MachineSet is used
         """
         return pulumi.get(self, "delete_policy")
@@ -25847,7 +26253,8 @@ class MachineDeploymentStatus(dict):
                  selector: Optional[_builtins.str] = None,
                  unavailable_replicas: Optional[_builtins.int] = None,
                  updated_replicas: Optional[_builtins.int] = None,
-                 v1beta2: Optional['outputs.MachineDeploymentStatusV1beta2'] = None):
+                 v1beta2: Optional['outputs.MachineDeploymentStatusV1beta2'] = None,
+                 versions: Optional[Sequence['outputs.MachineDeploymentStatusVersions']] = None):
         """
         status is the observed state of MachineDeployment.
 
@@ -25871,6 +26278,7 @@ class MachineDeploymentStatus(dict):
                Deprecated: This field is deprecated and is going to be removed when support for v1beta1 will be dropped. Please see https://github.com/kubernetes-sigs/cluster-api/blob/main/docs/proposals/20240916-improve-status-in-CAPI-resources.md for more details.
         :param _builtins.int updated_replicas: updatedReplicas is the total number of non-terminated machines targeted by this deployment
                that have the desired template spec.
+        :param Sequence['MachineDeploymentStatusVersionsArgs'] versions: versions is the aggregated Kubernetes versions in this MachineDeployment.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -25892,6 +26300,8 @@ class MachineDeploymentStatus(dict):
             pulumi.set(__self__, "updated_replicas", updated_replicas)
         if v1beta2 is not None:
             pulumi.set(__self__, "v1beta2", v1beta2)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -25980,6 +26390,14 @@ class MachineDeploymentStatus(dict):
     @pulumi.getter
     def v1beta2(self) -> Optional['outputs.MachineDeploymentStatusV1beta2']:
         return pulumi.get(self, "v1beta2")
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> Optional[Sequence['outputs.MachineDeploymentStatusVersions']]:
+        """
+        versions is the aggregated Kubernetes versions in this MachineDeployment.
+        """
+        return pulumi.get(self, "versions")
 
 
 @pulumi.output_type
@@ -26260,7 +26678,8 @@ class MachineDeploymentStatusPatch(dict):
                  selector: Optional[_builtins.str] = None,
                  unavailable_replicas: Optional[_builtins.int] = None,
                  updated_replicas: Optional[_builtins.int] = None,
-                 v1beta2: Optional['outputs.MachineDeploymentStatusV1beta2Patch'] = None):
+                 v1beta2: Optional['outputs.MachineDeploymentStatusV1beta2Patch'] = None,
+                 versions: Optional[Sequence['outputs.MachineDeploymentStatusVersionsPatch']] = None):
         """
         status is the observed state of MachineDeployment.
 
@@ -26284,6 +26703,7 @@ class MachineDeploymentStatusPatch(dict):
                Deprecated: This field is deprecated and is going to be removed when support for v1beta1 will be dropped. Please see https://github.com/kubernetes-sigs/cluster-api/blob/main/docs/proposals/20240916-improve-status-in-CAPI-resources.md for more details.
         :param _builtins.int updated_replicas: updatedReplicas is the total number of non-terminated machines targeted by this deployment
                that have the desired template spec.
+        :param Sequence['MachineDeploymentStatusVersionsPatchArgs'] versions: versions is the aggregated Kubernetes versions in this MachineDeployment.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -26305,6 +26725,8 @@ class MachineDeploymentStatusPatch(dict):
             pulumi.set(__self__, "updated_replicas", updated_replicas)
         if v1beta2 is not None:
             pulumi.set(__self__, "v1beta2", v1beta2)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -26393,6 +26815,14 @@ class MachineDeploymentStatusPatch(dict):
     @pulumi.getter
     def v1beta2(self) -> Optional['outputs.MachineDeploymentStatusV1beta2Patch']:
         return pulumi.get(self, "v1beta2")
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> Optional[Sequence['outputs.MachineDeploymentStatusVersionsPatch']]:
+        """
+        versions is the aggregated Kubernetes versions in this MachineDeployment.
+        """
+        return pulumi.get(self, "versions")
 
 
 @pulumi.output_type
@@ -26797,6 +27227,78 @@ class MachineDeploymentStatusV1beta2Patch(dict):
         upToDateReplicas is the number of up-to-date replicas targeted by this deployment. A machine is considered up-to-date when Machine's UpToDate condition is true.
         """
         return pulumi.get(self, "up_to_date_replicas")
+
+
+@pulumi.output_type
+class MachineDeploymentStatusVersions(dict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    def __init__(__self__, *,
+                 replicas: Optional[_builtins.int] = None,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param _builtins.int replicas: replicas is the number of replicas at this version.
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> Optional[_builtins.int]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+
+@pulumi.output_type
+class MachineDeploymentStatusVersionsPatch(dict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    def __init__(__self__, *,
+                 replicas: Optional[_builtins.int] = None,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param _builtins.int replicas: replicas is the number of replicas at this version.
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> Optional[_builtins.int]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
 
 
 @pulumi.output_type
@@ -32435,7 +32937,8 @@ class MachinePoolStatus(dict):
                  ready_replicas: Optional[_builtins.int] = None,
                  replicas: Optional[_builtins.int] = None,
                  unavailable_replicas: Optional[_builtins.int] = None,
-                 v1beta2: Optional['outputs.MachinePoolStatusV1beta2'] = None):
+                 v1beta2: Optional['outputs.MachinePoolStatusV1beta2'] = None,
+                 versions: Optional[Sequence['outputs.MachinePoolStatusVersions']] = None):
         """
         status is the observed state of MachinePool.
 
@@ -32451,7 +32954,7 @@ class MachinePoolStatus(dict):
                
                Deprecated: This field is deprecated and is going to be removed when support for v1beta1 will be dropped. Please see https://github.com/kubernetes-sigs/cluster-api/blob/main/docs/proposals/20240916-improve-status-in-CAPI-resources.md for more details.
         :param _builtins.bool infrastructure_ready: infrastructureReady is the state of the infrastructure provider.
-        :param Sequence['MachinePoolStatusNodeRefsArgs'] node_refs: nodeRefs will point to the corresponding Nodes if it they exist.
+        :param Sequence['MachinePoolStatusNodeRefsArgs'] node_refs: nodeRefs will point to the corresponding Nodes if they exist.
         :param _builtins.int observed_generation: observedGeneration is the latest generation observed by the controller.
         :param _builtins.str phase: phase represents the current phase of cluster actuation.
         :param _builtins.int ready_replicas: readyReplicas is the number of ready replicas for this MachinePool. A machine is considered ready when the node has been created and is "Ready".
@@ -32463,6 +32966,7 @@ class MachinePoolStatus(dict):
                that still have not been created.
                
                Deprecated: This field is deprecated and is going to be removed when support for v1beta1 will be dropped. Please see https://github.com/kubernetes-sigs/cluster-api/blob/main/docs/proposals/20240916-improve-status-in-CAPI-resources.md for more details.
+        :param Sequence['MachinePoolStatusVersionsArgs'] versions: versions is the aggregated Kubernetes versions in this MachinePool.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -32490,6 +32994,8 @@ class MachinePoolStatus(dict):
             pulumi.set(__self__, "unavailable_replicas", unavailable_replicas)
         if v1beta2 is not None:
             pulumi.set(__self__, "v1beta2", v1beta2)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -32549,7 +33055,7 @@ class MachinePoolStatus(dict):
     @pulumi.getter(name="nodeRefs")
     def node_refs(self) -> Optional[Sequence['outputs.MachinePoolStatusNodeRefs']]:
         """
-        nodeRefs will point to the corresponding Nodes if it they exist.
+        nodeRefs will point to the corresponding Nodes if they exist.
         """
         return pulumi.get(self, "node_refs")
 
@@ -32603,6 +33109,14 @@ class MachinePoolStatus(dict):
     @pulumi.getter
     def v1beta2(self) -> Optional['outputs.MachinePoolStatusV1beta2']:
         return pulumi.get(self, "v1beta2")
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> Optional[Sequence['outputs.MachinePoolStatusVersions']]:
+        """
+        versions is the aggregated Kubernetes versions in this MachinePool.
+        """
+        return pulumi.get(self, "versions")
 
 
 @pulumi.output_type
@@ -33172,7 +33686,8 @@ class MachinePoolStatusPatch(dict):
                  ready_replicas: Optional[_builtins.int] = None,
                  replicas: Optional[_builtins.int] = None,
                  unavailable_replicas: Optional[_builtins.int] = None,
-                 v1beta2: Optional['outputs.MachinePoolStatusV1beta2Patch'] = None):
+                 v1beta2: Optional['outputs.MachinePoolStatusV1beta2Patch'] = None,
+                 versions: Optional[Sequence['outputs.MachinePoolStatusVersionsPatch']] = None):
         """
         status is the observed state of MachinePool.
 
@@ -33188,7 +33703,7 @@ class MachinePoolStatusPatch(dict):
                
                Deprecated: This field is deprecated and is going to be removed when support for v1beta1 will be dropped. Please see https://github.com/kubernetes-sigs/cluster-api/blob/main/docs/proposals/20240916-improve-status-in-CAPI-resources.md for more details.
         :param _builtins.bool infrastructure_ready: infrastructureReady is the state of the infrastructure provider.
-        :param Sequence['MachinePoolStatusNodeRefsPatchArgs'] node_refs: nodeRefs will point to the corresponding Nodes if it they exist.
+        :param Sequence['MachinePoolStatusNodeRefsPatchArgs'] node_refs: nodeRefs will point to the corresponding Nodes if they exist.
         :param _builtins.int observed_generation: observedGeneration is the latest generation observed by the controller.
         :param _builtins.str phase: phase represents the current phase of cluster actuation.
         :param _builtins.int ready_replicas: readyReplicas is the number of ready replicas for this MachinePool. A machine is considered ready when the node has been created and is "Ready".
@@ -33200,6 +33715,7 @@ class MachinePoolStatusPatch(dict):
                that still have not been created.
                
                Deprecated: This field is deprecated and is going to be removed when support for v1beta1 will be dropped. Please see https://github.com/kubernetes-sigs/cluster-api/blob/main/docs/proposals/20240916-improve-status-in-CAPI-resources.md for more details.
+        :param Sequence['MachinePoolStatusVersionsPatchArgs'] versions: versions is the aggregated Kubernetes versions in this MachinePool.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -33227,6 +33743,8 @@ class MachinePoolStatusPatch(dict):
             pulumi.set(__self__, "unavailable_replicas", unavailable_replicas)
         if v1beta2 is not None:
             pulumi.set(__self__, "v1beta2", v1beta2)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -33286,7 +33804,7 @@ class MachinePoolStatusPatch(dict):
     @pulumi.getter(name="nodeRefs")
     def node_refs(self) -> Optional[Sequence['outputs.MachinePoolStatusNodeRefsPatch']]:
         """
-        nodeRefs will point to the corresponding Nodes if it they exist.
+        nodeRefs will point to the corresponding Nodes if they exist.
         """
         return pulumi.get(self, "node_refs")
 
@@ -33340,6 +33858,14 @@ class MachinePoolStatusPatch(dict):
     @pulumi.getter
     def v1beta2(self) -> Optional['outputs.MachinePoolStatusV1beta2Patch']:
         return pulumi.get(self, "v1beta2")
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> Optional[Sequence['outputs.MachinePoolStatusVersionsPatch']]:
+        """
+        versions is the aggregated Kubernetes versions in this MachinePool.
+        """
+        return pulumi.get(self, "versions")
 
 
 @pulumi.output_type
@@ -33751,6 +34277,78 @@ class MachinePoolStatusV1beta2Patch(dict):
 
 
 @pulumi.output_type
+class MachinePoolStatusVersions(dict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    def __init__(__self__, *,
+                 replicas: Optional[_builtins.int] = None,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param _builtins.int replicas: replicas is the number of replicas at this version.
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> Optional[_builtins.int]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+
+@pulumi.output_type
+class MachinePoolStatusVersionsPatch(dict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    def __init__(__self__, *,
+                 replicas: Optional[_builtins.int] = None,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param _builtins.int replicas: replicas is the number of replicas at this version.
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> Optional[_builtins.int]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+
+@pulumi.output_type
 class MachineSet(dict):
     """
     MachineSet is the Schema for the machinesets API.
@@ -33872,7 +34470,7 @@ class MachineSetSpec(dict):
 
         :param _builtins.str cluster_name: clusterName is the name of the Cluster this object belongs to.
         :param _builtins.str delete_policy: deletePolicy defines the policy used to identify nodes to delete when downscaling.
-               Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+               Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         :param _builtins.int min_ready_seconds: minReadySeconds is the minimum number of seconds for which a Node for a newly created machine should be ready before considering the replica available.
                Defaults to 0 (machine will be considered available as soon as the Node is ready)
         :param _builtins.int replicas: replicas is the number of desired replicas.
@@ -33921,7 +34519,7 @@ class MachineSetSpec(dict):
     def delete_policy(self) -> Optional[_builtins.str]:
         """
         deletePolicy defines the policy used to identify nodes to delete when downscaling.
-        Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+        Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         return pulumi.get(self, "delete_policy")
 
@@ -34127,7 +34725,7 @@ class MachineSetSpecPatch(dict):
 
         :param _builtins.str cluster_name: clusterName is the name of the Cluster this object belongs to.
         :param _builtins.str delete_policy: deletePolicy defines the policy used to identify nodes to delete when downscaling.
-               Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+               Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         :param _builtins.int min_ready_seconds: minReadySeconds is the minimum number of seconds for which a Node for a newly created machine should be ready before considering the replica available.
                Defaults to 0 (machine will be considered available as soon as the Node is ready)
         :param _builtins.int replicas: replicas is the number of desired replicas.
@@ -34176,7 +34774,7 @@ class MachineSetSpecPatch(dict):
     def delete_policy(self) -> Optional[_builtins.str]:
         """
         deletePolicy defines the policy used to identify nodes to delete when downscaling.
-        Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+        Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         return pulumi.get(self, "delete_policy")
 
@@ -36125,7 +36723,8 @@ class MachineSetStatus(dict):
                  ready_replicas: Optional[_builtins.int] = None,
                  replicas: Optional[_builtins.int] = None,
                  selector: Optional[_builtins.str] = None,
-                 v1beta2: Optional['outputs.MachineSetStatusV1beta2'] = None):
+                 v1beta2: Optional['outputs.MachineSetStatusV1beta2'] = None,
+                 versions: Optional[Sequence['outputs.MachineSetStatusVersions']] = None):
         """
         status is the observed state of MachineSet.
 
@@ -36169,6 +36768,7 @@ class MachineSetStatus(dict):
         :param _builtins.str selector: selector is the same as the label selector but in the string format to avoid introspection
                by clients. The string will be in the same format as the query-param syntax.
                More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors
+        :param Sequence['MachineSetStatusVersionsArgs'] versions: versions is the aggregated Kubernetes versions in this MachineSet.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -36190,6 +36790,8 @@ class MachineSetStatus(dict):
             pulumi.set(__self__, "selector", selector)
         if v1beta2 is not None:
             pulumi.set(__self__, "v1beta2", v1beta2)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -36298,6 +36900,14 @@ class MachineSetStatus(dict):
     @pulumi.getter
     def v1beta2(self) -> Optional['outputs.MachineSetStatusV1beta2']:
         return pulumi.get(self, "v1beta2")
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> Optional[Sequence['outputs.MachineSetStatusVersions']]:
+        """
+        versions is the aggregated Kubernetes versions in this MachineSet.
+        """
+        return pulumi.get(self, "versions")
 
 
 @pulumi.output_type
@@ -36580,7 +37190,8 @@ class MachineSetStatusPatch(dict):
                  ready_replicas: Optional[_builtins.int] = None,
                  replicas: Optional[_builtins.int] = None,
                  selector: Optional[_builtins.str] = None,
-                 v1beta2: Optional['outputs.MachineSetStatusV1beta2Patch'] = None):
+                 v1beta2: Optional['outputs.MachineSetStatusV1beta2Patch'] = None,
+                 versions: Optional[Sequence['outputs.MachineSetStatusVersionsPatch']] = None):
         """
         status is the observed state of MachineSet.
 
@@ -36624,6 +37235,7 @@ class MachineSetStatusPatch(dict):
         :param _builtins.str selector: selector is the same as the label selector but in the string format to avoid introspection
                by clients. The string will be in the same format as the query-param syntax.
                More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors
+        :param Sequence['MachineSetStatusVersionsPatchArgs'] versions: versions is the aggregated Kubernetes versions in this MachineSet.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -36645,6 +37257,8 @@ class MachineSetStatusPatch(dict):
             pulumi.set(__self__, "selector", selector)
         if v1beta2 is not None:
             pulumi.set(__self__, "v1beta2", v1beta2)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -36753,6 +37367,14 @@ class MachineSetStatusPatch(dict):
     @pulumi.getter
     def v1beta2(self) -> Optional['outputs.MachineSetStatusV1beta2Patch']:
         return pulumi.get(self, "v1beta2")
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> Optional[Sequence['outputs.MachineSetStatusVersionsPatch']]:
+        """
+        versions is the aggregated Kubernetes versions in this MachineSet.
+        """
+        return pulumi.get(self, "versions")
 
 
 @pulumi.output_type
@@ -37157,6 +37779,78 @@ class MachineSetStatusV1beta2Patch(dict):
         upToDateReplicas is the number of up-to-date replicas for this MachineSet. A machine is considered up-to-date when Machine's UpToDate condition is true.
         """
         return pulumi.get(self, "up_to_date_replicas")
+
+
+@pulumi.output_type
+class MachineSetStatusVersions(dict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    def __init__(__self__, *,
+                 replicas: Optional[_builtins.int] = None,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param _builtins.int replicas: replicas is the number of replicas at this version.
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> Optional[_builtins.int]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+
+@pulumi.output_type
+class MachineSetStatusVersionsPatch(dict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    def __init__(__self__, *,
+                 replicas: Optional[_builtins.int] = None,
+                 version: Optional[_builtins.str] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param _builtins.int replicas: replicas is the number of replicas at this version.
+        :param _builtins.str version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> Optional[_builtins.int]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> Optional[_builtins.str]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
 
 
 @pulumi.output_type
@@ -39193,6 +39887,10 @@ class MachineStatusDeletion(dict):
             suggest = "node_drain_start_time"
         elif key == "waitForNodeVolumeDetachStartTime":
             suggest = "wait_for_node_volume_detach_start_time"
+        elif key == "waitForPreDrainHookStartTime":
+            suggest = "wait_for_pre_drain_hook_start_time"
+        elif key == "waitForPreTerminateHookStartTime":
+            suggest = "wait_for_pre_terminate_hook_start_time"
 
         if suggest:
             pulumi.log.warn(f"Key '{key}' not found in MachineStatusDeletion. Access the value via the '{suggest}' property getter instead.")
@@ -39207,7 +39905,9 @@ class MachineStatusDeletion(dict):
 
     def __init__(__self__, *,
                  node_drain_start_time: Optional[_builtins.str] = None,
-                 wait_for_node_volume_detach_start_time: Optional[_builtins.str] = None):
+                 wait_for_node_volume_detach_start_time: Optional[_builtins.str] = None,
+                 wait_for_pre_drain_hook_start_time: Optional[_builtins.str] = None,
+                 wait_for_pre_terminate_hook_start_time: Optional[_builtins.str] = None):
         """
         deletion contains information relating to removal of the Machine.
         Only present when the Machine has a deletionTimestamp and drain or wait for volume detach started.
@@ -39220,11 +39920,21 @@ class MachineStatusDeletion(dict):
                Detaching volumes from nodes is usually done by CSI implementations and the current state
                is observed from the node's `.Status.VolumesAttached` field.
                Only present when the Machine has a deletionTimestamp and waiting for volume detachments had been started.
+        :param _builtins.str wait_for_pre_drain_hook_start_time: waitForPreDrainHookStartTime is the time when waiting for pre-drain hooks started
+               and is used to determine if the pre-drain hooks are taking too long.
+               Only present when the Machine has a deletionTimestamp and waiting for pre-drain hooks had been started.
+        :param _builtins.str wait_for_pre_terminate_hook_start_time: waitForPreTerminateHookStartTime is the time when waiting for pre-terminate hooks started
+               and is used to determine if the pre-terminate hooks are taking too long.
+               Only present when the Machine has a deletionTimestamp and waiting for pre-terminate hooks had been started.
         """
         if node_drain_start_time is not None:
             pulumi.set(__self__, "node_drain_start_time", node_drain_start_time)
         if wait_for_node_volume_detach_start_time is not None:
             pulumi.set(__self__, "wait_for_node_volume_detach_start_time", wait_for_node_volume_detach_start_time)
+        if wait_for_pre_drain_hook_start_time is not None:
+            pulumi.set(__self__, "wait_for_pre_drain_hook_start_time", wait_for_pre_drain_hook_start_time)
+        if wait_for_pre_terminate_hook_start_time is not None:
+            pulumi.set(__self__, "wait_for_pre_terminate_hook_start_time", wait_for_pre_terminate_hook_start_time)
 
     @_builtins.property
     @pulumi.getter(name="nodeDrainStartTime")
@@ -39247,6 +39957,26 @@ class MachineStatusDeletion(dict):
         Only present when the Machine has a deletionTimestamp and waiting for volume detachments had been started.
         """
         return pulumi.get(self, "wait_for_node_volume_detach_start_time")
+
+    @_builtins.property
+    @pulumi.getter(name="waitForPreDrainHookStartTime")
+    def wait_for_pre_drain_hook_start_time(self) -> Optional[_builtins.str]:
+        """
+        waitForPreDrainHookStartTime is the time when waiting for pre-drain hooks started
+        and is used to determine if the pre-drain hooks are taking too long.
+        Only present when the Machine has a deletionTimestamp and waiting for pre-drain hooks had been started.
+        """
+        return pulumi.get(self, "wait_for_pre_drain_hook_start_time")
+
+    @_builtins.property
+    @pulumi.getter(name="waitForPreTerminateHookStartTime")
+    def wait_for_pre_terminate_hook_start_time(self) -> Optional[_builtins.str]:
+        """
+        waitForPreTerminateHookStartTime is the time when waiting for pre-terminate hooks started
+        and is used to determine if the pre-terminate hooks are taking too long.
+        Only present when the Machine has a deletionTimestamp and waiting for pre-terminate hooks had been started.
+        """
+        return pulumi.get(self, "wait_for_pre_terminate_hook_start_time")
 
 
 @pulumi.output_type
@@ -39262,6 +39992,10 @@ class MachineStatusDeletionPatch(dict):
             suggest = "node_drain_start_time"
         elif key == "waitForNodeVolumeDetachStartTime":
             suggest = "wait_for_node_volume_detach_start_time"
+        elif key == "waitForPreDrainHookStartTime":
+            suggest = "wait_for_pre_drain_hook_start_time"
+        elif key == "waitForPreTerminateHookStartTime":
+            suggest = "wait_for_pre_terminate_hook_start_time"
 
         if suggest:
             pulumi.log.warn(f"Key '{key}' not found in MachineStatusDeletionPatch. Access the value via the '{suggest}' property getter instead.")
@@ -39276,7 +40010,9 @@ class MachineStatusDeletionPatch(dict):
 
     def __init__(__self__, *,
                  node_drain_start_time: Optional[_builtins.str] = None,
-                 wait_for_node_volume_detach_start_time: Optional[_builtins.str] = None):
+                 wait_for_node_volume_detach_start_time: Optional[_builtins.str] = None,
+                 wait_for_pre_drain_hook_start_time: Optional[_builtins.str] = None,
+                 wait_for_pre_terminate_hook_start_time: Optional[_builtins.str] = None):
         """
         deletion contains information relating to removal of the Machine.
         Only present when the Machine has a deletionTimestamp and drain or wait for volume detach started.
@@ -39289,11 +40025,21 @@ class MachineStatusDeletionPatch(dict):
                Detaching volumes from nodes is usually done by CSI implementations and the current state
                is observed from the node's `.Status.VolumesAttached` field.
                Only present when the Machine has a deletionTimestamp and waiting for volume detachments had been started.
+        :param _builtins.str wait_for_pre_drain_hook_start_time: waitForPreDrainHookStartTime is the time when waiting for pre-drain hooks started
+               and is used to determine if the pre-drain hooks are taking too long.
+               Only present when the Machine has a deletionTimestamp and waiting for pre-drain hooks had been started.
+        :param _builtins.str wait_for_pre_terminate_hook_start_time: waitForPreTerminateHookStartTime is the time when waiting for pre-terminate hooks started
+               and is used to determine if the pre-terminate hooks are taking too long.
+               Only present when the Machine has a deletionTimestamp and waiting for pre-terminate hooks had been started.
         """
         if node_drain_start_time is not None:
             pulumi.set(__self__, "node_drain_start_time", node_drain_start_time)
         if wait_for_node_volume_detach_start_time is not None:
             pulumi.set(__self__, "wait_for_node_volume_detach_start_time", wait_for_node_volume_detach_start_time)
+        if wait_for_pre_drain_hook_start_time is not None:
+            pulumi.set(__self__, "wait_for_pre_drain_hook_start_time", wait_for_pre_drain_hook_start_time)
+        if wait_for_pre_terminate_hook_start_time is not None:
+            pulumi.set(__self__, "wait_for_pre_terminate_hook_start_time", wait_for_pre_terminate_hook_start_time)
 
     @_builtins.property
     @pulumi.getter(name="nodeDrainStartTime")
@@ -39316,6 +40062,26 @@ class MachineStatusDeletionPatch(dict):
         Only present when the Machine has a deletionTimestamp and waiting for volume detachments had been started.
         """
         return pulumi.get(self, "wait_for_node_volume_detach_start_time")
+
+    @_builtins.property
+    @pulumi.getter(name="waitForPreDrainHookStartTime")
+    def wait_for_pre_drain_hook_start_time(self) -> Optional[_builtins.str]:
+        """
+        waitForPreDrainHookStartTime is the time when waiting for pre-drain hooks started
+        and is used to determine if the pre-drain hooks are taking too long.
+        Only present when the Machine has a deletionTimestamp and waiting for pre-drain hooks had been started.
+        """
+        return pulumi.get(self, "wait_for_pre_drain_hook_start_time")
+
+    @_builtins.property
+    @pulumi.getter(name="waitForPreTerminateHookStartTime")
+    def wait_for_pre_terminate_hook_start_time(self) -> Optional[_builtins.str]:
+        """
+        waitForPreTerminateHookStartTime is the time when waiting for pre-terminate hooks started
+        and is used to determine if the pre-terminate hooks are taking too long.
+        Only present when the Machine has a deletionTimestamp and waiting for pre-terminate hooks had been started.
+        """
+        return pulumi.get(self, "wait_for_pre_terminate_hook_start_time")
 
 
 @pulumi.output_type

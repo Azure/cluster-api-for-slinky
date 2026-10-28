@@ -20,29 +20,39 @@ __all__ = ['CredentialArgs', 'Credential']
 class CredentialArgs:
     def __init__(__self__, *,
                  credential_type_id: pulumi.Input[_builtins.float],
-                 inputs: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]],
                  organization_id: pulumi.Input[_builtins.float],
                  credential_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None):
+                 inputs: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_inputs_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_inputs_wo_version: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a Credential resource.
 
         :param pulumi.Input[_builtins.float] credential_type_id: Specify the type of credential you want to create. Refer to the Ansible Tower documentation for details on each type
-        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] inputs: The inputs to be created with the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to
         :param pulumi.Input[_builtins.str] description: The description of the credential
+        :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] inputs: The inputs to be created with the credential.
         :param pulumi.Input[_builtins.str] name: The name of the credential
+        :param pulumi.Input[_builtins.str] secret_inputs_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               Secret inputs as a JSON object, e.g. `jsonencode({ password = var.password })`, merged with <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span> before being sent to AWX. Keys must not also be set in <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span>. Write-only: never stored in state. Requires Terraform >= 1.11.
+        :param pulumi.Input[_builtins.float] secret_inputs_wo_version: Version of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span> to AWX.
         """
         pulumi.set(__self__, "credential_type_id", credential_type_id)
-        pulumi.set(__self__, "inputs", inputs)
         pulumi.set(__self__, "organization_id", organization_id)
         if credential_id is not None:
             pulumi.set(__self__, "credential_id", credential_id)
         if description is not None:
             pulumi.set(__self__, "description", description)
+        if inputs is not None:
+            pulumi.set(__self__, "inputs", inputs)
         if name is not None:
             pulumi.set(__self__, "name", name)
+        if secret_inputs_wo is not None:
+            pulumi.set(__self__, "secret_inputs_wo", secret_inputs_wo)
+        if secret_inputs_wo_version is not None:
+            pulumi.set(__self__, "secret_inputs_wo_version", secret_inputs_wo_version)
 
     @_builtins.property
     @pulumi.getter(name="credentialTypeId")
@@ -55,18 +65,6 @@ class CredentialArgs:
     @credential_type_id.setter
     def credential_type_id(self, value: pulumi.Input[_builtins.float]):
         pulumi.set(self, "credential_type_id", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def inputs(self) -> pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]:
-        """
-        The inputs to be created with the credential.
-        """
-        return pulumi.get(self, "inputs")
-
-    @inputs.setter
-    def inputs(self, value: pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]]):
-        pulumi.set(self, "inputs", value)
 
     @_builtins.property
     @pulumi.getter(name="organizationId")
@@ -103,6 +101,18 @@ class CredentialArgs:
 
     @_builtins.property
     @pulumi.getter
+    def inputs(self) -> pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]:
+        """
+        The inputs to be created with the credential.
+        """
+        return pulumi.get(self, "inputs")
+
+    @inputs.setter
+    def inputs(self, value: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]]):
+        pulumi.set(self, "inputs", value)
+
+    @_builtins.property
+    @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the credential
@@ -113,6 +123,31 @@ class CredentialArgs:
     def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
+    @_builtins.property
+    @pulumi.getter(name="secretInputsWo")
+    def secret_inputs_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        Secret inputs as a JSON object, e.g. `jsonencode({ password = var.password })`, merged with <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span> before being sent to AWX. Keys must not also be set in <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span>. Write-only: never stored in state. Requires Terraform >= 1.11.
+        """
+        return pulumi.get(self, "secret_inputs_wo")
+
+    @secret_inputs_wo.setter
+    def secret_inputs_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "secret_inputs_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="secretInputsWoVersion")
+    def secret_inputs_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span> to AWX.
+        """
+        return pulumi.get(self, "secret_inputs_wo_version")
+
+    @secret_inputs_wo_version.setter
+    def secret_inputs_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "secret_inputs_wo_version", value)
+
 
 @pulumi.input_type
 class _CredentialState:
@@ -122,7 +157,9 @@ class _CredentialState:
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  inputs: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization_id: pulumi.Input[Optional[_builtins.float]] = None):
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 secret_inputs_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_inputs_wo_version: pulumi.Input[Optional[_builtins.float]] = None):
         """
         Input properties used for looking up and filtering Credential resources.
 
@@ -131,6 +168,9 @@ class _CredentialState:
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] inputs: The inputs to be created with the credential.
         :param pulumi.Input[_builtins.str] name: The name of the credential
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to
+        :param pulumi.Input[_builtins.str] secret_inputs_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               Secret inputs as a JSON object, e.g. `jsonencode({ password = var.password })`, merged with <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span> before being sent to AWX. Keys must not also be set in <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span>. Write-only: never stored in state. Requires Terraform >= 1.11.
+        :param pulumi.Input[_builtins.float] secret_inputs_wo_version: Version of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span> to AWX.
         """
         if credential_id is not None:
             pulumi.set(__self__, "credential_id", credential_id)
@@ -144,6 +184,10 @@ class _CredentialState:
             pulumi.set(__self__, "name", name)
         if organization_id is not None:
             pulumi.set(__self__, "organization_id", organization_id)
+        if secret_inputs_wo is not None:
+            pulumi.set(__self__, "secret_inputs_wo", secret_inputs_wo)
+        if secret_inputs_wo_version is not None:
+            pulumi.set(__self__, "secret_inputs_wo_version", secret_inputs_wo_version)
 
     @_builtins.property
     @pulumi.getter(name="credentialId")
@@ -214,6 +258,31 @@ class _CredentialState:
     def organization_id(self, value: pulumi.Input[Optional[_builtins.float]]):
         pulumi.set(self, "organization_id", value)
 
+    @_builtins.property
+    @pulumi.getter(name="secretInputsWo")
+    def secret_inputs_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        Secret inputs as a JSON object, e.g. `jsonencode({ password = var.password })`, merged with <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span> before being sent to AWX. Keys must not also be set in <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span>. Write-only: never stored in state. Requires Terraform >= 1.11.
+        """
+        return pulumi.get(self, "secret_inputs_wo")
+
+    @secret_inputs_wo.setter
+    def secret_inputs_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "secret_inputs_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="secretInputsWoVersion")
+    def secret_inputs_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span> to AWX.
+        """
+        return pulumi.get(self, "secret_inputs_wo_version")
+
+    @secret_inputs_wo_version.setter
+    def secret_inputs_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "secret_inputs_wo_version", value)
+
 
 @pulumi.type_token("awx:index/credential:Credential")
 class Credential(pulumi.CustomResource):
@@ -227,6 +296,8 @@ class Credential(pulumi.CustomResource):
                  inputs: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 secret_inputs_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_inputs_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a Credential resource with the given unique name, props, and options.
@@ -238,6 +309,9 @@ class Credential(pulumi.CustomResource):
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] inputs: The inputs to be created with the credential.
         :param pulumi.Input[_builtins.str] name: The name of the credential
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to
+        :param pulumi.Input[_builtins.str] secret_inputs_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               Secret inputs as a JSON object, e.g. `jsonencode({ password = var.password })`, merged with <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span> before being sent to AWX. Keys must not also be set in <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span>. Write-only: never stored in state. Requires Terraform >= 1.11.
+        :param pulumi.Input[_builtins.float] secret_inputs_wo_version: Version of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span> to AWX.
         """
         ...
     @overload
@@ -269,6 +343,8 @@ class Credential(pulumi.CustomResource):
                  inputs: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 secret_inputs_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 secret_inputs_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -283,14 +359,14 @@ class Credential(pulumi.CustomResource):
                 raise TypeError("Missing required property 'credential_type_id'")
             __props__.__dict__["credential_type_id"] = credential_type_id
             __props__.__dict__["description"] = description
-            if inputs is None and not opts.urn:
-                raise TypeError("Missing required property 'inputs'")
             __props__.__dict__["inputs"] = None if inputs is None else pulumi.Output.secret(inputs)
             __props__.__dict__["name"] = name
             if organization_id is None and not opts.urn:
                 raise TypeError("Missing required property 'organization_id'")
             __props__.__dict__["organization_id"] = organization_id
-        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["inputs"])
+            __props__.__dict__["secret_inputs_wo"] = None if secret_inputs_wo is None else pulumi.Output.secret(secret_inputs_wo)
+            __props__.__dict__["secret_inputs_wo_version"] = secret_inputs_wo_version
+        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["inputs", "secretInputsWo"])
         opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(Credential, __self__).__init__(
             'awx:index/credential:Credential',
@@ -308,7 +384,9 @@ class Credential(pulumi.CustomResource):
             description: pulumi.Input[Optional[_builtins.str]] = None,
             inputs: pulumi.Input[Optional[Mapping[str, pulumi.Input[_builtins.str]]]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            organization_id: pulumi.Input[Optional[_builtins.float]] = None) -> 'Credential':
+            organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+            secret_inputs_wo: pulumi.Input[Optional[_builtins.str]] = None,
+            secret_inputs_wo_version: pulumi.Input[Optional[_builtins.float]] = None) -> 'Credential':
         """
         Get an existing Credential resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -321,6 +399,9 @@ class Credential(pulumi.CustomResource):
         :param pulumi.Input[Mapping[str, pulumi.Input[_builtins.str]]] inputs: The inputs to be created with the credential.
         :param pulumi.Input[_builtins.str] name: The name of the credential
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to
+        :param pulumi.Input[_builtins.str] secret_inputs_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               Secret inputs as a JSON object, e.g. `jsonencode({ password = var.password })`, merged with <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span> before being sent to AWX. Keys must not also be set in <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span>. Write-only: never stored in state. Requires Terraform >= 1.11.
+        :param pulumi.Input[_builtins.float] secret_inputs_wo_version: Version of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span> to AWX.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -332,6 +413,8 @@ class Credential(pulumi.CustomResource):
         __props__.__dict__["inputs"] = inputs
         __props__.__dict__["name"] = name
         __props__.__dict__["organization_id"] = organization_id
+        __props__.__dict__["secret_inputs_wo"] = secret_inputs_wo
+        __props__.__dict__["secret_inputs_wo_version"] = secret_inputs_wo_version
         return Credential(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
@@ -357,7 +440,7 @@ class Credential(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter
-    def inputs(self) -> pulumi.Output[Mapping[str, _builtins.str]]:
+    def inputs(self) -> pulumi.Output[Optional[Mapping[str, _builtins.str]]]:
         """
         The inputs to be created with the credential.
         """
@@ -378,4 +461,21 @@ class Credential(pulumi.CustomResource):
         The organization ID that the credential belongs to
         """
         return pulumi.get(self, "organization_id")
+
+    @_builtins.property
+    @pulumi.getter(name="secretInputsWo")
+    def secret_inputs_wo(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        Secret inputs as a JSON object, e.g. `jsonencode({ password = var.password })`, merged with <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span> before being sent to AWX. Keys must not also be set in <span pulumi-lang-nodejs="`inputs`" pulumi-lang-dotnet="`Inputs`" pulumi-lang-go="`inputs`" pulumi-lang-python="`inputs`" pulumi-lang-yaml="`inputs`" pulumi-lang-java="`inputs`" pulumi-lang-hcl="`inputs`">`inputs`</span>. Write-only: never stored in state. Requires Terraform >= 1.11.
+        """
+        return pulumi.get(self, "secret_inputs_wo")
+
+    @_builtins.property
+    @pulumi.getter(name="secretInputsWoVersion")
+    def secret_inputs_wo_version(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`secretInputsWo`" pulumi-lang-dotnet="`SecretInputsWo`" pulumi-lang-go="`secretInputsWo`" pulumi-lang-python="`secret_inputs_wo`" pulumi-lang-yaml="`secretInputsWo`" pulumi-lang-java="`secretInputsWo`" pulumi-lang-hcl="`secret_inputs_wo`">`secretInputsWo`</span> to AWX.
+        """
+        return pulumi.get(self, "secret_inputs_wo_version")
 

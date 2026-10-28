@@ -220,9 +220,9 @@ class Team(pulumi.CustomResource):
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
-                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict']]]]] = None,
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict', 'outputs.TeamRoleEntitlement']]]]] = None,
                  team_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeouts: pulumi.Input[Optional[Union['TeamTimeoutsArgs', 'TeamTimeoutsArgsDict']]] = None,
+                 timeouts: pulumi.Input[Optional[Union['TeamTimeoutsArgs', 'TeamTimeoutsArgsDict', 'outputs.TeamTimeouts']]] = None,
                  __props__=None):
         """
         Create a Team resource with the given unique name, props, and options.
@@ -232,7 +232,7 @@ class Team(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: Optional description of this Team.
         :param pulumi.Input[_builtins.str] name: Name of this Team
         :param pulumi.Input[_builtins.float] organization_id: Numeric ID of the Team organization
-        :param pulumi.Input[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict']]]] role_entitlements: Set of role IDs of the role entitlements
+        :param pulumi.Input[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict', 'outputs.TeamRoleEntitlement']]]] role_entitlements: Set of role IDs of the role entitlements
         """
         ...
     @overload
@@ -261,9 +261,9 @@ class Team(pulumi.CustomResource):
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
-                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict']]]]] = None,
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict', 'outputs.TeamRoleEntitlement']]]]] = None,
                  team_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeouts: pulumi.Input[Optional[Union['TeamTimeoutsArgs', 'TeamTimeoutsArgsDict']]] = None,
+                 timeouts: pulumi.Input[Optional[Union['TeamTimeoutsArgs', 'TeamTimeoutsArgsDict', 'outputs.TeamTimeouts']]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -295,9 +295,9 @@ class Team(pulumi.CustomResource):
             description: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
             organization_id: pulumi.Input[Optional[_builtins.float]] = None,
-            role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict']]]]] = None,
+            role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict', 'outputs.TeamRoleEntitlement']]]]] = None,
             team_id: pulumi.Input[Optional[_builtins.str]] = None,
-            timeouts: pulumi.Input[Optional[Union['TeamTimeoutsArgs', 'TeamTimeoutsArgsDict']]] = None) -> 'Team':
+            timeouts: pulumi.Input[Optional[Union['TeamTimeoutsArgs', 'TeamTimeoutsArgsDict', 'outputs.TeamTimeouts']]] = None) -> 'Team':
         """
         Get an existing Team resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -308,7 +308,7 @@ class Team(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: Optional description of this Team.
         :param pulumi.Input[_builtins.str] name: Name of this Team
         :param pulumi.Input[_builtins.float] organization_id: Numeric ID of the Team organization
-        :param pulumi.Input[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict']]]] role_entitlements: Set of role IDs of the role entitlements
+        :param pulumi.Input[Sequence[pulumi.Input[Union['TeamRoleEntitlementArgs', 'TeamRoleEntitlementArgsDict', 'outputs.TeamRoleEntitlement']]]] role_entitlements: Set of role IDs of the role entitlements
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 

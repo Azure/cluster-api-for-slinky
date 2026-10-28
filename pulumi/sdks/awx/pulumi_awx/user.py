@@ -21,28 +21,32 @@ __all__ = ['UserArgs', 'User']
 @pulumi.input_type
 class UserArgs:
     def __init__(__self__, *,
-                 password: pulumi.Input[_builtins.str],
                  username: pulumi.Input[_builtins.str],
                  email: pulumi.Input[Optional[_builtins.str]] = None,
                  first_name: pulumi.Input[Optional[_builtins.str]] = None,
                  is_superuser: pulumi.Input[Optional[_builtins.bool]] = None,
                  is_system_auditor: pulumi.Input[Optional[_builtins.bool]] = None,
                  last_name: pulumi.Input[Optional[_builtins.str]] = None,
+                 password: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input['UserRoleEntitlementArgs']]]] = None,
                  user_id: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a User resource.
 
-        :param pulumi.Input[_builtins.str] password: The password of the user
         :param pulumi.Input[_builtins.str] username: The username of the user
         :param pulumi.Input[_builtins.str] email: The email of the user
         :param pulumi.Input[_builtins.str] first_name: The first name of the user
         :param pulumi.Input[_builtins.bool] is_superuser: The superuser status of the user
         :param pulumi.Input[_builtins.bool] is_system_auditor: The system auditor status of the user
         :param pulumi.Input[_builtins.str] last_name: The last name of the user
+        :param pulumi.Input[_builtins.str] password: The password of the user
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The password of the user. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
         :param pulumi.Input[Sequence[pulumi.Input['UserRoleEntitlementArgs']]] role_entitlements: Set of role IDs of the role entitlements
         """
-        pulumi.set(__self__, "password", password)
         pulumi.set(__self__, "username", username)
         if email is not None:
             pulumi.set(__self__, "email", email)
@@ -54,22 +58,16 @@ class UserArgs:
             pulumi.set(__self__, "is_system_auditor", is_system_auditor)
         if last_name is not None:
             pulumi.set(__self__, "last_name", last_name)
+        if password is not None:
+            pulumi.set(__self__, "password", password)
+        if password_wo is not None:
+            pulumi.set(__self__, "password_wo", password_wo)
+        if password_wo_version is not None:
+            pulumi.set(__self__, "password_wo_version", password_wo_version)
         if role_entitlements is not None:
             pulumi.set(__self__, "role_entitlements", role_entitlements)
         if user_id is not None:
             pulumi.set(__self__, "user_id", user_id)
-
-    @_builtins.property
-    @pulumi.getter
-    def password(self) -> pulumi.Input[_builtins.str]:
-        """
-        The password of the user
-        """
-        return pulumi.get(self, "password")
-
-    @password.setter
-    def password(self, value: pulumi.Input[_builtins.str]):
-        pulumi.set(self, "password", value)
 
     @_builtins.property
     @pulumi.getter
@@ -144,6 +142,43 @@ class UserArgs:
         pulumi.set(self, "last_name", value)
 
     @_builtins.property
+    @pulumi.getter
+    def password(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The password of the user
+        """
+        return pulumi.get(self, "password")
+
+    @password.setter
+    def password(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "password", value)
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWo")
+    def password_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The password of the user. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        """
+        return pulumi.get(self, "password_wo")
+
+    @password_wo.setter
+    def password_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "password_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWoVersion")
+    def password_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "password_wo_version")
+
+    @password_wo_version.setter
+    def password_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "password_wo_version", value)
+
+    @_builtins.property
     @pulumi.getter(name="roleEntitlements")
     def role_entitlements(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['UserRoleEntitlementArgs']]]]:
         """
@@ -174,6 +209,8 @@ class _UserState:
                  is_system_auditor: pulumi.Input[Optional[_builtins.bool]] = None,
                  last_name: pulumi.Input[Optional[_builtins.str]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input['UserRoleEntitlementArgs']]]] = None,
                  user_id: pulumi.Input[Optional[_builtins.str]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None):
@@ -186,6 +223,9 @@ class _UserState:
         :param pulumi.Input[_builtins.bool] is_system_auditor: The system auditor status of the user
         :param pulumi.Input[_builtins.str] last_name: The last name of the user
         :param pulumi.Input[_builtins.str] password: The password of the user
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The password of the user. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
         :param pulumi.Input[Sequence[pulumi.Input['UserRoleEntitlementArgs']]] role_entitlements: Set of role IDs of the role entitlements
         :param pulumi.Input[_builtins.str] username: The username of the user
         """
@@ -201,6 +241,10 @@ class _UserState:
             pulumi.set(__self__, "last_name", last_name)
         if password is not None:
             pulumi.set(__self__, "password", password)
+        if password_wo is not None:
+            pulumi.set(__self__, "password_wo", password_wo)
+        if password_wo_version is not None:
+            pulumi.set(__self__, "password_wo_version", password_wo_version)
         if role_entitlements is not None:
             pulumi.set(__self__, "role_entitlements", role_entitlements)
         if user_id is not None:
@@ -281,6 +325,31 @@ class _UserState:
         pulumi.set(self, "password", value)
 
     @_builtins.property
+    @pulumi.getter(name="passwordWo")
+    def password_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The password of the user. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        """
+        return pulumi.get(self, "password_wo")
+
+    @password_wo.setter
+    def password_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "password_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWoVersion")
+    def password_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "password_wo_version")
+
+    @password_wo_version.setter
+    def password_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "password_wo_version", value)
+
+    @_builtins.property
     @pulumi.getter(name="roleEntitlements")
     def role_entitlements(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['UserRoleEntitlementArgs']]]]:
         """
@@ -326,7 +395,9 @@ class User(pulumi.CustomResource):
                  is_system_auditor: pulumi.Input[Optional[_builtins.bool]] = None,
                  last_name: pulumi.Input[Optional[_builtins.str]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
-                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict']]]]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict', 'outputs.UserRoleEntitlement']]]]] = None,
                  user_id: pulumi.Input[Optional[_builtins.str]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
@@ -341,7 +412,10 @@ class User(pulumi.CustomResource):
         :param pulumi.Input[_builtins.bool] is_system_auditor: The system auditor status of the user
         :param pulumi.Input[_builtins.str] last_name: The last name of the user
         :param pulumi.Input[_builtins.str] password: The password of the user
-        :param pulumi.Input[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict']]]] role_entitlements: Set of role IDs of the role entitlements
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The password of the user. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict', 'outputs.UserRoleEntitlement']]]] role_entitlements: Set of role IDs of the role entitlements
         :param pulumi.Input[_builtins.str] username: The username of the user
         """
         ...
@@ -374,7 +448,9 @@ class User(pulumi.CustomResource):
                  is_system_auditor: pulumi.Input[Optional[_builtins.bool]] = None,
                  last_name: pulumi.Input[Optional[_builtins.str]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
-                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict']]]]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
+                 role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict', 'outputs.UserRoleEntitlement']]]]] = None,
                  user_id: pulumi.Input[Optional[_builtins.str]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
@@ -391,15 +467,15 @@ class User(pulumi.CustomResource):
             __props__.__dict__["is_superuser"] = is_superuser
             __props__.__dict__["is_system_auditor"] = is_system_auditor
             __props__.__dict__["last_name"] = last_name
-            if password is None and not opts.urn:
-                raise TypeError("Missing required property 'password'")
             __props__.__dict__["password"] = None if password is None else pulumi.Output.secret(password)
+            __props__.__dict__["password_wo"] = None if password_wo is None else pulumi.Output.secret(password_wo)
+            __props__.__dict__["password_wo_version"] = password_wo_version
             __props__.__dict__["role_entitlements"] = role_entitlements
             __props__.__dict__["user_id"] = user_id
             if username is None and not opts.urn:
                 raise TypeError("Missing required property 'username'")
             __props__.__dict__["username"] = username
-        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["password"])
+        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["password", "passwordWo"])
         opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(User, __self__).__init__(
             'awx:index/user:User',
@@ -418,7 +494,9 @@ class User(pulumi.CustomResource):
             is_system_auditor: pulumi.Input[Optional[_builtins.bool]] = None,
             last_name: pulumi.Input[Optional[_builtins.str]] = None,
             password: pulumi.Input[Optional[_builtins.str]] = None,
-            role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict']]]]] = None,
+            password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+            password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
+            role_entitlements: pulumi.Input[Optional[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict', 'outputs.UserRoleEntitlement']]]]] = None,
             user_id: pulumi.Input[Optional[_builtins.str]] = None,
             username: pulumi.Input[Optional[_builtins.str]] = None) -> 'User':
         """
@@ -434,7 +512,10 @@ class User(pulumi.CustomResource):
         :param pulumi.Input[_builtins.bool] is_system_auditor: The system auditor status of the user
         :param pulumi.Input[_builtins.str] last_name: The last name of the user
         :param pulumi.Input[_builtins.str] password: The password of the user
-        :param pulumi.Input[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict']]]] role_entitlements: Set of role IDs of the role entitlements
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The password of the user. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['UserRoleEntitlementArgs', 'UserRoleEntitlementArgsDict', 'outputs.UserRoleEntitlement']]]] role_entitlements: Set of role IDs of the role entitlements
         :param pulumi.Input[_builtins.str] username: The username of the user
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -447,6 +528,8 @@ class User(pulumi.CustomResource):
         __props__.__dict__["is_system_auditor"] = is_system_auditor
         __props__.__dict__["last_name"] = last_name
         __props__.__dict__["password"] = password
+        __props__.__dict__["password_wo"] = password_wo
+        __props__.__dict__["password_wo_version"] = password_wo_version
         __props__.__dict__["role_entitlements"] = role_entitlements
         __props__.__dict__["user_id"] = user_id
         __props__.__dict__["username"] = username
@@ -494,11 +577,28 @@ class User(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter
-    def password(self) -> pulumi.Output[_builtins.str]:
+    def password(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         The password of the user
         """
         return pulumi.get(self, "password")
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWo")
+    def password_wo(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The password of the user. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        """
+        return pulumi.get(self, "password_wo")
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWoVersion")
+    def password_wo_version(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "password_wo_version")
 
     @_builtins.property
     @pulumi.getter(name="roleEntitlements")

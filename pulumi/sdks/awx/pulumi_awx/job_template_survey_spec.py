@@ -195,7 +195,7 @@ class JobTemplateSurveySpec(pulumi.CustomResource):
                  job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
                  job_template_survey_spec_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['JobTemplateSurveySpecSpecArgs', 'JobTemplateSurveySpecSpecArgsDict']]]]] = None,
+                 specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['JobTemplateSurveySpecSpecArgs', 'JobTemplateSurveySpecSpecArgsDict', 'outputs.JobTemplateSurveySpecSpec']]]]] = None,
                  __props__=None):
         """
         Create a JobTemplateSurveySpec resource with the given unique name, props, and options.
@@ -205,7 +205,7 @@ class JobTemplateSurveySpec(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: The description of the job template survey spec.
         :param pulumi.Input[_builtins.float] job_template_id: The ID of the Job Template to which create the survey spec.
         :param pulumi.Input[_builtins.str] name: The name of the Job Template survey spec.
-        :param pulumi.Input[Sequence[pulumi.Input[Union['JobTemplateSurveySpecSpecArgs', 'JobTemplateSurveySpecSpecArgsDict']]]] specs: Spec of the job template survey. One block per question in the survey.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['JobTemplateSurveySpecSpecArgs', 'JobTemplateSurveySpecSpecArgsDict', 'outputs.JobTemplateSurveySpecSpec']]]] specs: Spec of the job template survey. One block per question in the survey.
         """
         ...
     @overload
@@ -235,7 +235,7 @@ class JobTemplateSurveySpec(pulumi.CustomResource):
                  job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
                  job_template_survey_spec_id: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
-                 specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['JobTemplateSurveySpecSpecArgs', 'JobTemplateSurveySpecSpecArgsDict']]]]] = None,
+                 specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['JobTemplateSurveySpecSpecArgs', 'JobTemplateSurveySpecSpecArgsDict', 'outputs.JobTemplateSurveySpecSpec']]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -271,7 +271,7 @@ class JobTemplateSurveySpec(pulumi.CustomResource):
             job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
             job_template_survey_spec_id: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
-            specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['JobTemplateSurveySpecSpecArgs', 'JobTemplateSurveySpecSpecArgsDict']]]]] = None) -> 'JobTemplateSurveySpec':
+            specs: pulumi.Input[Optional[Sequence[pulumi.Input[Union['JobTemplateSurveySpecSpecArgs', 'JobTemplateSurveySpecSpecArgsDict', 'outputs.JobTemplateSurveySpecSpec']]]]] = None) -> 'JobTemplateSurveySpec':
         """
         Get an existing JobTemplateSurveySpec resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -282,7 +282,7 @@ class JobTemplateSurveySpec(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] description: The description of the job template survey spec.
         :param pulumi.Input[_builtins.float] job_template_id: The ID of the Job Template to which create the survey spec.
         :param pulumi.Input[_builtins.str] name: The name of the Job Template survey spec.
-        :param pulumi.Input[Sequence[pulumi.Input[Union['JobTemplateSurveySpecSpecArgs', 'JobTemplateSurveySpecSpecArgsDict']]]] specs: Spec of the job template survey. One block per question in the survey.
+        :param pulumi.Input[Sequence[pulumi.Input[Union['JobTemplateSurveySpecSpecArgs', 'JobTemplateSurveySpecSpecArgsDict', 'outputs.JobTemplateSurveySpecSpec']]]] specs: Spec of the job template survey. One block per question in the survey.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 

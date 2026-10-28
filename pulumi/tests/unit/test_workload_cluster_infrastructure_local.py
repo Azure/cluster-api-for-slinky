@@ -64,6 +64,16 @@ def test_v1beta2_cluster_wait_uses_control_plane_available_condition() -> None:
     assert _WAIT_FOR_CONTROL_PLANE_AVAILABLE == "condition=ControlPlaneAvailable"
 
 
+def test_management_and_workload_node_images_match() -> None:
+    from ctlptl.ctlptl_cluster import _MANIFEST_TEMPLATE
+
+    nodes = yaml.safe_load(_MANIFEST_TEMPLATE)["kindV1Alpha4Cluster"]["nodes"]
+    assert all(node["image"] == local_infra._KIND_NODE_IMAGE for node in nodes)
+    assert local_infra._KIND_NODE_IMAGE.startswith(
+        f"kindest/node:{local_infra._KUBERNETES_VERSION}@sha256:"
+    )
+
+
 @pytest.mark.parametrize("worker_spec", _LOCAL_MACHINE_DEPLOYMENTS, ids=lambda worker: worker.name)
 def test_local_worker_deletion_options(worker_spec) -> None:
     resources = []

@@ -516,6 +516,10 @@ __all__ = [
     'ClusterSpecArgsDict',
     'ClusterStatusConditionsArgs',
     'ClusterStatusConditionsArgsDict',
+    'ClusterStatusControlPlaneUpgradePlanArgs',
+    'ClusterStatusControlPlaneUpgradePlanArgsDict',
+    'ClusterStatusControlPlaneVersionsArgs',
+    'ClusterStatusControlPlaneVersionsArgsDict',
     'ClusterStatusControlPlaneArgs',
     'ClusterStatusControlPlaneArgsDict',
     'ClusterStatusDeprecatedV1beta1ConditionsArgs',
@@ -528,6 +532,10 @@ __all__ = [
     'ClusterStatusFailureDomainsArgsDict',
     'ClusterStatusInitializationArgs',
     'ClusterStatusInitializationArgsDict',
+    'ClusterStatusWorkersUpgradePlanArgs',
+    'ClusterStatusWorkersUpgradePlanArgsDict',
+    'ClusterStatusWorkersVersionsArgs',
+    'ClusterStatusWorkersVersionsArgsDict',
     'ClusterStatusWorkersArgs',
     'ClusterStatusWorkersArgsDict',
     'ClusterStatusArgs',
@@ -614,6 +622,8 @@ __all__ = [
     'MachineDeploymentStatusDeprecatedV1beta1ArgsDict',
     'MachineDeploymentStatusDeprecatedArgs',
     'MachineDeploymentStatusDeprecatedArgsDict',
+    'MachineDeploymentStatusVersionsArgs',
+    'MachineDeploymentStatusVersionsArgsDict',
     'MachineDeploymentStatusArgs',
     'MachineDeploymentStatusArgsDict',
     'MachineDeploymentArgs',
@@ -768,6 +778,8 @@ __all__ = [
     'MachinePoolStatusInitializationArgsDict',
     'MachinePoolStatusNodeRefsArgs',
     'MachinePoolStatusNodeRefsArgsDict',
+    'MachinePoolStatusVersionsArgs',
+    'MachinePoolStatusVersionsArgsDict',
     'MachinePoolStatusArgs',
     'MachinePoolStatusArgsDict',
     'MachinePoolArgs',
@@ -836,6 +848,8 @@ __all__ = [
     'MachineSetStatusDeprecatedV1beta1ArgsDict',
     'MachineSetStatusDeprecatedArgs',
     'MachineSetStatusDeprecatedArgsDict',
+    'MachineSetStatusVersionsArgs',
+    'MachineSetStatusVersionsArgsDict',
     'MachineSetStatusArgs',
     'MachineSetStatusArgsDict',
     'MachineSetArgs',
@@ -8780,7 +8794,7 @@ class ClusterClassSpecWorkersMachineDeploymentsDeletionPatchArgsDict(TypedDict):
     order: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     order defines the order in which Machines are deleted when downscaling.
-    Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+    Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
     """
 
 @pulumi.input_type
@@ -8805,7 +8819,7 @@ class ClusterClassSpecWorkersMachineDeploymentsDeletionPatchArgs:
                to be detached. The default value is 0, meaning that the volumes can be detached without any time limitations.
                NOTE: This value can be overridden while defining a Cluster.Topology using this MachineDeploymentClass.
         :param pulumi.Input[_builtins.str] order: order defines the order in which Machines are deleted when downscaling.
-               Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+               Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         if node_deletion_timeout_seconds is not None:
             pulumi.set(__self__, "node_deletion_timeout_seconds", node_deletion_timeout_seconds)
@@ -8865,7 +8879,7 @@ class ClusterClassSpecWorkersMachineDeploymentsDeletionPatchArgs:
     def order(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         order defines the order in which Machines are deleted when downscaling.
-        Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+        Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         return pulumi.get(self, "order")
 
@@ -8901,7 +8915,7 @@ class ClusterClassSpecWorkersMachineDeploymentsDeletionArgsDict(TypedDict):
     order: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     order defines the order in which Machines are deleted when downscaling.
-    Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+    Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
     """
 
 @pulumi.input_type
@@ -8926,7 +8940,7 @@ class ClusterClassSpecWorkersMachineDeploymentsDeletionArgs:
                to be detached. The default value is 0, meaning that the volumes can be detached without any time limitations.
                NOTE: This value can be overridden while defining a Cluster.Topology using this MachineDeploymentClass.
         :param pulumi.Input[_builtins.str] order: order defines the order in which Machines are deleted when downscaling.
-               Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+               Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         if node_deletion_timeout_seconds is not None:
             pulumi.set(__self__, "node_deletion_timeout_seconds", node_deletion_timeout_seconds)
@@ -8986,7 +9000,7 @@ class ClusterClassSpecWorkersMachineDeploymentsDeletionArgs:
     def order(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         order defines the order in which Machines are deleted when downscaling.
-        Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+        Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         return pulumi.get(self, "order")
 
@@ -20067,7 +20081,7 @@ class ClusterSpecTopologyWorkersMachineDeploymentsDeletionPatchArgsDict(TypedDic
     order: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     order defines the order in which Machines are deleted when downscaling.
-    Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+    Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
     """
 
 @pulumi.input_type
@@ -20089,7 +20103,7 @@ class ClusterSpecTopologyWorkersMachineDeploymentsDeletionPatchArgs:
         :param pulumi.Input[_builtins.int] node_volume_detach_timeout_seconds: nodeVolumeDetachTimeoutSeconds is the total amount of time that the controller will spend on waiting for all volumes
                to be detached. The default value is 0, meaning that the volumes can be detached without any time limitations.
         :param pulumi.Input[_builtins.str] order: order defines the order in which Machines are deleted when downscaling.
-               Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+               Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         if node_deletion_timeout_seconds is not None:
             pulumi.set(__self__, "node_deletion_timeout_seconds", node_deletion_timeout_seconds)
@@ -20146,7 +20160,7 @@ class ClusterSpecTopologyWorkersMachineDeploymentsDeletionPatchArgs:
     def order(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         order defines the order in which Machines are deleted when downscaling.
-        Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+        Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         return pulumi.get(self, "order")
 
@@ -20179,7 +20193,7 @@ class ClusterSpecTopologyWorkersMachineDeploymentsDeletionArgsDict(TypedDict):
     order: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     order defines the order in which Machines are deleted when downscaling.
-    Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+    Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
     """
 
 @pulumi.input_type
@@ -20201,7 +20215,7 @@ class ClusterSpecTopologyWorkersMachineDeploymentsDeletionArgs:
         :param pulumi.Input[_builtins.int] node_volume_detach_timeout_seconds: nodeVolumeDetachTimeoutSeconds is the total amount of time that the controller will spend on waiting for all volumes
                to be detached. The default value is 0, meaning that the volumes can be detached without any time limitations.
         :param pulumi.Input[_builtins.str] order: order defines the order in which Machines are deleted when downscaling.
-               Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+               Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         if node_deletion_timeout_seconds is not None:
             pulumi.set(__self__, "node_deletion_timeout_seconds", node_deletion_timeout_seconds)
@@ -20258,7 +20272,7 @@ class ClusterSpecTopologyWorkersMachineDeploymentsDeletionArgs:
     def order(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         order defines the order in which Machines are deleted when downscaling.
-        Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+        Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         return pulumi.get(self, "order")
 
@@ -25208,6 +25222,94 @@ class ClusterStatusConditionsArgs:
         pulumi.set(self, "type", value)
 
 
+class ClusterStatusControlPlaneUpgradePlanArgsDict(TypedDict):
+    """
+    StatusUpgradePlanVersion groups upgrade plan version-related status information.
+    """
+    version: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    version is the Kubernetes version.
+    """
+
+@pulumi.input_type
+class ClusterStatusControlPlaneUpgradePlanArgs:
+    def __init__(__self__, *,
+                 version: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        StatusUpgradePlanVersion groups upgrade plan version-related status information.
+
+        :param pulumi.Input[_builtins.str] version: version is the Kubernetes version.
+        """
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+    @version.setter
+    def version(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "version", value)
+
+
+class ClusterStatusControlPlaneVersionsArgsDict(TypedDict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    replicas: NotRequired[pulumi.Input[Optional[_builtins.int]]]
+    """
+    replicas is the number of replicas at this version.
+    """
+    version: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    version is the Kubernetes version.
+    """
+
+@pulumi.input_type
+class ClusterStatusControlPlaneVersionsArgs:
+    def __init__(__self__, *,
+                 replicas: pulumi.Input[Optional[_builtins.int]] = None,
+                 version: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param pulumi.Input[_builtins.int] replicas: replicas is the number of replicas at this version.
+        :param pulumi.Input[_builtins.str] version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> pulumi.Input[Optional[_builtins.int]]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @replicas.setter
+    def replicas(self, value: pulumi.Input[Optional[_builtins.int]]):
+        pulumi.set(self, "replicas", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+    @version.setter
+    def version(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "version", value)
+
+
 class ClusterStatusControlPlaneArgsDict(TypedDict):
     """
     controlPlane groups all the observations about Cluster's ControlPlane current state.
@@ -25233,6 +25335,20 @@ class ClusterStatusControlPlaneArgsDict(TypedDict):
     """
     upToDateReplicas is the number of up-to-date control plane machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
     """
+    upgrade_plan: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusControlPlaneUpgradePlanArgs']]]]]
+    """
+    upgradePlan reports the list of versions that would be applied to the control plane object according to the upgrade plan.
+    Note:
+    - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+    - Once a version is applied to the control plane object, it is removed from the list (after a version
+      is applied to a control plane object, it might take some time for the actual upgrade to complete)
+    - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+      report only the last known upgrade plan.
+    """
+    versions: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusControlPlaneVersionsArgs']]]]]
+    """
+    versions is the aggregated Kubernetes versions in this control plane.
+    """
 
 @pulumi.input_type
 class ClusterStatusControlPlaneArgs:
@@ -25241,7 +25357,9 @@ class ClusterStatusControlPlaneArgs:
                  desired_replicas: pulumi.Input[Optional[_builtins.int]] = None,
                  ready_replicas: pulumi.Input[Optional[_builtins.int]] = None,
                  replicas: pulumi.Input[Optional[_builtins.int]] = None,
-                 up_to_date_replicas: pulumi.Input[Optional[_builtins.int]] = None):
+                 up_to_date_replicas: pulumi.Input[Optional[_builtins.int]] = None,
+                 upgrade_plan: pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusControlPlaneUpgradePlanArgs']]]] = None,
+                 versions: pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusControlPlaneVersionsArgs']]]] = None):
         """
         controlPlane groups all the observations about Cluster's ControlPlane current state.
 
@@ -25251,6 +25369,14 @@ class ClusterStatusControlPlaneArgs:
         :param pulumi.Input[_builtins.int] replicas: replicas is the total number of control plane machines in this cluster.
                NOTE: replicas also includes machines still being provisioned or being deleted.
         :param pulumi.Input[_builtins.int] up_to_date_replicas: upToDateReplicas is the number of up-to-date control plane machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
+        :param pulumi.Input[Sequence[pulumi.Input['ClusterStatusControlPlaneUpgradePlanArgs']]] upgrade_plan: upgradePlan reports the list of versions that would be applied to the control plane object according to the upgrade plan.
+               Note:
+               - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+               - Once a version is applied to the control plane object, it is removed from the list (after a version
+                 is applied to a control plane object, it might take some time for the actual upgrade to complete)
+               - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+                 report only the last known upgrade plan.
+        :param pulumi.Input[Sequence[pulumi.Input['ClusterStatusControlPlaneVersionsArgs']]] versions: versions is the aggregated Kubernetes versions in this control plane.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -25262,6 +25388,10 @@ class ClusterStatusControlPlaneArgs:
             pulumi.set(__self__, "replicas", replicas)
         if up_to_date_replicas is not None:
             pulumi.set(__self__, "up_to_date_replicas", up_to_date_replicas)
+        if upgrade_plan is not None:
+            pulumi.set(__self__, "upgrade_plan", upgrade_plan)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -25323,6 +25453,36 @@ class ClusterStatusControlPlaneArgs:
     @up_to_date_replicas.setter
     def up_to_date_replicas(self, value: pulumi.Input[Optional[_builtins.int]]):
         pulumi.set(self, "up_to_date_replicas", value)
+
+    @_builtins.property
+    @pulumi.getter(name="upgradePlan")
+    def upgrade_plan(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusControlPlaneUpgradePlanArgs']]]]:
+        """
+        upgradePlan reports the list of versions that would be applied to the control plane object according to the upgrade plan.
+        Note:
+        - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+        - Once a version is applied to the control plane object, it is removed from the list (after a version
+          is applied to a control plane object, it might take some time for the actual upgrade to complete)
+        - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+          report only the last known upgrade plan.
+        """
+        return pulumi.get(self, "upgrade_plan")
+
+    @upgrade_plan.setter
+    def upgrade_plan(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusControlPlaneUpgradePlanArgs']]]]):
+        pulumi.set(self, "upgrade_plan", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusControlPlaneVersionsArgs']]]]:
+        """
+        versions is the aggregated Kubernetes versions in this control plane.
+        """
+        return pulumi.get(self, "versions")
+
+    @versions.setter
+    def versions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusControlPlaneVersionsArgs']]]]):
+        pulumi.set(self, "versions", value)
 
 
 class ClusterStatusDeprecatedV1beta1ConditionsArgsDict(TypedDict):
@@ -25770,6 +25930,94 @@ class ClusterStatusInitializationArgs:
         pulumi.set(self, "infrastructure_provisioned", value)
 
 
+class ClusterStatusWorkersUpgradePlanArgsDict(TypedDict):
+    """
+    StatusUpgradePlanVersion groups upgrade plan version-related status information.
+    """
+    version: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    version is the Kubernetes version.
+    """
+
+@pulumi.input_type
+class ClusterStatusWorkersUpgradePlanArgs:
+    def __init__(__self__, *,
+                 version: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        StatusUpgradePlanVersion groups upgrade plan version-related status information.
+
+        :param pulumi.Input[_builtins.str] version: version is the Kubernetes version.
+        """
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+    @version.setter
+    def version(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "version", value)
+
+
+class ClusterStatusWorkersVersionsArgsDict(TypedDict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    replicas: NotRequired[pulumi.Input[Optional[_builtins.int]]]
+    """
+    replicas is the number of replicas at this version.
+    """
+    version: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    version is the Kubernetes version.
+    """
+
+@pulumi.input_type
+class ClusterStatusWorkersVersionsArgs:
+    def __init__(__self__, *,
+                 replicas: pulumi.Input[Optional[_builtins.int]] = None,
+                 version: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param pulumi.Input[_builtins.int] replicas: replicas is the number of replicas at this version.
+        :param pulumi.Input[_builtins.str] version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> pulumi.Input[Optional[_builtins.int]]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @replicas.setter
+    def replicas(self, value: pulumi.Input[Optional[_builtins.int]]):
+        pulumi.set(self, "replicas", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+    @version.setter
+    def version(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "version", value)
+
+
 class ClusterStatusWorkersArgsDict(TypedDict):
     """
     workers groups all the observations about Cluster's Workers current state.
@@ -25795,6 +26043,20 @@ class ClusterStatusWorkersArgsDict(TypedDict):
     """
     upToDateReplicas is the number of up-to-date worker machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
     """
+    upgrade_plan: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusWorkersUpgradePlanArgs']]]]]
+    """
+    upgradePlan reports the list of versions that would be applied to the worker objects (all MachineDeployments and MachinePools).
+    Note:
+    - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+    - Once a version is applied to the worker objects, it is removed from the list (after a version
+      is applied to a worker object, it might take some time for the actual upgrade to complete)
+    - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+      report only the last known upgrade plan.
+    """
+    versions: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusWorkersVersionsArgs']]]]]
+    """
+    versions is the aggregated Kubernetes versions in cluster workers.
+    """
 
 @pulumi.input_type
 class ClusterStatusWorkersArgs:
@@ -25803,7 +26065,9 @@ class ClusterStatusWorkersArgs:
                  desired_replicas: pulumi.Input[Optional[_builtins.int]] = None,
                  ready_replicas: pulumi.Input[Optional[_builtins.int]] = None,
                  replicas: pulumi.Input[Optional[_builtins.int]] = None,
-                 up_to_date_replicas: pulumi.Input[Optional[_builtins.int]] = None):
+                 up_to_date_replicas: pulumi.Input[Optional[_builtins.int]] = None,
+                 upgrade_plan: pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusWorkersUpgradePlanArgs']]]] = None,
+                 versions: pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusWorkersVersionsArgs']]]] = None):
         """
         workers groups all the observations about Cluster's Workers current state.
 
@@ -25813,6 +26077,14 @@ class ClusterStatusWorkersArgs:
         :param pulumi.Input[_builtins.int] replicas: replicas is the total number of worker machines in this cluster.
                NOTE: replicas also includes machines still being provisioned or being deleted.
         :param pulumi.Input[_builtins.int] up_to_date_replicas: upToDateReplicas is the number of up-to-date worker machines in this cluster. A machine is considered up-to-date when Machine's UpToDate condition is true.
+        :param pulumi.Input[Sequence[pulumi.Input['ClusterStatusWorkersUpgradePlanArgs']]] upgrade_plan: upgradePlan reports the list of versions that would be applied to the worker objects (all MachineDeployments and MachinePools).
+               Note:
+               - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+               - Once a version is applied to the worker objects, it is removed from the list (after a version
+                 is applied to a worker object, it might take some time for the actual upgrade to complete)
+               - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+                 report only the last known upgrade plan.
+        :param pulumi.Input[Sequence[pulumi.Input['ClusterStatusWorkersVersionsArgs']]] versions: versions is the aggregated Kubernetes versions in cluster workers.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -25824,6 +26096,10 @@ class ClusterStatusWorkersArgs:
             pulumi.set(__self__, "replicas", replicas)
         if up_to_date_replicas is not None:
             pulumi.set(__self__, "up_to_date_replicas", up_to_date_replicas)
+        if upgrade_plan is not None:
+            pulumi.set(__self__, "upgrade_plan", upgrade_plan)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -25885,6 +26161,36 @@ class ClusterStatusWorkersArgs:
     @up_to_date_replicas.setter
     def up_to_date_replicas(self, value: pulumi.Input[Optional[_builtins.int]]):
         pulumi.set(self, "up_to_date_replicas", value)
+
+    @_builtins.property
+    @pulumi.getter(name="upgradePlan")
+    def upgrade_plan(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusWorkersUpgradePlanArgs']]]]:
+        """
+        upgradePlan reports the list of versions that would be applied to the worker objects (all MachineDeployments and MachinePools).
+        Note:
+        - This field is set only when the Cluster topology is managed by Cluster API and a Cluster upgrade is in progress.
+        - Once a version is applied to the worker objects, it is removed from the list (after a version
+          is applied to a worker object, it might take some time for the actual upgrade to complete)
+        - During a chained upgrade, the upgrade plan is continuously re-computed, and this field will
+          report only the last known upgrade plan.
+        """
+        return pulumi.get(self, "upgrade_plan")
+
+    @upgrade_plan.setter
+    def upgrade_plan(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusWorkersUpgradePlanArgs']]]]):
+        pulumi.set(self, "upgrade_plan", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusWorkersVersionsArgs']]]]:
+        """
+        versions is the aggregated Kubernetes versions in cluster workers.
+        """
+        return pulumi.get(self, "versions")
+
+    @versions.setter
+    def versions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['ClusterStatusWorkersVersionsArgs']]]]):
+        pulumi.set(self, "versions", value)
 
 
 class ClusterStatusArgsDict(TypedDict):
@@ -26149,7 +26455,7 @@ class MachineDeploymentSpecDeletionPatchArgsDict(TypedDict):
     order: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     order defines the order in which Machines are deleted when downscaling.
-    Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+    Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
     """
 
 @pulumi.input_type
@@ -26160,7 +26466,7 @@ class MachineDeploymentSpecDeletionPatchArgs:
         deletion contains configuration options for MachineDeployment deletion.
 
         :param pulumi.Input[_builtins.str] order: order defines the order in which Machines are deleted when downscaling.
-               Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+               Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         if order is not None:
             pulumi.set(__self__, "order", order)
@@ -26170,7 +26476,7 @@ class MachineDeploymentSpecDeletionPatchArgs:
     def order(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         order defines the order in which Machines are deleted when downscaling.
-        Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+        Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         return pulumi.get(self, "order")
 
@@ -26186,7 +26492,7 @@ class MachineDeploymentSpecDeletionArgsDict(TypedDict):
     order: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     order defines the order in which Machines are deleted when downscaling.
-    Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+    Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
     """
 
 @pulumi.input_type
@@ -26197,7 +26503,7 @@ class MachineDeploymentSpecDeletionArgs:
         deletion contains configuration options for MachineDeployment deletion.
 
         :param pulumi.Input[_builtins.str] order: order defines the order in which Machines are deleted when downscaling.
-               Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+               Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         if order is not None:
             pulumi.set(__self__, "order", order)
@@ -26207,7 +26513,7 @@ class MachineDeploymentSpecDeletionArgs:
     def order(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         order defines the order in which Machines are deleted when downscaling.
-        Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+        Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         return pulumi.get(self, "order")
 
@@ -30057,6 +30363,60 @@ class MachineDeploymentStatusDeprecatedArgs:
         pulumi.set(self, "v1beta1", value)
 
 
+class MachineDeploymentStatusVersionsArgsDict(TypedDict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    replicas: NotRequired[pulumi.Input[Optional[_builtins.int]]]
+    """
+    replicas is the number of replicas at this version.
+    """
+    version: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    version is the Kubernetes version.
+    """
+
+@pulumi.input_type
+class MachineDeploymentStatusVersionsArgs:
+    def __init__(__self__, *,
+                 replicas: pulumi.Input[Optional[_builtins.int]] = None,
+                 version: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param pulumi.Input[_builtins.int] replicas: replicas is the number of replicas at this version.
+        :param pulumi.Input[_builtins.str] version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> pulumi.Input[Optional[_builtins.int]]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @replicas.setter
+    def replicas(self, value: pulumi.Input[Optional[_builtins.int]]):
+        pulumi.set(self, "replicas", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+    @version.setter
+    def version(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "version", value)
+
+
 class MachineDeploymentStatusArgsDict(TypedDict):
     """
     status is the observed state of MachineDeployment.
@@ -30098,6 +30458,10 @@ class MachineDeploymentStatusArgsDict(TypedDict):
     """
     upToDateReplicas is the number of up-to-date replicas targeted by this deployment. A machine is considered up-to-date when Machine's UpToDate condition is true.
     """
+    versions: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['MachineDeploymentStatusVersionsArgs']]]]]
+    """
+    versions is the aggregated Kubernetes versions in this MachineDeployment.
+    """
 
 @pulumi.input_type
 class MachineDeploymentStatusArgs:
@@ -30110,7 +30474,8 @@ class MachineDeploymentStatusArgs:
                  ready_replicas: pulumi.Input[Optional[_builtins.int]] = None,
                  replicas: pulumi.Input[Optional[_builtins.int]] = None,
                  selector: pulumi.Input[Optional[_builtins.str]] = None,
-                 up_to_date_replicas: pulumi.Input[Optional[_builtins.int]] = None):
+                 up_to_date_replicas: pulumi.Input[Optional[_builtins.int]] = None,
+                 versions: pulumi.Input[Optional[Sequence[pulumi.Input['MachineDeploymentStatusVersionsArgs']]]] = None):
         """
         status is the observed state of MachineDeployment.
 
@@ -30126,6 +30491,7 @@ class MachineDeploymentStatusArgs:
                by clients. The string will be in the same format as the query-param syntax.
                More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors
         :param pulumi.Input[_builtins.int] up_to_date_replicas: upToDateReplicas is the number of up-to-date replicas targeted by this deployment. A machine is considered up-to-date when Machine's UpToDate condition is true.
+        :param pulumi.Input[Sequence[pulumi.Input['MachineDeploymentStatusVersionsArgs']]] versions: versions is the aggregated Kubernetes versions in this MachineDeployment.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -30145,6 +30511,8 @@ class MachineDeploymentStatusArgs:
             pulumi.set(__self__, "selector", selector)
         if up_to_date_replicas is not None:
             pulumi.set(__self__, "up_to_date_replicas", up_to_date_replicas)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -30254,6 +30622,18 @@ class MachineDeploymentStatusArgs:
     @up_to_date_replicas.setter
     def up_to_date_replicas(self, value: pulumi.Input[Optional[_builtins.int]]):
         pulumi.set(self, "up_to_date_replicas", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['MachineDeploymentStatusVersionsArgs']]]]:
+        """
+        versions is the aggregated Kubernetes versions in this MachineDeployment.
+        """
+        return pulumi.get(self, "versions")
+
+    @versions.setter
+    def versions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['MachineDeploymentStatusVersionsArgs']]]]):
+        pulumi.set(self, "versions", value)
 
 
 class MachineDeploymentArgsDict(TypedDict):
@@ -37515,6 +37895,60 @@ class MachinePoolStatusNodeRefsArgs:
         pulumi.set(self, "uid", value)
 
 
+class MachinePoolStatusVersionsArgsDict(TypedDict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    replicas: NotRequired[pulumi.Input[Optional[_builtins.int]]]
+    """
+    replicas is the number of replicas at this version.
+    """
+    version: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    version is the Kubernetes version.
+    """
+
+@pulumi.input_type
+class MachinePoolStatusVersionsArgs:
+    def __init__(__self__, *,
+                 replicas: pulumi.Input[Optional[_builtins.int]] = None,
+                 version: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param pulumi.Input[_builtins.int] replicas: replicas is the number of replicas at this version.
+        :param pulumi.Input[_builtins.str] version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> pulumi.Input[Optional[_builtins.int]]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @replicas.setter
+    def replicas(self, value: pulumi.Input[Optional[_builtins.int]]):
+        pulumi.set(self, "replicas", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+    @version.setter
+    def version(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "version", value)
+
+
 class MachinePoolStatusArgsDict(TypedDict):
     """
     status is the observed state of MachinePool.
@@ -37533,7 +37967,7 @@ class MachinePoolStatusArgsDict(TypedDict):
     initialization: NotRequired[pulumi.Input[Optional['MachinePoolStatusInitializationArgs']]]
     node_refs: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['MachinePoolStatusNodeRefsArgs']]]]]
     """
-    nodeRefs will point to the corresponding Nodes if it they exist.
+    nodeRefs will point to the corresponding Nodes if they exist.
     """
     observed_generation: NotRequired[pulumi.Input[Optional[_builtins.int]]]
     """
@@ -37555,6 +37989,10 @@ class MachinePoolStatusArgsDict(TypedDict):
     """
     upToDateReplicas is the number of up-to-date replicas targeted by this MachinePool. A machine is considered up-to-date when Machine's UpToDate condition is true.
     """
+    versions: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['MachinePoolStatusVersionsArgs']]]]]
+    """
+    versions is the aggregated Kubernetes versions in this MachinePool.
+    """
 
 @pulumi.input_type
 class MachinePoolStatusArgs:
@@ -37568,7 +38006,8 @@ class MachinePoolStatusArgs:
                  phase: pulumi.Input[Optional[_builtins.str]] = None,
                  ready_replicas: pulumi.Input[Optional[_builtins.int]] = None,
                  replicas: pulumi.Input[Optional[_builtins.int]] = None,
-                 up_to_date_replicas: pulumi.Input[Optional[_builtins.int]] = None):
+                 up_to_date_replicas: pulumi.Input[Optional[_builtins.int]] = None,
+                 versions: pulumi.Input[Optional[Sequence[pulumi.Input['MachinePoolStatusVersionsArgs']]]] = None):
         """
         status is the observed state of MachinePool.
 
@@ -37576,12 +38015,13 @@ class MachinePoolStatusArgs:
         :param pulumi.Input[Sequence[pulumi.Input['MachinePoolStatusConditionsArgs']]] conditions: conditions represents the observations of a MachinePool's current state.
                Known condition types are Available, BootstrapConfigReady, InfrastructureReady, MachinesReady, MachinesUpToDate,
                ScalingUp, ScalingDown, Remediating, Deleting, Paused.
-        :param pulumi.Input[Sequence[pulumi.Input['MachinePoolStatusNodeRefsArgs']]] node_refs: nodeRefs will point to the corresponding Nodes if it they exist.
+        :param pulumi.Input[Sequence[pulumi.Input['MachinePoolStatusNodeRefsArgs']]] node_refs: nodeRefs will point to the corresponding Nodes if they exist.
         :param pulumi.Input[_builtins.int] observed_generation: observedGeneration is the latest generation observed by the controller.
         :param pulumi.Input[_builtins.str] phase: phase represents the current phase of cluster actuation.
         :param pulumi.Input[_builtins.int] ready_replicas: readyReplicas is the number of ready replicas for this MachinePool. A machine is considered ready when Machine's Ready condition is true.
         :param pulumi.Input[_builtins.int] replicas: replicas is the most recently observed number of replicas.
         :param pulumi.Input[_builtins.int] up_to_date_replicas: upToDateReplicas is the number of up-to-date replicas targeted by this MachinePool. A machine is considered up-to-date when Machine's UpToDate condition is true.
+        :param pulumi.Input[Sequence[pulumi.Input['MachinePoolStatusVersionsArgs']]] versions: versions is the aggregated Kubernetes versions in this MachinePool.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -37603,6 +38043,8 @@ class MachinePoolStatusArgs:
             pulumi.set(__self__, "replicas", replicas)
         if up_to_date_replicas is not None:
             pulumi.set(__self__, "up_to_date_replicas", up_to_date_replicas)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -37652,7 +38094,7 @@ class MachinePoolStatusArgs:
     @pulumi.getter(name="nodeRefs")
     def node_refs(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['MachinePoolStatusNodeRefsArgs']]]]:
         """
-        nodeRefs will point to the corresponding Nodes if it they exist.
+        nodeRefs will point to the corresponding Nodes if they exist.
         """
         return pulumi.get(self, "node_refs")
 
@@ -37719,6 +38161,18 @@ class MachinePoolStatusArgs:
     @up_to_date_replicas.setter
     def up_to_date_replicas(self, value: pulumi.Input[Optional[_builtins.int]]):
         pulumi.set(self, "up_to_date_replicas", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['MachinePoolStatusVersionsArgs']]]]:
+        """
+        versions is the aggregated Kubernetes versions in this MachinePool.
+        """
+        return pulumi.get(self, "versions")
+
+    @versions.setter
+    def versions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['MachinePoolStatusVersionsArgs']]]]):
+        pulumi.set(self, "versions", value)
 
 
 class MachinePoolArgsDict(TypedDict):
@@ -37830,7 +38284,7 @@ class MachineSetSpecDeletionPatchArgsDict(TypedDict):
     order: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     order defines the order in which Machines are deleted when downscaling.
-    Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+    Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
     """
 
 @pulumi.input_type
@@ -37841,7 +38295,7 @@ class MachineSetSpecDeletionPatchArgs:
         deletion contains configuration options for MachineSet deletion.
 
         :param pulumi.Input[_builtins.str] order: order defines the order in which Machines are deleted when downscaling.
-               Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+               Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         if order is not None:
             pulumi.set(__self__, "order", order)
@@ -37851,7 +38305,7 @@ class MachineSetSpecDeletionPatchArgs:
     def order(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         order defines the order in which Machines are deleted when downscaling.
-        Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+        Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         return pulumi.get(self, "order")
 
@@ -37867,7 +38321,7 @@ class MachineSetSpecDeletionArgsDict(TypedDict):
     order: NotRequired[pulumi.Input[Optional[_builtins.str]]]
     """
     order defines the order in which Machines are deleted when downscaling.
-    Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+    Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
     """
 
 @pulumi.input_type
@@ -37878,7 +38332,7 @@ class MachineSetSpecDeletionArgs:
         deletion contains configuration options for MachineSet deletion.
 
         :param pulumi.Input[_builtins.str] order: order defines the order in which Machines are deleted when downscaling.
-               Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+               Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         if order is not None:
             pulumi.set(__self__, "order", order)
@@ -37888,7 +38342,7 @@ class MachineSetSpecDeletionArgs:
     def order(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         order defines the order in which Machines are deleted when downscaling.
-        Defaults to "Random".  Valid values are "Random, "Newest", "Oldest"
+        Defaults to "Random". Valid values are "Random", "Newest", "Oldest"
         """
         return pulumi.get(self, "order")
 
@@ -41107,6 +41561,60 @@ class MachineSetStatusDeprecatedArgs:
         pulumi.set(self, "v1beta1", value)
 
 
+class MachineSetStatusVersionsArgsDict(TypedDict):
+    """
+    StatusVersion groups version-related status information.
+    """
+    replicas: NotRequired[pulumi.Input[Optional[_builtins.int]]]
+    """
+    replicas is the number of replicas at this version.
+    """
+    version: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    version is the Kubernetes version.
+    """
+
+@pulumi.input_type
+class MachineSetStatusVersionsArgs:
+    def __init__(__self__, *,
+                 replicas: pulumi.Input[Optional[_builtins.int]] = None,
+                 version: pulumi.Input[Optional[_builtins.str]] = None):
+        """
+        StatusVersion groups version-related status information.
+
+        :param pulumi.Input[_builtins.int] replicas: replicas is the number of replicas at this version.
+        :param pulumi.Input[_builtins.str] version: version is the Kubernetes version.
+        """
+        if replicas is not None:
+            pulumi.set(__self__, "replicas", replicas)
+        if version is not None:
+            pulumi.set(__self__, "version", version)
+
+    @_builtins.property
+    @pulumi.getter
+    def replicas(self) -> pulumi.Input[Optional[_builtins.int]]:
+        """
+        replicas is the number of replicas at this version.
+        """
+        return pulumi.get(self, "replicas")
+
+    @replicas.setter
+    def replicas(self, value: pulumi.Input[Optional[_builtins.int]]):
+        pulumi.set(self, "replicas", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def version(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        version is the Kubernetes version.
+        """
+        return pulumi.get(self, "version")
+
+    @version.setter
+    def version(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "version", value)
+
+
 class MachineSetStatusArgsDict(TypedDict):
     """
     status is the observed state of MachineSet.
@@ -41143,6 +41651,10 @@ class MachineSetStatusArgsDict(TypedDict):
     """
     upToDateReplicas is the number of up-to-date replicas for this MachineSet. A machine is considered up-to-date when Machine's UpToDate condition is true.
     """
+    versions: NotRequired[pulumi.Input[Optional[Sequence[pulumi.Input['MachineSetStatusVersionsArgs']]]]]
+    """
+    versions is the aggregated Kubernetes versions in this MachineSet.
+    """
 
 @pulumi.input_type
 class MachineSetStatusArgs:
@@ -41154,7 +41666,8 @@ class MachineSetStatusArgs:
                  ready_replicas: pulumi.Input[Optional[_builtins.int]] = None,
                  replicas: pulumi.Input[Optional[_builtins.int]] = None,
                  selector: pulumi.Input[Optional[_builtins.str]] = None,
-                 up_to_date_replicas: pulumi.Input[Optional[_builtins.int]] = None):
+                 up_to_date_replicas: pulumi.Input[Optional[_builtins.int]] = None,
+                 versions: pulumi.Input[Optional[Sequence[pulumi.Input['MachineSetStatusVersionsArgs']]]] = None):
         """
         status is the observed state of MachineSet.
 
@@ -41168,6 +41681,7 @@ class MachineSetStatusArgs:
                by clients. The string will be in the same format as the query-param syntax.
                More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors
         :param pulumi.Input[_builtins.int] up_to_date_replicas: upToDateReplicas is the number of up-to-date replicas for this MachineSet. A machine is considered up-to-date when Machine's UpToDate condition is true.
+        :param pulumi.Input[Sequence[pulumi.Input['MachineSetStatusVersionsArgs']]] versions: versions is the aggregated Kubernetes versions in this MachineSet.
         """
         if available_replicas is not None:
             pulumi.set(__self__, "available_replicas", available_replicas)
@@ -41185,6 +41699,8 @@ class MachineSetStatusArgs:
             pulumi.set(__self__, "selector", selector)
         if up_to_date_replicas is not None:
             pulumi.set(__self__, "up_to_date_replicas", up_to_date_replicas)
+        if versions is not None:
+            pulumi.set(__self__, "versions", versions)
 
     @_builtins.property
     @pulumi.getter(name="availableReplicas")
@@ -41281,6 +41797,18 @@ class MachineSetStatusArgs:
     @up_to_date_replicas.setter
     def up_to_date_replicas(self, value: pulumi.Input[Optional[_builtins.int]]):
         pulumi.set(self, "up_to_date_replicas", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def versions(self) -> pulumi.Input[Optional[Sequence[pulumi.Input['MachineSetStatusVersionsArgs']]]]:
+        """
+        versions is the aggregated Kubernetes versions in this MachineSet.
+        """
+        return pulumi.get(self, "versions")
+
+    @versions.setter
+    def versions(self, value: pulumi.Input[Optional[Sequence[pulumi.Input['MachineSetStatusVersionsArgs']]]]):
+        pulumi.set(self, "versions", value)
 
 
 class MachineSetArgsDict(TypedDict):
@@ -43220,12 +43748,26 @@ class MachineStatusDeletionArgsDict(TypedDict):
     is observed from the node's `.Status.VolumesAttached` field.
     Only present when the Machine has a deletionTimestamp and waiting for volume detachments had been started.
     """
+    wait_for_pre_drain_hook_start_time: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    waitForPreDrainHookStartTime is the time when waiting for pre-drain hooks started
+    and is used to determine if the pre-drain hooks are taking too long.
+    Only present when the Machine has a deletionTimestamp and waiting for pre-drain hooks had been started.
+    """
+    wait_for_pre_terminate_hook_start_time: NotRequired[pulumi.Input[Optional[_builtins.str]]]
+    """
+    waitForPreTerminateHookStartTime is the time when waiting for pre-terminate hooks started
+    and is used to determine if the pre-terminate hooks are taking too long.
+    Only present when the Machine has a deletionTimestamp and waiting for pre-terminate hooks had been started.
+    """
 
 @pulumi.input_type
 class MachineStatusDeletionArgs:
     def __init__(__self__, *,
                  node_drain_start_time: pulumi.Input[Optional[_builtins.str]] = None,
-                 wait_for_node_volume_detach_start_time: pulumi.Input[Optional[_builtins.str]] = None):
+                 wait_for_node_volume_detach_start_time: pulumi.Input[Optional[_builtins.str]] = None,
+                 wait_for_pre_drain_hook_start_time: pulumi.Input[Optional[_builtins.str]] = None,
+                 wait_for_pre_terminate_hook_start_time: pulumi.Input[Optional[_builtins.str]] = None):
         """
         deletion contains information relating to removal of the Machine.
         Only present when the Machine has a deletionTimestamp and drain or wait for volume detach started.
@@ -43238,11 +43780,21 @@ class MachineStatusDeletionArgs:
                Detaching volumes from nodes is usually done by CSI implementations and the current state
                is observed from the node's `.Status.VolumesAttached` field.
                Only present when the Machine has a deletionTimestamp and waiting for volume detachments had been started.
+        :param pulumi.Input[_builtins.str] wait_for_pre_drain_hook_start_time: waitForPreDrainHookStartTime is the time when waiting for pre-drain hooks started
+               and is used to determine if the pre-drain hooks are taking too long.
+               Only present when the Machine has a deletionTimestamp and waiting for pre-drain hooks had been started.
+        :param pulumi.Input[_builtins.str] wait_for_pre_terminate_hook_start_time: waitForPreTerminateHookStartTime is the time when waiting for pre-terminate hooks started
+               and is used to determine if the pre-terminate hooks are taking too long.
+               Only present when the Machine has a deletionTimestamp and waiting for pre-terminate hooks had been started.
         """
         if node_drain_start_time is not None:
             pulumi.set(__self__, "node_drain_start_time", node_drain_start_time)
         if wait_for_node_volume_detach_start_time is not None:
             pulumi.set(__self__, "wait_for_node_volume_detach_start_time", wait_for_node_volume_detach_start_time)
+        if wait_for_pre_drain_hook_start_time is not None:
+            pulumi.set(__self__, "wait_for_pre_drain_hook_start_time", wait_for_pre_drain_hook_start_time)
+        if wait_for_pre_terminate_hook_start_time is not None:
+            pulumi.set(__self__, "wait_for_pre_terminate_hook_start_time", wait_for_pre_terminate_hook_start_time)
 
     @_builtins.property
     @pulumi.getter(name="nodeDrainStartTime")
@@ -43273,6 +43825,34 @@ class MachineStatusDeletionArgs:
     @wait_for_node_volume_detach_start_time.setter
     def wait_for_node_volume_detach_start_time(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "wait_for_node_volume_detach_start_time", value)
+
+    @_builtins.property
+    @pulumi.getter(name="waitForPreDrainHookStartTime")
+    def wait_for_pre_drain_hook_start_time(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        waitForPreDrainHookStartTime is the time when waiting for pre-drain hooks started
+        and is used to determine if the pre-drain hooks are taking too long.
+        Only present when the Machine has a deletionTimestamp and waiting for pre-drain hooks had been started.
+        """
+        return pulumi.get(self, "wait_for_pre_drain_hook_start_time")
+
+    @wait_for_pre_drain_hook_start_time.setter
+    def wait_for_pre_drain_hook_start_time(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "wait_for_pre_drain_hook_start_time", value)
+
+    @_builtins.property
+    @pulumi.getter(name="waitForPreTerminateHookStartTime")
+    def wait_for_pre_terminate_hook_start_time(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        waitForPreTerminateHookStartTime is the time when waiting for pre-terminate hooks started
+        and is used to determine if the pre-terminate hooks are taking too long.
+        Only present when the Machine has a deletionTimestamp and waiting for pre-terminate hooks had been started.
+        """
+        return pulumi.get(self, "wait_for_pre_terminate_hook_start_time")
+
+    @wait_for_pre_terminate_hook_start_time.setter
+    def wait_for_pre_terminate_hook_start_time(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "wait_for_pre_terminate_hook_start_time", value)
 
 
 class MachineStatusDeprecatedV1beta1ConditionsArgsDict(TypedDict):

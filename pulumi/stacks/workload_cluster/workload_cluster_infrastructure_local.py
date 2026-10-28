@@ -70,7 +70,11 @@ _CONTROL_PLANE_API_VERSION = "controlplane.cluster.x-k8s.io/v1beta2"
 _INFRASTRUCTURE_API_VERSION = "infrastructure.cluster.x-k8s.io/v1beta2"
 
 _NAMESPACE = "default"
-_KUBERNETES_VERSION = "v1.36.1"
+_KUBERNETES_VERSION = "v1.36.4"
+_KIND_NODE_IMAGE = (
+    "kindest/node:v1.36.4@sha256:"
+    "099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
+)
 _POD_CIDR = "192.168.0.0/16"
 _SERVICE_CIDR = "10.128.0.0/12"
 _SERVICE_DOMAIN = "cluster.local"
@@ -573,7 +577,7 @@ class LocalWorkloadClusterInfrastructure(pulumi.ComponentResource):
         )
 
         cluster_name = _resource_name(instance, "workload")
-        node_image = f"kindest/node:{_KUBERNETES_VERSION}"
+        node_image = _KIND_NODE_IMAGE
         pre_kubeadm_commands = _containerd_registry_commands(
             _local_registry_routes(registry, custom_registry, registry_routes or {})
         )

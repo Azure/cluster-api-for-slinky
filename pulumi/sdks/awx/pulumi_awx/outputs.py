@@ -17,7 +17,7 @@ from . import _utilities
 __all__ = [
     'JobTemplateLaunchTimeouts',
     'JobTemplateSurveySpecSpec',
-    'NotificationTemplateMessage',
+    'NotificationTemplateMessages',
     'NotificationTemplateNotificationConfiguration',
     'ProjectTimeouts',
     'SettingTimeouts',
@@ -191,7 +191,7 @@ class JobTemplateSurveySpecSpec(dict):
 
 
 @pulumi.output_type
-class NotificationTemplateMessage(dict):
+class NotificationTemplateMessages(dict):
     def __init__(__self__, *,
                  error: Optional[Mapping[str, _builtins.str]] = None,
                  started: Optional[Mapping[str, _builtins.str]] = None,
@@ -961,59 +961,66 @@ class WorkflowJobTemplateSurveySpecSpec(dict):
 @pulumi.output_type
 class GetCredentialsCredentialResult(dict):
     def __init__(__self__, *,
-                 description: _builtins.str,
-                 id: _builtins.float,
-                 kind: _builtins.str,
-                 name: _builtins.str,
-                 username: _builtins.str):
-        pulumi.set(__self__, "description", description)
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "kind", kind)
-        pulumi.set(__self__, "name", name)
-        pulumi.set(__self__, "username", username)
+                 description: Optional[_builtins.str] = None,
+                 id: Optional[_builtins.float] = None,
+                 kind: Optional[_builtins.str] = None,
+                 name: Optional[_builtins.str] = None,
+                 username: Optional[_builtins.str] = None):
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if kind is not None:
+            pulumi.set(__self__, "kind", kind)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if username is not None:
+            pulumi.set(__self__, "username", username)
 
     @_builtins.property
     @pulumi.getter
-    def description(self) -> _builtins.str:
+    def description(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "description")
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.float:
+    def id(self) -> Optional[_builtins.float]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter
-    def kind(self) -> _builtins.str:
+    def kind(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "kind")
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> _builtins.str:
+    def name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "name")
 
     @_builtins.property
     @pulumi.getter
-    def username(self) -> _builtins.str:
+    def username(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "username")
 
 
 @pulumi.output_type
 class GetOrganizationsOrganizationResult(dict):
     def __init__(__self__, *,
-                 id: _builtins.float,
-                 name: _builtins.str):
-        pulumi.set(__self__, "id", id)
-        pulumi.set(__self__, "name", name)
+                 id: Optional[_builtins.float] = None,
+                 name: Optional[_builtins.str] = None):
+        if id is not None:
+            pulumi.set(__self__, "id", id)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
 
     @_builtins.property
     @pulumi.getter
-    def id(self) -> _builtins.float:
+    def id(self) -> Optional[_builtins.float]:
         return pulumi.get(self, "id")
 
     @_builtins.property
     @pulumi.getter
-    def name(self) -> _builtins.str:
+    def name(self) -> Optional[_builtins.str]:
         return pulumi.get(self, "name")
 
 

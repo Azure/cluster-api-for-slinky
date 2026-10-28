@@ -175,14 +175,9 @@ def _normalize_terraform_readme(path: Path, sdk: dict[str, Any]) -> None:
 
 def _normalize_terraform_utilities(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
-    old = "pulumi.runtime.settings._sync_monitor_supports_parameterization()"
-    new = (
-        "pulumi.runtime.settings.monitor_supports_feature("
-        "resource_pb2.RESOURCE_MONITOR_FEATURE_PARAMETERIZATION)"
-    )
-    if source.count(old) != 1:
-        raise GenerationError(f"expected one parameterization feature probe in {path}")
-    path.write_text(source.replace(old, new).replace("\t", "    "), encoding="utf-8")
+    if source.count("pulumi.runtime.register_package(") != 1:
+        raise GenerationError(f"expected one package registration in {path}")
+    path.write_text(source.replace("\t", "    ").rstrip() + "\n", encoding="utf-8")
 
 
 def _remove_flux_provider_shim(package: Path) -> None:

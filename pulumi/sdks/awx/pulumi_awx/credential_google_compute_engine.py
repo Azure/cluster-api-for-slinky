@@ -21,24 +21,28 @@ class CredentialGoogleComputeEngineArgs:
     def __init__(__self__, *,
                  organization_id: pulumi.Input[_builtins.float],
                  project: pulumi.Input[_builtins.str],
-                 ssh_key_data: pulumi.Input[_builtins.str],
                  username: pulumi.Input[_builtins.str],
                  credential_google_compute_engine_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None):
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo_version: pulumi.Input[Optional[_builtins.float]] = None):
         """
         The set of arguments for constructing a CredentialGoogleComputeEngine resource.
 
         :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
         :param pulumi.Input[_builtins.str] project: The project to use for the credential.
-        :param pulumi.Input[_builtins.str] ssh_key_data: The SSH key data to use for the credential.
         :param pulumi.Input[_builtins.str] username: The username to use for the credential.
         :param pulumi.Input[_builtins.str] description: The description of the credential.
         :param pulumi.Input[_builtins.str] name: The name of the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_data: The SSH key data to use for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_data_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key data to use for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_data_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
         """
         pulumi.set(__self__, "organization_id", organization_id)
         pulumi.set(__self__, "project", project)
-        pulumi.set(__self__, "ssh_key_data", ssh_key_data)
         pulumi.set(__self__, "username", username)
         if credential_google_compute_engine_id is not None:
             pulumi.set(__self__, "credential_google_compute_engine_id", credential_google_compute_engine_id)
@@ -46,6 +50,12 @@ class CredentialGoogleComputeEngineArgs:
             pulumi.set(__self__, "description", description)
         if name is not None:
             pulumi.set(__self__, "name", name)
+        if ssh_key_data is not None:
+            pulumi.set(__self__, "ssh_key_data", ssh_key_data)
+        if ssh_key_data_wo is not None:
+            pulumi.set(__self__, "ssh_key_data_wo", ssh_key_data_wo)
+        if ssh_key_data_wo_version is not None:
+            pulumi.set(__self__, "ssh_key_data_wo_version", ssh_key_data_wo_version)
 
     @_builtins.property
     @pulumi.getter(name="organizationId")
@@ -70,18 +80,6 @@ class CredentialGoogleComputeEngineArgs:
     @project.setter
     def project(self, value: pulumi.Input[_builtins.str]):
         pulumi.set(self, "project", value)
-
-    @_builtins.property
-    @pulumi.getter(name="sshKeyData")
-    def ssh_key_data(self) -> pulumi.Input[_builtins.str]:
-        """
-        The SSH key data to use for the credential.
-        """
-        return pulumi.get(self, "ssh_key_data")
-
-    @ssh_key_data.setter
-    def ssh_key_data(self, value: pulumi.Input[_builtins.str]):
-        pulumi.set(self, "ssh_key_data", value)
 
     @_builtins.property
     @pulumi.getter
@@ -128,6 +126,43 @@ class CredentialGoogleComputeEngineArgs:
     def name(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "name", value)
 
+    @_builtins.property
+    @pulumi.getter(name="sshKeyData")
+    def ssh_key_data(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The SSH key data to use for the credential.
+        """
+        return pulumi.get(self, "ssh_key_data")
+
+    @ssh_key_data.setter
+    def ssh_key_data(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "ssh_key_data", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyDataWo")
+    def ssh_key_data_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The SSH key data to use for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        """
+        return pulumi.get(self, "ssh_key_data_wo")
+
+    @ssh_key_data_wo.setter
+    def ssh_key_data_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "ssh_key_data_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyDataWoVersion")
+    def ssh_key_data_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
+        """
+        return pulumi.get(self, "ssh_key_data_wo_version")
+
+    @ssh_key_data_wo_version.setter
+    def ssh_key_data_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "ssh_key_data_wo_version", value)
+
 
 @pulumi.input_type
 class _CredentialGoogleComputeEngineState:
@@ -138,6 +173,8 @@ class _CredentialGoogleComputeEngineState:
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  project: pulumi.Input[Optional[_builtins.str]] = None,
                  ssh_key_data: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering CredentialGoogleComputeEngine resources.
@@ -147,6 +184,9 @@ class _CredentialGoogleComputeEngineState:
         :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
         :param pulumi.Input[_builtins.str] project: The project to use for the credential.
         :param pulumi.Input[_builtins.str] ssh_key_data: The SSH key data to use for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_data_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key data to use for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_data_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] username: The username to use for the credential.
         """
         if credential_google_compute_engine_id is not None:
@@ -161,6 +201,10 @@ class _CredentialGoogleComputeEngineState:
             pulumi.set(__self__, "project", project)
         if ssh_key_data is not None:
             pulumi.set(__self__, "ssh_key_data", ssh_key_data)
+        if ssh_key_data_wo is not None:
+            pulumi.set(__self__, "ssh_key_data_wo", ssh_key_data_wo)
+        if ssh_key_data_wo_version is not None:
+            pulumi.set(__self__, "ssh_key_data_wo_version", ssh_key_data_wo_version)
         if username is not None:
             pulumi.set(__self__, "username", username)
 
@@ -234,6 +278,31 @@ class _CredentialGoogleComputeEngineState:
         pulumi.set(self, "ssh_key_data", value)
 
     @_builtins.property
+    @pulumi.getter(name="sshKeyDataWo")
+    def ssh_key_data_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The SSH key data to use for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        """
+        return pulumi.get(self, "ssh_key_data_wo")
+
+    @ssh_key_data_wo.setter
+    def ssh_key_data_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "ssh_key_data_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyDataWoVersion")
+    def ssh_key_data_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
+        """
+        return pulumi.get(self, "ssh_key_data_wo_version")
+
+    @ssh_key_data_wo_version.setter
+    def ssh_key_data_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "ssh_key_data_wo_version", value)
+
+    @_builtins.property
     @pulumi.getter
     def username(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -258,6 +327,8 @@ class CredentialGoogleComputeEngine(pulumi.CustomResource):
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  project: pulumi.Input[Optional[_builtins.str]] = None,
                  ssh_key_data: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -270,6 +341,9 @@ class CredentialGoogleComputeEngine(pulumi.CustomResource):
         :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
         :param pulumi.Input[_builtins.str] project: The project to use for the credential.
         :param pulumi.Input[_builtins.str] ssh_key_data: The SSH key data to use for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_data_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key data to use for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_data_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] username: The username to use for the credential.
         """
         ...
@@ -302,6 +376,8 @@ class CredentialGoogleComputeEngine(pulumi.CustomResource):
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  project: pulumi.Input[Optional[_builtins.str]] = None,
                  ssh_key_data: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -321,13 +397,13 @@ class CredentialGoogleComputeEngine(pulumi.CustomResource):
             if project is None and not opts.urn:
                 raise TypeError("Missing required property 'project'")
             __props__.__dict__["project"] = project
-            if ssh_key_data is None and not opts.urn:
-                raise TypeError("Missing required property 'ssh_key_data'")
             __props__.__dict__["ssh_key_data"] = None if ssh_key_data is None else pulumi.Output.secret(ssh_key_data)
+            __props__.__dict__["ssh_key_data_wo"] = None if ssh_key_data_wo is None else pulumi.Output.secret(ssh_key_data_wo)
+            __props__.__dict__["ssh_key_data_wo_version"] = ssh_key_data_wo_version
             if username is None and not opts.urn:
                 raise TypeError("Missing required property 'username'")
             __props__.__dict__["username"] = username
-        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["sshKeyData"])
+        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["sshKeyData", "sshKeyDataWo"])
         opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(CredentialGoogleComputeEngine, __self__).__init__(
             'awx:index/credentialGoogleComputeEngine:CredentialGoogleComputeEngine',
@@ -346,6 +422,8 @@ class CredentialGoogleComputeEngine(pulumi.CustomResource):
             organization_id: pulumi.Input[Optional[_builtins.float]] = None,
             project: pulumi.Input[Optional[_builtins.str]] = None,
             ssh_key_data: pulumi.Input[Optional[_builtins.str]] = None,
+            ssh_key_data_wo: pulumi.Input[Optional[_builtins.str]] = None,
+            ssh_key_data_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
             username: pulumi.Input[Optional[_builtins.str]] = None) -> 'CredentialGoogleComputeEngine':
         """
         Get an existing CredentialGoogleComputeEngine resource's state with the given name, id, and optional extra
@@ -359,6 +437,9 @@ class CredentialGoogleComputeEngine(pulumi.CustomResource):
         :param pulumi.Input[_builtins.float] organization_id: The organization ID this credential belongs to.
         :param pulumi.Input[_builtins.str] project: The project to use for the credential.
         :param pulumi.Input[_builtins.str] ssh_key_data: The SSH key data to use for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_data_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key data to use for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_data_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] username: The username to use for the credential.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -371,6 +452,8 @@ class CredentialGoogleComputeEngine(pulumi.CustomResource):
         __props__.__dict__["organization_id"] = organization_id
         __props__.__dict__["project"] = project
         __props__.__dict__["ssh_key_data"] = ssh_key_data
+        __props__.__dict__["ssh_key_data_wo"] = ssh_key_data_wo
+        __props__.__dict__["ssh_key_data_wo_version"] = ssh_key_data_wo_version
         __props__.__dict__["username"] = username
         return CredentialGoogleComputeEngine(resource_name, opts=opts, __props__=__props__)
 
@@ -413,11 +496,28 @@ class CredentialGoogleComputeEngine(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter(name="sshKeyData")
-    def ssh_key_data(self) -> pulumi.Output[_builtins.str]:
+    def ssh_key_data(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         The SSH key data to use for the credential.
         """
         return pulumi.get(self, "ssh_key_data")
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyDataWo")
+    def ssh_key_data_wo(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The SSH key data to use for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        """
+        return pulumi.get(self, "ssh_key_data_wo")
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyDataWoVersion")
+    def ssh_key_data_wo_version(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
+        """
+        return pulumi.get(self, "ssh_key_data_wo_version")
 
     @_builtins.property
     @pulumi.getter

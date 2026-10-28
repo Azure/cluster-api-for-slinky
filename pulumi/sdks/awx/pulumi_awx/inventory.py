@@ -25,6 +25,7 @@ class InventoryArgs:
                  inventory_id: pulumi.Input[Optional[_builtins.str]] = None,
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
+                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a Inventory resource.
@@ -34,6 +35,7 @@ class InventoryArgs:
         :param pulumi.Input[_builtins.str] host_filter: The host filter of the inventory
         :param pulumi.Input[_builtins.str] kind: The kind of the inventory
         :param pulumi.Input[_builtins.str] name: The name of the inventory
+        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: Only run jobs on instance groups assigned to this inventory, without falling back to the organization instance groups
         :param pulumi.Input[_builtins.str] variables: The variables of the inventory
         """
         pulumi.set(__self__, "organization_id", organization_id)
@@ -47,6 +49,8 @@ class InventoryArgs:
             pulumi.set(__self__, "kind", kind)
         if name is not None:
             pulumi.set(__self__, "name", name)
+        if prevent_instance_group_fallback is not None:
+            pulumi.set(__self__, "prevent_instance_group_fallback", prevent_instance_group_fallback)
         if variables is not None:
             pulumi.set(__self__, "variables", variables)
 
@@ -120,6 +124,18 @@ class InventoryArgs:
         pulumi.set(self, "name", value)
 
     @_builtins.property
+    @pulumi.getter(name="preventInstanceGroupFallback")
+    def prevent_instance_group_fallback(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Only run jobs on instance groups assigned to this inventory, without falling back to the organization instance groups
+        """
+        return pulumi.get(self, "prevent_instance_group_fallback")
+
+    @prevent_instance_group_fallback.setter
+    def prevent_instance_group_fallback(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "prevent_instance_group_fallback", value)
+
+    @_builtins.property
     @pulumi.getter
     def variables(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -141,6 +157,7 @@ class _InventoryState:
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering Inventory resources.
@@ -150,6 +167,7 @@ class _InventoryState:
         :param pulumi.Input[_builtins.str] kind: The kind of the inventory
         :param pulumi.Input[_builtins.str] name: The name of the inventory
         :param pulumi.Input[_builtins.str] organization_id: The organization id of the inventory
+        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: Only run jobs on instance groups assigned to this inventory, without falling back to the organization instance groups
         :param pulumi.Input[_builtins.str] variables: The variables of the inventory
         """
         if description is not None:
@@ -164,6 +182,8 @@ class _InventoryState:
             pulumi.set(__self__, "name", name)
         if organization_id is not None:
             pulumi.set(__self__, "organization_id", organization_id)
+        if prevent_instance_group_fallback is not None:
+            pulumi.set(__self__, "prevent_instance_group_fallback", prevent_instance_group_fallback)
         if variables is not None:
             pulumi.set(__self__, "variables", variables)
 
@@ -237,6 +257,18 @@ class _InventoryState:
         pulumi.set(self, "organization_id", value)
 
     @_builtins.property
+    @pulumi.getter(name="preventInstanceGroupFallback")
+    def prevent_instance_group_fallback(self) -> pulumi.Input[Optional[_builtins.bool]]:
+        """
+        Only run jobs on instance groups assigned to this inventory, without falling back to the organization instance groups
+        """
+        return pulumi.get(self, "prevent_instance_group_fallback")
+
+    @prevent_instance_group_fallback.setter
+    def prevent_instance_group_fallback(self, value: pulumi.Input[Optional[_builtins.bool]]):
+        pulumi.set(self, "prevent_instance_group_fallback", value)
+
+    @_builtins.property
     @pulumi.getter
     def variables(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -261,6 +293,7 @@ class Inventory(pulumi.CustomResource):
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -273,6 +306,7 @@ class Inventory(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] kind: The kind of the inventory
         :param pulumi.Input[_builtins.str] name: The name of the inventory
         :param pulumi.Input[_builtins.str] organization_id: The organization id of the inventory
+        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: Only run jobs on instance groups assigned to this inventory, without falling back to the organization instance groups
         :param pulumi.Input[_builtins.str] variables: The variables of the inventory
         """
         ...
@@ -305,6 +339,7 @@ class Inventory(pulumi.CustomResource):
                  kind: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
                  variables: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -323,6 +358,7 @@ class Inventory(pulumi.CustomResource):
             if organization_id is None and not opts.urn:
                 raise TypeError("Missing required property 'organization_id'")
             __props__.__dict__["organization_id"] = organization_id
+            __props__.__dict__["prevent_instance_group_fallback"] = prevent_instance_group_fallback
             __props__.__dict__["variables"] = variables
         super(Inventory, __self__).__init__(
             'awx:index/inventory:Inventory',
@@ -341,6 +377,7 @@ class Inventory(pulumi.CustomResource):
             kind: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
             organization_id: pulumi.Input[Optional[_builtins.str]] = None,
+            prevent_instance_group_fallback: pulumi.Input[Optional[_builtins.bool]] = None,
             variables: pulumi.Input[Optional[_builtins.str]] = None) -> 'Inventory':
         """
         Get an existing Inventory resource's state with the given name, id, and optional extra
@@ -354,6 +391,7 @@ class Inventory(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] kind: The kind of the inventory
         :param pulumi.Input[_builtins.str] name: The name of the inventory
         :param pulumi.Input[_builtins.str] organization_id: The organization id of the inventory
+        :param pulumi.Input[_builtins.bool] prevent_instance_group_fallback: Only run jobs on instance groups assigned to this inventory, without falling back to the organization instance groups
         :param pulumi.Input[_builtins.str] variables: The variables of the inventory
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -366,6 +404,7 @@ class Inventory(pulumi.CustomResource):
         __props__.__dict__["kind"] = kind
         __props__.__dict__["name"] = name
         __props__.__dict__["organization_id"] = organization_id
+        __props__.__dict__["prevent_instance_group_fallback"] = prevent_instance_group_fallback
         __props__.__dict__["variables"] = variables
         return Inventory(resource_name, opts=opts, __props__=__props__)
 
@@ -413,6 +452,14 @@ class Inventory(pulumi.CustomResource):
         The organization id of the inventory
         """
         return pulumi.get(self, "organization_id")
+
+    @_builtins.property
+    @pulumi.getter(name="preventInstanceGroupFallback")
+    def prevent_instance_group_fallback(self) -> pulumi.Output[Optional[_builtins.bool]]:
+        """
+        Only run jobs on instance groups assigned to this inventory, without falling back to the organization instance groups
+        """
+        return pulumi.get(self, "prevent_instance_group_fallback")
 
     @_builtins.property
     @pulumi.getter

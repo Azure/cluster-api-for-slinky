@@ -35,7 +35,7 @@ NATIVE_WORKLOAD_RUNTIME_CONFIG = "scheduling.k8s.io/v1alpha2=true"
 
 _CLUSTER_AUTOSCALER_CHART_REPO = "https://kubernetes.github.io/autoscaler"
 _CLUSTER_AUTOSCALER_CHART_NAME = "cluster-autoscaler"
-_CLUSTER_AUTOSCALER_CHART_VERSION = "9.57.0"
+_CLUSTER_AUTOSCALER_CHART_VERSION = "9.59.0"
 _CLUSTER_AUTOSCALER_WORKLOAD_KUBECONFIG_SECRET_KEY = "value"
 _CAPI_NAMESPACE = "default"
 _CAPI_INFRASTRUCTURE_API_GROUP = "infrastructure.cluster.x-k8s.io"
@@ -137,6 +137,7 @@ def _cluster_autoscaler_values(
     return {
         "fullnameOverride": fullname,
         "cloudProvider": "clusterapi",
+        "image": {"tag": "v1.36.1"},
         "clusterAPIMode": "kubeconfig-incluster",
         "clusterAPIKubeconfigSecret": kubeconfig_secret_name,
         "clusterAPIWorkloadKubeconfigPath": (

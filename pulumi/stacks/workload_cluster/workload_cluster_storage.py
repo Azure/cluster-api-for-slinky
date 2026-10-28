@@ -17,7 +17,7 @@ from stacks.workload_cluster.workload_cluster_infrastructure import (
 
 _LOCAL_PATH_NAMESPACE = "local-path-storage"
 _LOCAL_PATH_STORAGE_CLASS = "local-path"
-_LOCAL_PATH_PROVISIONER_VERSION = "v0.0.32"
+_LOCAL_PATH_PROVISIONER_VERSION = "v0.0.37"
 _LOCAL_PATH_SERVICE_ACCOUNT = "local-path-provisioner-service-account"
 _LOCAL_PATH_RBAC_NAME = "local-path-provisioner-role"
 _LOCAL_PATH_RBAC_BINDING_NAME = "local-path-provisioner-bind"

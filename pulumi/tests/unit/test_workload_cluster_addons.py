@@ -68,6 +68,8 @@ def test_azure_cloud_provider_values_cover_bootstrap_taints() -> None:
 
     assert values["infra"] == {"clusterName": "caps-self"}
     ccm = values["cloudControllerManager"]
+    assert ccm["imageTag"] == "v1.36.8"
+    assert values["cloudNodeManager"]["imageTag"] == "v1.36.8"
     assert ccm["clusterCIDR"] == "192.168.0.0/16"
     assert ccm["configureCloudRoutes"] == "true"
     assert {
@@ -111,7 +113,7 @@ def test_calico_component_retains_resources_and_waits_for_manifests(monkeypatch)
         )
 
         def verify(status):
-            assert status == {"version": "v3.32.0", "status": "deployed", "typha": False}
+            assert status == {"version": "v3.32.2", "status": "deployed", "typha": False}
             config = next(resource for resource in resources if resource.typ == "kubernetes:core/v1:ConfigMap")
             assert options[config.name].retain_on_delete
             assert not any(resource.typ == "kubernetes:helm.sh/v3:Release" for resource in resources)

@@ -19,7 +19,7 @@ from stacks.kubernetes_annotations import pulumi_wait_for
 
 FLUX_NAMESPACE = "flux-system"
 FLUX_CHART_OCI = "oci://ghcr.io/fluxcd-community/charts/flux2"
-FLUX_CHART_VERSION = "2.18.4"
+FLUX_CHART_VERSION = "2.19.1"
 FLUX_SOURCE_API_VERSION = "source.toolkit.fluxcd.io/v1"
 FLUX_SOURCE_KIND = "GitRepository"
 FLUX_SOURCE_NAME = "gitops-source"

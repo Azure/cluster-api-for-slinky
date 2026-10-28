@@ -3,6 +3,44 @@
 This guide describes how to test custom Cluster API ecosystem components with
 CA4S. Customizations are configured in `pulumi/Pulumi.<stack>.yaml`.
 
+## Version Alignment
+
+The refreshed defaults use the following compatible component versions:
+
+| Component | Version |
+| --- | --- |
+| Pulumi CLI, Python SDK minimum, PKO Python workspace | `3.272.0` |
+| Pulumi Kubernetes SDK | `4.34.2`, including both generated CRD SDK dependencies |
+| PKO / Flux chart | `2.10.0` / `2.19.1` (Flux `2.9.5`) |
+| Gitea chart / application | `12.7.0` / `1.27.0` |
+| External Secrets / cert-manager | `2.14.0` / `1.21.3` |
+| CAPI Operator / core, kubeadm providers and CAPD | `0.30.0` / `1.14.3` |
+| CAPZ | `1.27.0`, including its bundled ASO |
+| Self-managed Kubernetes / Calico | `1.36.4` / `3.32.2` |
+| Cluster Autoscaler chart / image | `9.59.0` / `1.36.1` |
+| Azure CCM chart / CCM and cloud-node-manager images | `1.36.0` / `1.36.8` |
+| KEDA / kube-prometheus-stack | `2.21.0` / `92.14.1` |
+| Slurm Bridge / released Slurm chart fallback | `1.2.3` / `1.2.3` |
+| Workload local-path-provisioner / Alpine sidecars | `0.0.37` / `3.24.3` |
+
+Autoscaler and Azure cloud-provider **image** tags are explicit: their Helm
+chart defaults otherwise select older Kubernetes minors. CAPZ source builds
+pin the `1.27.0` release commit for both controller and provider bundle.
+Slinky source builds pin the aligned naming branch revision
+`c6837713bceb4b0c488f01cf56023e27453f05ad` for operator, webhook and all charts.
+
+Gitea uses the application shipped by its chart; the separate v28 migration is
+not part of this refresh. AKS Kubernetes versions remain region-dependent and
+must be selected from the service's available versions. AWX Operator/chart,
+Slurm `26.05`, ORAS and crd2pulumi remain on their existing current release
+lines. Helm remains on v3.
+
+Update the generated CAPI/Flux SDK source versions and checksums together with
+their runtime components, then use the workflow in
+[Generated Pulumi SDKs](../pulumi/sdks/README.md). CAPI `1.14` still serves the
+Docker resources used here; moving to `1.15` requires the Docker-to-Dev API
+migration first.
+
 ## Build Configuration
 
 `ca4s-infra:builds` is a map of named builds. Every entry selects a `builder`
@@ -305,7 +343,7 @@ does not show these three local chart deployments. See
 [Container Registry Setup](container-registries.md) for details about which
 clients use each local registry route.
 
-Every workload cluster also installs `slurm-bridge` chart `1.2.2`. CA4S creates
+Every workload cluster also installs `slurm-bridge` chart `1.2.3`. CA4S creates
 a `Token` backed by the Slurm chart's `slurm-auth-jwt` key, uses the generated
 `slurm-bridge-token` Secret, and targets the `compute` Slurm partition. Bridge
 admission, controller, and scheduler pods run on controller nodes. Slurm

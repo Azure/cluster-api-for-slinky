@@ -254,7 +254,7 @@ class JobTemplateLaunch(pulumi.CustomResource):
                  job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
                  job_template_launch_id: pulumi.Input[Optional[_builtins.str]] = None,
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeouts: pulumi.Input[Optional[Union['JobTemplateLaunchTimeoutsArgs', 'JobTemplateLaunchTimeoutsArgsDict']]] = None,
+                 timeouts: pulumi.Input[Optional[Union['JobTemplateLaunchTimeoutsArgs', 'JobTemplateLaunchTimeoutsArgsDict', 'outputs.JobTemplateLaunchTimeouts']]] = None,
                  wait_for_completion: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         """
@@ -297,7 +297,7 @@ class JobTemplateLaunch(pulumi.CustomResource):
                  job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
                  job_template_launch_id: pulumi.Input[Optional[_builtins.str]] = None,
                  limit: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeouts: pulumi.Input[Optional[Union['JobTemplateLaunchTimeoutsArgs', 'JobTemplateLaunchTimeoutsArgsDict']]] = None,
+                 timeouts: pulumi.Input[Optional[Union['JobTemplateLaunchTimeoutsArgs', 'JobTemplateLaunchTimeoutsArgsDict', 'outputs.JobTemplateLaunchTimeouts']]] = None,
                  wait_for_completion: pulumi.Input[Optional[_builtins.bool]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -333,7 +333,7 @@ class JobTemplateLaunch(pulumi.CustomResource):
             job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
             job_template_launch_id: pulumi.Input[Optional[_builtins.str]] = None,
             limit: pulumi.Input[Optional[_builtins.str]] = None,
-            timeouts: pulumi.Input[Optional[Union['JobTemplateLaunchTimeoutsArgs', 'JobTemplateLaunchTimeoutsArgsDict']]] = None,
+            timeouts: pulumi.Input[Optional[Union['JobTemplateLaunchTimeoutsArgs', 'JobTemplateLaunchTimeoutsArgsDict', 'outputs.JobTemplateLaunchTimeouts']]] = None,
             wait_for_completion: pulumi.Input[Optional[_builtins.bool]] = None) -> 'JobTemplateLaunch':
         """
         Get an existing JobTemplateLaunch resource's state with the given name, id, and optional extra

@@ -19,102 +19,23 @@ __all__ = ['CredentialGitlabArgs', 'CredentialGitlab']
 @pulumi.input_type
 class CredentialGitlabArgs:
     def __init__(__self__, *,
-                 token: pulumi.Input[_builtins.str],
-                 credential_gitlab_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 description: pulumi.Input[Optional[_builtins.str]] = None,
-                 name: pulumi.Input[Optional[_builtins.str]] = None,
-                 organization_id: pulumi.Input[Optional[_builtins.float]] = None):
-        """
-        The set of arguments for constructing a CredentialGitlab resource.
-
-        :param pulumi.Input[_builtins.str] token: The GitLab Personal Access Token.
-        :param pulumi.Input[_builtins.str] description: The description of the credential.
-        :param pulumi.Input[_builtins.str] name: The name of the credential.
-        :param pulumi.Input[_builtins.float] organization_id: The organization ID that this credential belongs to.
-        """
-        pulumi.set(__self__, "token", token)
-        if credential_gitlab_id is not None:
-            pulumi.set(__self__, "credential_gitlab_id", credential_gitlab_id)
-        if description is not None:
-            pulumi.set(__self__, "description", description)
-        if name is not None:
-            pulumi.set(__self__, "name", name)
-        if organization_id is not None:
-            pulumi.set(__self__, "organization_id", organization_id)
-
-    @_builtins.property
-    @pulumi.getter
-    def token(self) -> pulumi.Input[_builtins.str]:
-        """
-        The GitLab Personal Access Token.
-        """
-        return pulumi.get(self, "token")
-
-    @token.setter
-    def token(self, value: pulumi.Input[_builtins.str]):
-        pulumi.set(self, "token", value)
-
-    @_builtins.property
-    @pulumi.getter(name="credentialGitlabId")
-    def credential_gitlab_id(self) -> pulumi.Input[Optional[_builtins.str]]:
-        return pulumi.get(self, "credential_gitlab_id")
-
-    @credential_gitlab_id.setter
-    def credential_gitlab_id(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "credential_gitlab_id", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The description of the credential.
-        """
-        return pulumi.get(self, "description")
-
-    @description.setter
-    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "description", value)
-
-    @_builtins.property
-    @pulumi.getter
-    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
-        """
-        The name of the credential.
-        """
-        return pulumi.get(self, "name")
-
-    @name.setter
-    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
-        pulumi.set(self, "name", value)
-
-    @_builtins.property
-    @pulumi.getter(name="organizationId")
-    def organization_id(self) -> pulumi.Input[Optional[_builtins.float]]:
-        """
-        The organization ID that this credential belongs to.
-        """
-        return pulumi.get(self, "organization_id")
-
-    @organization_id.setter
-    def organization_id(self, value: pulumi.Input[Optional[_builtins.float]]):
-        pulumi.set(self, "organization_id", value)
-
-
-@pulumi.input_type
-class _CredentialGitlabState:
-    def __init__(__self__, *,
                  credential_gitlab_id: pulumi.Input[Optional[_builtins.str]] = None,
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
-                 token: pulumi.Input[Optional[_builtins.str]] = None):
+                 token: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo_version: pulumi.Input[Optional[_builtins.float]] = None):
         """
-        Input properties used for looking up and filtering CredentialGitlab resources.
+        The set of arguments for constructing a CredentialGitlab resource.
 
         :param pulumi.Input[_builtins.str] description: The description of the credential.
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that this credential belongs to.
         :param pulumi.Input[_builtins.str] token: The GitLab Personal Access Token.
+        :param pulumi.Input[_builtins.str] token_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The GitLab Personal Access Token. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        :param pulumi.Input[_builtins.float] token_wo_version: Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
         """
         if credential_gitlab_id is not None:
             pulumi.set(__self__, "credential_gitlab_id", credential_gitlab_id)
@@ -126,6 +47,10 @@ class _CredentialGitlabState:
             pulumi.set(__self__, "organization_id", organization_id)
         if token is not None:
             pulumi.set(__self__, "token", token)
+        if token_wo is not None:
+            pulumi.set(__self__, "token_wo", token_wo)
+        if token_wo_version is not None:
+            pulumi.set(__self__, "token_wo_version", token_wo_version)
 
     @_builtins.property
     @pulumi.getter(name="credentialGitlabId")
@@ -184,6 +109,150 @@ class _CredentialGitlabState:
     def token(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "token", value)
 
+    @_builtins.property
+    @pulumi.getter(name="tokenWo")
+    def token_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The GitLab Personal Access Token. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        """
+        return pulumi.get(self, "token_wo")
+
+    @token_wo.setter
+    def token_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "token_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="tokenWoVersion")
+    def token_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
+        """
+        return pulumi.get(self, "token_wo_version")
+
+    @token_wo_version.setter
+    def token_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "token_wo_version", value)
+
+
+@pulumi.input_type
+class _CredentialGitlabState:
+    def __init__(__self__, *,
+                 credential_gitlab_id: pulumi.Input[Optional[_builtins.str]] = None,
+                 description: pulumi.Input[Optional[_builtins.str]] = None,
+                 name: pulumi.Input[Optional[_builtins.str]] = None,
+                 organization_id: pulumi.Input[Optional[_builtins.float]] = None,
+                 token: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo_version: pulumi.Input[Optional[_builtins.float]] = None):
+        """
+        Input properties used for looking up and filtering CredentialGitlab resources.
+
+        :param pulumi.Input[_builtins.str] description: The description of the credential.
+        :param pulumi.Input[_builtins.str] name: The name of the credential.
+        :param pulumi.Input[_builtins.float] organization_id: The organization ID that this credential belongs to.
+        :param pulumi.Input[_builtins.str] token: The GitLab Personal Access Token.
+        :param pulumi.Input[_builtins.str] token_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The GitLab Personal Access Token. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        :param pulumi.Input[_builtins.float] token_wo_version: Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
+        """
+        if credential_gitlab_id is not None:
+            pulumi.set(__self__, "credential_gitlab_id", credential_gitlab_id)
+        if description is not None:
+            pulumi.set(__self__, "description", description)
+        if name is not None:
+            pulumi.set(__self__, "name", name)
+        if organization_id is not None:
+            pulumi.set(__self__, "organization_id", organization_id)
+        if token is not None:
+            pulumi.set(__self__, "token", token)
+        if token_wo is not None:
+            pulumi.set(__self__, "token_wo", token_wo)
+        if token_wo_version is not None:
+            pulumi.set(__self__, "token_wo_version", token_wo_version)
+
+    @_builtins.property
+    @pulumi.getter(name="credentialGitlabId")
+    def credential_gitlab_id(self) -> pulumi.Input[Optional[_builtins.str]]:
+        return pulumi.get(self, "credential_gitlab_id")
+
+    @credential_gitlab_id.setter
+    def credential_gitlab_id(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "credential_gitlab_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def description(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The description of the credential.
+        """
+        return pulumi.get(self, "description")
+
+    @description.setter
+    def description(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "description", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def name(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The name of the credential.
+        """
+        return pulumi.get(self, "name")
+
+    @name.setter
+    def name(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "name", value)
+
+    @_builtins.property
+    @pulumi.getter(name="organizationId")
+    def organization_id(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        The organization ID that this credential belongs to.
+        """
+        return pulumi.get(self, "organization_id")
+
+    @organization_id.setter
+    def organization_id(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "organization_id", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def token(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        The GitLab Personal Access Token.
+        """
+        return pulumi.get(self, "token")
+
+    @token.setter
+    def token(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "token", value)
+
+    @_builtins.property
+    @pulumi.getter(name="tokenWo")
+    def token_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The GitLab Personal Access Token. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        """
+        return pulumi.get(self, "token_wo")
+
+    @token_wo.setter
+    def token_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "token_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="tokenWoVersion")
+    def token_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
+        """
+        return pulumi.get(self, "token_wo_version")
+
+    @token_wo_version.setter
+    def token_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "token_wo_version", value)
+
 
 @pulumi.type_token("awx:index/credentialGitlab:CredentialGitlab")
 class CredentialGitlab(pulumi.CustomResource):
@@ -196,6 +265,8 @@ class CredentialGitlab(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  token: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         """
         Create a CredentialGitlab resource with the given unique name, props, and options.
@@ -206,12 +277,15 @@ class CredentialGitlab(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that this credential belongs to.
         :param pulumi.Input[_builtins.str] token: The GitLab Personal Access Token.
+        :param pulumi.Input[_builtins.str] token_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The GitLab Personal Access Token. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        :param pulumi.Input[_builtins.float] token_wo_version: Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
         """
         ...
     @overload
     def __init__(__self__,
                  resource_name: str,
-                 args: CredentialGitlabArgs,
+                 args: Optional[CredentialGitlabArgs] = None,
                  opts: Optional[pulumi.ResourceOptions] = None):
         """
         Create a CredentialGitlab resource with the given unique name, props, and options.
@@ -236,6 +310,8 @@ class CredentialGitlab(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  token: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 token_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
         if not isinstance(opts, pulumi.ResourceOptions):
@@ -249,10 +325,10 @@ class CredentialGitlab(pulumi.CustomResource):
             __props__.__dict__["description"] = description
             __props__.__dict__["name"] = name
             __props__.__dict__["organization_id"] = organization_id
-            if token is None and not opts.urn:
-                raise TypeError("Missing required property 'token'")
             __props__.__dict__["token"] = None if token is None else pulumi.Output.secret(token)
-        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["token"])
+            __props__.__dict__["token_wo"] = None if token_wo is None else pulumi.Output.secret(token_wo)
+            __props__.__dict__["token_wo_version"] = token_wo_version
+        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["token", "tokenWo"])
         opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(CredentialGitlab, __self__).__init__(
             'awx:index/credentialGitlab:CredentialGitlab',
@@ -269,7 +345,9 @@ class CredentialGitlab(pulumi.CustomResource):
             description: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
             organization_id: pulumi.Input[Optional[_builtins.float]] = None,
-            token: pulumi.Input[Optional[_builtins.str]] = None) -> 'CredentialGitlab':
+            token: pulumi.Input[Optional[_builtins.str]] = None,
+            token_wo: pulumi.Input[Optional[_builtins.str]] = None,
+            token_wo_version: pulumi.Input[Optional[_builtins.float]] = None) -> 'CredentialGitlab':
         """
         Get an existing CredentialGitlab resource's state with the given name, id, and optional extra
         properties used to qualify the lookup.
@@ -281,6 +359,9 @@ class CredentialGitlab(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that this credential belongs to.
         :param pulumi.Input[_builtins.str] token: The GitLab Personal Access Token.
+        :param pulumi.Input[_builtins.str] token_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The GitLab Personal Access Token. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        :param pulumi.Input[_builtins.float] token_wo_version: Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
 
@@ -291,6 +372,8 @@ class CredentialGitlab(pulumi.CustomResource):
         __props__.__dict__["name"] = name
         __props__.__dict__["organization_id"] = organization_id
         __props__.__dict__["token"] = token
+        __props__.__dict__["token_wo"] = token_wo
+        __props__.__dict__["token_wo_version"] = token_wo_version
         return CredentialGitlab(resource_name, opts=opts, __props__=__props__)
 
     @_builtins.property
@@ -324,9 +407,26 @@ class CredentialGitlab(pulumi.CustomResource):
 
     @_builtins.property
     @pulumi.getter
-    def token(self) -> pulumi.Output[_builtins.str]:
+    def token(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         The GitLab Personal Access Token.
         """
         return pulumi.get(self, "token")
+
+    @_builtins.property
+    @pulumi.getter(name="tokenWo")
+    def token_wo(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The GitLab Personal Access Token. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`token`" pulumi-lang-dotnet="`Token`" pulumi-lang-go="`token`" pulumi-lang-python="`token`" pulumi-lang-yaml="`token`" pulumi-lang-java="`token`" pulumi-lang-hcl="`token`">`token`</span> for older versions.
+        """
+        return pulumi.get(self, "token_wo")
+
+    @_builtins.property
+    @pulumi.getter(name="tokenWoVersion")
+    def token_wo_version(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`tokenWo`" pulumi-lang-dotnet="`TokenWo`" pulumi-lang-go="`tokenWo`" pulumi-lang-python="`token_wo`" pulumi-lang-yaml="`tokenWo`" pulumi-lang-java="`tokenWo`" pulumi-lang-hcl="`token_wo`">`tokenWo`</span> to AWX.
+        """
+        return pulumi.get(self, "token_wo_version")
 

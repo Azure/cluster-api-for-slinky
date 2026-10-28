@@ -25,6 +25,7 @@ class WorkflowJobTemplateScheduleArgs:
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  extra_data: pulumi.Input[Optional[_builtins.str]] = None,
                  inventory: pulumi.Input[Optional[_builtins.str]] = None,
+                 limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  unified_job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
                  workflow_job_template_schedule_id: pulumi.Input[Optional[_builtins.str]] = None):
@@ -37,6 +38,7 @@ class WorkflowJobTemplateScheduleArgs:
         :param pulumi.Input[_builtins.bool] enabled: Whether the schedule is enabled or not
         :param pulumi.Input[_builtins.str] extra_data: Extra data to be pass for the schedule (YAML format)
         :param pulumi.Input[_builtins.str] inventory: Inventory applied as a prompt, assuming job template prompts for inventory (id, default=``)
+        :param pulumi.Input[_builtins.str] limit: Host pattern applied as a prompt, assuming the workflow job template prompts for a limit
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[_builtins.float] unified_job_template_id: The unified job template id for this schedule
         """
@@ -50,6 +52,8 @@ class WorkflowJobTemplateScheduleArgs:
             pulumi.set(__self__, "extra_data", extra_data)
         if inventory is not None:
             pulumi.set(__self__, "inventory", inventory)
+        if limit is not None:
+            pulumi.set(__self__, "limit", limit)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if unified_job_template_id is not None:
@@ -131,6 +135,18 @@ class WorkflowJobTemplateScheduleArgs:
 
     @_builtins.property
     @pulumi.getter
+    def limit(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Host pattern applied as a prompt, assuming the workflow job template prompts for a limit
+        """
+        return pulumi.get(self, "limit")
+
+    @limit.setter
+    def limit(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "limit", value)
+
+    @_builtins.property
+    @pulumi.getter
     def name(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
         The name of the schedule
@@ -170,6 +186,7 @@ class _WorkflowJobTemplateScheduleState:
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  extra_data: pulumi.Input[Optional[_builtins.str]] = None,
                  inventory: pulumi.Input[Optional[_builtins.str]] = None,
+                 limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  rrule: pulumi.Input[Optional[_builtins.str]] = None,
                  unified_job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
@@ -182,6 +199,7 @@ class _WorkflowJobTemplateScheduleState:
         :param pulumi.Input[_builtins.bool] enabled: Whether the schedule is enabled or not
         :param pulumi.Input[_builtins.str] extra_data: Extra data to be pass for the schedule (YAML format)
         :param pulumi.Input[_builtins.str] inventory: Inventory applied as a prompt, assuming job template prompts for inventory (id, default=``)
+        :param pulumi.Input[_builtins.str] limit: Host pattern applied as a prompt, assuming the workflow job template prompts for a limit
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[_builtins.str] rrule: The recurrence rule for the schedule. See https://github.com/ansible/awx/blob/devel/awx/api/templates/api/_schedule_detail.md for more information.
         :param pulumi.Input[_builtins.float] unified_job_template_id: The unified job template id for this schedule
@@ -195,6 +213,8 @@ class _WorkflowJobTemplateScheduleState:
             pulumi.set(__self__, "extra_data", extra_data)
         if inventory is not None:
             pulumi.set(__self__, "inventory", inventory)
+        if limit is not None:
+            pulumi.set(__self__, "limit", limit)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if rrule is not None:
@@ -253,6 +273,18 @@ class _WorkflowJobTemplateScheduleState:
     @inventory.setter
     def inventory(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "inventory", value)
+
+    @_builtins.property
+    @pulumi.getter
+    def limit(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        Host pattern applied as a prompt, assuming the workflow job template prompts for a limit
+        """
+        return pulumi.get(self, "limit")
+
+    @limit.setter
+    def limit(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "limit", value)
 
     @_builtins.property
     @pulumi.getter
@@ -322,6 +354,7 @@ class WorkflowJobTemplateSchedule(pulumi.CustomResource):
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  extra_data: pulumi.Input[Optional[_builtins.str]] = None,
                  inventory: pulumi.Input[Optional[_builtins.str]] = None,
+                 limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  rrule: pulumi.Input[Optional[_builtins.str]] = None,
                  unified_job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
@@ -337,6 +370,7 @@ class WorkflowJobTemplateSchedule(pulumi.CustomResource):
         :param pulumi.Input[_builtins.bool] enabled: Whether the schedule is enabled or not
         :param pulumi.Input[_builtins.str] extra_data: Extra data to be pass for the schedule (YAML format)
         :param pulumi.Input[_builtins.str] inventory: Inventory applied as a prompt, assuming job template prompts for inventory (id, default=``)
+        :param pulumi.Input[_builtins.str] limit: Host pattern applied as a prompt, assuming the workflow job template prompts for a limit
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[_builtins.str] rrule: The recurrence rule for the schedule. See https://github.com/ansible/awx/blob/devel/awx/api/templates/api/_schedule_detail.md for more information.
         :param pulumi.Input[_builtins.float] unified_job_template_id: The unified job template id for this schedule
@@ -370,6 +404,7 @@ class WorkflowJobTemplateSchedule(pulumi.CustomResource):
                  enabled: pulumi.Input[Optional[_builtins.bool]] = None,
                  extra_data: pulumi.Input[Optional[_builtins.str]] = None,
                  inventory: pulumi.Input[Optional[_builtins.str]] = None,
+                 limit: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  rrule: pulumi.Input[Optional[_builtins.str]] = None,
                  unified_job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
@@ -388,6 +423,7 @@ class WorkflowJobTemplateSchedule(pulumi.CustomResource):
             __props__.__dict__["enabled"] = enabled
             __props__.__dict__["extra_data"] = extra_data
             __props__.__dict__["inventory"] = inventory
+            __props__.__dict__["limit"] = limit
             __props__.__dict__["name"] = name
             if rrule is None and not opts.urn:
                 raise TypeError("Missing required property 'rrule'")
@@ -412,6 +448,7 @@ class WorkflowJobTemplateSchedule(pulumi.CustomResource):
             enabled: pulumi.Input[Optional[_builtins.bool]] = None,
             extra_data: pulumi.Input[Optional[_builtins.str]] = None,
             inventory: pulumi.Input[Optional[_builtins.str]] = None,
+            limit: pulumi.Input[Optional[_builtins.str]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
             rrule: pulumi.Input[Optional[_builtins.str]] = None,
             unified_job_template_id: pulumi.Input[Optional[_builtins.float]] = None,
@@ -428,6 +465,7 @@ class WorkflowJobTemplateSchedule(pulumi.CustomResource):
         :param pulumi.Input[_builtins.bool] enabled: Whether the schedule is enabled or not
         :param pulumi.Input[_builtins.str] extra_data: Extra data to be pass for the schedule (YAML format)
         :param pulumi.Input[_builtins.str] inventory: Inventory applied as a prompt, assuming job template prompts for inventory (id, default=``)
+        :param pulumi.Input[_builtins.str] limit: Host pattern applied as a prompt, assuming the workflow job template prompts for a limit
         :param pulumi.Input[_builtins.str] name: The name of the schedule
         :param pulumi.Input[_builtins.str] rrule: The recurrence rule for the schedule. See https://github.com/ansible/awx/blob/devel/awx/api/templates/api/_schedule_detail.md for more information.
         :param pulumi.Input[_builtins.float] unified_job_template_id: The unified job template id for this schedule
@@ -441,6 +479,7 @@ class WorkflowJobTemplateSchedule(pulumi.CustomResource):
         __props__.__dict__["enabled"] = enabled
         __props__.__dict__["extra_data"] = extra_data
         __props__.__dict__["inventory"] = inventory
+        __props__.__dict__["limit"] = limit
         __props__.__dict__["name"] = name
         __props__.__dict__["rrule"] = rrule
         __props__.__dict__["unified_job_template_id"] = unified_job_template_id
@@ -479,6 +518,14 @@ class WorkflowJobTemplateSchedule(pulumi.CustomResource):
         Inventory applied as a prompt, assuming job template prompts for inventory (id, default=``)
         """
         return pulumi.get(self, "inventory")
+
+    @_builtins.property
+    @pulumi.getter
+    def limit(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        Host pattern applied as a prompt, assuming the workflow job template prompts for a limit
+        """
+        return pulumi.get(self, "limit")
 
     @_builtins.property
     @pulumi.getter

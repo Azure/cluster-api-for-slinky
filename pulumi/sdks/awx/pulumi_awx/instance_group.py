@@ -22,6 +22,7 @@ class InstanceGroupArgs:
                  credential_id: pulumi.Input[Optional[_builtins.str]] = None,
                  instance_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  is_container_group: pulumi.Input[Optional[_builtins.bool]] = None,
+                 max_concurrent_jobs: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  pod_spec_override: pulumi.Input[Optional[_builtins.str]] = None,
                  policy_instance_minimum: pulumi.Input[Optional[_builtins.float]] = None,
@@ -31,6 +32,7 @@ class InstanceGroupArgs:
 
         :param pulumi.Input[_builtins.str] credential_id: ID of the credential of type 'OpenShift or Kubernetes API Bearer Token' to use as remote cluster.
         :param pulumi.Input[_builtins.bool] is_container_group: Whether the instance group is a container group.
+        :param pulumi.Input[_builtins.float] max_concurrent_jobs: The maximum number of jobs to run concurrently on the instance group. Zero means no limit.
         :param pulumi.Input[_builtins.str] name: The name of the instance group.
         :param pulumi.Input[_builtins.str] pod_spec_override: The pod spec override for the instance group.
         :param pulumi.Input[_builtins.float] policy_instance_minimum: The minimum number of instances to run in the instance group.
@@ -42,6 +44,8 @@ class InstanceGroupArgs:
             pulumi.set(__self__, "instance_group_id", instance_group_id)
         if is_container_group is not None:
             pulumi.set(__self__, "is_container_group", is_container_group)
+        if max_concurrent_jobs is not None:
+            pulumi.set(__self__, "max_concurrent_jobs", max_concurrent_jobs)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if pod_spec_override is not None:
@@ -83,6 +87,18 @@ class InstanceGroupArgs:
     @is_container_group.setter
     def is_container_group(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "is_container_group", value)
+
+    @_builtins.property
+    @pulumi.getter(name="maxConcurrentJobs")
+    def max_concurrent_jobs(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        The maximum number of jobs to run concurrently on the instance group. Zero means no limit.
+        """
+        return pulumi.get(self, "max_concurrent_jobs")
+
+    @max_concurrent_jobs.setter
+    def max_concurrent_jobs(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "max_concurrent_jobs", value)
 
     @_builtins.property
     @pulumi.getter
@@ -139,6 +155,7 @@ class _InstanceGroupState:
                  credential_id: pulumi.Input[Optional[_builtins.str]] = None,
                  instance_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  is_container_group: pulumi.Input[Optional[_builtins.bool]] = None,
+                 max_concurrent_jobs: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  pod_spec_override: pulumi.Input[Optional[_builtins.str]] = None,
                  policy_instance_minimum: pulumi.Input[Optional[_builtins.float]] = None,
@@ -148,6 +165,7 @@ class _InstanceGroupState:
 
         :param pulumi.Input[_builtins.str] credential_id: ID of the credential of type 'OpenShift or Kubernetes API Bearer Token' to use as remote cluster.
         :param pulumi.Input[_builtins.bool] is_container_group: Whether the instance group is a container group.
+        :param pulumi.Input[_builtins.float] max_concurrent_jobs: The maximum number of jobs to run concurrently on the instance group. Zero means no limit.
         :param pulumi.Input[_builtins.str] name: The name of the instance group.
         :param pulumi.Input[_builtins.str] pod_spec_override: The pod spec override for the instance group.
         :param pulumi.Input[_builtins.float] policy_instance_minimum: The minimum number of instances to run in the instance group.
@@ -159,6 +177,8 @@ class _InstanceGroupState:
             pulumi.set(__self__, "instance_group_id", instance_group_id)
         if is_container_group is not None:
             pulumi.set(__self__, "is_container_group", is_container_group)
+        if max_concurrent_jobs is not None:
+            pulumi.set(__self__, "max_concurrent_jobs", max_concurrent_jobs)
         if name is not None:
             pulumi.set(__self__, "name", name)
         if pod_spec_override is not None:
@@ -200,6 +220,18 @@ class _InstanceGroupState:
     @is_container_group.setter
     def is_container_group(self, value: pulumi.Input[Optional[_builtins.bool]]):
         pulumi.set(self, "is_container_group", value)
+
+    @_builtins.property
+    @pulumi.getter(name="maxConcurrentJobs")
+    def max_concurrent_jobs(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        The maximum number of jobs to run concurrently on the instance group. Zero means no limit.
+        """
+        return pulumi.get(self, "max_concurrent_jobs")
+
+    @max_concurrent_jobs.setter
+    def max_concurrent_jobs(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "max_concurrent_jobs", value)
 
     @_builtins.property
     @pulumi.getter
@@ -259,6 +291,7 @@ class InstanceGroup(pulumi.CustomResource):
                  credential_id: pulumi.Input[Optional[_builtins.str]] = None,
                  instance_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  is_container_group: pulumi.Input[Optional[_builtins.bool]] = None,
+                 max_concurrent_jobs: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  pod_spec_override: pulumi.Input[Optional[_builtins.str]] = None,
                  policy_instance_minimum: pulumi.Input[Optional[_builtins.float]] = None,
@@ -271,6 +304,7 @@ class InstanceGroup(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] credential_id: ID of the credential of type 'OpenShift or Kubernetes API Bearer Token' to use as remote cluster.
         :param pulumi.Input[_builtins.bool] is_container_group: Whether the instance group is a container group.
+        :param pulumi.Input[_builtins.float] max_concurrent_jobs: The maximum number of jobs to run concurrently on the instance group. Zero means no limit.
         :param pulumi.Input[_builtins.str] name: The name of the instance group.
         :param pulumi.Input[_builtins.str] pod_spec_override: The pod spec override for the instance group.
         :param pulumi.Input[_builtins.float] policy_instance_minimum: The minimum number of instances to run in the instance group.
@@ -303,6 +337,7 @@ class InstanceGroup(pulumi.CustomResource):
                  credential_id: pulumi.Input[Optional[_builtins.str]] = None,
                  instance_group_id: pulumi.Input[Optional[_builtins.str]] = None,
                  is_container_group: pulumi.Input[Optional[_builtins.bool]] = None,
+                 max_concurrent_jobs: pulumi.Input[Optional[_builtins.float]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  pod_spec_override: pulumi.Input[Optional[_builtins.str]] = None,
                  policy_instance_minimum: pulumi.Input[Optional[_builtins.float]] = None,
@@ -319,6 +354,7 @@ class InstanceGroup(pulumi.CustomResource):
             __props__.__dict__["credential_id"] = credential_id
             __props__.__dict__["instance_group_id"] = instance_group_id
             __props__.__dict__["is_container_group"] = is_container_group
+            __props__.__dict__["max_concurrent_jobs"] = max_concurrent_jobs
             __props__.__dict__["name"] = name
             __props__.__dict__["pod_spec_override"] = pod_spec_override
             __props__.__dict__["policy_instance_minimum"] = policy_instance_minimum
@@ -337,6 +373,7 @@ class InstanceGroup(pulumi.CustomResource):
             credential_id: pulumi.Input[Optional[_builtins.str]] = None,
             instance_group_id: pulumi.Input[Optional[_builtins.str]] = None,
             is_container_group: pulumi.Input[Optional[_builtins.bool]] = None,
+            max_concurrent_jobs: pulumi.Input[Optional[_builtins.float]] = None,
             name: pulumi.Input[Optional[_builtins.str]] = None,
             pod_spec_override: pulumi.Input[Optional[_builtins.str]] = None,
             policy_instance_minimum: pulumi.Input[Optional[_builtins.float]] = None,
@@ -350,6 +387,7 @@ class InstanceGroup(pulumi.CustomResource):
         :param pulumi.ResourceOptions opts: Options for the resource.
         :param pulumi.Input[_builtins.str] credential_id: ID of the credential of type 'OpenShift or Kubernetes API Bearer Token' to use as remote cluster.
         :param pulumi.Input[_builtins.bool] is_container_group: Whether the instance group is a container group.
+        :param pulumi.Input[_builtins.float] max_concurrent_jobs: The maximum number of jobs to run concurrently on the instance group. Zero means no limit.
         :param pulumi.Input[_builtins.str] name: The name of the instance group.
         :param pulumi.Input[_builtins.str] pod_spec_override: The pod spec override for the instance group.
         :param pulumi.Input[_builtins.float] policy_instance_minimum: The minimum number of instances to run in the instance group.
@@ -362,6 +400,7 @@ class InstanceGroup(pulumi.CustomResource):
         __props__.__dict__["credential_id"] = credential_id
         __props__.__dict__["instance_group_id"] = instance_group_id
         __props__.__dict__["is_container_group"] = is_container_group
+        __props__.__dict__["max_concurrent_jobs"] = max_concurrent_jobs
         __props__.__dict__["name"] = name
         __props__.__dict__["pod_spec_override"] = pod_spec_override
         __props__.__dict__["policy_instance_minimum"] = policy_instance_minimum
@@ -388,6 +427,14 @@ class InstanceGroup(pulumi.CustomResource):
         Whether the instance group is a container group.
         """
         return pulumi.get(self, "is_container_group")
+
+    @_builtins.property
+    @pulumi.getter(name="maxConcurrentJobs")
+    def max_concurrent_jobs(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        The maximum number of jobs to run concurrently on the instance group. Zero means no limit.
+        """
+        return pulumi.get(self, "max_concurrent_jobs")
 
     @_builtins.property
     @pulumi.getter

@@ -24,8 +24,14 @@ class CredentialScmArgs:
                  description: pulumi.Input[Optional[_builtins.str]] = None,
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  ssh_key_data: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  ssh_key_unlock: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_unlock_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_unlock_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None):
         """
         The set of arguments for constructing a CredentialScm resource.
@@ -34,8 +40,17 @@ class CredentialScmArgs:
         :param pulumi.Input[_builtins.str] description: The description of the credential.
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.str] password: The password for the credential.
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The password for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] ssh_key_data: The SSH key data for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_data_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key data for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_data_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] ssh_key_unlock: The SSH key unlock for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_unlock_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key unlock for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyUnlock`" pulumi-lang-dotnet="`SshKeyUnlock`" pulumi-lang-go="`sshKeyUnlock`" pulumi-lang-python="`ssh_key_unlock`" pulumi-lang-yaml="`sshKeyUnlock`" pulumi-lang-java="`sshKeyUnlock`" pulumi-lang-hcl="`ssh_key_unlock`">`sshKeyUnlock`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_unlock_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] username: The username for the credential.
         """
         pulumi.set(__self__, "organization_id", organization_id)
@@ -47,10 +62,22 @@ class CredentialScmArgs:
             pulumi.set(__self__, "name", name)
         if password is not None:
             pulumi.set(__self__, "password", password)
+        if password_wo is not None:
+            pulumi.set(__self__, "password_wo", password_wo)
+        if password_wo_version is not None:
+            pulumi.set(__self__, "password_wo_version", password_wo_version)
         if ssh_key_data is not None:
             pulumi.set(__self__, "ssh_key_data", ssh_key_data)
+        if ssh_key_data_wo is not None:
+            pulumi.set(__self__, "ssh_key_data_wo", ssh_key_data_wo)
+        if ssh_key_data_wo_version is not None:
+            pulumi.set(__self__, "ssh_key_data_wo_version", ssh_key_data_wo_version)
         if ssh_key_unlock is not None:
             pulumi.set(__self__, "ssh_key_unlock", ssh_key_unlock)
+        if ssh_key_unlock_wo is not None:
+            pulumi.set(__self__, "ssh_key_unlock_wo", ssh_key_unlock_wo)
+        if ssh_key_unlock_wo_version is not None:
+            pulumi.set(__self__, "ssh_key_unlock_wo_version", ssh_key_unlock_wo_version)
         if username is not None:
             pulumi.set(__self__, "username", username)
 
@@ -112,6 +139,31 @@ class CredentialScmArgs:
         pulumi.set(self, "password", value)
 
     @_builtins.property
+    @pulumi.getter(name="passwordWo")
+    def password_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The password for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        """
+        return pulumi.get(self, "password_wo")
+
+    @password_wo.setter
+    def password_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "password_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWoVersion")
+    def password_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "password_wo_version")
+
+    @password_wo_version.setter
+    def password_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "password_wo_version", value)
+
+    @_builtins.property
     @pulumi.getter(name="sshKeyData")
     def ssh_key_data(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -124,6 +176,31 @@ class CredentialScmArgs:
         pulumi.set(self, "ssh_key_data", value)
 
     @_builtins.property
+    @pulumi.getter(name="sshKeyDataWo")
+    def ssh_key_data_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The SSH key data for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        """
+        return pulumi.get(self, "ssh_key_data_wo")
+
+    @ssh_key_data_wo.setter
+    def ssh_key_data_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "ssh_key_data_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyDataWoVersion")
+    def ssh_key_data_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
+        """
+        return pulumi.get(self, "ssh_key_data_wo_version")
+
+    @ssh_key_data_wo_version.setter
+    def ssh_key_data_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "ssh_key_data_wo_version", value)
+
+    @_builtins.property
     @pulumi.getter(name="sshKeyUnlock")
     def ssh_key_unlock(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -134,6 +211,31 @@ class CredentialScmArgs:
     @ssh_key_unlock.setter
     def ssh_key_unlock(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "ssh_key_unlock", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyUnlockWo")
+    def ssh_key_unlock_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The SSH key unlock for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyUnlock`" pulumi-lang-dotnet="`SshKeyUnlock`" pulumi-lang-go="`sshKeyUnlock`" pulumi-lang-python="`ssh_key_unlock`" pulumi-lang-yaml="`sshKeyUnlock`" pulumi-lang-java="`sshKeyUnlock`" pulumi-lang-hcl="`ssh_key_unlock`">`sshKeyUnlock`</span> for older versions.
+        """
+        return pulumi.get(self, "ssh_key_unlock_wo")
+
+    @ssh_key_unlock_wo.setter
+    def ssh_key_unlock_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "ssh_key_unlock_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyUnlockWoVersion")
+    def ssh_key_unlock_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span> to AWX.
+        """
+        return pulumi.get(self, "ssh_key_unlock_wo_version")
+
+    @ssh_key_unlock_wo_version.setter
+    def ssh_key_unlock_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "ssh_key_unlock_wo_version", value)
 
     @_builtins.property
     @pulumi.getter
@@ -156,8 +258,14 @@ class _CredentialScmState:
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  ssh_key_data: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  ssh_key_unlock: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_unlock_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_unlock_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None):
         """
         Input properties used for looking up and filtering CredentialScm resources.
@@ -166,8 +274,17 @@ class _CredentialScmState:
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to.
         :param pulumi.Input[_builtins.str] password: The password for the credential.
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The password for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] ssh_key_data: The SSH key data for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_data_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key data for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_data_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] ssh_key_unlock: The SSH key unlock for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_unlock_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key unlock for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyUnlock`" pulumi-lang-dotnet="`SshKeyUnlock`" pulumi-lang-go="`sshKeyUnlock`" pulumi-lang-python="`ssh_key_unlock`" pulumi-lang-yaml="`sshKeyUnlock`" pulumi-lang-java="`sshKeyUnlock`" pulumi-lang-hcl="`ssh_key_unlock`">`sshKeyUnlock`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_unlock_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] username: The username for the credential.
         """
         if credential_scm_id is not None:
@@ -180,10 +297,22 @@ class _CredentialScmState:
             pulumi.set(__self__, "organization_id", organization_id)
         if password is not None:
             pulumi.set(__self__, "password", password)
+        if password_wo is not None:
+            pulumi.set(__self__, "password_wo", password_wo)
+        if password_wo_version is not None:
+            pulumi.set(__self__, "password_wo_version", password_wo_version)
         if ssh_key_data is not None:
             pulumi.set(__self__, "ssh_key_data", ssh_key_data)
+        if ssh_key_data_wo is not None:
+            pulumi.set(__self__, "ssh_key_data_wo", ssh_key_data_wo)
+        if ssh_key_data_wo_version is not None:
+            pulumi.set(__self__, "ssh_key_data_wo_version", ssh_key_data_wo_version)
         if ssh_key_unlock is not None:
             pulumi.set(__self__, "ssh_key_unlock", ssh_key_unlock)
+        if ssh_key_unlock_wo is not None:
+            pulumi.set(__self__, "ssh_key_unlock_wo", ssh_key_unlock_wo)
+        if ssh_key_unlock_wo_version is not None:
+            pulumi.set(__self__, "ssh_key_unlock_wo_version", ssh_key_unlock_wo_version)
         if username is not None:
             pulumi.set(__self__, "username", username)
 
@@ -245,6 +374,31 @@ class _CredentialScmState:
         pulumi.set(self, "password", value)
 
     @_builtins.property
+    @pulumi.getter(name="passwordWo")
+    def password_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The password for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        """
+        return pulumi.get(self, "password_wo")
+
+    @password_wo.setter
+    def password_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "password_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWoVersion")
+    def password_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "password_wo_version")
+
+    @password_wo_version.setter
+    def password_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "password_wo_version", value)
+
+    @_builtins.property
     @pulumi.getter(name="sshKeyData")
     def ssh_key_data(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -257,6 +411,31 @@ class _CredentialScmState:
         pulumi.set(self, "ssh_key_data", value)
 
     @_builtins.property
+    @pulumi.getter(name="sshKeyDataWo")
+    def ssh_key_data_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The SSH key data for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        """
+        return pulumi.get(self, "ssh_key_data_wo")
+
+    @ssh_key_data_wo.setter
+    def ssh_key_data_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "ssh_key_data_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyDataWoVersion")
+    def ssh_key_data_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
+        """
+        return pulumi.get(self, "ssh_key_data_wo_version")
+
+    @ssh_key_data_wo_version.setter
+    def ssh_key_data_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "ssh_key_data_wo_version", value)
+
+    @_builtins.property
     @pulumi.getter(name="sshKeyUnlock")
     def ssh_key_unlock(self) -> pulumi.Input[Optional[_builtins.str]]:
         """
@@ -267,6 +446,31 @@ class _CredentialScmState:
     @ssh_key_unlock.setter
     def ssh_key_unlock(self, value: pulumi.Input[Optional[_builtins.str]]):
         pulumi.set(self, "ssh_key_unlock", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyUnlockWo")
+    def ssh_key_unlock_wo(self) -> pulumi.Input[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The SSH key unlock for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyUnlock`" pulumi-lang-dotnet="`SshKeyUnlock`" pulumi-lang-go="`sshKeyUnlock`" pulumi-lang-python="`ssh_key_unlock`" pulumi-lang-yaml="`sshKeyUnlock`" pulumi-lang-java="`sshKeyUnlock`" pulumi-lang-hcl="`ssh_key_unlock`">`sshKeyUnlock`</span> for older versions.
+        """
+        return pulumi.get(self, "ssh_key_unlock_wo")
+
+    @ssh_key_unlock_wo.setter
+    def ssh_key_unlock_wo(self, value: pulumi.Input[Optional[_builtins.str]]):
+        pulumi.set(self, "ssh_key_unlock_wo", value)
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyUnlockWoVersion")
+    def ssh_key_unlock_wo_version(self) -> pulumi.Input[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span> to AWX.
+        """
+        return pulumi.get(self, "ssh_key_unlock_wo_version")
+
+    @ssh_key_unlock_wo_version.setter
+    def ssh_key_unlock_wo_version(self, value: pulumi.Input[Optional[_builtins.float]]):
+        pulumi.set(self, "ssh_key_unlock_wo_version", value)
 
     @_builtins.property
     @pulumi.getter
@@ -292,8 +496,14 @@ class CredentialScm(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  ssh_key_data: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  ssh_key_unlock: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_unlock_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_unlock_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         """
@@ -305,8 +515,17 @@ class CredentialScm(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to.
         :param pulumi.Input[_builtins.str] password: The password for the credential.
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The password for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] ssh_key_data: The SSH key data for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_data_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key data for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_data_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] ssh_key_unlock: The SSH key unlock for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_unlock_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key unlock for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyUnlock`" pulumi-lang-dotnet="`SshKeyUnlock`" pulumi-lang-go="`sshKeyUnlock`" pulumi-lang-python="`ssh_key_unlock`" pulumi-lang-yaml="`sshKeyUnlock`" pulumi-lang-java="`sshKeyUnlock`" pulumi-lang-hcl="`ssh_key_unlock`">`sshKeyUnlock`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_unlock_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] username: The username for the credential.
         """
         ...
@@ -338,8 +557,14 @@ class CredentialScm(pulumi.CustomResource):
                  name: pulumi.Input[Optional[_builtins.str]] = None,
                  organization_id: pulumi.Input[Optional[_builtins.float]] = None,
                  password: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  ssh_key_data: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_data_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  ssh_key_unlock: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_unlock_wo: pulumi.Input[Optional[_builtins.str]] = None,
+                 ssh_key_unlock_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
                  username: pulumi.Input[Optional[_builtins.str]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -357,10 +582,16 @@ class CredentialScm(pulumi.CustomResource):
                 raise TypeError("Missing required property 'organization_id'")
             __props__.__dict__["organization_id"] = organization_id
             __props__.__dict__["password"] = None if password is None else pulumi.Output.secret(password)
+            __props__.__dict__["password_wo"] = None if password_wo is None else pulumi.Output.secret(password_wo)
+            __props__.__dict__["password_wo_version"] = password_wo_version
             __props__.__dict__["ssh_key_data"] = None if ssh_key_data is None else pulumi.Output.secret(ssh_key_data)
+            __props__.__dict__["ssh_key_data_wo"] = None if ssh_key_data_wo is None else pulumi.Output.secret(ssh_key_data_wo)
+            __props__.__dict__["ssh_key_data_wo_version"] = ssh_key_data_wo_version
             __props__.__dict__["ssh_key_unlock"] = None if ssh_key_unlock is None else pulumi.Output.secret(ssh_key_unlock)
+            __props__.__dict__["ssh_key_unlock_wo"] = None if ssh_key_unlock_wo is None else pulumi.Output.secret(ssh_key_unlock_wo)
+            __props__.__dict__["ssh_key_unlock_wo_version"] = ssh_key_unlock_wo_version
             __props__.__dict__["username"] = username
-        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["password", "sshKeyData", "sshKeyUnlock"])
+        secret_opts = pulumi.ResourceOptions(additional_secret_outputs=["password", "passwordWo", "sshKeyData", "sshKeyDataWo", "sshKeyUnlock", "sshKeyUnlockWo"])
         opts = pulumi.ResourceOptions.merge(opts, secret_opts)
         super(CredentialScm, __self__).__init__(
             'awx:index/credentialScm:CredentialScm',
@@ -378,8 +609,14 @@ class CredentialScm(pulumi.CustomResource):
             name: pulumi.Input[Optional[_builtins.str]] = None,
             organization_id: pulumi.Input[Optional[_builtins.float]] = None,
             password: pulumi.Input[Optional[_builtins.str]] = None,
+            password_wo: pulumi.Input[Optional[_builtins.str]] = None,
+            password_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
             ssh_key_data: pulumi.Input[Optional[_builtins.str]] = None,
+            ssh_key_data_wo: pulumi.Input[Optional[_builtins.str]] = None,
+            ssh_key_data_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
             ssh_key_unlock: pulumi.Input[Optional[_builtins.str]] = None,
+            ssh_key_unlock_wo: pulumi.Input[Optional[_builtins.str]] = None,
+            ssh_key_unlock_wo_version: pulumi.Input[Optional[_builtins.float]] = None,
             username: pulumi.Input[Optional[_builtins.str]] = None) -> 'CredentialScm':
         """
         Get an existing CredentialScm resource's state with the given name, id, and optional extra
@@ -392,8 +629,17 @@ class CredentialScm(pulumi.CustomResource):
         :param pulumi.Input[_builtins.str] name: The name of the credential.
         :param pulumi.Input[_builtins.float] organization_id: The organization ID that the credential belongs to.
         :param pulumi.Input[_builtins.str] password: The password for the credential.
+        :param pulumi.Input[_builtins.str] password_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The password for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        :param pulumi.Input[_builtins.float] password_wo_version: Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] ssh_key_data: The SSH key data for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_data_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key data for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_data_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] ssh_key_unlock: The SSH key unlock for the credential.
+        :param pulumi.Input[_builtins.str] ssh_key_unlock_wo: **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+               The SSH key unlock for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyUnlock`" pulumi-lang-dotnet="`SshKeyUnlock`" pulumi-lang-go="`sshKeyUnlock`" pulumi-lang-python="`ssh_key_unlock`" pulumi-lang-yaml="`sshKeyUnlock`" pulumi-lang-java="`sshKeyUnlock`" pulumi-lang-hcl="`ssh_key_unlock`">`sshKeyUnlock`</span> for older versions.
+        :param pulumi.Input[_builtins.float] ssh_key_unlock_wo_version: Version of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span> to AWX.
         :param pulumi.Input[_builtins.str] username: The username for the credential.
         """
         opts = pulumi.ResourceOptions.merge(opts, pulumi.ResourceOptions(id=id))
@@ -405,8 +651,14 @@ class CredentialScm(pulumi.CustomResource):
         __props__.__dict__["name"] = name
         __props__.__dict__["organization_id"] = organization_id
         __props__.__dict__["password"] = password
+        __props__.__dict__["password_wo"] = password_wo
+        __props__.__dict__["password_wo_version"] = password_wo_version
         __props__.__dict__["ssh_key_data"] = ssh_key_data
+        __props__.__dict__["ssh_key_data_wo"] = ssh_key_data_wo
+        __props__.__dict__["ssh_key_data_wo_version"] = ssh_key_data_wo_version
         __props__.__dict__["ssh_key_unlock"] = ssh_key_unlock
+        __props__.__dict__["ssh_key_unlock_wo"] = ssh_key_unlock_wo
+        __props__.__dict__["ssh_key_unlock_wo_version"] = ssh_key_unlock_wo_version
         __props__.__dict__["username"] = username
         return CredentialScm(resource_name, opts=opts, __props__=__props__)
 
@@ -448,6 +700,23 @@ class CredentialScm(pulumi.CustomResource):
         return pulumi.get(self, "password")
 
     @_builtins.property
+    @pulumi.getter(name="passwordWo")
+    def password_wo(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The password for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`password`" pulumi-lang-dotnet="`Password`" pulumi-lang-go="`password`" pulumi-lang-python="`password`" pulumi-lang-yaml="`password`" pulumi-lang-java="`password`" pulumi-lang-hcl="`password`">`password`</span> for older versions.
+        """
+        return pulumi.get(self, "password_wo")
+
+    @_builtins.property
+    @pulumi.getter(name="passwordWoVersion")
+    def password_wo_version(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`passwordWo`" pulumi-lang-dotnet="`PasswordWo`" pulumi-lang-go="`passwordWo`" pulumi-lang-python="`password_wo`" pulumi-lang-yaml="`passwordWo`" pulumi-lang-java="`passwordWo`" pulumi-lang-hcl="`password_wo`">`passwordWo`</span> to AWX.
+        """
+        return pulumi.get(self, "password_wo_version")
+
+    @_builtins.property
     @pulumi.getter(name="sshKeyData")
     def ssh_key_data(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
@@ -456,12 +725,46 @@ class CredentialScm(pulumi.CustomResource):
         return pulumi.get(self, "ssh_key_data")
 
     @_builtins.property
+    @pulumi.getter(name="sshKeyDataWo")
+    def ssh_key_data_wo(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The SSH key data for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyData`" pulumi-lang-dotnet="`SshKeyData`" pulumi-lang-go="`sshKeyData`" pulumi-lang-python="`ssh_key_data`" pulumi-lang-yaml="`sshKeyData`" pulumi-lang-java="`sshKeyData`" pulumi-lang-hcl="`ssh_key_data`">`sshKeyData`</span> for older versions.
+        """
+        return pulumi.get(self, "ssh_key_data_wo")
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyDataWoVersion")
+    def ssh_key_data_wo_version(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyDataWo`" pulumi-lang-dotnet="`SshKeyDataWo`" pulumi-lang-go="`sshKeyDataWo`" pulumi-lang-python="`ssh_key_data_wo`" pulumi-lang-yaml="`sshKeyDataWo`" pulumi-lang-java="`sshKeyDataWo`" pulumi-lang-hcl="`ssh_key_data_wo`">`sshKeyDataWo`</span> to AWX.
+        """
+        return pulumi.get(self, "ssh_key_data_wo_version")
+
+    @_builtins.property
     @pulumi.getter(name="sshKeyUnlock")
     def ssh_key_unlock(self) -> pulumi.Output[Optional[_builtins.str]]:
         """
         The SSH key unlock for the credential.
         """
         return pulumi.get(self, "ssh_key_unlock")
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyUnlockWo")
+    def ssh_key_unlock_wo(self) -> pulumi.Output[Optional[_builtins.str]]:
+        """
+        **NOTE:** This field is write-only and its value will not be updated in state as part of read operations.
+        The SSH key unlock for the credential. Write-only: never stored in state. Requires Terraform >= 1.11. Use <span pulumi-lang-nodejs="`sshKeyUnlock`" pulumi-lang-dotnet="`SshKeyUnlock`" pulumi-lang-go="`sshKeyUnlock`" pulumi-lang-python="`ssh_key_unlock`" pulumi-lang-yaml="`sshKeyUnlock`" pulumi-lang-java="`sshKeyUnlock`" pulumi-lang-hcl="`ssh_key_unlock`">`sshKeyUnlock`</span> for older versions.
+        """
+        return pulumi.get(self, "ssh_key_unlock_wo")
+
+    @_builtins.property
+    @pulumi.getter(name="sshKeyUnlockWoVersion")
+    def ssh_key_unlock_wo_version(self) -> pulumi.Output[Optional[_builtins.float]]:
+        """
+        Version of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span>. Change it to send a new value of <span pulumi-lang-nodejs="`sshKeyUnlockWo`" pulumi-lang-dotnet="`SshKeyUnlockWo`" pulumi-lang-go="`sshKeyUnlockWo`" pulumi-lang-python="`ssh_key_unlock_wo`" pulumi-lang-yaml="`sshKeyUnlockWo`" pulumi-lang-java="`sshKeyUnlockWo`" pulumi-lang-hcl="`ssh_key_unlock_wo`">`sshKeyUnlockWo`</span> to AWX.
+        """
+        return pulumi.get(self, "ssh_key_unlock_wo_version")
 
     @_builtins.property
     @pulumi.getter

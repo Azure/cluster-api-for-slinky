@@ -221,7 +221,7 @@ class SettingsLdapTeamMap(pulumi.CustomResource):
                  organization: pulumi.Input[Optional[_builtins.str]] = None,
                  remove: pulumi.Input[Optional[_builtins.bool]] = None,
                  settings_ldap_team_map_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeouts: pulumi.Input[Optional[Union['SettingsLdapTeamMapTimeoutsArgs', 'SettingsLdapTeamMapTimeoutsArgsDict']]] = None,
+                 timeouts: pulumi.Input[Optional[Union['SettingsLdapTeamMapTimeoutsArgs', 'SettingsLdapTeamMapTimeoutsArgsDict', 'outputs.SettingsLdapTeamMapTimeouts']]] = None,
                  users: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         """
@@ -262,7 +262,7 @@ class SettingsLdapTeamMap(pulumi.CustomResource):
                  organization: pulumi.Input[Optional[_builtins.str]] = None,
                  remove: pulumi.Input[Optional[_builtins.bool]] = None,
                  settings_ldap_team_map_id: pulumi.Input[Optional[_builtins.str]] = None,
-                 timeouts: pulumi.Input[Optional[Union['SettingsLdapTeamMapTimeoutsArgs', 'SettingsLdapTeamMapTimeoutsArgsDict']]] = None,
+                 timeouts: pulumi.Input[Optional[Union['SettingsLdapTeamMapTimeoutsArgs', 'SettingsLdapTeamMapTimeoutsArgsDict', 'outputs.SettingsLdapTeamMapTimeouts']]] = None,
                  users: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None,
                  __props__=None):
         opts = pulumi.ResourceOptions.merge(_utilities.get_resource_opts_defaults(), opts)
@@ -296,7 +296,7 @@ class SettingsLdapTeamMap(pulumi.CustomResource):
             organization: pulumi.Input[Optional[_builtins.str]] = None,
             remove: pulumi.Input[Optional[_builtins.bool]] = None,
             settings_ldap_team_map_id: pulumi.Input[Optional[_builtins.str]] = None,
-            timeouts: pulumi.Input[Optional[Union['SettingsLdapTeamMapTimeoutsArgs', 'SettingsLdapTeamMapTimeoutsArgsDict']]] = None,
+            timeouts: pulumi.Input[Optional[Union['SettingsLdapTeamMapTimeoutsArgs', 'SettingsLdapTeamMapTimeoutsArgsDict', 'outputs.SettingsLdapTeamMapTimeouts']]] = None,
             users: pulumi.Input[Optional[Sequence[pulumi.Input[_builtins.str]]]] = None) -> 'SettingsLdapTeamMap':
         """
         Get an existing SettingsLdapTeamMap resource's state with the given name, id, and optional extra
