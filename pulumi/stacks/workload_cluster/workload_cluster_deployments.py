@@ -460,7 +460,7 @@ auth_provider = none
             {
                 "apiVersion": "v1",
                 "kind": "ConfigMap",
-                "metadata": {"name": name},
+                "metadata": {"name": name, "annotations": pulumi_patch_force()},
                 "data": {"slurm_capacity.py": script},
             },
             {

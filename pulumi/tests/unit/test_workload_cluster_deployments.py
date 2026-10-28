@@ -435,6 +435,7 @@ def test_slurm_capacity_collector_is_wired_to_scaled_partitions() -> None:
     ]
     assert len(controller["metadata"]["annotations"]["checksum/ca4s-slurm-capacity"]) == 64
     objects = {resource["kind"]: resource for resource in values["extraObjects"]}
+    assert objects["ConfigMap"]["metadata"]["annotations"] == {"pulumi.com/patchForce": "true"}
     assert "def calculate_demand(" in objects["ConfigMap"]["data"]["slurm_capacity.py"]
     assert "{{" not in objects["ConfigMap"]["data"]["slurm_capacity.py"]
     assert objects["Service"]["spec"]["selector"] == controller["metadata"]["labels"]
