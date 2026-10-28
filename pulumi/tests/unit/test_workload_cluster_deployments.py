@@ -367,7 +367,10 @@ def test_prometheus_server_address_uses_helm_release_name() -> None:
 
 
 @pytest.mark.parametrize("partition_name", ["compute", "gpu"])
-def test_keda_scaled_object_targets_slurm_nodeset(partition_name: str) -> None:
+@pytest.mark.parametrize("min_replicas", [0, 1])
+def test_keda_scaled_object_targets_slurm_nodeset(
+    partition_name: str, min_replicas: int,
+) -> None:
     assert _slurm_nodeset_name("slurm-87aab368", partition_name) == (
         f"slurm-87aab368-worker-{partition_name}"
     )
@@ -375,7 +378,7 @@ def test_keda_scaled_object_targets_slurm_nodeset(partition_name: str) -> None:
     spec = _keda_scaled_object_spec(
         node_set_name=f"slurm-87aab368-worker-{partition_name}",
         partition_name=partition_name,
-        min_replicas=1,
+        min_replicas=min_replicas,
         max_replicas=10,
         prometheus_server_address=(
             "http://prometheus-a9b5a75d-kube-p-prometheus."
@@ -389,7 +392,7 @@ def test_keda_scaled_object_targets_slurm_nodeset(partition_name: str) -> None:
             "kind": "NodeSet",
             "name": f"slurm-87aab368-worker-{partition_name}",
         },
-        "minReplicaCount": 1,
+        "minReplicaCount": min_replicas,
         "maxReplicaCount": 10,
         "triggers": [
             {
@@ -401,7 +404,6 @@ def test_keda_scaled_object_targets_slurm_nodeset(partition_name: str) -> None:
                     ),
                     "query": f'max(slurm_partition_jobs_pending{{partition="{partition_name}"}})',
                     "threshold": "1",
-                    "activationThreshold": "1",
                     "unsafeSsl": "true",
                 },
             }

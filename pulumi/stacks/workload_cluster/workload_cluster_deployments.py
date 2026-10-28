@@ -229,7 +229,6 @@ def _keda_scaled_object_spec(
                         f"{{partition={json.dumps(partition_name)}}})"
                     ),
                     "threshold": "1",
-                    "activationThreshold": "1",
                     "unsafeSsl": "true",
                 },
             }

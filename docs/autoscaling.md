@@ -55,13 +55,14 @@ spec:
     metadata:
       query: max(slurm_partition_jobs_pending{partition="compute"})
       threshold: '1'
-      activationThreshold: '1'
 ```
 
-With the configured activation threshold of 1, more than one pending job
-activates the scaler. Each replica becomes one `slurmd` pod, essentially one Slurm compute
-node. When pending jobs drop to zero, KEDA reduces replicas back to its
-configured minimum.
+The activation threshold is omitted, using KEDA's default of zero. It applies
+only when scaling from zero; with `minReplicaCount: 1`, activation does not gate
+scaling. The positive scaling threshold remains one pending job per desired
+replica, subject to the configured minimum and maximum. Each replica becomes
+one `slurmd` pod, essentially one Slurm compute node. When pending jobs drop to
+zero, KEDA reduces replicas back to its configured minimum.
 
 ### 3. Unschedulable Pods → Cluster Autoscaler → MachineDeployment
 
