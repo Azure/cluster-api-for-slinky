@@ -922,6 +922,8 @@ class GiteaBuiltinRepository(GitOpsRepositoryProvider):
             username=owner,
             name=repo_name,
             default_branch=default_branch,
+            # Non-mirror repositories read back an empty interval, not the provider's 8h default.
+            migration_mirror_interval="",
             auto_init=False,
             private=True,
             description="Bootstrap GitOps repo managed by ca4s-infra",
@@ -1156,6 +1158,8 @@ class GiteaBuiltinWebhook(GitOpsWebhookProvider):
             active=active,
             branch_filter=branch_filter,
             content_type="json",
+            # The provider also reads these flattened fields back into its optional config map.
+            config={"url": webhook_url, "content_type": "json"},
             type="gitea",
             opts=ResourceOptions(parent=self, provider=gitea_provider),
         )
