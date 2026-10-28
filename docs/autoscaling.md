@@ -8,8 +8,8 @@ and the Cluster Autoscaler in the management cluster.
 ## High-Level Flow
 
 ```
-Slurm pending jobs
-  → Prometheus scrapes slurmctld metrics
+Slurm busy workers + eligible queued node requests
+  → Prometheus scrapes the Slurm capacity collector
     → KEDA scales the NodeSet (slurmd pod count)
       → Unschedulable slurmd pods appear
         → Cluster Autoscaler scales the compute MachineDeployment
@@ -21,25 +21,61 @@ Slurm pending jobs
 
 ## Components
 
-### 1. Slurm Metrics → Prometheus
+### 1. Slurm Capacity → Prometheus
 
-The `slurmctld` controller exposes a built-in Prometheus metrics endpoint. The
-Pulumi workload-cluster class enables controller metrics in generated Slurm Helm
-values and installs kube-prometheus-stack before Slinky so the Slurm chart's
-`ServiceMonitor` resources can be created. The key metric is:
+The generated Slurm chart values add a small capacity-collector sidecar to the
+controller Pod. It uses the controller image's Python and authenticated Slurm
+CLI, without an additional exporter dependency. A dedicated Service and
+ServiceMonitor expose these per-partition gauges:
 
 ```
-slurm_partition_jobs_pending{partition="compute"}
+ca4s_slurm_busy_workers{partition="compute"}
+ca4s_slurm_pending_workers{partition="compute"}
+ca4s_slurm_worker_demand{partition="compute"}
 ```
 
-This is the number of Slurm jobs waiting in the NodeSet's partition. The scaler
-uses `max` to avoid counting the same controller twice when both its public and
-internal Services are scraped.
+The demand gauge is **distinct busy workers plus eligible queued node
+requests**, not merely the number of pending jobs:
+
+| Busy workers | Eligible pending node requests | Desired workers before min/max bounds |
+|---|---|---|
+| 1 | 1 | 2 |
+| 3 | 2 | 5 |
+| 3 | 0 | 3 |
+
+Allocated, mixed and completing nodes are counted once, even if several jobs
+share a worker. For pending jobs, the collector sums minimum node requests,
+including multi-node jobs, rather than counting each job as one worker. Array
+tasks respect the array's concurrency limit and already active tasks. A job
+eligible for several configured partitions contributes to only the first
+permitted partition in its request.
+
+Eligible pending reasons are `Resources`, `Priority` and `PartitionNodeLimit`.
+The last is included only when the request fits both the partition's configured
+limit and the NodeSet's maximum replica count: a valid two-node request can have
+this reason while only one Slurm node is registered. Held, dependent,
+license-blocked, not-yet-evaluated, and other policy-blocked jobs do not add
+demand. Neither do requests tied to specific existing nodes or requests beyond
+the configured capacity bounds. Excluded counts are exposed as
+`ca4s_slurm_excluded_pending_jobs{partition,reason}`.
+
+This is an exclusive-job capacity model for compatible, homogeneous workers
+in disjoint partitions, not a replacement for Slurm scheduling. Shared jobs
+are conservatively treated as whole-node requests; CPU/GPU bin packing and
+arbitrary feature-constraint feasibility are not estimated. The operator's
+workload-aware drain protections remain the final authority on worker removal.
+
+The collector takes fresh CLI snapshots on each scrape. Failed commands,
+invalid JSON or missing partitions produce HTTP 503 rather than zero demand.
+The scaler excludes unhealthy scrape targets and rejects an empty result,
+preventing unavailable telemetry from being interpreted as spare capacity.
+`max` deduplicates scrape copies instead of summing the same demand twice.
+The built-in slurmctld metrics remain enabled for monitoring.
 
 ### 2. KEDA ScaledObject → NodeSet Replicas
 
 Pulumi installs KEDA in the workload cluster and creates a `ScaledObject` that
-watches the pending-jobs metric and maps it to the replica count of a Slinky
+watches the capacity-demand metric and maps it to the replica count of a Slinky
 **NodeSet**:
 
 ```yaml
@@ -53,16 +89,22 @@ spec:
   triggers:
   - type: prometheus
     metadata:
-      query: max(slurm_partition_jobs_pending{partition="compute"})
+      query: >-
+        max(ca4s_slurm_worker_demand{namespace="slurm",partition="compute"}
+        and on (job, instance)
+        (up{namespace="slurm",service="slurm-capacity-metrics"} == 1))
       threshold: '1'
+      ignoreNullValues: 'false'
 ```
 
 The activation threshold is omitted, using KEDA's default of zero. It applies
 only when scaling from zero; with `minReplicaCount: 1`, activation does not gate
-scaling. The positive scaling threshold remains one pending job per desired
+scaling. The positive scaling threshold is one worker-equivalent per desired
 replica, subject to the configured minimum and maximum. Each replica becomes
-one `slurmd` pod, essentially one Slurm compute node. When pending jobs drop to
-zero, KEDA reduces replicas back to its configured minimum.
+one `slurmd` pod, essentially one Slurm compute node. When a queued one-node job
+starts, its pending demand becomes a busy worker, leaving the total unchanged.
+Only when jobs finish does that occupied capacity leave the target. KEDA/HPA
+stabilization still applies before reducing replicas.
 
 ### 3. Unschedulable Pods → Cluster Autoscaler → MachineDeployment
 

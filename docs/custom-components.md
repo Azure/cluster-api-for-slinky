@@ -327,6 +327,12 @@ The Slurm controller uses `ReturnToService=2` so a valid worker registration
 after Pod recreation can clear the operator's termination `DOWN` state.
 `DRAIN` continues to protect terminating workers and running workloads.
 
+Autoscaled NodeSets also install a controller-side capacity collector using
+the Slurm controller image's Python and CLI. Its worker-demand metric combines
+busy workers with eligible pending node requests; failed collection is not
+reported as zero demand. See [Autoscaling](autoscaling.md) for filtering,
+array concurrency, limitations and the healthy-target Prometheus query.
+
 Local and Azure BYO workload clusters use Kubernetes 1.36 or newer and enable
 the `GenericWorkload` and `WorkloadWithJob` feature gates together with the
 `scheduling.k8s.io/v1alpha2` API. This enables native `Workload` and `PodGroup`

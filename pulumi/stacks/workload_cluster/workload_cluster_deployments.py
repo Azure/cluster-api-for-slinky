@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+from pathlib import Path
 from typing import Any
 
 import pulumi
@@ -44,6 +46,9 @@ _KEDA_CHART_VERSION = "2.20.1"
 _KEDA_SCALED_OBJECT_API_VERSION = "keda.sh/v1alpha1"
 _SLURM_NODESET_API_VERSION = "slinky.slurm.net/v1beta1"
 _PROMETHEUS_PORT = 9090
+_SLURM_CAPACITY_NAME = "slurm-capacity-metrics"
+_SLURM_CAPACITY_PORT = 9091
+_SLURM_CAPACITY_IMAGE = "ghcr.io/slinkyproject/slurmctld:26.05-ubuntu26.04"
 
 _SLINKY_CHART_OCI_PREFIX = "oci://ghcr.io/slinkyproject/charts"
 _SLINKY_CHART_VERSION = "1.2.1"
@@ -225,10 +230,15 @@ def _keda_scaled_object_spec(
                 "metadata": {
                     "serverAddress": prometheus_server_address,
                     "query": (
-                        "max(slurm_partition_jobs_pending"
-                        f"{{partition={json.dumps(partition_name)}}})"
+                        "max(ca4s_slurm_worker_demand"
+                        f"{{namespace={json.dumps(_SLURM_NAMESPACE)},"
+                        f"partition={json.dumps(partition_name)}}} "
+                        "and on (job, instance) "
+                        f'(up{{namespace="{_SLURM_NAMESPACE}",'
+                        f'service="{_SLURM_CAPACITY_NAME}"}} == 1))'
                     ),
                     "threshold": "1",
+                    "ignoreNullValues": "false",
                     "unsafeSsl": "true",
                 },
             }
@@ -352,8 +362,9 @@ def _slurm_nodeset_values(node_set: SlurmNodeSetSpec) -> dict[str, object]:
 
 def _slurm_values(
     node_sets: tuple[SlurmNodeSetSpec, ...],
+    scaled_node_sets: tuple[KEDANodeSetScalerSpec, ...] = (),
 ) -> dict[str, object]:
-    return {
+    values = {
         "configFiles": {
             "cgroup.conf": "CgroupPlugin=cgroup/v2\nIgnoreSystemd=yes\n",
         },
@@ -407,10 +418,78 @@ auth_provider = none
         },
         "restapi": {"podSpec": controller_pod_spec()},
     }
+    if scaled_node_sets:
+        script = Path(__file__).with_name("slurm_capacity.py").read_text()
+        limits = json.dumps({
+            scaler.node_set_name: scaler.max_replicas for scaler in scaled_node_sets
+        }, sort_keys=True)
+        name = _SLURM_CAPACITY_NAME
+        label = {"ca4s.azure.com/slurm-capacity": "enabled"}
+        values["controller"]["metadata"] = {
+            "labels": label,
+            "annotations": {
+                "checksum/ca4s-slurm-capacity": hashlib.sha256(
+                    (script + limits).encode()
+                ).hexdigest(),
+            },
+        }
+        values["controller"]["podSpec"].update({
+            "containers": [{
+                "name": name,
+                "image": _SLURM_CAPACITY_IMAGE,
+                "command": ["python3", "/opt/ca4s/slurm_capacity.py", "--limits", limits],
+                "ports": [{"name": "capacity", "containerPort": _SLURM_CAPACITY_PORT}],
+                "resources": {"requests": {"cpu": "10m", "memory": "32Mi"}},
+                "volumeMounts": [
+                    {"name": name, "mountPath": "/opt/ca4s", "readOnly": True},
+                    {"name": "slurm-etc", "mountPath": "/etc/slurm", "readOnly": True},
+                ],
+                "readinessProbe": {
+                    "httpGet": {"path": "/healthz", "port": "capacity"},
+                },
+                "livenessProbe": {
+                    "tcpSocket": {"port": "capacity"},
+                    "timeoutSeconds": 5,
+                    "periodSeconds": 30,
+                },
+            }],
+            "volumes": [{"name": name, "configMap": {"name": name}}],
+        })
+        values["extraObjects"] = [
+            {
+                "apiVersion": "v1",
+                "kind": "ConfigMap",
+                "metadata": {"name": name},
+                "data": {"slurm_capacity.py": script},
+            },
+            {
+                "apiVersion": "v1",
+                "kind": "Service",
+                "metadata": {"name": name, "labels": label},
+                "spec": {
+                    "selector": label,
+                    "ports": [{"name": "capacity", "port": _SLURM_CAPACITY_PORT}],
+                },
+            },
+            {
+                "apiVersion": "monitoring.coreos.com/v1",
+                "kind": "ServiceMonitor",
+                "metadata": {"name": name},
+                "spec": {
+                    "selector": {"matchLabels": label},
+                    "endpoints": [{
+                        "port": "capacity",
+                        "interval": "30s",
+                        "scrapeTimeout": "25s",
+                    }],
+                },
+            },
+        ]
+    return values
 
 
 class KEDANodeSetScaler(pulumi.ComponentResource):
-    """KEDA ScaledObjects that translate Slurm queue depth into NodeSet replicas."""
+    """Translate occupied workers plus eligible queued capacity into replicas."""
 
     status: pulumi.Output[Any]
     outputs: pulumi.Output[KEDAOutputs]
@@ -700,7 +779,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 version=slinky.slurm_chart_version,
                 namespace=_SLURM_NAMESPACE,
                 plain_http=True,
-                values=_slurm_values(slurm_node_sets),
+                values=_slurm_values(slurm_node_sets, keda_scaled_node_sets),
                 opts=child_options(
                     provider=workload_provider,
                     depends_on=[slurm_namespace, slurm_operator],
@@ -767,7 +846,7 @@ class WorkloadClusterDeployments(pulumi.ComponentResource):
                 atomic=True,
                 wait_for_jobs=True,
                 timeout=900,
-                values=_slurm_values(slurm_node_sets),
+                values=_slurm_values(slurm_node_sets, keda_scaled_node_sets),
                 opts=child_options(
                     provider=workload_provider,
                     depends_on=[slurm_namespace, slurm_operator],

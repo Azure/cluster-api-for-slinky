@@ -402,10 +402,41 @@ def test_keda_scaled_object_targets_slurm_nodeset(
                         "http://prometheus-a9b5a75d-kube-p-prometheus."
                         "prometheus.svc.cluster.local:9090"
                     ),
-                    "query": f'max(slurm_partition_jobs_pending{{partition="{partition_name}"}})',
+                    "query": (
+                        f'max(ca4s_slurm_worker_demand{{namespace="slurm",partition="{partition_name}"}} '
+                        'and on (job, instance) '
+                        '(up{namespace="slurm",service="slurm-capacity-metrics"} == 1))'
+                    ),
                     "threshold": "1",
+                    "ignoreNullValues": "false",
                     "unsafeSsl": "true",
                 },
             }
         ],
     }
+
+
+def test_slurm_capacity_collector_is_wired_to_scaled_partitions() -> None:
+    from stacks.workload_cluster.workload_cluster_deployments import KEDANodeSetScalerSpec
+
+    values = _slurm_values(
+        (SlurmNodeSetSpec(name="compute", node_type="compute", replicas=1),),
+        (KEDANodeSetScalerSpec(node_set_name="compute", min_replicas=1, max_replicas=10),),
+    )
+    name = "slurm-capacity-metrics"
+    controller = values["controller"]
+    sidecar = controller["podSpec"]["containers"][0]
+    assert sidecar["name"] == name
+    assert sidecar["command"] == ["python3", "/opt/ca4s/slurm_capacity.py", "--limits", '{"compute": 10}']
+    assert sidecar["volumeMounts"] == [
+        {"name": name, "mountPath": "/opt/ca4s", "readOnly": True},
+        {"name": "slurm-etc", "mountPath": "/etc/slurm", "readOnly": True},
+    ]
+    assert len(controller["metadata"]["annotations"]["checksum/ca4s-slurm-capacity"]) == 64
+    objects = {resource["kind"]: resource for resource in values["extraObjects"]}
+    assert "def calculate_demand(" in objects["ConfigMap"]["data"]["slurm_capacity.py"]
+    assert "{{" not in objects["ConfigMap"]["data"]["slurm_capacity.py"]
+    assert objects["Service"]["spec"]["selector"] == controller["metadata"]["labels"]
+    assert objects["ServiceMonitor"]["spec"]["selector"]["matchLabels"] == objects["Service"]["metadata"]["labels"]
+    assert objects["ServiceMonitor"]["spec"]["endpoints"][0]["port"] == sidecar["ports"][0]["name"]
+    assert "extraObjects" not in _slurm_values(())
