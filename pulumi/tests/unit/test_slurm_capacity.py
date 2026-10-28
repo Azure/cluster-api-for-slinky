@@ -203,7 +203,8 @@ def test_command_failures_are_not_zero_demand(monkeypatch, failure):
         raise failure
 
     monkeypatch.setattr(subprocess, "run", fail)
-    with pytest.raises(type(failure)):
+    expected_error = CollectionError if isinstance(failure, subprocess.CalledProcessError) else type(failure)
+    with pytest.raises(expected_error):
         collect({"compute": 10})
 
 

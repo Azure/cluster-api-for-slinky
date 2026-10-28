@@ -123,9 +123,12 @@ def calculate_demand(
 
 
 def _read_slurm(command: list[str], key: str) -> list[dict[str, Any]]:
-    output = subprocess.run(
-        command, check=True, capture_output=True, text=True, timeout=5,
-    )
+    try:
+        output = subprocess.run(
+            command, check=True, capture_output=True, text=True, timeout=5,
+        )
+    except subprocess.CalledProcessError as error:
+        raise CollectionError(f"{command[0]} failed: {error.stderr}") from error
     data = json.loads(output.stdout)
     if not isinstance(data, dict):
         raise CollectionError(f"{command[0]} returned a non-object JSON response")

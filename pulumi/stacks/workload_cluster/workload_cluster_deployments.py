@@ -443,6 +443,7 @@ auth_provider = none
                 "volumeMounts": [
                     {"name": name, "mountPath": "/opt/ca4s", "readOnly": True},
                     {"name": "slurm-etc", "mountPath": "/etc/slurm", "readOnly": True},
+                    {"name": "slurm-authsocket", "mountPath": "/run/slurmctld", "readOnly": True},
                 ],
                 "readinessProbe": {
                     "httpGet": {"path": "/healthz", "port": "capacity"},

@@ -431,6 +431,7 @@ def test_slurm_capacity_collector_is_wired_to_scaled_partitions() -> None:
     assert sidecar["volumeMounts"] == [
         {"name": name, "mountPath": "/opt/ca4s", "readOnly": True},
         {"name": "slurm-etc", "mountPath": "/etc/slurm", "readOnly": True},
+        {"name": "slurm-authsocket", "mountPath": "/run/slurmctld", "readOnly": True},
     ]
     assert len(controller["metadata"]["annotations"]["checksum/ca4s-slurm-capacity"]) == 64
     objects = {resource["kind"]: resource for resource in values["extraObjects"]}

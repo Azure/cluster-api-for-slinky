@@ -25,7 +25,8 @@ Slurm busy workers + eligible queued node requests
 
 The generated Slurm chart values add a small capacity-collector sidecar to the
 controller Pod. It uses the controller image's Python and authenticated Slurm
-CLI, without an additional exporter dependency. A dedicated Service and
+CLI with the controller's shared authentication socket, without an additional
+exporter dependency. A dedicated Service and
 ServiceMonitor expose these per-partition gauges:
 
 ```
